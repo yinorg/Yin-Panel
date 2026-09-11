@@ -2,7 +2,7 @@
 import { VueDraggable } from 'vue-draggable-plus'
 import { NBackTop, NButton, NButtonGroup, NDropdown, NInput, NModal, NSkeleton, NSpin, useDialog, useMessage } from 'naive-ui'
 import { nextTick, onMounted, ref } from 'vue'
-import { createTeam, getGroups, getItems, getSpaces, type Space } from '../../api/panel/space'
+import { createTeam, getGroups, getItems, getSpaces, spaceDisplayName, type Space } from '../../api/panel/space'
 import { Clock, SearchBox, SystemMonitor } from '../../components/deskModule'
 import { SvgIcon } from '../../components/common'
 import { AppIcon, AppStarter, EditItem } from './components'
@@ -351,10 +351,10 @@ function handleAddItem(itemIconGroupId?: number) {
 <template>
   <div class="w-full h-full sun-main">
     <div v-if="spaces.length && authStore.token" class="space-status-bar">
-      <NDropdown trigger="hover" :options="spaces.map(space => ({ label: space.name, key: space.id }))" @select="selectSpace">
+      <NDropdown trigger="hover" :options="spaces.map(space => ({ label: spaceDisplayName(space, spaces), key: space.id }))" @select="selectSpace">
         <NButton quaternary class="space-status-button">
           <span class="space-status-dot" />
-          {{ activeSpace?.name }}
+          {{ activeSpace ? spaceDisplayName(activeSpace, spaces) : '' }}
           <span class="ml-2 opacity-60">⌄</span>
         </NButton>
       </NDropdown>
