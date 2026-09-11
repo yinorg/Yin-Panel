@@ -381,10 +381,16 @@ func (r *SpaceRouter) Members(c *gin.Context) {
 		response.ErrorNoAccess(c)
 		return
 	}
-	var members []repository.SpaceMember
-	if err := repository.Db.Where("space_id = ?", id).Find(&members).Error; err != nil {
+	var records []repository.SpaceMember
+	if err := repository.Db.Where("space_id = ?", id).Find(&records).Error; err != nil {
 		response.ErrorDatabase(c, err.Error())
 		return
+	}
+	members := make([]map[string]any, 0, len(records))
+	for _, record := range records {
+		var memberUser repository.User
+		repository.Db.First(&memberUser, record.UserID)
+		members = append(members, map[string]any{"id": record.ID, "spaceId": record.SpaceID, "userId": record.UserID, "email": memberUser.Mail, "role": record.Role, "source": record.Source, "joinedAt": record.JoinedAt})
 	}
 	response.SuccessData(c, members)
 }

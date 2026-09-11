@@ -56,7 +56,7 @@ onMounted(load)
         </NList>
         <NCard v-if="selectedSpaceId" title="成员管理">
           <NSpace><NInput v-model:value="memberEmail" placeholder="用户邮箱" /><NSelect v-model:value="memberRole" :options="[{ label: '编辑者', value: 'editor' }, { label: '查看者', value: 'viewer' }]" /><NButton @click="addCurrentMember">添加成员</NButton></NSpace>
-          <NList><NListItem v-for="member in members" :key="member.userId"><NSpace justify="space-between" class="w-full"><span>用户 {{ member.userId }} ({{ member.source || 'manual' }})</span><NSelect :value="member.role" :options="[{ label: '管理员', value: 'admin' }, { label: '编辑者', value: 'editor' }, { label: '查看者', value: 'viewer' }]" @update:value="role => changeMember(member, role)" /></NSpace></NListItem></NList>
+          <NList><NListItem v-for="member in members" :key="member.userId"><NSpace justify="space-between" class="w-full"><span>{{ (member as any).email || '邮箱未设置' }} ({{ member.source || 'manual' }})</span><NSelect :value="member.role" :options="[{ label: '管理员', value: 'admin' }, { label: '编辑者', value: 'editor' }, { label: '查看者', value: 'viewer' }]" @update:value="role => changeMember(member, role)" /></NSpace></NListItem></NList>
         </NCard>
         <NCard v-if="selectedSpaceId" title="OIDC 分组授权">
           <NSpace><NInput v-model:value="oidcProvider" placeholder="Provider" /><NInput v-model:value="oidcGroup" placeholder="分组名称" /><NSelect v-model:value="oidcRole" :options="[{ label: '编辑者', value: 'editor' }, { label: '查看者', value: 'viewer' }]" /><NButton @click="addRule">添加规则</NButton></NSpace>
