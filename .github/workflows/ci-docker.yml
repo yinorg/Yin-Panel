@@ -1,184 +1,42 @@
-name: Docker Image CI
+name: Build Docker Image
 
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Image tag (for example 0.3.1)
+        required: true
+        default: latest
+
+permissions:
+  contents: read
+  packages: write
 
 jobs:
-  prepare:
-    runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.version.outputs.ver }}
-      repo_lower: ${{ steps.repo.outputs.lower }}
-    steps:
-      - uses: actions/checkout@v3
-      - name: Get version
-        id: version
-        run: echo "ver=$(git describe --tags --abbrev=0 2>/dev/null || echo 'v0.0.0')" >> $GITHUB_OUTPUT
-      - name: Lowercase repo
-        id: repo
-        run: echo "lower=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
-
-  build-temp:
-    needs: prepare
+  build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - name: Login to GHCR
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Setup QEMU
-        uses: docker/setup-qemu-action@v3
+      - name: Build and push image
+        uses: docker/build-push-action@v6
         with:
-          platforms: amd64,arm64
-      - name: Set up buildx
-        uses: docker/setup-buildx-action@v3
-        with:
-          driver-opts: |
-            image=moby/buildkit:latest
-      - name: Cache Docker layers
-        uses: actions/cache@v3
-        with:
-          path: /tmp/.buildx-cache-temp
-          key: ${{ runner.os }}-buildx-temp-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-buildx-temp-
-      - name: Build temp
-        uses: docker/build-push-action@v4
-        with:
-          file: ./distribution/docker-image/Dockerfile_temp
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: |
-            ghcr.io/${{ needs.prepare.outputs.repo_lower }}/temp:${{ needs.prepare.outputs.version }}
-          cache-from: type=local,src=/tmp/.buildx-cache-temp
-          cache-to: type=local,dest=/tmp/.buildx-cache-temp-new,mode=max
-      - name: Move cache
-        run: |
-          rm -rf /tmp/.buildx-cache-temp
-          mv /tmp/.buildx-cache-temp-new /tmp/.buildx-cache-temp
-
-  build-frontend:
-    needs: [prepare, build-temp]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Login to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Setup QEMU
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: amd64,arm64
-      - name: Set up buildx
-        uses: docker/setup-buildx-action@v3
-      - name: Build frontend
-        uses: docker/build-push-action@v4
-        with:
-          file: ./distribution/docker-image/Dockerfile_frontend
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: |
-            ghcr.io/${{ needs.prepare.outputs.repo_lower }}/frontend:latest
-            ghcr.io/${{ needs.prepare.outputs.repo_lower }}/frontend:${{ needs.prepare.outputs.version }}
-          build-args: |
-            REPO_LOWER=${{ needs.prepare.outputs.repo_lower }}
-            VERSION=${{ needs.prepare.outputs.version }}
-
-  build-backend:
-    needs: prepare
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Login to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Setup QEMU
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: amd64,arm64
-      - name: Set up buildx
-        uses: docker/setup-buildx-action@v3
-        with:
-          driver-opts: |
-            image=moby/buildkit:latest
-      - name: Cache Docker layers
-        uses: actions/cache@v3
-        with:
-          path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-backend-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-buildx-backend-
-      - name: Build backend
-        uses: docker/build-push-action@v4
-        with:
-          file: ./distribution/docker-image/Dockerfile_backend
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: |
-            ghcr.io/${{ needs.prepare.outputs.repo_lower }}/backend:latest
-            ghcr.io/${{ needs.prepare.outputs.repo_lower }}/backend:${{ needs.prepare.outputs.version }}
-          build-args: |
-            VERSION=${{ needs.prepare.outputs.version }}
-          cache-from: type=local,src=/tmp/.buildx-cache
-          cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
-      - name: Move cache
-        run: |
-          rm -rf /tmp/.buildx-cache
-          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
-
-  build-monolith:
-    needs: [prepare, build-temp, build-backend]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Login to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Setup QEMU
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: amd64,arm64
-      - name: Set up buildx
-        uses: docker/setup-buildx-action@v3
-      - name: Build monolith
-        uses: docker/build-push-action@v4
-        with:
+          context: .
           file: ./distribution/docker-image/Dockerfile_monolith
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ghcr.io/${{ needs.prepare.outputs.repo_lower }}/monolith:latest
-            ghcr.io/${{ needs.prepare.outputs.repo_lower }}/monolith:${{ needs.prepare.outputs.version }}
-          build-args: |
-            REPO_LOWER=${{ needs.prepare.outputs.repo_lower }}
-            VERSION=${{ needs.prepare.outputs.version }}
-
-  cleanup:
-    needs: [build-frontend, build-monolith]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Delete temp image
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          echo "Deleting temp image ..."
-          gh api \
-            --method DELETE \
-            -H "Accept: application/vnd.github+json" \
-            "/users/${{ github.repository_owner }}/packages/container/${{ github.event.repository.name }}/temp" || true
-
-          echo "Temp image deletion attempts completed. If all failed, the package may not exist or require different permissions."
+            ghcr.io/${{ github.repository }}:${{ inputs.tag }}
+            ghcr.io/${{ github.repository }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
