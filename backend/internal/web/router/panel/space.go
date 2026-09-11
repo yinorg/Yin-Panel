@@ -39,6 +39,8 @@ func (r *SpaceRouter) InitRouter(router *gin.RouterGroup) {
 	g.POST("/teams", r.CreateTeam)
 	g.POST("/shared", r.CreateTeam)
 	g.PUT("/:spaceId", r.Rename)
+	// The frontend request wrapper uses POST for JSON mutations.
+	g.POST("/:spaceId", r.Rename)
 	g.POST("/:spaceId/transfer", r.Transfer)
 	g.POST("/:spaceId/copy", r.Copy)
 	g.GET("/:spaceId/oidc-groups", r.OIDCGroups)
