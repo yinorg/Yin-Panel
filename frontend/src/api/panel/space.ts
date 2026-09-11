@@ -1,7 +1,7 @@
 import { get, post } from '../../utils/request'
 
 export interface Space { id: number; type: 'personal' | 'team' | 'shared'; name: string; ownerUserId: number }
-export interface SpaceMember { id: number; userId: number; role: 'admin' | 'editor' | 'viewer'; source?: string }
+export interface SpaceMember { id: number; userId: number; email?: string; role: 'admin' | 'editor' | 'viewer'; source?: string }
 export function getSpaces<T>() { return get<T>({ url: '/spaces' }) }
 export function createTeam<T>(name: string) { return post<T>({ url: '/spaces/teams', data: { name } }) }
 export function getGroups<T>(spaceId: number) { return get<T>({ url: `/spaces/${spaceId}/groups` }) }
