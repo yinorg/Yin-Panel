@@ -240,6 +240,10 @@ func (s *UserService) findOrCreateOAuthUser(provider string, providerConfig conf
 		Role:          2, // Regular user
 		OauthProvider: provider,
 		OauthID:       identifier,
+		// SQLite treats the empty string as a value, so multiple OAuth users
+		// would violate the unique publiccode index. The provider identifier is
+		// stable and unique enough for the initial value; users can regenerate it.
+		Publiccode: identifier,
 	}
 
 	if err := s.CreateUser(newUser); err != nil {

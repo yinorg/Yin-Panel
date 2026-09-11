@@ -3,7 +3,7 @@ base:
   # Web run port. Default:3002
   http_port: 3002
   # Root URL
-  root_url: http://127.0.0.1:1002
+  root_url: http://192.168.31.132:3002
   # Database driver [mysql/sqlite(Default)]
   database_drive: sqlite
   # Enable static file server. Default:true
@@ -85,19 +85,15 @@ oauth:
       token_url: https://oauth2.googleapis.com/token
       user_info_url: https://www.googleapis.com/oauth2/v3/userinfo
       scopes: profile email
-      field_mapping_identifier: sub
+      field_mapping_identifier: email
       field_mapping_display_name: name
       field_mapping_email: email
-    # Authentik OIDC example. Set the issuer to the value shown in the
-    # application's OpenID configuration page. Endpoints are discovered
-    # automatically, and the authorization-code flow uses PKCE, state and nonce.
-    # Register https://panel.example.com/api/oauth/authentik/callback as the
-    # redirect URI in the Authentik application, replacing the host as needed.
-    # - name: authentik
-    #   client_id: sun-panel
-    #   client_secret: your_client_secret
-    #   issuer_url: https://auth.example.com/application/o/sun-panel/
-    #   scopes: openid profile email
-    #   field_mapping_identifier: sub
-    #   field_mapping_display_name: name
-    #   field_mapping_email: email
+    - name: authentik
+      client_id: 35XDlL1bVPsRTvktwmCJshhXNb2WsXIjeZ6acdbI
+      # Replace with the client secret shown by Authentik.
+      client_secret: REPLACE_WITH_AUTHENTIK_CLIENT_SECRET
+      issuer_url: http://192.168.31.132:9000/application/o/test/
+      scopes: openid profile email
+      field_mapping_identifier: email
+      field_mapping_display_name: name
+      field_mapping_email: email

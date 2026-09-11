@@ -50,6 +50,9 @@ func InitRouters(addr string) error {
 
 		// 处理根目录下的特定文件
 		router.StaticFile("/", webPath+"/index.html")
+		// Vue history mode routes (for example the OAuth /login redirect)
+		// must fall back to the SPA entry document.
+		router.StaticFile("/login", webPath+"/index.html")
 
 		if config.AppConfig.Rclone.Type == "local" {
 			// 使用本次存储时，为本次存储设置静态文件服务
