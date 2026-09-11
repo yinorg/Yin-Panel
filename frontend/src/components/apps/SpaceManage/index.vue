@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { NButton, NCard, NInput, NList, NListItem, NSelect, NSpace, useMessage } from 'naive-ui'
-import { createGroup, createTeam, deleteGroup, getGroups, getSpaces, updateGroup, type Space } from '../../../api/panel/space'
+import { addMember, addOIDCGroup, copySpace, createGroup, createTeam, deleteGroup, deleteOIDCGroup, getGroups, getMembers, getOIDCGroups, getSpaces, renameSpace, updateGroup, updateMember, type Space, type SpaceMember } from '../../../api/panel/space'
 
 const message = useMessage()
 const spaces = ref<Space[]>([])
@@ -9,8 +9,11 @@ const selectedSpaceId = ref<number | null>(null)
 const name = ref(''); const groupName = ref(''); const editing = ref<{ spaceId: number; id: number } | null>(null)
 const loading = ref(false)
 const groups = ref<Record<number, { id: number; title: string }[]>>({})
-function load() { getSpaces<{ code: number; data: Space[] }>().then(({ data }) => { spaces.value = data || []; if (spaces.value.length && !selectedSpaceId.value) selectedSpaceId.value = spaces.value[0].id; spaces.value.forEach(space => loadGroups(space.id)) }) }
+const members = ref<SpaceMember[]>([]); const oidcRules = ref<any[]>([])
+const rename = ref(''); const memberUserId = ref(''); const memberRole = ref('viewer'); const oidcProvider = ref('authentik'); const oidcGroup = ref(''); const oidcRole = ref('viewer')
+function load() { getSpaces<{ code: number; data: Space[] }>().then(({ data }) => { spaces.value = data || []; if (spaces.value.length && !selectedSpaceId.value) selectedSpaceId.value = spaces.value[0].id; spaces.value.forEach(space => loadGroups(space.id)); if (selectedSpaceId.value) loadDetails(selectedSpaceId.value) }) }
 function loadGroups(spaceId: number) { getGroups<{ code: number; data: { id: number; title: string }[] }>(spaceId).then(({ data }) => { groups.value[spaceId] = data || [] }) }
+function loadDetails(spaceId: number) { getMembers<{ code: number; data: SpaceMember[] }>(spaceId).then(({ data }) => { members.value = data || [] }); getOIDCGroups<{ code: number; data: any[] }>(spaceId).then(({ data }) => { oidcRules.value = data || [] }) }
 function saveGroup(spaceId: number) {
   const title = groupName.value.trim(); if (!title) return
   const req = editing.value ? updateGroup(spaceId, editing.value.id, title) : createGroup(spaceId, title)
@@ -22,6 +25,13 @@ function create() {
   loading.value = true
   createTeam<{ code: number }>(name.value.trim()).then(({ code }) => { if (code === 0) { message.success('团队创建成功'); name.value = ''; load() } }).finally(() => { loading.value = false })
 }
+function selected() { return spaces.value.find(space => space.id === selectedSpaceId.value) }
+function renameCurrent() { const value = rename.value.trim(); if (value && selectedSpaceId.value) renameSpace(selectedSpaceId.value, value).then(({ code }) => { if (code === 0) { message.success('空间名称已更新'); load() } }) }
+function copyCurrent() { if (selectedSpaceId.value) copySpace<{ code: number }>(selectedSpaceId.value).then(({ code }) => { if (code === 0) { message.success('空间已复制'); load() } }) }
+function addCurrentMember() { const userId = Number(memberUserId.value); if (selectedSpaceId.value && userId) addMember(selectedSpaceId.value, userId, memberRole.value).then(({ code }) => { if (code === 0) { memberUserId.value = ''; loadDetails(selectedSpaceId.value!) } }) }
+function changeMember(member: SpaceMember, role: string) { if (selectedSpaceId.value) updateMember(selectedSpaceId.value, member.userId, role).then(() => loadDetails(selectedSpaceId.value!)) }
+function addRule() { if (selectedSpaceId.value && oidcGroup.value.trim()) addOIDCGroup(selectedSpaceId.value, oidcProvider.value, oidcGroup.value.trim(), oidcRole.value).then(({ code }) => { if (code === 0) { oidcGroup.value = ''; loadDetails(selectedSpaceId.value!) } }) }
+function removeRule(id: number) { if (selectedSpaceId.value) deleteOIDCGroup(selectedSpaceId.value, id).then(() => loadDetails(selectedSpaceId.value!)) }
 onMounted(load)
 </script>
 
@@ -33,7 +43,8 @@ onMounted(load)
           <NInput v-model:value="name" placeholder="团队名称" maxlength="100" @keyup.enter="create" />
           <NButton type="primary" :loading="loading" @click="create">创建团队</NButton>
         </NSpace>
-        <NSelect v-model:value="selectedSpaceId" :options="spaces.map(space => ({ label: `${space.name} (${space.type === 'shared' ? '共享' : '个人'})`, value: space.id }))" />
+        <NSelect v-model:value="selectedSpaceId" :options="spaces.map(space => ({ label: `${space.name} (${space.type === 'shared' || space.type === 'team' ? '共享' : '个人'})`, value: space.id }))" @update:value="(id) => loadDetails(Number(id))" />
+        <NSpace v-if="selectedSpaceId"><NInput v-model:value="rename" :placeholder="selected()?.name || '空间名称'" /><NButton @click="renameCurrent">重命名</NButton><NButton @click="copyCurrent">复制空间</NButton></NSpace>
         <NList v-if="selectedSpaceId" bordered>
           <NListItem>
             <div class="w-full">
@@ -43,6 +54,14 @@ onMounted(load)
             </div>
           </NListItem>
         </NList>
+        <NCard v-if="selectedSpaceId" title="成员管理">
+          <NSpace><NInput v-model:value="memberUserId" placeholder="用户 ID" /><NSelect v-model:value="memberRole" :options="[{ label: '编辑者', value: 'editor' }, { label: '查看者', value: 'viewer' }]" /><NButton @click="addCurrentMember">添加成员</NButton></NSpace>
+          <NList><NListItem v-for="member in members" :key="member.userId"><NSpace justify="space-between" class="w-full"><span>用户 {{ member.userId }} ({{ member.source || 'manual' }})</span><NSelect :value="member.role" :options="[{ label: '管理员', value: 'admin' }, { label: '编辑者', value: 'editor' }, { label: '查看者', value: 'viewer' }]" @update:value="role => changeMember(member, role)" /></NSpace></NListItem></NList>
+        </NCard>
+        <NCard v-if="selectedSpaceId" title="OIDC 分组授权">
+          <NSpace><NInput v-model:value="oidcProvider" placeholder="Provider" /><NInput v-model:value="oidcGroup" placeholder="分组名称" /><NSelect v-model:value="oidcRole" :options="[{ label: '编辑者', value: 'editor' }, { label: '查看者', value: 'viewer' }]" /><NButton @click="addRule">添加规则</NButton></NSpace>
+          <NList><NListItem v-for="rule in oidcRules" :key="rule.id"><NSpace justify="space-between" class="w-full"><span>{{ rule.provider }} / {{ rule.groupName }} ({{ rule.role }})</span><NButton size="small" @click="removeRule(rule.id)">删除</NButton></NSpace></NListItem></NList>
+        </NCard>
       </NSpace>
     </NCard>
   </div>
