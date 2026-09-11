@@ -23,10 +23,10 @@ func RouterArray() []IRouter {
 		system.NewMonitorRouter(),
 		system.NewOAuthRouter(),
 		panel.NewItemIconRouter(),
-		panel.NewItemIconGroupRouter(),
 		panel.NewUserConfigRouter(),
 		panel.NewUsersRouter(),
 		panel.NewPublicVisitRouter(),
+		panel.NewSpaceRouter(),
 	}
 }
 

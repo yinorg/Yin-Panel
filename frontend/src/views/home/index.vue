@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { VueDraggable } from 'vue-draggable-plus'
-import { NBackTop, NButton, NButtonGroup, NDropdown, NModal, NSkeleton, NSpin, useDialog, useMessage } from 'naive-ui'
+import { NBackTop, NButton, NButtonGroup, NDropdown, NInput, NModal, NSkeleton, NSpin, useDialog, useMessage } from 'naive-ui'
 import { nextTick, onMounted, ref } from 'vue'
-import { getList as getGroupList } from '../../api/panel/itemIconGroup'
+import { createTeam, getGroups, getItems, getSpaces, type Space } from '../../api/panel/space'
 import { Clock, SearchBox, SystemMonitor } from '../../components/deskModule'
 import { SvgIcon } from '../../components/common'
 import { AppIcon, AppStarter, EditItem } from './components'
-import { deleteItem, getListByGroupId, saveSort } from '@/api/panel/itemIcon'
+import { deleteItem, sortItems } from '@/api/panel/space'
 
 import { setTitle } from '@/utils/cmn'
 import { parsePublicCodeFromPath } from '@/utils/request/axios'
@@ -43,6 +43,11 @@ const currentRightSelectItem = ref<Panel.ItemInfo | null>(null)
 const currentAddItenIconGroupId = ref<number | undefined>()
 
 const settingModalShow = ref(false)
+const spaces = ref<Space[]>([])
+const activeSpace = ref<Space | null>(null)
+const createTeamVisible = ref(false)
+const teamName = ref('')
+const creatingTeam = ref(false)
 
 const items = ref<ItemGroup[]>([])
 const filterItems = ref<ItemGroup[]>([])
@@ -89,25 +94,49 @@ function handWindowIframeIdLoad(payload: Event) {
 
 // 获取组数据
 function getList() {
-  getGroupList<Common.ListResponse<ItemGroup[]>>().then(({ code, data, msg }) => {
-    if (code === 0 && data && data.list) {
-      items.value = data.list
-      for (let i = 0; i < data.list.length; i++) {
-        const element = data.list[i]
-        if (element.id)
-          updateItemIconGroupByNet(i, element.id)
-      }
+  if (!activeSpace.value) {
+    items.value = []
+    filterItems.value = []
+    return
+  }
+
+  getGroups<{ code: number; data: ItemGroup[] }>(activeSpace.value.id).then(({ code, data }) => {
+    if (code !== 0 || !data) return
+    getItems<{ code: number; data: ItemGroup[] }>(activeSpace.value!.id).then((itemsResponse) => {
+      const allItems = itemsResponse.data || []
+      items.value = data.map(group => ({ ...group, items: allItems.filter(item => item.itemIconGroupId === group.id) }))
       filterItems.value = items.value
-      // console.log(items)
-    }
+    })
   })
+}
+
+function selectSpace(key: string | number) {
+  const selected = spaces.value.find(space => space.id === Number(key))
+  if (selected) { activeSpace.value = selected; getList() }
+}
+
+function reloadSpaces(selectLatest = false) {
+  getSpaces<{ code: number; data: Space[] }>().then(({ code, data }) => {
+    if (code !== 0 || !data?.length) return
+    spaces.value = data
+    if (selectLatest) activeSpace.value = data[data.length - 1]
+    getList()
+  })
+}
+function submitCreateTeam() {
+  const name = teamName.value.trim()
+  if (!name || creatingTeam.value) return
+  creatingTeam.value = true
+  createTeam<{ code: number }>(name).then(({ code }) => {
+    if (code === 0) { createTeamVisible.value = false; teamName.value = ''; reloadSpaces(true) }
+  }).finally(() => { creatingTeam.value = false })
 }
 
 // 从后端获取组下面的图标
 function updateItemIconGroupByNet(itemIconGroupIndex: number, itemIconGroupId: number) {
-  getListByGroupId<Common.ListResponse<Panel.ItemInfo[]>>(itemIconGroupId).then((res) => {
+  getItems<{ code: number; data: Panel.ItemInfo[] }>(activeSpace.value!.id, itemIconGroupId).then((res) => {
     if (res.code === 0)
-      items.value[itemIconGroupIndex].items = res.data.list
+      items.value[itemIconGroupIndex].items = res.data
   })
 }
 
@@ -140,7 +169,7 @@ function handleRightMenuSelect(key: string | number) {
         positiveText: t('common.confirm'),
         negativeText: t('common.cancel'),
         onPositiveClick: () => {
-          deleteItem(currentRightSelectItem.value?.id as number).then(({ code, msg }) => {
+          deleteItem(activeSpace.value!.id, currentRightSelectItem.value?.id as number).then(({ code, msg }) => {
             if (code === 0) {
               ms.success(t('common.deleteSuccess'))
               getList()
@@ -207,7 +236,7 @@ function handleSaveSort(itemGroup: ItemGroup) {
       })
     }
 
-    saveSort({ itemIconGroupId: itemGroup.id as number, sortItems: saveItems }).then(({ code, msg }) => {
+    sortItems(activeSpace.value!.id, itemGroup.id as number, saveItems).then(({ code, msg }) => {
       if (code === 0) {
         ms.success(t('common.saveSuccess'))
         itemGroup.sortStatus = false
@@ -253,8 +282,9 @@ function getDropdownMenuOptions() {
 }
 
 onMounted(() => {
-  // 获取页面数据
-  getList()
+  getSpaces<{ code: number; data: Space[] }>().then(({ code, data }) => {
+    if (code === 0 && data?.length) { activeSpace.value = data[0]; spaces.value = data; getList() }
+  })
 
   // 更新同步云端配置
   panelState.updatePanelConfigByCloud()
@@ -320,6 +350,15 @@ function handleAddItem(itemIconGroupId?: number) {
 
 <template>
   <div class="w-full h-full sun-main">
+    <div v-if="spaces.length && authStore.token" class="space-status-bar">
+      <NDropdown trigger="hover" :options="spaces.map(space => ({ label: space.name, key: space.id }))" @select="selectSpace">
+        <NButton quaternary class="space-status-button">
+          <span class="space-status-dot" />
+          {{ activeSpace?.name }}
+          <span class="ml-2 opacity-60">⌄</span>
+        </NButton>
+      </NDropdown>
+    </div>
     <div
       class="cover wallpaper" :style="{
         filter: `blur(${panelState.panelConfig.backgroundBlur}px)`,
@@ -540,7 +579,7 @@ function handleAddItem(itemIconGroupId?: number) {
       </div>
     </NBackTop>
 
-    <EditItem v-model:visible="editItemInfoShow" :item-info="editItemInfoData" :item-group-id="currentAddItenIconGroupId" @done="handleEditSuccess" />
+    <EditItem v-model:visible="editItemInfoShow" :item-info="editItemInfoData" :item-group-id="currentAddItenIconGroupId" :space-id="activeSpace?.id" @done="handleEditSuccess" />
 
     <!-- 弹窗 -->
     <NModal
@@ -570,7 +609,28 @@ function handleAddItem(itemIconGroupId?: number) {
       </div>
     </NModal>
   </div>
+  <NModal v-model:show="createTeamVisible" preset="dialog" title="创建团队空间" positive-text="创建" negative-text="取消" :loading="creatingTeam" @positive-click="submitCreateTeam">
+    <NInput v-model:value="teamName" placeholder="团队名称" maxlength="100" show-count @keyup.enter="submitCreateTeam" />
+  </NModal>
 </template>
+
+<style scoped>
+.space-status-bar {
+  position: fixed;
+  z-index: 20;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  background: rgba(18, 22, 28, 0.46);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
+}
+.space-status-button { color: white; min-width: 140px; }
+.space-status-dot { width: 7px; height: 7px; margin-right: 8px; border-radius: 50%; background: #7dd3fc; box-shadow: 0 0 10px #7dd3fc; }
+</style>
 
 <style>
 body,

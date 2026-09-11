@@ -1,6 +1,7 @@
 package database
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -43,6 +44,11 @@ func initDatabase(db *gorm.DB) (err error) {
 	// 创建数据表
 	err = db.AutoMigrate(
 		&repository.User{},
+		&repository.OAuthIdentity{},
+		&repository.Space{},
+		&repository.SpaceMember{},
+		&repository.Team{},
+		&repository.SpaceOIDCGroup{},
 		&repository.SystemSetting{},
 		&repository.ItemIcon{},
 		&repository.UserConfig{},
@@ -51,7 +57,73 @@ func initDatabase(db *gorm.DB) (err error) {
 		&repository.ModuleConfig{},
 	)
 
-	return err
+	if err != nil {
+		return err
+	}
+	if err := ensurePersonalSpaces(db); err != nil {
+		return err
+	}
+	return backfillPanelSpaces(db)
+}
+
+// ensurePersonalSpaces is idempotent and prepares legacy users for the space
+// model without moving existing panel data yet.
+func ensurePersonalSpaces(db *gorm.DB) error {
+	var users []repository.User
+	if err := db.Find(&users).Error; err != nil {
+		return err
+	}
+	for _, user := range users {
+		var space repository.Space
+		if err := db.Where("type = ? AND owner_user_id = ?", repository.SpaceTypePersonal, user.ID).First(&space).Error; err == nil {
+			continue
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+		space = repository.Space{Type: repository.SpaceTypePersonal, Name: user.Name, OwnerUserID: user.ID}
+		if err := db.Create(&space).Error; err != nil {
+			return err
+		}
+		member := repository.SpaceMember{SpaceID: space.ID, UserID: user.ID, Role: repository.SpaceRoleAdmin, JoinedAt: time.Now()}
+		if err := db.Create(&member).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func backfillPanelSpaces(db *gorm.DB) error {
+	if err := db.Model(&repository.Space{}).Where("type = ?", "team").Update("type", repository.SpaceTypeShared).Error; err != nil {
+		return err
+	}
+	var spaces []repository.Space
+	if err := db.Where("type = ?", repository.SpaceTypePersonal).Find(&spaces).Error; err != nil {
+		return err
+	}
+	for _, space := range spaces {
+		if err := db.Model(&repository.ItemIconGroup{}).Where("user_id = ? AND (space_id = 0 OR space_id IS NULL)", space.OwnerUserID).Update("space_id", space.ID).Error; err != nil {
+			return err
+		}
+		if err := db.Model(&repository.ItemIcon{}).Where("user_id = ? AND (space_id = 0 OR space_id IS NULL)", space.OwnerUserID).Update("space_id", space.ID).Error; err != nil {
+			return err
+		}
+	}
+	var teamSpaces []repository.Space
+	if err := db.Where("type = ?", repository.SpaceTypeTeam).Find(&teamSpaces).Error; err != nil {
+		return err
+	}
+	for _, space := range teamSpaces {
+		var count int64
+		if err := db.Model(&repository.ItemIconGroup{}).Where("space_id = ?", space.ID).Count(&count).Error; err != nil {
+			return err
+		}
+		if count == 0 {
+			if err := db.Create(&repository.ItemIconGroup{Title: "APP", Icon: "material-symbols:apps", Sort: 0, UserId: space.OwnerUserID, SpaceID: space.ID}).Error; err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func CreateDefaultUser() error {

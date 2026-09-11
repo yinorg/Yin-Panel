@@ -34,12 +34,7 @@ func (a *ItemIconRouter) InitRouter(router *gin.RouterGroup) {
 	r := router.Group("")
 	r.Use(interceptor.Auth)
 	{
-		r.POST("/panel/itemIcon/edit", a.Edit)
-		r.POST("/panel/itemIcon/delete", a.Delete)
-		r.POST("/panel/itemIcon/saveSort", a.SaveSort)
-		r.POST("/panel/itemIcon/addMultiple", a.AddMultiple)
 		r.POST("/panel/itemIcon/getSiteFavicon", a.GetSiteFavicon)
-		r.GET("/panel/itemIcon/getIcons", a.GetIcons)
 	}
 }
 

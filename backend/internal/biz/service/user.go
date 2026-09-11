@@ -15,11 +15,13 @@ import (
 	"time"
 
 	"golang.org/x/oauth2"
+	"gorm.io/gorm"
 
 	"sun-panel/internal/biz/repository"
 	"sun-panel/internal/infra/config"
 	"sun-panel/internal/infra/kvcache"
 	"sun-panel/internal/infra/zaplog"
+	"sun-panel/internal/util"
 )
 
 type UserService struct {
@@ -198,15 +200,16 @@ func (s *UserService) getOAuthProvider(provider string) (*config.OAuthProviderCo
 }
 
 func (s *UserService) findOrCreateOAuthUser(provider string, providerConfig config.OAuthProviderConfig, userInfo map[string]any) (*repository.User, error) {
-	identifierField := providerConfig.FieldMappingIdentifier
-	if identifierField == "" {
-		identifierField = "sub"
-	}
-
-	// Extract user identifier from the provider's response
-	identifier, ok := userInfo[identifierField].(string)
+	// OIDC subject is the stable identity key; email is only used for merging.
+	identifier, ok := userInfo["sub"].(string)
 	if !ok || identifier == "" {
 		return nil, errors.New("failed to get user identifier from OAuth provider")
+	}
+	email, _ := userInfo["email"].(string)
+	email = strings.ToLower(strings.TrimSpace(email))
+	verified, _ := userInfo["email_verified"].(bool)
+	if email == "" || !verified {
+		return nil, errors.New("OAuth provider did not return a verified email")
 	}
 
 	// Check if user already exists
@@ -215,10 +218,32 @@ func (s *UserService) findOrCreateOAuthUser(provider string, providerConfig conf
 		if user.Status != 1 {
 			return nil, errors.New("user account is disabled or inactive")
 		}
+		// Keep legacy OAuth accounts readable after switching from subject-based
+		// usernames to email-based usernames.
+		if email != "" && user.Username != email {
+			if err := s.userRepo.UpdateUserInfo(user.ID, map[string]any{"username": email, "mail": email}); err != nil {
+				return nil, err
+			}
+			user.Username = email
+			user.Mail = email
+		}
+		s.syncOIDCGroups(user.ID, provider, userInfo)
 		return &user, nil
 	}
 
-	// User doesn't exist, create a new one
+	// A new provider identity is automatically merged by verified email.
+	user, err = s.userRepo.GetByMail(email)
+	if err == nil {
+		identity := &repository.OAuthIdentity{UserID: user.ID, Provider: provider, Subject: identifier, Email: email}
+		if repository.Db != nil {
+			if err := repository.Db.Create(identity).Error; err != nil {
+				return nil, err
+			}
+		}
+		return &user, nil
+	}
+
+	// User doesn't exist, create a new one.
 	displayNameField := providerConfig.FieldMappingDisplayName
 	if displayNameField == "" {
 		displayNameField = "name"
@@ -228,11 +253,12 @@ func (s *UserService) findOrCreateOAuthUser(provider string, providerConfig conf
 		emailField = "email"
 	}
 	displayName, _ := userInfo[displayNameField].(string)
-	email, _ := userInfo[emailField].(string)
+	email, _ = userInfo[emailField].(string)
+	email = strings.ToLower(strings.TrimSpace(email))
 
 	// OAuth users don't need a password as they authenticate through the provider
 	newUser := &repository.User{
-		Username:      identifier,
+		Username:      email,
 		Password:      "", // No password needed for OAuth users
 		Name:          displayName,
 		Mail:          email,
@@ -243,14 +269,75 @@ func (s *UserService) findOrCreateOAuthUser(provider string, providerConfig conf
 		// SQLite treats the empty string as a value, so multiple OAuth users
 		// would violate the unique publiccode index. The provider identifier is
 		// stable and unique enough for the initial value; users can regenerate it.
-		Publiccode: identifier,
+		Publiccode: util.GenerateRandomString(10),
 	}
 
 	if err := s.CreateUser(newUser); err != nil {
 		return nil, err
 	}
+	if repository.Db != nil {
+		if err := repository.Db.Create(&repository.OAuthIdentity{UserID: newUser.ID, Provider: provider, Subject: identifier, Email: email}).Error; err != nil {
+			return nil, err
+		}
+	}
+	s.syncOIDCGroups(newUser.ID, provider, userInfo)
 
 	return newUser, nil
+}
+
+// syncOIDCGroups grants configured space roles from the provider's groups claim.
+// It only adds or upgrades access and never removes manual permissions.
+func (s *UserService) syncOIDCGroups(userID uint, provider string, userInfo map[string]any) {
+	if repository.Db == nil {
+		return
+	}
+	groups := make(map[string]bool)
+	switch raw := userInfo["groups"].(type) {
+	case []any:
+		for _, value := range raw {
+			if group, ok := value.(string); ok {
+				groups[group] = true
+			}
+		}
+	case []string:
+		for _, group := range raw {
+			groups[group] = true
+		}
+	default:
+		return
+	}
+	if len(groups) == 0 {
+		return
+	}
+	var rules []repository.SpaceOIDCGroup
+	if repository.Db.Where("provider = ?", provider).Find(&rules).Error != nil {
+		return
+	}
+	for _, rule := range rules {
+		if !groups[rule.GroupName] {
+			continue
+		}
+		var member repository.SpaceMember
+		err := repository.Db.Where("space_id = ? AND user_id = ?", rule.SpaceID, userID).First(&member).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			repository.Db.Create(&repository.SpaceMember{SpaceID: rule.SpaceID, UserID: userID, Role: rule.Role, Source: "oidc"})
+		} else if err == nil && member.Source == "oidc" && roleRank(rule.Role) > roleRank(member.Role) {
+			repository.Db.Model(&member).Update("role", rule.Role)
+		}
+	}
+}
+
+func roleRank(role string) int {
+	switch role {
+	case repository.SpaceRoleAdmin:
+		return 3
+	case repository.SpaceRoleEditor:
+		return 2
+	case repository.SpaceRoleViewer:
+		return 1
+	default:
+		return 0
+	}
 }
 
 // exchangeCodeForToken exchanges the authorization code for an access token

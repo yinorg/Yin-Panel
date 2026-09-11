@@ -68,6 +68,7 @@ func TestAuthentikOIDCAuthorizationCodeFlow(t *testing.T) {
 				"preferred_username": "alice",
 				"name":               "Alice Example",
 				"email":              "alice@example.test",
+				"email_verified":     true,
 				"nonce":              nonce,
 				"exp":                time.Now().Add(time.Minute).Unix(),
 			})
@@ -144,7 +145,7 @@ func TestAuthentikOIDCAuthorizationCodeFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("handle Authentik OIDC callback: %v", err)
 	}
-	if user.Username != "alice" || user.Name != "Alice Example" || user.Mail != "alice@example.test" {
+	if user.Username != "alice@example.test" || user.Name != "Alice Example" || user.Mail != "alice@example.test" {
 		t.Fatalf("unexpected OIDC user: %#v", user)
 	}
 	if _, err := service.HandleOAuthCallback("authentik", "authentik-code", redirectURI, state); err == nil {
@@ -185,6 +186,15 @@ func (r *memoryUserRepo) GetByUsernameAndPassword(string, string, string) (repos
 func (r *memoryUserRepo) GetByOAuthID(provider, oauthID string) (repository.User, error) {
 	for _, user := range r.users {
 		if user.OauthProvider == provider && user.OauthID == oauthID {
+			return user, nil
+		}
+	}
+	return repository.User{}, gorm.ErrRecordNotFound
+}
+
+func (r *memoryUserRepo) GetByMail(mail string) (repository.User, error) {
+	for _, user := range r.users {
+		if user.Mail == mail {
 			return user, nil
 		}
 	}

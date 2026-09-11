@@ -91,7 +91,7 @@ oauth:
     - name: authentik
       client_id: 35XDlL1bVPsRTvktwmCJshhXNb2WsXIjeZ6acdbI
       # Replace with the client secret shown by Authentik.
-      client_secret: REPLACE_WITH_AUTHENTIK_CLIENT_SECRET
+      client_secret: KRbNFbtsHAba2JOBxD8z54Q3FeKWz1t7sNlLzJhSzVlRoxJMTOvSiJXxwLwIm09xhDI3uxv7QJ2p28QlZe9eYriVHXUqjXSFgcta46NvgrbxD5KRPjxaN4vNoM1jIUCM
       issuer_url: http://192.168.31.132:9000/application/o/test/
       scopes: openid profile email
       field_mapping_identifier: email

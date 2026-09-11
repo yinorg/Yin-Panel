@@ -4,13 +4,15 @@ import type { FormInst, FormRules } from 'naive-ui'
 import { NButton, NForm, NFormItem, NGrid, NGridItem, NInput, NInputGroup, NModal, NSelect, useMessage } from 'naive-ui'
 import IconEditor from './IconEditor.vue'
 import { edit, getSiteFavicon } from '../../../../api/panel/itemIcon'
-import { getList as getGroupList } from '../../../../api/panel/itemIconGroup'
+import { getGroups } from '../../../../api/panel/space'
+import { createItem, updateItem } from '../../../../api/panel/space'
 import { t } from '../../../../locales'
 
 interface Props {
   visible: boolean
   itemInfo: Panel.Info | null
   itemGroupId?: number
+  spaceId?: number
 }
 
 const props = defineProps<Props>()
@@ -86,7 +88,9 @@ const show = computed({
 async function editApi() {
   submitLoading.value = true
   try {
-    const { code, data, msg } = await edit<Panel.ItemInfo>(model.value)
+    const { code, data, msg } = await (props.spaceId
+      ? (model.value.id ? updateItem<Panel.ItemInfo>(props.spaceId, model.value.id, model.value) : createItem<Panel.ItemInfo>(props.spaceId, model.value))
+      : edit<Panel.ItemInfo>(model.value))
     if (code === 0) {
       show.value = false
       model.value = { ...restoreDefault }
@@ -143,12 +147,17 @@ watch(() => props.visible, (newValue) => {
 })
 
 function getGroupListOptions() {
-  getGroupList<Common.ListResponse<Panel.ItemIconGroup[]>>().then(({ data, code, msg }) => {
+  if (!props.spaceId) {
+    itemIconGroupOptions.value = []
+    return
+  }
+  getGroups<{ code: number; data: Panel.ItemIconGroup[] }>(props.spaceId).then(({ data, code, msg }) => {
     if (code === 0) {
       itemIconGroupOptions.value = []
 
-      for (let i = 0; i < data.list.length; i++) {
-        const element = data.list[i]
+      const list = data as Panel.ItemIconGroup[]
+      for (let i = 0; i < list.length; i++) {
+        const element = list[i]
         if (i === 0 && !model.value.itemIconGroupId) {
           model.value.itemIconGroupId = element.id
           restoreDefault.itemIconGroupId = element.id

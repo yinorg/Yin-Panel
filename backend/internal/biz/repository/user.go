@@ -22,6 +22,12 @@ type User struct {
 	TokenVersion  uint   `gorm:"not null;default:0" json:"-"`                                                   // 用于撤销已签发的JWT
 }
 
+func (r *UserRepo) GetByMail(mail string) (User, error) {
+	var user User
+	err := Db.Where("lower(mail)=?", mail).First(&user).Error
+	return user, err
+}
+
 type UserRepo struct {
 }
 
@@ -30,6 +36,7 @@ type IUserRepo interface {
 	Count() (uint, error)
 	GetByUsernameAndPassword(username, password, oauthProvider string) (User, error)
 	GetByOAuthID(source, oauthID string) (User, error)
+	GetByMail(mail string) (User, error)
 	GetList(pagedParam PagedParam) ([]User, uint, error)
 	Update(id uint, user *User) error
 	UpdateUserInfo(id uint, updateInfo map[string]any) error
