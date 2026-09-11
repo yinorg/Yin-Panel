@@ -35,8 +35,6 @@ jobs:
           file: ./distribution/docker-image/Dockerfile_monolith
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: |
-            ghcr.io/${{ github.repository }}:${{ inputs.tag }}
-            ghcr.io/${{ github.repository }}:latest
+          tags: ghcr.io/${{ github.repository }}/monolith:${{ inputs.tag }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
