@@ -1,6 +1,7 @@
 import { get, post } from '../../utils/request'
 
-export interface Space { id: number; type: 'personal' | 'team'; name: string; ownerUserId: number }
+export interface Space { id: number; type: 'personal' | 'team' | 'shared'; name: string; ownerUserId: number }
+export interface SpaceMember { id: number; userId: number; role: 'admin' | 'editor' | 'viewer'; source?: string }
 export function getSpaces<T>() { return get<T>({ url: '/spaces' }) }
 export function createTeam<T>(name: string) { return post<T>({ url: '/spaces/teams', data: { name } }) }
 export function getGroups<T>(spaceId: number) { return get<T>({ url: `/spaces/${spaceId}/groups` }) }
@@ -12,3 +13,13 @@ export function sortItems<T>(spaceId: number, groupId: number, sortItems: any[])
 export function createGroup<T>(spaceId: number, title: string, icon = '') { return post<T>({ url: `/spaces/${spaceId}/groups`, data: { title, icon } }) }
 export function updateGroup<T>(spaceId: number, groupId: number, title: string, icon = '') { return post<T>({ url: `/spaces/${spaceId}/groups/${groupId}/update`, data: { title, icon } }) }
 export function deleteGroup<T>(spaceId: number, groupId: number) { return post<T>({ url: `/spaces/${spaceId}/groups/${groupId}/delete` }) }
+export function renameSpace<T>(spaceId: number, name: string) { return post<T>({ url: `/spaces/${spaceId}`, data: { name } }) }
+export function copySpace<T>(spaceId: number, name?: string) { return post<T>({ url: `/spaces/${spaceId}/copy`, data: name ? { name } : {} }) }
+export function transferSpace<T>(spaceId: number, userId: number) { return post<T>({ url: `/spaces/${spaceId}/transfer`, data: { userId } }) }
+export function getMembers<T>(spaceId: number) { return get<T>({ url: `/spaces/${spaceId}/members` }) }
+export function addMember<T>(spaceId: number, userId: number, role: string) { return post<T>({ url: `/spaces/${spaceId}/members`, data: { userId, role } }) }
+export function updateMember<T>(spaceId: number, userId: number, role: string) { return post<T>({ url: `/spaces/${spaceId}/members/${userId}`, data: { role } }) }
+export function removeMember<T>(spaceId: number, userId: number) { return post<T>({ url: `/spaces/${spaceId}/members/${userId}` }) }
+export function getOIDCGroups<T>(spaceId: number) { return get<T>({ url: `/spaces/${spaceId}/oidc-groups` }) }
+export function addOIDCGroup<T>(spaceId: number, provider: string, groupName: string, role: string) { return post<T>({ url: `/spaces/${spaceId}/oidc-groups`, data: { provider, groupName, role } }) }
+export function deleteOIDCGroup<T>(spaceId: number, ruleId: number) { return post<T>({ url: `/spaces/${spaceId}/oidc-groups/${ruleId}` }) }
