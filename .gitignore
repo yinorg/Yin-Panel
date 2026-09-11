@@ -40,5 +40,8 @@ backend/web
 backend/uploads
 backend/sun-panel
 
+# Local planning notes
+docs/optimization-goals.md
+
 # Secrets
 secrets.txt
