@@ -2,7 +2,7 @@
 import { VueDraggable } from 'vue-draggable-plus'
 import { NBackTop, NButton, NButtonGroup, NDropdown, NInput, NModal, NSkeleton, NSpin, useDialog, useMessage } from 'naive-ui'
 import { nextTick, onMounted, ref } from 'vue'
-import { createTeam, getGroups, getItems, getSpaces, spaceDisplayName, type Space } from '../../api/panel/space'
+import { createTeam, getGroups, getItems, getSpaces, sortSpaces, spaceDisplayName, type Space } from '../../api/panel/space'
 import { Clock, SearchBox, SystemMonitor } from '../../components/deskModule'
 import { SvgIcon } from '../../components/common'
 import { AppIcon, AppStarter, EditItem } from './components'
@@ -118,7 +118,7 @@ function selectSpace(key: string | number) {
 function reloadSpaces(selectLatest = false) {
   getSpaces<{ code: number; data: Space[] }>().then(({ code, data }) => {
     if (code !== 0 || !data?.length) return
-    spaces.value = data
+    spaces.value = sortSpaces(data, authStore.userInfo?.id)
     if (selectLatest) activeSpace.value = data[data.length - 1]
     getList()
   })
@@ -283,7 +283,7 @@ function getDropdownMenuOptions() {
 
 onMounted(() => {
   getSpaces<{ code: number; data: Space[] }>().then(({ code, data }) => {
-    if (code === 0 && data?.length) { activeSpace.value = data[0]; spaces.value = data; getList() }
+    if (code === 0 && data?.length) { spaces.value = sortSpaces(data, authStore.userInfo?.id); activeSpace.value = spaces.value[0]; getList() }
   })
 
   // 更新同步云端配置

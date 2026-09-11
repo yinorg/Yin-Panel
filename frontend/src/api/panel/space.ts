@@ -8,6 +8,13 @@ export function spaceDisplayName(space: Space, spaces: Space[], currentUserId?: 
   const sameName = spaces.filter(item => item.name === space.name)
   return sameName.length > 1 ? `${space.name} ${space.id}` : space.name
 }
+export function sortSpaces(spaces: Space[], currentUserId?: number) {
+  return [...spaces].sort((a, b) => {
+    const aMine = a.type === 'personal' && a.ownerUserId === currentUserId ? 0 : 1
+    const bMine = b.type === 'personal' && b.ownerUserId === currentUserId ? 0 : 1
+    return aMine - bMine || a.name.localeCompare(b.name) || a.id - b.id
+  })
+}
 export function getSpaces<T>() { return get<T>({ url: '/spaces' }) }
 export function createTeam<T>(name: string) { return post<T>({ url: '/spaces/teams', data: { name } }) }
 export function getGroups<T>(spaceId: number) { return get<T>({ url: `/spaces/${spaceId}/groups` }) }
