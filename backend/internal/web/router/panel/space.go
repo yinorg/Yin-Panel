@@ -58,7 +58,7 @@ type renameRequest struct {
 	Name string `json:"name" binding:"required,max=100"`
 }
 type transferRequest struct {
-	UserID uint `json:"userId" binding:"required"`
+	Email string `json:"email" binding:"required,email"`
 }
 type oidcGroupRequest struct {
 	Provider  string `json:"provider" binding:"required"`
@@ -169,7 +169,7 @@ func (r *SpaceRouter) Transfer(c *gin.Context) {
 		return
 	}
 	var targetUser repository.User
-	if repository.Db.First(&targetUser, req.UserID).Error != nil {
+	if repository.Db.Where("lower(mail) = ?", strings.ToLower(strings.TrimSpace(req.Email))).First(&targetUser).Error != nil {
 		response.ErrorDataNotFound(c)
 		return
 	}
