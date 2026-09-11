@@ -7,12 +7,12 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"sun-panel/internal/global"
-	"sun-panel/internal/infra/config"
-	"sun-panel/internal/infra/zaplog"
-	"sun-panel/internal/util"
-	"sun-panel/internal/util/jwt"
-	"sun-panel/internal/web/model/response"
+	"yin-panel/internal/global"
+	"yin-panel/internal/infra/config"
+	"yin-panel/internal/infra/zaplog"
+	"yin-panel/internal/util"
+	"yin-panel/internal/util/jwt"
+	"yin-panel/internal/web/model/response"
 
 	"github.com/gin-gonic/gin"
 )

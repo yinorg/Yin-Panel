@@ -7,7 +7,7 @@ import { PanelPanelConfigStyleEnum, PanelStateNetworkModeEnum } from '@/enums'
 const defaultBackground = '/assets/bg-forest.jpg'
 const LOCAL_NAME = 'panelStorage'
 
-const defaultFooterHtml = '<div class="flex justify-center text-slate-300" style="margin-top:100px">Powered By <a href="https://moon.phantomlab.top/site/" target="_blank" class="ml-[5px]">Moon-Box</a></div>'
+const defaultFooterHtml = '<div class="flex justify-center text-slate-300" style="margin-top:100px">Powered By <a href="https://moon.phantomlab.top/site/" target="_blank" class="ml-[5px]">Yin-Panel</a></div>'
 
 export function defaultStatePanelConfig(): Panel.panelConfig {
   return {
@@ -18,7 +18,7 @@ export function defaultStatePanelConfig(): Panel.panelConfig {
     iconTextColor: '#ffffff',
     iconTextInfoHideDescription: false,
     iconTextIconHideTitle: false,
-    logoText: 'Moon-Box',
+    logoText: 'Yin-Panel',
     logoImageSrc: '',
     clockShowSecond: false,
     searchBoxShow: false,

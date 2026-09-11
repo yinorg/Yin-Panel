@@ -1,6 +1,6 @@
-# Moon-Box
+# Yin-Panel
 
-Moon-Box 是轻量级个人与共享导航面板，适合服务器、NAS 和家庭网络，支持书签管理、空间隔离、协作权限与 OIDC 单点登录。
+Yin-Panel 是轻量级个人与共享导航面板，适合服务器、NAS 和家庭网络，支持书签管理、空间隔离、协作权限与 OIDC 单点登录。
 
 ## 功能
 
@@ -21,7 +21,7 @@ Go、Gin、GORM、SQLite、Vue 3、TypeScript、Vite、Naive UI。
 
 Docker 部署：在 `docker` 目录执行 `docker compose up -d`，默认访问 `http://localhost:3002`。
 
-源码运行：先在 `frontend` 执行 `pnpm install` 和 `pnpm run build-only`，再在 `backend` 执行 `go build -o ../sun-panel` 和 `./../sun-panel -c conf.yaml`。
+源码运行：先在 `frontend` 执行 `pnpm install` 和 `pnpm run build-only`，再在 `backend` 执行 `go build -o ../yin-panel` 和 `./../yin-panel -c conf.yaml`。
 
 首次启动后请修改配置文件中的安全密钥和管理员配置。
 

@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"gorm.io/gorm"
-	"sun-panel/internal/biz/repository"
-	"sun-panel/internal/infra/kvcache"
+	"yin-panel/internal/biz/repository"
+	"yin-panel/internal/infra/kvcache"
 )
 
 type SystemSetting struct {

@@ -7,7 +7,7 @@ import (
 	"io"
 	"os"
 	"strings"
-	"sun-panel/internal/infra/zaplog"
+	"yin-panel/internal/infra/zaplog"
 	"time"
 
 	"github.com/rclone/rclone/fs"

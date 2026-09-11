@@ -3,7 +3,7 @@ package repository
 import (
 	"encoding/json"
 	"errors"
-	"sun-panel/internal/util"
+	"yin-panel/internal/util"
 
 	"gorm.io/gorm"
 )

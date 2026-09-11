@@ -1,7 +1,7 @@
 services:
-  sun-panel:
-    image: ghcr.io/phantommaa/sun-panel/monolith:latest
-    container_name: sun-panel
+  yin-panel:
+    image: ghcr.io/phantommaa/yin-panel/monolith:latest
+    container_name: yin-panel
     volumes:
       - ./conf.yaml:/app/conf.yaml
       - ./uploads:/app/uploads

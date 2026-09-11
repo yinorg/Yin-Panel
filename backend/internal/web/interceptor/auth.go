@@ -3,13 +3,13 @@ package interceptor
 import (
 	"errors"
 	"strings"
-	"sun-panel/internal/constant"
-	"sun-panel/internal/global"
-	"sun-panel/internal/infra/zaplog"
-	"sun-panel/internal/util/jwt"
-	"sun-panel/internal/util/publiccode"
-	"sun-panel/internal/web/model/base"
-	"sun-panel/internal/web/model/response"
+	"yin-panel/internal/constant"
+	"yin-panel/internal/global"
+	"yin-panel/internal/infra/zaplog"
+	"yin-panel/internal/util/jwt"
+	"yin-panel/internal/util/publiccode"
+	"yin-panel/internal/web/model/base"
+	"yin-panel/internal/web/model/response"
 
 	"github.com/gin-gonic/gin"
 )

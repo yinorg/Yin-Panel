@@ -1,8 +1,8 @@
 package interceptor
 
 import (
-	"sun-panel/internal/web/model/base"
-	"sun-panel/internal/web/model/response"
+	"yin-panel/internal/web/model/base"
+	"yin-panel/internal/web/model/response"
 
 	"github.com/gin-gonic/gin"
 )

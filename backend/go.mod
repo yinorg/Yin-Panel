@@ -1,4 +1,4 @@
-module sun-panel
+module yin-panel
 
 go 1.23.0
 

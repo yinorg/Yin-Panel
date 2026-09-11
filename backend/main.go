@@ -5,16 +5,16 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"sun-panel/internal/biz/repository"
-	"sun-panel/internal/biz/service"
-	"sun-panel/internal/global"
-	"sun-panel/internal/infra/config"
-	"sun-panel/internal/infra/database"
-	"sun-panel/internal/infra/storage"
-	"sun-panel/internal/infra/zaplog"
-	"sun-panel/internal/util/i18n"
-	"sun-panel/internal/util/jwt"
-	"sun-panel/internal/web/router"
+	"yin-panel/internal/biz/repository"
+	"yin-panel/internal/biz/service"
+	"yin-panel/internal/global"
+	"yin-panel/internal/infra/config"
+	"yin-panel/internal/infra/database"
+	"yin-panel/internal/infra/storage"
+	"yin-panel/internal/infra/zaplog"
+	"yin-panel/internal/util/i18n"
+	"yin-panel/internal/util/jwt"
+	"yin-panel/internal/web/router"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -140,6 +140,6 @@ func Logo() {
 	fmt.Println("")
 
 	fmt.Println("Version:", global.VERSION)
-	fmt.Println("Welcome to the Moon-Box.")
-	fmt.Println("Project address:", "https://github.com/hslr-s/sun-panel")
+	fmt.Println("Welcome to the Yin-Panel.")
+	fmt.Println("Project address:", "https://github.com/hslr-s/yin-panel")
 }

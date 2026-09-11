@@ -1,8 +1,8 @@
 package system
 
 import (
-	"sun-panel/internal/global"
-	"sun-panel/internal/web/model/response"
+	"yin-panel/internal/global"
+	"yin-panel/internal/web/model/response"
 
 	"github.com/gin-gonic/gin"
 )

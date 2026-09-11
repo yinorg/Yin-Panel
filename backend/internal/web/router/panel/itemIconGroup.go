@@ -2,13 +2,13 @@ package panel
 
 import (
 	"math"
-	"sun-panel/internal/biz/repository"
-	"sun-panel/internal/constant"
-	"sun-panel/internal/global"
-	"sun-panel/internal/web/interceptor"
-	"sun-panel/internal/web/model/base"
-	"sun-panel/internal/web/model/param/commonApi"
-	"sun-panel/internal/web/model/response"
+	"yin-panel/internal/biz/repository"
+	"yin-panel/internal/constant"
+	"yin-panel/internal/global"
+	"yin-panel/internal/web/interceptor"
+	"yin-panel/internal/web/model/base"
+	"yin-panel/internal/web/model/param/commonApi"
+	"yin-panel/internal/web/model/response"
 
 	"github.com/gin-gonic/gin/binding"
 

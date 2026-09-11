@@ -3,8 +3,8 @@ package i18n
 import (
 	"os"
 	"strings"
-	"sun-panel/internal/infra/zaplog"
-	"sun-panel/internal/util"
+	"yin-panel/internal/infra/zaplog"
+	"yin-panel/internal/util"
 
 	"gopkg.in/ini.v1"
 )

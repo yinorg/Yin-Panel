@@ -17,11 +17,11 @@ import (
 	"golang.org/x/oauth2"
 	"gorm.io/gorm"
 
-	"sun-panel/internal/biz/repository"
-	"sun-panel/internal/infra/config"
-	"sun-panel/internal/infra/kvcache"
-	"sun-panel/internal/infra/zaplog"
-	"sun-panel/internal/util"
+	"yin-panel/internal/biz/repository"
+	"yin-panel/internal/infra/config"
+	"yin-panel/internal/infra/kvcache"
+	"yin-panel/internal/infra/zaplog"
+	"yin-panel/internal/util"
 )
 
 type UserService struct {

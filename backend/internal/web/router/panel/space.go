@@ -3,10 +3,10 @@ package panel
 import (
 	"strconv"
 	"strings"
-	"sun-panel/internal/biz/repository"
-	"sun-panel/internal/web/interceptor"
-	"sun-panel/internal/web/model/base"
-	"sun-panel/internal/web/model/response"
+	"yin-panel/internal/biz/repository"
+	"yin-panel/internal/web/interceptor"
+	"yin-panel/internal/web/model/base"
+	"yin-panel/internal/web/model/response"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"

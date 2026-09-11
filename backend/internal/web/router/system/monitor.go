@@ -1,11 +1,11 @@
 package system
 
 import (
-	"sun-panel/internal/global"
-	"sun-panel/internal/util/monitor"
-	"sun-panel/internal/web/interceptor"
-	"sun-panel/internal/web/model/param/systemApi"
-	"sun-panel/internal/web/model/response"
+	"yin-panel/internal/global"
+	"yin-panel/internal/util/monitor"
+	"yin-panel/internal/web/interceptor"
+	"yin-panel/internal/web/model/param/systemApi"
+	"yin-panel/internal/web/model/response"
 
 	"github.com/gin-gonic/gin"
 )

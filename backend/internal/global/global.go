@@ -1,12 +1,12 @@
 package global
 
 import (
-	"sun-panel/internal/biz/cache"
-	"sun-panel/internal/biz/repository"
-	"sun-panel/internal/biz/service"
-	"sun-panel/internal/infra/config"
-	"sun-panel/internal/infra/kvcache"
-	"sun-panel/internal/infra/storage"
+	"yin-panel/internal/biz/cache"
+	"yin-panel/internal/biz/repository"
+	"yin-panel/internal/biz/service"
+	"yin-panel/internal/infra/config"
+	"yin-panel/internal/infra/kvcache"
+	"yin-panel/internal/infra/storage"
 	"time"
 )
 

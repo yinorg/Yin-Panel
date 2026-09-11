@@ -1,10 +1,10 @@
 package router
 
 import (
-	"sun-panel/internal/infra/config"
-	"sun-panel/internal/infra/zaplog"
-	"sun-panel/internal/web/router/panel"
-	"sun-panel/internal/web/router/system"
+	"yin-panel/internal/infra/config"
+	"yin-panel/internal/infra/zaplog"
+	"yin-panel/internal/web/router/panel"
+	"yin-panel/internal/web/router/system"
 
 	"github.com/gin-gonic/gin"
 )
@@ -66,6 +66,6 @@ func InitRouters(addr string) error {
 		zaplog.Logger.Info("Static file server is disabled")
 	}
 
-	zaplog.Logger.Info("Moon-Box is Started.  Listening and serving HTTP on ", addr)
+	zaplog.Logger.Info("Yin-Panel is Started.  Listening and serving HTTP on ", addr)
 	return router.Run(addr)
 }

@@ -17,10 +17,10 @@ import (
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 
-	"sun-panel/internal/biz/repository"
-	"sun-panel/internal/infra/config"
-	"sun-panel/internal/infra/zaplog"
-	"sun-panel/internal/web/model/param/commonApi"
+	"yin-panel/internal/biz/repository"
+	"yin-panel/internal/infra/config"
+	"yin-panel/internal/infra/zaplog"
+	"yin-panel/internal/web/model/param/commonApi"
 )
 
 func TestAuthentikOIDCAuthorizationCodeFlow(t *testing.T) {
@@ -63,7 +63,7 @@ func TestAuthentikOIDCAuthorizationCodeFlow(t *testing.T) {
 			}
 			idToken := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.MapClaims{
 				"iss":                issuer,
-				"aud":                "sun-panel-client",
+				"aud":                "yin-panel-client",
 				"sub":                "authentik-user-42",
 				"preferred_username": "alice",
 				"name":               "Alice Example",
@@ -97,8 +97,8 @@ func TestAuthentikOIDCAuthorizationCodeFlow(t *testing.T) {
 		Enable: true,
 		Providers: []config.OAuthProviderConfig{{
 			Name:                    "authentik",
-			ClientID:                "sun-panel-client",
-			ClientSecret:            "sun-panel-secret",
+			ClientID:                "yin-panel-client",
+			ClientSecret:            "yin-panel-secret",
 			IssuerURL:               issuer,
 			Scopes:                  "profile email",
 			FieldMappingIdentifier:  "preferred_username",

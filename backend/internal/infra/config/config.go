@@ -3,7 +3,7 @@ package config
 import (
 	"errors"
 	"os"
-	"sun-panel/internal/util"
+	"yin-panel/internal/util"
 
 	"gopkg.in/yaml.v3"
 )

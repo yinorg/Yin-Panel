@@ -1,7 +1,7 @@
 package repository
 
 import (
-	"sun-panel/internal/web/model/param/commonApi"
+	"yin-panel/internal/web/model/param/commonApi"
 
 	"gorm.io/gorm"
 )

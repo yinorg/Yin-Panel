@@ -8,7 +8,7 @@ import (
 	"gorm.io/gorm/schema"
 	"os"
 	"path"
-	"sun-panel/internal/util"
+	"yin-panel/internal/util"
 )
 
 type SQLiteConfig struct {

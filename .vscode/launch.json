@@ -5,7 +5,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Launch Moon-Box",
+            "name": "Launch Yin-Panel",
             "type": "go",
             "request": "launch",
             "mode": "auto",

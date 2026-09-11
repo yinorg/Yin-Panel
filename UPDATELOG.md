@@ -15,8 +15,8 @@
 - [优化] 小图标模式，鼠标悬浮显示详情，支持隐藏图标标题
 - [优化] 详情图标样式，支持隐藏描述信息
 - [优化] 添加用户密码时限制字符
-- [其他] 新增arm版本docker支持。[DockerHub](https://hub.docker.com/r/hslr/sun-panel)直接拉取即可
-- [其他] 新增多平台二进制文件运行。[Releases](https://github.com/hslr-s/sun-panel/releases)
+- [其他] 新增arm版本docker支持。[DockerHub](https://hub.docker.com/r/hslr/yin-panel)直接拉取即可
+- [其他] 新增多平台二进制文件运行。[Releases](https://github.com/hslr-s/yin-panel/releases)
 
 ## v1.0.0
 - 首个版本

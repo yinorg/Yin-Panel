@@ -10,9 +10,9 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"sun-panel/internal/global"
-	"sun-panel/internal/infra/zaplog"
-	"sun-panel/internal/util"
+	"yin-panel/internal/global"
+	"yin-panel/internal/infra/zaplog"
+	"yin-panel/internal/util"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"

@@ -39,8 +39,8 @@ jwt:
 #   enable: true
 #   providers:
 #     - name: authentik
-#       client_id: sun-panel
+#       client_id: yin-panel
 #       client_secret: your_client_secret
-#       issuer_url: https://auth.example.com/application/o/sun-panel/
+#       issuer_url: https://auth.example.com/application/o/yin-panel/
 #       scopes: openid profile email
 #       # Register <root_url>/api/oauth/authentik/callback in Authentik.

@@ -16,7 +16,7 @@ RUN apk add --no-cache bash curl gcc git musl-dev && \
     go env -w GO111MODULE=on && \
     export PATH=$PATH:/go/bin && \
     export CGO_ENABLED=1 && \
-    go build -o sun-panel --ldflags="-X sun-panel/internal/global.RUNCODE=release -X sun-panel/internal/global.VERSION=${VERSION}" main.go
+    go build -o yin-panel --ldflags="-X yin-panel/internal/global.RUNCODE=release -X yin-panel/internal/global.VERSION=${VERSION}" main.go
 
 # final image
 FROM alpine:3.19
@@ -30,10 +30,10 @@ RUN apk add --no-cache bash curl tzdata && \
     ln -sf /usr/share/zoneinfo/$TZ /etc/localtime && echo "$TZ" > /etc/timezone && \
     mkdir -p /app/lang
 
-COPY --from=builder /build/sun-panel /app/sun-panel
+COPY --from=builder /build/yin-panel /app/yin-panel
 COPY backend/lang /app/lang
 COPY backend/conf.yaml /app/conf.yaml
 
 EXPOSE 3002
-RUN chmod +x ./sun-panel
-CMD ./sun-panel
+RUN chmod +x ./yin-panel
+CMD ./yin-panel

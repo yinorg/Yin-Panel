@@ -38,7 +38,7 @@ backend/my_conf.yaml
 backend/database
 backend/web
 backend/uploads
-backend/sun-panel
+backend/yin-panel
 
 # Local planning notes
 docs/optimization-goals.md
