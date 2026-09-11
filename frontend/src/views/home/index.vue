@@ -351,10 +351,10 @@ function handleAddItem(itemIconGroupId?: number) {
 <template>
   <div class="w-full h-full sun-main">
     <div v-if="spaces.length && authStore.token" class="space-status-bar">
-      <NDropdown trigger="hover" :options="spaces.map(space => ({ label: spaceDisplayName(space, spaces), key: space.id }))" @select="selectSpace">
+      <NDropdown trigger="hover" :options="spaces.map(space => ({ label: spaceDisplayName(space, spaces, authStore.userInfo?.id), key: space.id }))" @select="selectSpace">
         <NButton quaternary class="space-status-button">
           <span class="space-status-dot" />
-          {{ activeSpace ? spaceDisplayName(activeSpace, spaces) : '' }}
+          {{ activeSpace ? spaceDisplayName(activeSpace, spaces, authStore.userInfo?.id) : '' }}
           <span class="ml-2 opacity-60">⌄</span>
         </NButton>
       </NDropdown>

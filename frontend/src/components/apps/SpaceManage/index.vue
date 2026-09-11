@@ -2,8 +2,10 @@
 import { onMounted, ref } from 'vue'
 import { NButton, NCard, NInput, NList, NListItem, NSelect, NSpace, useMessage } from 'naive-ui'
 import { addMember, addOIDCGroup, copySpace, createGroup, createTeam, deleteGroup, deleteOIDCGroup, getGroups, getMembers, getOIDCGroups, getSpaces, renameSpace, spaceDisplayName, updateGroup, updateMember, type Space, type SpaceMember } from '../../../api/panel/space'
+import { useAuthStore } from '../../../store'
 
 const message = useMessage()
+const authStore = useAuthStore()
 const spaces = ref<Space[]>([])
 const selectedSpaceId = ref<number | null>(null)
 const name = ref(''); const groupName = ref(''); const editing = ref<{ spaceId: number; id: number } | null>(null)
@@ -43,7 +45,7 @@ onMounted(load)
           <NInput v-model:value="name" placeholder="团队名称" maxlength="100" @keyup.enter="create" />
           <NButton type="primary" :loading="loading" @click="create">创建团队</NButton>
         </NSpace>
-        <NSelect v-model:value="selectedSpaceId" :options="spaces.map(space => ({ label: `${spaceDisplayName(space, spaces, true)} (${space.type === 'shared' || space.type === 'team' ? '共享' : '个人'})`, value: space.id }))" @update:value="(id) => loadDetails(Number(id))" />
+        <NSelect v-model:value="selectedSpaceId" :options="spaces.map(space => ({ label: `${spaceDisplayName(space, spaces, authStore.userInfo?.id, true)} (${space.type === 'shared' || space.type === 'team' ? '共享' : '个人'})`, value: space.id }))" @update:value="(id) => loadDetails(Number(id))" />
         <NSpace v-if="selectedSpaceId"><NInput v-model:value="rename" :placeholder="selected()?.name || '空间名称'" /><NButton @click="renameCurrent">重命名</NButton><NButton @click="copyCurrent">复制空间</NButton></NSpace>
         <NList v-if="selectedSpaceId" bordered>
           <NListItem>

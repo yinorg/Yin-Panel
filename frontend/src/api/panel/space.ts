@@ -2,8 +2,8 @@ import { get, post } from '../../utils/request'
 
 export interface Space { id: number; type: 'personal' | 'team' | 'shared'; name: string; ownerUserId: number }
 export interface SpaceMember { id: number; userId: number; email?: string; role: 'admin' | 'editor' | 'viewer'; source?: string }
-export function spaceDisplayName(space: Space, spaces: Space[], memberView = false) {
-  if (space.type === 'personal' && !memberView)
+export function spaceDisplayName(space: Space, spaces: Space[], currentUserId?: number, memberView = false) {
+  if (space.type === 'personal' && !memberView && space.ownerUserId === currentUserId)
     return '我的空间'
   const sameName = spaces.filter(item => item.name === space.name)
   return sameName.length > 1 ? `${space.name} ${space.id}` : space.name
