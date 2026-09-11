@@ -17,7 +17,7 @@ export function renameSpace<T>(spaceId: number, name: string) { return post<T>({
 export function copySpace<T>(spaceId: number, name?: string) { return post<T>({ url: `/spaces/${spaceId}/copy`, data: name ? { name } : {} }) }
 export function transferSpace<T>(spaceId: number, userId: number) { return post<T>({ url: `/spaces/${spaceId}/transfer`, data: { userId } }) }
 export function getMembers<T>(spaceId: number) { return get<T>({ url: `/spaces/${spaceId}/members` }) }
-export function addMember<T>(spaceId: number, userId: number, role: string) { return post<T>({ url: `/spaces/${spaceId}/members`, data: { userId, role } }) }
+export function addMember<T>(spaceId: number, email: string, role: string) { return post<T>({ url: `/spaces/${spaceId}/members`, data: { email, role } }) }
 export function updateMember<T>(spaceId: number, userId: number, role: string) { return post<T>({ url: `/spaces/${spaceId}/members/${userId}`, data: { role } }) }
 export function removeMember<T>(spaceId: number, userId: number) { return post<T>({ url: `/spaces/${spaceId}/members/${userId}` }) }
 export function getOIDCGroups<T>(spaceId: number) { return get<T>({ url: `/spaces/${spaceId}/oidc-groups` }) }

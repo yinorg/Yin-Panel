@@ -2,6 +2,7 @@ package panel
 
 import (
 	"strconv"
+	"strings"
 	"sun-panel/internal/biz/repository"
 	"sun-panel/internal/web/interceptor"
 	"sun-panel/internal/web/model/base"
@@ -49,8 +50,8 @@ func (r *SpaceRouter) InitRouter(router *gin.RouterGroup) {
 }
 
 type memberRequest struct {
-	UserID uint   `json:"userId" binding:"required"`
-	Role   string `json:"role" binding:"required"`
+	Email string `json:"email" binding:"required,email"`
+	Role  string `json:"role" binding:"required"`
 }
 
 type renameRequest struct {
@@ -173,11 +174,11 @@ func (r *SpaceRouter) Transfer(c *gin.Context) {
 		return
 	}
 	err = repository.Db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Model(&repository.Space{}).Where("id = ?", id).Update("owner_user_id", req.UserID).Error; err != nil {
+		if err := tx.Model(&repository.Space{}).Where("id = ?", id).Update("owner_user_id", targetUser.ID).Error; err != nil {
 			return err
 		}
 		tx.Model(&repository.SpaceMember{}).Where("space_id = ? AND user_id = ?", id, user.ID).Update("role", repository.SpaceRoleEditor)
-		return tx.Model(&repository.SpaceMember{}).Where("space_id = ? AND user_id = ?", id, req.UserID).Assign(map[string]any{"role": repository.SpaceRoleAdmin}).FirstOrCreate(&repository.SpaceMember{SpaceID: id, UserID: req.UserID, Role: repository.SpaceRoleAdmin}).Error
+		return tx.Model(&repository.SpaceMember{}).Where("space_id = ? AND user_id = ?", id, targetUser.ID).Assign(map[string]any{"role": repository.SpaceRoleAdmin}).FirstOrCreate(&repository.SpaceMember{SpaceID: id, UserID: targetUser.ID, Role: repository.SpaceRoleAdmin}).Error
 	})
 	if err != nil {
 		response.ErrorDatabase(c, err.Error())
@@ -415,12 +416,12 @@ func (r *SpaceRouter) AddMember(c *gin.Context) {
 		return
 	}
 	var targetUser repository.User
-	if repository.Db.First(&targetUser, req.UserID).Error != nil {
+	if repository.Db.Where("lower(mail) = ?", strings.ToLower(strings.TrimSpace(req.Email))).First(&targetUser).Error != nil {
 		response.ErrorDataNotFound(c)
 		return
 	}
-	m := repository.SpaceMember{SpaceID: id, UserID: req.UserID, Role: req.Role}
-	if err := repository.Db.Where("space_id = ? AND user_id = ?", id, req.UserID).Assign(m).FirstOrCreate(&m).Error; err != nil {
+	m := repository.SpaceMember{SpaceID: id, UserID: targetUser.ID, Role: req.Role}
+	if err := repository.Db.Where("space_id = ? AND user_id = ?", id, targetUser.ID).Assign(m).FirstOrCreate(&m).Error; err != nil {
 		response.ErrorDatabase(c, err.Error())
 		return
 	}

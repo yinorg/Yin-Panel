@@ -10,7 +10,7 @@ const name = ref(''); const groupName = ref(''); const editing = ref<{ spaceId: 
 const loading = ref(false)
 const groups = ref<Record<number, { id: number; title: string }[]>>({})
 const members = ref<SpaceMember[]>([]); const oidcRules = ref<any[]>([])
-const rename = ref(''); const memberUserId = ref(''); const memberRole = ref('viewer'); const oidcProvider = ref('authentik'); const oidcGroup = ref(''); const oidcRole = ref('viewer')
+const rename = ref(''); const memberEmail = ref(''); const memberRole = ref('viewer'); const oidcProvider = ref('authentik'); const oidcGroup = ref(''); const oidcRole = ref('viewer')
 function load() { getSpaces<{ code: number; data: Space[] }>().then(({ data }) => { spaces.value = data || []; if (spaces.value.length && !selectedSpaceId.value) selectedSpaceId.value = spaces.value[0].id; spaces.value.forEach(space => loadGroups(space.id)); if (selectedSpaceId.value) loadDetails(selectedSpaceId.value) }) }
 function loadGroups(spaceId: number) { getGroups<{ code: number; data: { id: number; title: string }[] }>(spaceId).then(({ data }) => { groups.value[spaceId] = data || [] }) }
 function loadDetails(spaceId: number) { getMembers<{ code: number; data: SpaceMember[] }>(spaceId).then(({ data }) => { members.value = data || [] }); getOIDCGroups<{ code: number; data: any[] }>(spaceId).then(({ data }) => { oidcRules.value = data || [] }) }
@@ -28,7 +28,7 @@ function create() {
 function selected() { return spaces.value.find(space => space.id === selectedSpaceId.value) }
 function renameCurrent() { const value = rename.value.trim(); if (value && selectedSpaceId.value) renameSpace(selectedSpaceId.value, value).then(({ code }) => { if (code === 0) { message.success('空间名称已更新'); load() } }) }
 function copyCurrent() { if (selectedSpaceId.value) copySpace<{ code: number }>(selectedSpaceId.value).then(({ code }) => { if (code === 0) { message.success('空间已复制'); load() } }) }
-function addCurrentMember() { const userId = Number(memberUserId.value); if (selectedSpaceId.value && userId) addMember(selectedSpaceId.value, userId, memberRole.value).then(({ code }) => { if (code === 0) { memberUserId.value = ''; loadDetails(selectedSpaceId.value!) } }) }
+function addCurrentMember() { const email = memberEmail.value.trim(); if (selectedSpaceId.value && email) addMember(selectedSpaceId.value, email, memberRole.value).then(({ code }) => { if (code === 0) { memberEmail.value = ''; loadDetails(selectedSpaceId.value!) } }) }
 function changeMember(member: SpaceMember, role: string) { if (selectedSpaceId.value) updateMember(selectedSpaceId.value, member.userId, role).then(() => loadDetails(selectedSpaceId.value!)) }
 function addRule() { if (selectedSpaceId.value && oidcGroup.value.trim()) addOIDCGroup(selectedSpaceId.value, oidcProvider.value, oidcGroup.value.trim(), oidcRole.value).then(({ code }) => { if (code === 0) { oidcGroup.value = ''; loadDetails(selectedSpaceId.value!) } }) }
 function removeRule(id: number) { if (selectedSpaceId.value) deleteOIDCGroup(selectedSpaceId.value, id).then(() => loadDetails(selectedSpaceId.value!)) }
@@ -55,7 +55,7 @@ onMounted(load)
           </NListItem>
         </NList>
         <NCard v-if="selectedSpaceId" title="成员管理">
-          <NSpace><NInput v-model:value="memberUserId" placeholder="用户 ID" /><NSelect v-model:value="memberRole" :options="[{ label: '编辑者', value: 'editor' }, { label: '查看者', value: 'viewer' }]" /><NButton @click="addCurrentMember">添加成员</NButton></NSpace>
+          <NSpace><NInput v-model:value="memberEmail" placeholder="用户邮箱" /><NSelect v-model:value="memberRole" :options="[{ label: '编辑者', value: 'editor' }, { label: '查看者', value: 'viewer' }]" /><NButton @click="addCurrentMember">添加成员</NButton></NSpace>
           <NList><NListItem v-for="member in members" :key="member.userId"><NSpace justify="space-between" class="w-full"><span>用户 {{ member.userId }} ({{ member.source || 'manual' }})</span><NSelect :value="member.role" :options="[{ label: '管理员', value: 'admin' }, { label: '编辑者', value: 'editor' }, { label: '查看者', value: 'viewer' }]" @update:value="role => changeMember(member, role)" /></NSpace></NListItem></NList>
         </NCard>
         <NCard v-if="selectedSpaceId" title="OIDC 分组授权">
