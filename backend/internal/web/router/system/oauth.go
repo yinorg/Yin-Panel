@@ -1,6 +1,11 @@
 package system
 
 import (
+	"crypto/sha256"
+	"crypto/subtle"
+	"encoding/hex"
+	"net/http"
+	"net/url"
 	"strings"
 	"sun-panel/internal/global"
 	"sun-panel/internal/infra/config"
@@ -65,6 +70,13 @@ func (r *OAuthRouter) OAuthLogin(c *gin.Context) {
 		response.Error(c, "获取OAuth授权URL失败")
 		return
 	}
+	authorizationURL, err := url.Parse(authURL)
+	if err != nil || authorizationURL.Query().Get("state") == "" {
+		zaplog.Logger.Error("OAuth authorization URL does not include state", err)
+		response.Error(c, "获取OAuth授权URL失败")
+		return
+	}
+	r.setOAuthStateCookie(c, provider, authorizationURL.Query().Get("state"), 300)
 
 	// 重定向到OAuth授权页面
 	c.Redirect(302, authURL)
@@ -74,15 +86,22 @@ func (r *OAuthRouter) OAuthLogin(c *gin.Context) {
 func (r *OAuthRouter) OAuthCallback(c *gin.Context) {
 	provider := c.Param("provider")
 	code := c.Query("code")
+	state := c.Query("state")
 
 	// 检查是否支持该OAuth提供商
 	if !r.isProviderSupported(provider) {
 		response.Error(c, "不支持的OAuth提供商")
 		return
 	}
+	stateCookie, err := c.Cookie(oauthStateCookieName(provider))
+	r.setOAuthStateCookie(c, provider, "", -1)
+	if err != nil || subtle.ConstantTimeCompare([]byte(state), []byte(stateCookie)) != 1 {
+		response.Error(c, "OAuth state校验失败")
+		return
+	}
 
 	// 处理OAuth回调
-	user, err := global.UserService.HandleOAuthCallback(provider, code, util.RedirectURL(config.AppConfig.Base.RootURL, provider))
+	user, err := global.UserService.HandleOAuthCallback(provider, code, util.RedirectURL(config.AppConfig.Base.RootURL, provider), state)
 	if err != nil {
 		zaplog.Logger.Error("处理OAuth回调失败:", err)
 		response.Error(c, "处理OAuth回调失败")
@@ -90,7 +109,7 @@ func (r *OAuthRouter) OAuthCallback(c *gin.Context) {
 	}
 
 	// 生成JWT Token
-	token, err := jwt.GenerateToken(user.ID)
+	token, err := jwt.GenerateToken(user.ID, user.TokenVersion)
 	if err != nil {
 		zaplog.Logger.Error("生成token失败:", err)
 		response.Error(c, "生成token失败")
@@ -99,6 +118,17 @@ func (r *OAuthRouter) OAuthCallback(c *gin.Context) {
 
 	redirectUrl := config.AppConfig.Base.RootURL + "/login?token=" + token
 	c.Redirect(302, redirectUrl)
+}
+
+func (r *OAuthRouter) setOAuthStateCookie(c *gin.Context, provider, state string, maxAge int) {
+	rootURL, _ := url.Parse(config.AppConfig.Base.RootURL)
+	c.SetSameSite(http.SameSiteLaxMode)
+	c.SetCookie(oauthStateCookieName(provider), state, maxAge, "/api/oauth/"+provider+"/callback", "", rootURL != nil && rootURL.Scheme == "https", true)
+}
+
+func oauthStateCookieName(provider string) string {
+	digest := sha256.Sum256([]byte(provider))
+	return "sun_panel_oauth_state_" + hex.EncodeToString(digest[:8])
 }
 
 // 检查是否支持该OAuth提供商

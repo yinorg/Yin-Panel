@@ -113,6 +113,10 @@ func (a *UserRouter) UpdatePasssword(c *gin.Context) {
 		response.ErrorDatabase(c, err.Error())
 		return
 	}
+	if err = global.UserRepo.InvalidateTokens(userInfo.ID); err != nil {
+		response.ErrorDatabase(c, err.Error())
+		return
+	}
 
 	response.Success(c)
 }

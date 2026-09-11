@@ -59,8 +59,8 @@ rclone:
 jwt:
   # JWT secret key
   secret: your_secret_key
-  # JWT token expiration time in hours, default: 72
-  expire: 72
+  # JWT token expiration time in hours, default: 2160 (90 days). Values <= 0 use the default.
+  expire: 2160
 
 # OAuth providers configuration
 oauth:
@@ -88,3 +88,16 @@ oauth:
       field_mapping_identifier: sub
       field_mapping_display_name: name
       field_mapping_email: email
+    # Authentik OIDC example. Set the issuer to the value shown in the
+    # application's OpenID configuration page. Endpoints are discovered
+    # automatically, and the authorization-code flow uses PKCE, state and nonce.
+    # Register https://panel.example.com/api/oauth/authentik/callback as the
+    # redirect URI in the Authentik application, replacing the host as needed.
+    # - name: authentik
+    #   client_id: sun-panel
+    #   client_secret: your_client_secret
+    #   issuer_url: https://auth.example.com/application/o/sun-panel/
+    #   scopes: openid profile email
+    #   field_mapping_identifier: sub
+    #   field_mapping_display_name: name
+    #   field_mapping_email: email

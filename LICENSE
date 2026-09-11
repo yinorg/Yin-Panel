@@ -1,21 +1,22 @@
-MIT License
+Business Source License 1.1
 
-Copyright (c) 2023 红烧猎人
+Parameters
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+Licensor: Alkaid / yinorg
+Licensed Work: Yin-Panel
+Change Date: 2029-09-11
+Change License: AGPL-3.0-or-later
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+Additional Use Grant
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+You may use the Licensed Work for personal, internal, and commercial
+production use without charge. You may not offer the Licensed Work or a
+substantially similar product as a paid hosted or SaaS service that competes
+with Yin-Panel, or distribute a modified version as a separately sold product,
+before the Change Date.
+
+Notice
+
+This license applies to the Licensed Work from this commit onward. On the
+Change Date, the Licensed Work will be governed by the Change License above.
+See https://mariadb.com/bsl11/ for the BSL 1.1 terms.

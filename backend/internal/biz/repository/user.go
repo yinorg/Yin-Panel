@@ -19,6 +19,7 @@ type User struct {
 	OauthProvider string `gorm:"type:varchar(50);uniqueIndex:idx_username_oauth_provider" json:"oauthProvider"` // OAuth来源 (github, google)
 	OauthID       string `gorm:"type:varchar(255);index" json:"oauthId"`                                        // OAuth提供商中的用户ID
 	Publiccode    string `gorm:"type:varchar(50);uniqueIndex:uk_publiccode" json:"publiccode"`                  // 公开访问代码
+	TokenVersion  uint   `gorm:"not null;default:0" json:"-"`                                                   // 用于撤销已签发的JWT
 }
 
 type UserRepo struct {
@@ -36,6 +37,7 @@ type IUserRepo interface {
 	Delete(userId uint) ([]string, error)
 	CheckUsernameExist(username, oauthProvider string) (User, error)
 	GetByPubliccode(publiccode string) (User, error)
+	InvalidateTokens(userID uint) error
 }
 
 func NewUserRepo() IUserRepo {
@@ -193,4 +195,11 @@ func (r *UserRepo) GetByPubliccode(publiccode string) (User, error) {
 	user := User{}
 	err := Db.Where("publiccode=?", publiccode).First(&user).Error
 	return user, err
+}
+
+// InvalidateTokens revokes all sessions for a user, including sessions created
+// before a process restart, by advancing the version embedded in JWT claims.
+func (r *UserRepo) InvalidateTokens(userID uint) error {
+	return Db.Model(&User{}).Where("id=?", userID).
+		UpdateColumn("token_version", gorm.Expr("token_version + ?", 1)).Error
 }

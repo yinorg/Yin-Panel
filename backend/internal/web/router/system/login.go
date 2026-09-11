@@ -75,7 +75,7 @@ func (l *LoginRouter) Login(c *gin.Context) {
 	}
 
 	// 生成JWT Token
-	user.Token, err = jwt.GenerateToken(user.ID)
+	user.Token, err = jwt.GenerateToken(user.ID, user.TokenVersion)
 	if err != nil {
 		zaplog.Logger.Error("JWT生成失败:", err)
 		response.Error(c, "系统错误")
@@ -96,5 +96,19 @@ func (l *LoginRouter) Login(c *gin.Context) {
 
 // Logout 安全退出
 func (l *LoginRouter) Logout(c *gin.Context) {
+	if c.GetString("authMethod") != "jwt" {
+		response.ErrorByCode(c, constant.CodeNotLogin)
+		return
+	}
+	userInfo, ok := base.GetCurrentUserInfo(c)
+	if !ok {
+		response.ErrorByCode(c, constant.CodeNotLogin)
+		return
+	}
+	if err := global.UserRepo.InvalidateTokens(userInfo.ID); err != nil {
+		zaplog.Logger.Error("撤销登录会话失败:", err)
+		response.Error(c, "退出登录失败")
+		return
+	}
 	response.Success(c)
 }

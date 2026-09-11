@@ -21,6 +21,10 @@ const oauthProviders = ref<string[]>([])
 const oauthLoading = ref(false)
 const loadingProvider = ref<string>('')
 
+const oauthProviderMeta: Record<string, { icon: string; label: string }> = {
+  authentik: { icon: 'mdi:shield-account', label: 'Authentik' },
+}
+
 const form = ref<Login.LoginReqest>({
   username: '',
   password: '',
@@ -38,36 +42,30 @@ onMounted(async () => {
     console.error('Failed to fetch OAuth config:', error)
   }
 
-  // 检查URL中是否有token参数（OAuth回调）
-  // 从hash部分获取token参数
-  const hashParts = window.location.href.split('?')
-  if (hashParts.length > 1) {
-    const hashParams = new URLSearchParams(hashParts[1])
-    const token = hashParams.get('token')
-    if (token) {
-      authStore.setToken(token)
-      authStore.saveStorage()
-      
-      try {
-        try {
-          const { data } = await getUser()
-          if (data) {
-            authStore.setUserInfo(data)
-            authStore.saveStorage()
+  // OIDC/OAuth callback returns the application's session token to this route.
+  const callbackURL = new URL(window.location.href)
+  const token = callbackURL.searchParams.get('token')
+  if (token) {
+    callbackURL.searchParams.delete('token')
+    window.history.replaceState({}, document.title, `${callbackURL.pathname}${callbackURL.search}${callbackURL.hash}`)
 
-            // 显示欢迎消息
-            ms.success(`Hi ${data.name}, ${t('login.welcomeMessage')}`)
-            router.push({ path: '/' })
-          } else {
-            console.error('Failed to get user info:', data)
-          }
-        }
-        catch (error) {
-          console.error('Failed to update local user info:', error)
-        }
-      } catch (error) {
-        console.error('Error during OAuth login:', error)
+    authStore.setToken(token)
+    authStore.saveStorage()
+      
+    try {
+      const { data } = await getUser()
+      if (data) {
+        authStore.setUserInfo(data)
+        authStore.saveStorage()
+
+        ms.success(`Hi ${data.name}, ${t('login.welcomeMessage')}`)
+        router.push({ path: '/' })
+      } else {
+        console.error('Failed to get user info:', data)
       }
+    }
+    catch (error) {
+      console.error('Error during OAuth login:', error)
     }
   }
 })
@@ -117,6 +115,14 @@ function handleOAuthLogin(provider: string) {
   
   // 直接在当前窗口打开OAuth登录页面
   window.location.href = oauthUrl
+}
+
+function getProviderIcon(provider: string) {
+  return oauthProviderMeta[provider.toLowerCase()]?.icon || `mdi:${provider}`
+}
+
+function getProviderLabel(provider: string) {
+  return oauthProviderMeta[provider.toLowerCase()]?.label || `${provider.charAt(0).toUpperCase()}${provider.slice(1)}`
 }
 
 </script>
@@ -175,9 +181,9 @@ function handleOAuthLogin(provider: string) {
               @click="handleOAuthLogin(provider)"
             >
               <template #icon>
-                <SvgIconOnline :icon="`mdi:${provider}`" />
+                <SvgIconOnline :icon="getProviderIcon(provider)" />
               </template>
-              {{ provider.charAt(0).toUpperCase() + provider.slice(1) }}
+              {{ getProviderLabel(provider) }}
             </NButton>
           </div>
         </div>
@@ -213,7 +219,8 @@ function handleOAuthLogin(provider: string) {
 
     .login-card {
         margin: 20px;
-        min-width:400px;
+        width: min(100%, 400px);
+        min-width: 0;
     }
 
   .login-title{

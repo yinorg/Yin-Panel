@@ -10,15 +10,18 @@ import (
 
 // Claims 自定义JWT claims结构
 type Claims struct {
-	UserID uint `json:"user_id"`
+	UserID       uint  `json:"user_id"`
+	TokenVersion *uint `json:"token_version"`
 	jwt.RegisteredClaims
 }
 
 var (
 	secretKey       []byte
-	expireHours     = 72                          // 默认72小时
+	expireHours     = DefaultExpireHours          // 默认90天
 	ErrInvalidToken = errors.New("invalid token") // 自定义错误
 )
+
+const DefaultExpireHours = 90 * 24
 
 // InitJWT 初始化JWT配置
 func InitJWT() error {
@@ -36,13 +39,19 @@ func InitSecret(secret string) {
 
 // SetExpire 设置Token过期时间（小时）
 func SetExpire(hours int) {
+	if hours <= 0 {
+		expireHours = DefaultExpireHours
+		return
+	}
 	expireHours = hours
 }
 
 // GenerateToken 生成JWT Token
-func GenerateToken(userID uint) (string, error) {
+func GenerateToken(userID, tokenVersion uint) (string, error) {
+	tokenVersionClaim := tokenVersion
 	claims := Claims{
-		UserID: userID,
+		UserID:       userID,
+		TokenVersion: &tokenVersionClaim,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Duration(expireHours) * time.Hour)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -58,6 +67,9 @@ func GenerateToken(userID uint) (string, error) {
 // ParseToken 解析JWT Token
 func ParseToken(tokenString string) (*Claims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (any, error) {
+		if token.Method != jwt.SigningMethodHS256 {
+			return nil, ErrInvalidToken
+		}
 		return secretKey, nil
 	})
 

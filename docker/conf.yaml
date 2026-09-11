@@ -31,5 +31,16 @@ rclone:
 jwt:
   # JWT secret key
   secret: your_secret_key
-  # JWT token expiration time in hours, default: 72
-  expire: 72
+  # JWT token expiration time in hours, default: 2160 (90 days). Values <= 0 use the default.
+  expire: 2160
+
+# OAuth / OIDC login configuration
+# oauth:
+#   enable: true
+#   providers:
+#     - name: authentik
+#       client_id: sun-panel
+#       client_secret: your_client_secret
+#       issuer_url: https://auth.example.com/application/o/sun-panel/
+#       scopes: openid profile email
+#       # Register <root_url>/api/oauth/authentik/callback in Authentik.

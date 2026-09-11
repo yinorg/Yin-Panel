@@ -19,10 +19,16 @@ func Auth(c *gin.Context) {
 	publiccode := c.GetHeader("publiccode")
 	var userId uint
 	var err error
+	var claims *jwt.Claims
+	authMethod := "publiccode"
 	if publiccode != "" {
 		userId, err = ParseUserIdFromPubliccode(publiccode)
 	} else {
-		userId, err = ParseUserIdFromJwtToken(c.GetHeader("Authorization"))
+		claims, err = ParseJwtClaims(c.GetHeader("Authorization"))
+		if err == nil {
+			userId = claims.UserID
+			authMethod = "jwt"
+		}
 	}
 
 	if err != nil {
@@ -46,6 +52,11 @@ func Auth(c *gin.Context) {
 		c.Abort()
 		return
 	}
+	if claims != nil && (claims.TokenVersion == nil || *claims.TokenVersion != user.TokenVersion) {
+		response.ErrorByCode(c, constant.CodeNotLogin)
+		c.Abort()
+		return
+	}
 
 	// 将用户信息存储到上下文
 	userInfo := base.UserInfo{
@@ -57,13 +68,22 @@ func Auth(c *gin.Context) {
 		Token:      user.Token,
 	}
 	c.Set("userInfo", userInfo)
+	c.Set("authMethod", authMethod)
 	c.Next()
 }
 
 // ParseUserIdFromJwtToken 解析JWT Token，获取用户ID
 func ParseUserIdFromJwtToken(authHeader string) (uint, error) {
+	claims, err := ParseJwtClaims(authHeader)
+	if err != nil {
+		return 0, err
+	}
+	return claims.UserID, nil
+}
+
+func ParseJwtClaims(authHeader string) (*jwt.Claims, error) {
 	if authHeader == "" {
-		return 0, errors.New("authHeader is empty")
+		return nil, errors.New("authHeader is empty")
 	}
 
 	// 支持Bearer token
@@ -76,10 +96,10 @@ func ParseUserIdFromJwtToken(authHeader string) (uint, error) {
 	claims, err := jwt.ParseToken(authHeader)
 	if err != nil {
 		zaplog.Logger.Infof("invalid token. %v", err)
-		return 0, errors.New("invalid token")
+		return nil, errors.New("invalid token")
 	}
 
-	return claims.UserID, nil
+	return claims, nil
 }
 
 // ParseUserIdFromPubliccode 解析公开访问代码，获取用户ID

@@ -11,30 +11,37 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/oauth2"
 
 	"sun-panel/internal/biz/repository"
 	"sun-panel/internal/infra/config"
+	"sun-panel/internal/infra/kvcache"
 	"sun-panel/internal/infra/zaplog"
-	"sun-panel/internal/util"
 )
 
 type UserService struct {
 	itemGroupRepo repository.IItemIconGroupRepo
 	userRepo      repository.IUserRepo
 	proxyClient   *http.Client
+	oauthStates   *kvcache.LocalCache[oauthLoginState]
+	oauthStateMu  sync.Mutex
 }
 
 type IUserService interface {
 	CreateUser(user *repository.User) error
 	GetOAuthLoginURL(provider string, redirectURI string) (string, error)
-	HandleOAuthCallback(provider, code, redirectURI string) (*repository.User, error)
+	HandleOAuthCallback(provider, code, redirectURI, state string) (*repository.User, error)
 }
 
 func NewUserService(userRepo repository.IUserRepo, itemGroupRepo repository.IItemIconGroupRepo) *UserService {
-	service := &UserService{userRepo: userRepo, itemGroupRepo: itemGroupRepo}
+	service := &UserService{
+		userRepo:      userRepo,
+		itemGroupRepo: itemGroupRepo,
+		oauthStates:   kvcache.NewLocalCache[oauthLoginState](5*time.Minute, time.Minute),
+	}
 
 	// 初始化代理客户端
 	service.initProxyClient()
@@ -73,9 +80,9 @@ func (s *UserService) initProxyClient() {
 		zaplog.Logger.Info("Node proxy not enabled")
 	}
 
-	s.proxyClient = &http.Client{
-		Timeout:   30 * time.Second, // 使用较长的超时时间，因为这是共享的客户端
-		Transport: transport,
+	s.proxyClient = &http.Client{Timeout: 30 * time.Second}
+	if transport != nil {
+		s.proxyClient.Transport = transport
 	}
 }
 
@@ -109,18 +116,20 @@ func (s *UserService) CreateUser(user *repository.User) error {
 
 // GetOAuthLoginURL generates the OAuth login URL for the specified provider
 func (s *UserService) GetOAuthLoginURL(provider string, redirectURI string) (string, error) {
-	// Find the provider config
-	var providerConfig *config.OAuthProviderConfig
-	for _, p := range config.AppConfig.OAuth.Providers {
-		if strings.EqualFold(p.Name, provider) {
-			providerConfig = &p
-			break
-		}
+	providerConfig, err := s.getOAuthProvider(provider)
+	if err != nil {
+		return "", err
 	}
 
-	if providerConfig == nil {
-		return "", errors.New("unsupported OAuth provider")
+	if providerConfig.IssuerURL != "" {
+		return s.getOIDCLoginURL(*providerConfig, redirectURI)
 	}
+
+	state, err := randomURLSafeString(32)
+	if err != nil {
+		return "", fmt.Errorf("generate OAuth state: %w", err)
+	}
+	s.oauthStates.Set(state, oauthLoginState{Provider: provider}, 5*time.Minute)
 
 	// Build OAuth URL
 	authURL, err := url.Parse(providerConfig.AuthURL)
@@ -133,25 +142,33 @@ func (s *UserService) GetOAuthLoginURL(provider string, redirectURI string) (str
 	q.Set("redirect_uri", redirectURI)
 	q.Set("scope", providerConfig.Scopes)
 	q.Set("response_type", "code")
-	q.Set("state", util.GenerateRandomString(16)) // State should be stored in session and verified on callback
+	q.Set("state", state)
 
 	authURL.RawQuery = q.Encode()
 	return authURL.String(), nil
 }
 
 // HandleOAuthCallback processes the OAuth callback and returns or creates a user
-func (s *UserService) HandleOAuthCallback(provider, code, redirectURI string) (*repository.User, error) {
-	// Find the provider config
-	var providerConfig *config.OAuthProviderConfig
-	for _, p := range config.AppConfig.OAuth.Providers {
-		if strings.EqualFold(p.Name, provider) {
-			providerConfig = &p
-			break
-		}
+func (s *UserService) HandleOAuthCallback(provider, code, redirectURI, state string) (*repository.User, error) {
+	providerConfig, err := s.getOAuthProvider(provider)
+	if err != nil {
+		return nil, err
 	}
 
-	if providerConfig == nil {
-		return nil, errors.New("unsupported OAuth provider")
+	loginState, err := s.consumeOAuthState(provider, state)
+	if err != nil {
+		return nil, err
+	}
+	if code == "" {
+		return nil, errors.New("authorization response did not include a code")
+	}
+
+	if providerConfig.IssuerURL != "" {
+		userInfo, err := s.exchangeOIDCCode(*providerConfig, redirectURI, code, loginState)
+		if err != nil {
+			return nil, err
+		}
+		return s.findOrCreateOAuthUser(provider, *providerConfig, userInfo)
 	}
 
 	// Exchange code for token
@@ -168,8 +185,26 @@ func (s *UserService) HandleOAuthCallback(provider, code, redirectURI string) (*
 		return nil, err
 	}
 
+	return s.findOrCreateOAuthUser(provider, *providerConfig, userInfo)
+}
+
+func (s *UserService) getOAuthProvider(provider string) (*config.OAuthProviderConfig, error) {
+	for _, candidate := range config.AppConfig.OAuth.Providers {
+		if strings.EqualFold(candidate.Name, provider) {
+			return &candidate, nil
+		}
+	}
+	return nil, errors.New("unsupported OAuth provider")
+}
+
+func (s *UserService) findOrCreateOAuthUser(provider string, providerConfig config.OAuthProviderConfig, userInfo map[string]any) (*repository.User, error) {
+	identifierField := providerConfig.FieldMappingIdentifier
+	if identifierField == "" {
+		identifierField = "sub"
+	}
+
 	// Extract user identifier from the provider's response
-	identifier, ok := userInfo[providerConfig.FieldMappingIdentifier].(string)
+	identifier, ok := userInfo[identifierField].(string)
 	if !ok || identifier == "" {
 		return nil, errors.New("failed to get user identifier from OAuth provider")
 	}
@@ -177,13 +212,23 @@ func (s *UserService) HandleOAuthCallback(provider, code, redirectURI string) (*
 	// Check if user already exists
 	user, err := s.userRepo.GetByOAuthID(provider, identifier)
 	if err == nil {
-		// 用户已存在，直接返回
+		if user.Status != 1 {
+			return nil, errors.New("user account is disabled or inactive")
+		}
 		return &user, nil
 	}
 
 	// User doesn't exist, create a new one
-	displayName, _ := userInfo[providerConfig.FieldMappingDisplayName].(string)
-	email, _ := userInfo[providerConfig.FieldMappingEmail].(string)
+	displayNameField := providerConfig.FieldMappingDisplayName
+	if displayNameField == "" {
+		displayNameField = "name"
+	}
+	emailField := providerConfig.FieldMappingEmail
+	if emailField == "" {
+		emailField = "email"
+	}
+	displayName, _ := userInfo[displayNameField].(string)
+	email, _ := userInfo[emailField].(string)
 
 	// OAuth users don't need a password as they authenticate through the provider
 	newUser := &repository.User{

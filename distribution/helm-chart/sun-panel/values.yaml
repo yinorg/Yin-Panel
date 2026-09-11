@@ -85,8 +85,8 @@ appConfig:
   jwt:
     # JWT secret key
     secret: your_secret_key
-    # JWT token expiration time in hours, default: 72
-    expire: 72
+    # JWT token expiration time in hours, default: 2160 (90 days). Values <= 0 use the default.
+    expire: 2160
 
   # OAuth providers configuration
   oauth:
@@ -111,6 +111,15 @@ appConfig:
       #   token_url: https://oauth2.googleapis.com/token
       #   user_info_url: https://www.googleapis.com/oauth2/v3/userinfo
       #   scopes: profile email
+      #   field_mapping_identifier: sub
+      #   field_mapping_display_name: name
+      #   field_mapping_email: email
+      # - name: authentik
+      #   client_id: sun-panel
+      #   client_secret: your_client_secret
+      #   issuer_url: https://auth.example.com/application/o/sun-panel/
+      #   scopes: openid profile email
+      #   # Register <base.root_url>/api/oauth/authentik/callback in Authentik.
       #   field_mapping_identifier: sub
       #   field_mapping_display_name: name
       #   field_mapping_email: email

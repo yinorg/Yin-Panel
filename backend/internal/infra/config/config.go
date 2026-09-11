@@ -67,9 +67,15 @@ type OAuthConfig struct {
 
 // OAuthProviderConfig represents the configuration for an OAuth provider
 type OAuthProviderConfig struct {
-	Name                    string `yaml:"name"`
-	ClientID                string `yaml:"client_id"`
-	ClientSecret            string `yaml:"client_secret"`
+	Name         string `yaml:"name"`
+	ClientID     string `yaml:"client_id"`
+	ClientSecret string `yaml:"client_secret"`
+	// IssuerURL enables OpenID Connect discovery for this provider. The value must
+	// exactly match the issuer published by the identity provider.
+	IssuerURL string `yaml:"issuer_url"`
+	// DiscoveryURL is optional. Leave it empty to use
+	// {issuer_url}/.well-known/openid-configuration.
+	DiscoveryURL            string `yaml:"discovery_url"`
 	AuthURL                 string `yaml:"auth_url"`
 	TokenURL                string `yaml:"token_url"`
 	UserInfoURL             string `yaml:"user_info_url"`
