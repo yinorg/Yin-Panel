@@ -1,6 +1,7 @@
 package panel
 
 import (
+	"encoding/json"
 	"strconv"
 	"strings"
 	"yin-panel/internal/biz/repository"
@@ -541,6 +542,11 @@ func (r *SpaceRouter) Items(c *gin.Context) {
 		response.ErrorDatabase(c, err.Error())
 		return
 	}
+	for i := range items {
+		if items[i].IconJson != "" {
+			_ = json.Unmarshal([]byte(items[i].IconJson), &items[i].Icon)
+		}
+	}
 	response.SuccessData(c, items)
 }
 
@@ -566,7 +572,12 @@ func (r *SpaceRouter) CreateItem(c *gin.Context) {
 		return
 	}
 	item.UserId, item.SpaceID = user.ID, id
-	item.IconJson = "{}"
+	iconJSON, err := json.Marshal(item.Icon)
+	if err != nil {
+		response.ErrorParamFomat(c, "invalid icon")
+		return
+	}
+	item.IconJson = string(iconJSON)
 	if err := repository.Db.Create(&item).Error; err != nil {
 		response.ErrorDatabase(c, err.Error())
 		return
@@ -603,7 +614,12 @@ func (r *SpaceRouter) UpdateItem(c *gin.Context) {
 		response.ErrorDataNotFound(c)
 		return
 	}
-	if err := repository.Db.Model(&repository.ItemIcon{}).Where("id = ? AND space_id = ?", iid, id).Updates(map[string]any{"title": input.Title, "url": input.Url, "lan_url": input.LanUrl, "description": input.Description, "open_method": input.OpenMethod, "sort": input.Sort, "item_icon_group_id": input.ItemIconGroupId}).Error; err != nil {
+	iconJSON, err := json.Marshal(input.Icon)
+	if err != nil {
+		response.ErrorParamFomat(c, "invalid icon")
+		return
+	}
+	if err := repository.Db.Model(&repository.ItemIcon{}).Where("id = ? AND space_id = ?", iid, id).Updates(map[string]any{"icon_json": string(iconJSON), "title": input.Title, "url": input.Url, "lan_url": input.LanUrl, "description": input.Description, "open_method": input.OpenMethod, "sort": input.Sort, "item_icon_group_id": input.ItemIconGroupId}).Error; err != nil {
 		response.ErrorDatabase(c, err.Error())
 		return
 	}

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { NAvatar, NImage } from 'naive-ui'
+import { NAvatar } from 'naive-ui'
 import { computed, ref, withDefaults } from 'vue'
 import { SvgIconOnline } from '../index'
 
@@ -15,9 +15,11 @@ const defaultStyle = ref({
   width: `${props.size}px`,
   height: `${props.size}px`,
 })
-const iconExt = computed(() => {
-  return props.itemIcon?.src?.split('.').pop()
-})
+const imageSrc = computed(() => props.itemIcon?.src?.trim() || '')
+
+const handleImageError = (event: Event) => {
+  ;(event.target as HTMLImageElement).style.display = 'none'
+}
 </script>
 
 <template>
@@ -31,10 +33,15 @@ const iconExt = computed(() => {
         </template>
 
         <template v-else-if="itemIcon?.itemType === 2">
-          <div v-if="iconExt === 'svg'" :style="{ backgroundColor: (forceBackground ?? itemIcon?.backgroundColor) || defaultBackground, ...defaultStyle }" class="flex justify-center items-center">
-            <img :src="itemIcon?.src" class="w-[35px] h-[35px]">
+          <div :style="{ backgroundColor: (forceBackground ?? itemIcon?.backgroundColor) || defaultBackground, ...defaultStyle }" class="flex justify-center items-center">
+            <img
+              v-if="imageSrc"
+              :src="imageSrc"
+              class="max-w-full max-h-full object-contain"
+              alt=""
+              @error="handleImageError"
+            >
           </div>
-          <NImage v-else :style="{ backgroundColor: (forceBackground ?? itemIcon?.backgroundColor) || defaultBackground, ...defaultStyle }" :src="itemIcon?.src" preview-disabled />
         </template>
 
         <template v-else-if="itemIcon?.itemType === 3">
