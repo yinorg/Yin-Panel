@@ -177,7 +177,7 @@ function getGroupListOptions() {
 </script>
 
 <template>
-  <NModal v-model:show="show" preset="card" size="small" style="width: 600px;border-radius: 1rem;" :title="itemInfo ? t('iconItem.edit') : t('iconItem.add')">
+  <NModal v-model:show="show" preset="card" size="small" style="width: 600px;max-width:calc(100vw - 24px);max-height:90vh;border-radius:1rem;overflow:auto;" :title="itemInfo ? t('iconItem.edit') : t('iconItem.add')">
     <div class="h-[600px] overflow-auto p-[5px]">
       <NForm ref="formRef" :model="model" :rules="rules">
         <NGrid cols="2" :x-gap="10" item-responsive>

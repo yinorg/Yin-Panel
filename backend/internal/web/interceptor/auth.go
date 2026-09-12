@@ -1,8 +1,11 @@
 package interceptor
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"strings"
+	"yin-panel/internal/biz/repository"
 	"yin-panel/internal/constant"
 	"yin-panel/internal/global"
 	"yin-panel/internal/infra/zaplog"
@@ -21,8 +24,21 @@ func Auth(c *gin.Context) {
 	var err error
 	var claims *jwt.Claims
 	authMethod := "publiccode"
+	var publicSpaceID uint
 	if publiccode != "" {
-		userId, err = ParseUserIdFromPubliccode(publiccode)
+		var space repository.Space
+		err = repository.Db.Where("public_id = ? AND public_enabled = ?", publiccode, true).First(&space).Error
+		if err == nil && space.PublicMode == "code" {
+			accessCode := c.GetHeader("Public-Access-Code")
+			sum := sha256.Sum256([]byte(accessCode))
+			if accessCode == "" || hex.EncodeToString(sum[:]) != space.PublicCodeHash {
+				err = errors.New("invalid public access code")
+			}
+		}
+		if err == nil {
+			userId = space.OwnerUserID
+			publicSpaceID = space.ID
+		}
 	} else {
 		claims, err = ParseJwtClaims(c.GetHeader("Authorization"))
 		if err == nil {
@@ -69,6 +85,9 @@ func Auth(c *gin.Context) {
 	}
 	c.Set("userInfo", userInfo)
 	c.Set("authMethod", authMethod)
+	if publicSpaceID != 0 {
+		c.Set("publicSpaceID", publicSpaceID)
+	}
 	c.Next()
 }
 

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { NButton, NCard, NInput, NList, NListItem, NSelect, NSpace, useMessage } from 'naive-ui'
-import { addMember, addOIDCGroup, copySpace, createGroup, createTeam, deleteGroup, deleteOIDCGroup, getGroups, getMembers, getOIDCGroups, getSpaces, renameSpace, spaceDisplayName, updateGroup, updateMember, type Space, type SpaceMember } from '../../../api/panel/space'
+import { addMember, addOIDCGroup, copySpace, createGroup, createTeam, deleteGroup, deleteOIDCGroup, getGroups, getMembers, getOIDCGroups, getPublicConfig, getSpaces, renameSpace, setPublicConfig, spaceDisplayName, updateGroup, updateMember, type Space, type SpaceMember } from '../../../api/panel/space'
 import { useAuthStore } from '../../../store'
 
 const message = useMessage()
@@ -13,9 +13,12 @@ const loading = ref(false)
 const groups = ref<Record<number, { id: number; title: string }[]>>({})
 const members = ref<SpaceMember[]>([]); const oidcRules = ref<any[]>([])
 const rename = ref(''); const memberEmail = ref(''); const memberRole = ref('viewer'); const oidcProvider = ref('authentik'); const oidcGroup = ref(''); const oidcRole = ref('viewer')
+const publicEnabled = ref(false); const publicId = ref(''); const publicMode = ref<'direct' | 'code'>('direct'); const publicAccessCode = ref(''); const publicSaving = ref(false)
+const publicOrigin = typeof window !== 'undefined' ? window.location.origin : ''
 function load() { getSpaces<{ code: number; data: Space[] }>().then(({ data }) => { spaces.value = data || []; if (spaces.value.length && !selectedSpaceId.value) selectedSpaceId.value = spaces.value[0].id; spaces.value.forEach(space => loadGroups(space.id)); if (selectedSpaceId.value) loadDetails(selectedSpaceId.value) }) }
 function loadGroups(spaceId: number) { getGroups<{ code: number; data: { id: number; title: string }[] }>(spaceId).then(({ data }) => { groups.value[spaceId] = data || [] }) }
-function loadDetails(spaceId: number) { getMembers<{ code: number; data: SpaceMember[] }>(spaceId).then(({ data }) => { members.value = data || [] }); getOIDCGroups<{ code: number; data: any[] }>(spaceId).then(({ data }) => { oidcRules.value = data || [] }) }
+function loadDetails(spaceId: number) { getMembers<{ code: number; data: SpaceMember[] }>(spaceId).then(({ data }) => { members.value = data || [] }); getOIDCGroups<{ code: number; data: any[] }>(spaceId).then(({ data }) => { oidcRules.value = data || [] }); getPublicConfig<{ code: number; data: any }>(spaceId).then(({ data }) => { publicEnabled.value = !!data?.enabled; publicId.value = data?.publicId || ''; publicMode.value = data?.mode === 'code' ? 'code' : 'direct'; publicAccessCode.value = '' }) }
+function savePublic() { if (!selectedSpaceId.value || (publicEnabled.value && !/^[a-z][a-z0-9-]{4,28}[a-z0-9]$/.test(publicId.value))) { message.error('FN ID需为6-30位小写字母、数字或连字符'); return }; if (publicMode.value === 'code' && publicEnabled.value && publicAccessCode.value && (publicAccessCode.value.length < 4 || publicAccessCode.value.length > 12)) { message.error('访问码需为4-12个字符'); return }; publicSaving.value = true; setPublicConfig(selectedSpaceId.value, { enabled: publicEnabled.value, publicId: publicId.value, mode: publicMode.value, accessCode: publicAccessCode.value }).then(({ code }) => { if (code === 0) message.success('公开访问配置已保存') }).finally(() => { publicSaving.value = false }) }
 function saveGroup(spaceId: number) {
   const title = groupName.value.trim(); if (!title) return
   const req = editing.value ? updateGroup(spaceId, editing.value.id, title) : createGroup(spaceId, title)
@@ -42,11 +45,21 @@ onMounted(load)
     <NCard title="空间管理">
       <NSpace vertical>
         <NSpace>
-          <NInput v-model:value="name" placeholder="团队名称" maxlength="100" @keyup.enter="create" />
-          <NButton type="primary" :loading="loading" @click="create">创建团队</NButton>
+          <NInput v-model:value="name" placeholder="新空间名称" maxlength="100" @keyup.enter="create" />
+          <NButton type="primary" :loading="loading" @click="create">创建新空间</NButton>
         </NSpace>
         <NSelect v-model:value="selectedSpaceId" :options="spaces.map(space => ({ label: `${spaceDisplayName(space, spaces, authStore.userInfo?.id, true)} (${space.type === 'shared' || space.type === 'team' ? '共享' : '个人'})`, value: space.id }))" @update:value="(id) => loadDetails(Number(id))" />
         <NSpace v-if="selectedSpaceId"><NInput v-model:value="rename" :placeholder="selected()?.name || '空间名称'" /><NButton @click="renameCurrent">重命名</NButton><NButton @click="copyCurrent">复制空间</NButton></NSpace>
+        <NCard v-if="selectedSpaceId" title="公开访问">
+          <NSpace vertical>
+            <label><input v-model="publicEnabled" type="checkbox"> 开启公开访问</label>
+            <NInput v-model:value="publicId" placeholder="FN ID，例如 my-panel" maxlength="30" />
+            <NSelect v-model:value="publicMode" :options="[{ label: '链接直接访问', value: 'direct' }, { label: '访问码验证', value: 'code' }]" />
+            <NInput v-if="publicMode === 'code'" v-model:value="publicAccessCode" type="password" show-password-on="click" placeholder="访问码（4-12个字符，留空保持不变）" maxlength="12" />
+            <span v-if="publicEnabled && publicId" class="text-gray-500">访问地址：{{ `${publicOrigin}/${publicId}` }}</span>
+            <NButton type="primary" :loading="publicSaving" @click="savePublic">保存公开访问配置</NButton>
+          </NSpace>
+        </NCard>
         <NList v-if="selectedSpaceId" bordered>
           <NListItem>
             <div class="w-full">

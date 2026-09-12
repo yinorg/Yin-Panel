@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, onMounted, ref } from 'vue'
+import { nextTick, onMounted, onUnmounted, provide, ref } from 'vue'
 import { VueDraggable } from 'vue-draggable-plus'
 import { NButton, NDropdown, useDialog, useMessage } from 'naive-ui'
 import AppIconSystemMonitor from './AppIconSystemMonitor/index.vue'
@@ -10,6 +10,8 @@ import { usePanelState } from '../../../store'
 import { PanelPanelConfigStyleEnum } from '../../../enums'
 import { SvgIcon } from '../../common'
 import { t } from '../../../locales'
+import { getSnapshot } from '../../../api/system/systemMonitor'
+import { monitorSnapshotKey, type MonitorSnapshot } from './snapshot'
 
 interface MonitorGroup extends Panel.ItemIconGroup {
   sortStatus?: boolean
@@ -63,6 +65,23 @@ const cardStyle: CardStyle = {
 }
 
 const monitorDatas = ref<MonitorData[]>([])
+const monitorSnapshot = ref<MonitorSnapshot | null>(null)
+let snapshotTimer: ReturnType<typeof setInterval>
+let snapshotFailures = 0
+provide(monitorSnapshotKey, monitorSnapshot)
+
+async function updateSnapshot() {
+  try {
+    const res = await getSnapshot<MonitorSnapshot>()
+    if (res.code !== 0) throw new Error('monitor snapshot request failed')
+    snapshotFailures = 0
+    monitorSnapshot.value = res.data
+  }
+  catch {
+    snapshotFailures += 1
+    if (snapshotFailures >= 3) clearInterval(snapshotTimer)
+  }
+}
 
 function handleClick(index: number, item: MonitorData) {
   if (!props.allowEdit)
@@ -74,6 +93,21 @@ function handleClick(index: number, item: MonitorData) {
 
 async function getData() {
   monitorDatas.value = await getAll()
+
+  const defaultExtendParam = {
+    backgroundColor: '#2a2a2a6b', color: '#fff', progressColor: '#fff', progressRailColor: '#CFCFCFA8',
+  }
+  if (monitorDatas.value.length > 0) {
+    const types = new Set(monitorDatas.value.map(item => item.monitorType))
+    let changed = false
+    for (const monitorType of [MonitorType.memory, MonitorType.network]) {
+      if (!types.has(monitorType)) {
+        monitorDatas.value.push({ monitorType, extendParam: { ...defaultExtendParam } })
+        changed = true
+      }
+    }
+    if (changed) saveAll(monitorDatas.value)
+  }
 
   if (monitorDatas.value.length === 0) {
     // 防止空 - 默认数据
@@ -87,6 +121,24 @@ async function getData() {
         },
         monitorType: MonitorType.cpu,
       },
+      {
+        extendParam: {
+          backgroundColor: '#2a2a2a6b',
+          color: '#fff',
+          progressColor: '#fff',
+          progressRailColor: '#CFCFCFA8',
+        },
+        monitorType: MonitorType.memory,
+      },
+      {
+        extendParam: {
+          backgroundColor: '#2a2a2a6b',
+          color: '#fff',
+          progressColor: '#fff',
+          progressRailColor: '#CFCFCFA8',
+        },
+        monitorType: MonitorType.network,
+      },
     )
 
     // 生成并保存
@@ -96,7 +148,11 @@ async function getData() {
 
 onMounted(() => {
   getData()
+  updateSnapshot()
+  snapshotTimer = setInterval(updateSnapshot, 3000)
 })
+
+onUnmounted(() => clearInterval(snapshotTimer))
 
 function handleSaveDone() {
   getData()

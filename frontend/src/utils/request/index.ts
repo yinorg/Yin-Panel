@@ -32,7 +32,7 @@ function http<T = any>(
     if (res.data.code === 0)
       return res.data
 
-    if (res.data.code === 1001) {
+    if (res.data.code === 1001 && !window.location.pathname.match(/^\/[a-z][a-z0-9-]{4,28}[a-z0-9]\/?$/)) {
       // 避免重复弹窗
       if (!loginMessageShow) {
         loginMessageShow = true
@@ -48,7 +48,7 @@ function http<T = any>(
       return res.data
     }
 
-    if (res.data.code === 1000) {
+    if (res.data.code === 1000 && !window.location.pathname.match(/^\/[a-z][a-z0-9-]{4,28}[a-z0-9]\/?$/)) {
       router.push({ path: '/login' })
       authStore.removeStorage()
       return res.data

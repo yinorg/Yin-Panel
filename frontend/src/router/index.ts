@@ -35,9 +35,9 @@ const routes: RouteRecordRaw[] = [
   },
 
   // 专门处理公开访问代码的路由
-  // 匹配 10 位字母数字的路径，可以带或不带斜杠
+  // 匹配空间公开 FN ID
   {
-    path: '/:code([a-zA-Z0-9]{10})',
+    path: '/:code([a-z][a-z0-9-]{4,28}[a-z0-9])',
     name: 'PublicAccess',
     component: () => import('../views/home/index.vue'),
   },

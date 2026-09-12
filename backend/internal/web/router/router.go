@@ -53,6 +53,8 @@ func InitRouters(addr string) error {
 		// Vue history mode routes (for example the OAuth /login redirect)
 		// must fall back to the SPA entry document.
 		router.StaticFile("/login", webPath+"/index.html")
+		// Public space links are handled by the SPA router.
+		router.GET("/:publicId", func(c *gin.Context) { c.File(webPath + "/index.html") })
 
 		if config.AppConfig.Rclone.Type == "local" {
 			// 使用本次存储时，为本次存储设置静态文件服务

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MoonBox - 简单、易用、美观的导航面板</title>
+    <title>Yin-Panel - 简单、易用、美观的导航面板</title>
 	<link rel="icon" type="image/svg+xml" href="image/favicon.svg">
     <link rel="apple-touch-icon" href="image/apple-touch-icon.png">
     <link rel="stylesheet" href="css/style-combined.css">
@@ -40,8 +40,8 @@
         <div class="container">
             <nav class="navbar">
                 <div class="logo">
-                    <img src="image/favicon.svg" alt="MoonBox Logo">
-                    <span>MoonBox</span>
+                    <img src="image/favicon.svg" alt="Yin-Panel Logo">
+                    <span>Yin-Panel</span>
                 </div>
                 <div class="nav-toggle" id="nav-toggle">
                     <span></span>
@@ -71,7 +71,7 @@
         <section id="home" class="hero">
             <div class="container">
                 <div class="hero-content">
-                    <h1 class="glitch-text">MoonBox</h1>
+                    <h1 class="glitch-text">Yin-Panel</h1>
                     <p class="hero-subtitle">简单、易用、美观</p>
                     <p class="hero-description">一个 NAS、服务器导航面板、简易 docker 管理器、Homepage、浏览器首页</p>
                     <div class="hero-buttons">
@@ -102,7 +102,7 @@
                             <img src="svg-icons/majesticons-applications.svg" alt="应用图标">
                         </div>
                     </div>
-                    <img src="image/defaultBackground.webp" alt="MoonBox 界面预览" class="main-image">
+                    <img src="image/defaultBackground.webp" alt="Yin-Panel 界面预览" class="main-image">
                 </div>
             </div>
             <div class="scroll-indicator">
@@ -122,7 +122,7 @@
             <div class="container">
                 <div class="section-header">
                     <h2 class="section-title">核心特点</h2>
-                    <p class="section-subtitle">MoonBox 提供了丰富的功能，让您的导航体验更加简单、高效</p>
+                    <p class="section-subtitle">Yin-Panel 提供了丰富的功能，让您的导航体验更加简单、高效</p>
                 </div>
                 <div class="features-grid">
                     <div class="feature-card" data-aos="fade-up" data-aos-delay="100">
@@ -162,7 +162,7 @@
             <div class="container">
                 <div class="section-header">
                     <h2 class="section-title">快速部署</h2>
-                    <p class="section-subtitle">只需几个简单步骤，即可开始使用 MoonBox</p>
+                    <p class="section-subtitle">只需几个简单步骤，即可开始使用 Yin-Panel</p>
                 </div>
                 <div class="deployment-content">
                     <div class="deployment-steps">
@@ -170,7 +170,7 @@
                             <div class="step-number">01</div>
                             <div class="step-content">
                                 <h3>拉取 Docker 镜像</h3>
-                                <p>使用 Docker 命令拉取最新的 MoonBox 镜像。</p>
+                                <p>使用 Docker 命令拉取最新的 Yin-Panel 镜像。</p>
                                 <div class="code-block">
                                     <code>docker pull ghcr.io/phantommaa/yin-panel/monolith:latest</code>
                                     <button class="copy-btn" aria-label="复制代码">
@@ -183,9 +183,9 @@
                             <div class="step-number">02</div>
                             <div class="step-content">
                                 <h3>启动容器</h3>
-                                <p>配置端口映射和数据卷，启动 MoonBox 容器。</p>
+                                <p>配置端口映射和数据卷，启动 Yin-Panel 容器。</p>
                                 <div class="code-block">
-                                    <code>docker run -d --name moonbox -p 8085:8085 -v /your/data/path:/app/data ghcr.io/phantommaa/yin-panel/monolith:latest</code>
+                                    <code>docker run -d --name yin-panel -p 8085:8085 -v /your/data/path:/app/data ghcr.io/phantommaa/yin-panel/monolith:latest</code>
                                     <button class="copy-btn" aria-label="复制代码">
                                         <img src="svg-icons/ion-copy.svg" alt="复制">
                                     </button>
@@ -196,7 +196,7 @@
                             <div class="step-number">03</div>
                             <div class="step-content">
                                 <h3>访问面板</h3>
-                                <p>通过浏览器访问 <code>http://localhost:8085</code>，开始使用 MoonBox。</p>
+                                <p>通过浏览器访问 <code>http://localhost:8085</code>，开始使用 Yin-Panel。</p>
                                 <a href="https://doc.yin-panel.top/zh_cn/usage/quick_deploy.html" class="btn btn-outline">查看详细部署指南</a>
                             </div>
                         </div>
@@ -225,7 +225,7 @@
                                         <div class="browser-address">http://localhost:8085</div>
                                     </div>
                                     <div class="browser-content">
-                                        <div class="moonbox-logo">
+                                        <div class="yin-panel-logo">
                                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
                                                 <circle cx="12" cy="12" r="5" fill="currentColor"></circle>
                                                 <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"></path>
@@ -294,8 +294,8 @@
             <div class="footer-content">
                 <div class="footer-column">
                     <div class="footer-logo">
-                        <img src="image/favicon.svg" alt="MoonBox Logo">
-                        <span>MoonBox</span>
+                        <img src="image/favicon.svg" alt="Yin-Panel Logo">
+                        <span>Yin-Panel</span>
                     </div>
                     <p class="footer-description">简单、易用、美观的导航面板</p>
                 </div>
@@ -323,7 +323,7 @@
                 </div>
             </div>
             <div class="footer-bottom">
-                <p class="copyright">Copyright 2023-present MoonBox. Released under the MIT License.</p>
+                <p class="copyright">Copyright 2023-present Yin-Panel. Released under the MIT License.</p>
             </div>
         </div>
     </footer>

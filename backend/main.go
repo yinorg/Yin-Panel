@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"time"
 	"yin-panel/internal/biz/repository"
 	"yin-panel/internal/biz/service"
 	"yin-panel/internal/global"
@@ -15,7 +16,6 @@ import (
 	"yin-panel/internal/util/i18n"
 	"yin-panel/internal/util/jwt"
 	"yin-panel/internal/web/router"
-	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -111,6 +111,12 @@ func DatabaseConnect() error {
 	err = database.CreateDefaultUser()
 	if err != nil {
 		return fmt.Errorf("database CreateDefaultUser error, %w", err)
+	}
+	if err = database.EnsurePersonalSpaces(db); err != nil {
+		return fmt.Errorf("database EnsurePersonalSpaces error, %w", err)
+	}
+	if global.Config.Base.EnableMonitor {
+		global.CacheMonitor.Start()
 	}
 
 	return nil

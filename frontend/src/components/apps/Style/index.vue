@@ -12,7 +12,7 @@ const authStore = useAuthStore()
 const panelState = usePanelState()
 const ms = useMessage()
 const showWallpaperInput = ref(false)
-const monitorEnabled = ref(true) // 默认为 true，避免闪烁
+const monitorEnabled = ref(false)
 
 // 获取后端 enableMonitor 配置
 onMounted(async () => {

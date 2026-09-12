@@ -1,7 +1,11 @@
 package panel
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 	"yin-panel/internal/biz/repository"
@@ -45,6 +49,8 @@ func (r *SpaceRouter) InitRouter(router *gin.RouterGroup) {
 	g.POST("/:spaceId/transfer", r.Transfer)
 	g.POST("/:spaceId/copy", r.Copy)
 	g.GET("/:spaceId/oidc-groups", r.OIDCGroups)
+	g.GET("/:spaceId/public", r.GetPublicConfig)
+	g.POST("/:spaceId/public", r.SetPublicConfig)
 	g.POST("/:spaceId/oidc-groups", r.AddOIDCGroup)
 	g.DELETE("/:spaceId/oidc-groups/:ruleId", r.DeleteOIDCGroup)
 	g.POST("/:spaceId/members", r.AddMember)
@@ -67,6 +73,77 @@ type oidcGroupRequest struct {
 	Provider  string `json:"provider" binding:"required"`
 	GroupName string `json:"groupName" binding:"required"`
 	Role      string `json:"role" binding:"required"`
+}
+
+type publicConfigRequest struct {
+	Enabled    bool   `json:"enabled"`
+	PublicID   string `json:"publicId"`
+	Mode       string `json:"mode"`
+	AccessCode string `json:"accessCode"`
+}
+
+var publicIDPattern = regexp.MustCompile(`^[a-z][a-z0-9-]{4,28}[a-z0-9]$`)
+
+func (r *SpaceRouter) GetPublicConfig(c *gin.Context) {
+	user, ok := base.GetCurrentUserInfo(c)
+	if !ok {
+		response.Error(c, "not logged in")
+		return
+	}
+	id, err := spaceID(c)
+	if err != nil || !canManageSpace(user.ID, id) {
+		response.ErrorNoAccess(c)
+		return
+	}
+	var space repository.Space
+	if err := repository.Db.First(&space, id).Error; err != nil {
+		response.ErrorDataNotFound(c)
+		return
+	}
+	response.SuccessData(c, gin.H{"enabled": space.PublicEnabled, "publicId": space.PublicID, "mode": space.PublicMode})
+}
+
+func (r *SpaceRouter) SetPublicConfig(c *gin.Context) {
+	user, ok := base.GetCurrentUserInfo(c)
+	if !ok {
+		response.Error(c, "not logged in")
+		return
+	}
+	id, err := spaceID(c)
+	if err != nil || !canManageSpace(user.ID, id) {
+		response.ErrorNoAccess(c)
+		return
+	}
+	var req publicConfigRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.ErrorParamFomat(c, err.Error())
+		return
+	}
+	if req.Enabled && !publicIDPattern.MatchString(req.PublicID) {
+		response.ErrorParamFomat(c, "invalid publicId")
+		return
+	}
+	if req.Mode != "direct" && req.Mode != "code" {
+		response.ErrorParamFomat(c, "invalid public mode")
+		return
+	}
+	if req.Mode == "code" && req.Enabled && (len(req.AccessCode) < 4 || len(req.AccessCode) > 12) {
+		response.ErrorParamFomat(c, "invalid access code")
+		return
+	}
+	updates := map[string]any{"public_enabled": req.Enabled, "public_id": req.PublicID, "public_mode": req.Mode}
+	if req.Mode == "code" && req.AccessCode != "" {
+		sum := sha256.Sum256([]byte(req.AccessCode))
+		updates["public_code_hash"] = hex.EncodeToString(sum[:])
+	}
+	if !req.Enabled {
+		updates["public_code_hash"] = ""
+	}
+	if err := repository.Db.Model(&repository.Space{}).Where("id = ?", id).Updates(updates).Error; err != nil {
+		response.Error(c, fmt.Sprintf("save public config: %v", err))
+		return
+	}
+	response.Success(c)
 }
 
 func (r *SpaceRouter) OIDCGroups(c *gin.Context) {
@@ -495,7 +572,11 @@ func (r *SpaceRouter) List(c *gin.Context) {
 		return
 	}
 	var spaces []repository.Space
-	err := repository.Db.Where("owner_user_id = ? OR id IN (SELECT space_id FROM space_member WHERE user_id = ?)", user.ID, user.ID).Order("type, created_at").Find(&spaces).Error
+	query := repository.Db.Where("owner_user_id = ? OR id IN (SELECT space_id FROM space_member WHERE user_id = ?)", user.ID, user.ID)
+	if publicID, exists := c.Get("publicSpaceID"); exists {
+		query = query.Where("id = ?", publicID)
+	}
+	err := query.Order("type, created_at").Find(&spaces).Error
 	if err != nil {
 		response.ErrorDatabase(c, err.Error())
 		return

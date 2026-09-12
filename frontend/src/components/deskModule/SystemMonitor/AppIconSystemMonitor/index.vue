@@ -6,6 +6,7 @@ import GenericMonitorCard from '../components/GenericMonitorCard/index.vue'
 import CardCPU from './CPU.vue'
 import Memory from './Memory.vue'
 import Disk from './Disk.vue'
+import Network from './Network.vue'
 import { SvgIcon } from '../../../common'
 import { PanelPanelConfigStyleEnum } from '../../../../enums'
 
@@ -51,6 +52,7 @@ const refreshInterval = 5000
             <SvgIcon v-if="monitorType === MonitorType.cpu" icon="solar-cpu-bold" :style="{ color: extendParam.color }" style="width:35px;height:35px" />
             <SvgIcon v-if="monitorType === MonitorType.memory" icon="material-symbols-memory-alt-rounded" :style="{ color: extendParam.color }" style="width:35px;height:35px" />
             <SvgIcon v-if="monitorType === MonitorType.disk" icon="clarity-hard-disk-solid" :style="{ color: extendParam.color }" style="width:35px;height:35px" />
+            <SvgIcon v-if="monitorType === MonitorType.network" icon="material-symbols:lan-outline-rounded" :style="{ color: extendParam.color }" style="width:35px;height:35px" />
           </div>
         </div>
       </template>
@@ -66,6 +68,13 @@ const refreshInterval = 5000
             :progress-rail-color="extendParam?.progressRailColor"
             :text-color="extendParam?.color"
             :refresh-interval="refreshInterval"
+          />
+          <Network
+            v-else-if="monitorType === MonitorType.network"
+            :refresh-interval="refreshInterval"
+            :text-color="extendParam?.color"
+            :progress-color="extendParam?.progressColor"
+            :progress-rail-color="extendParam?.progressRailColor"
           />
           <Memory
             v-else-if="monitorType === MonitorType.memory"
@@ -112,6 +121,7 @@ const refreshInterval = 5000
           :path="extendParam?.path"
           :refresh-interval="refreshInterval"
         />
+        <Network v-else-if="monitorType === MonitorType.network" :refresh-interval="refreshInterval" :text-color="extendParam?.color" :progress-color="extendParam?.progressColor" :progress-rail-color="extendParam?.progressRailColor" />
       </template>
     </GenericMonitorCard>
   </div>

@@ -1,10 +1,18 @@
 services:
   yin-panel:
-    image: ghcr.io/phantommaa/yin-panel/monolith:latest
+    image: ${YIN_PANEL_IMAGE:-yin-panel/monolith:local}
+    pull_policy: never
     container_name: yin-panel
+    restart: unless-stopped
     volumes:
       - ./conf.yaml:/app/conf.yaml
       - ./uploads:/app/uploads
       - ./database:/app/database
     ports:
-      - 3002:3002
+      - "${YIN_PANEL_PORT:-3002}:3002"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:3002/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

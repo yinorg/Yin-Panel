@@ -1,15 +1,16 @@
 package database
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
 	"os"
+	"time"
 	"yin-panel/internal/biz/repository"
 	"yin-panel/internal/constant"
 	"yin-panel/internal/global"
 	"yin-panel/internal/util"
-	"time"
 
 	_ "gorm.io/driver/mysql"
 	_ "gorm.io/driver/sqlite"
@@ -60,31 +61,70 @@ func initDatabase(db *gorm.DB) (err error) {
 	if err != nil {
 		return err
 	}
-	if err := ensurePersonalSpaces(db); err != nil {
+	if err := EnsurePersonalSpaces(db); err != nil {
 		return err
+	}
+	// SQLite unique indexes reject multiple empty strings; NULL clears legacy
+	// public links while allowing every user to remain link-free.
+	if err := db.Exec("UPDATE user SET publiccode = NULL WHERE publiccode <> ''").Error; err != nil {
+		return err
+	}
+	if !global.Config.Base.EnableMonitor {
+		if err := disableUserMonitorConfigs(db); err != nil {
+			return err
+		}
 	}
 	return backfillPanelSpaces(db)
 }
 
+func disableUserMonitorConfigs(db *gorm.DB) error {
+	var configs []repository.UserConfig
+	if err := db.Find(&configs).Error; err != nil {
+		return err
+	}
+	for _, config := range configs {
+		var panel map[string]any
+		if err := json.Unmarshal([]byte(config.PanelJson), &panel); err != nil {
+			continue
+		}
+		panel["systemMonitorShow"] = false
+		panel["systemMonitorShowTitle"] = false
+		data, err := json.Marshal(panel)
+		if err != nil {
+			return err
+		}
+		if err := db.Model(&repository.UserConfig{}).Where("user_id = ?", config.UserId).Update("panel_json", string(data)).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // ensurePersonalSpaces is idempotent and prepares legacy users for the space
 // model without moving existing panel data yet.
-func ensurePersonalSpaces(db *gorm.DB) error {
+func EnsurePersonalSpaces(db *gorm.DB) error {
 	var users []repository.User
 	if err := db.Find(&users).Error; err != nil {
 		return err
 	}
 	for _, user := range users {
 		var space repository.Space
-		if err := db.Where("type = ? AND owner_user_id = ?", repository.SpaceTypePersonal, user.ID).First(&space).Error; err == nil {
+		if err := db.Where("type = ? AND owner_user_id = ?", repository.SpaceTypePersonal, user.ID).First(&space).Error; err != nil {
+			if !errors.Is(err, gorm.ErrRecordNotFound) {
+				return err
+			}
+			space = repository.Space{Type: repository.SpaceTypePersonal, Name: user.Name, OwnerUserID: user.ID}
+			if err := db.Create(&space).Error; err != nil {
+				return err
+			}
+		}
+		var member repository.SpaceMember
+		if err := db.Where("space_id = ? AND user_id = ?", space.ID, user.ID).First(&member).Error; err == nil {
 			continue
 		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return err
 		}
-		space = repository.Space{Type: repository.SpaceTypePersonal, Name: user.Name, OwnerUserID: user.ID}
-		if err := db.Create(&space).Error; err != nil {
-			return err
-		}
-		member := repository.SpaceMember{SpaceID: space.ID, UserID: user.ID, Role: repository.SpaceRoleAdmin, JoinedAt: time.Now()}
+		member = repository.SpaceMember{SpaceID: space.ID, UserID: user.ID, Role: repository.SpaceRoleAdmin, JoinedAt: time.Now()}
 		if err := db.Create(&member).Error; err != nil {
 			return err
 		}

@@ -7,8 +7,8 @@ import (
 	"io"
 	"os"
 	"strings"
-	"yin-panel/internal/infra/zaplog"
 	"time"
+	"yin-panel/internal/infra/zaplog"
 
 	"github.com/rclone/rclone/fs"
 	rconfig "github.com/rclone/rclone/fs/config"
@@ -21,6 +21,11 @@ import (
 
 type RcloneStorage struct {
 	fs fs.Fs
+}
+
+func (r *RcloneStorage) Exists(ctx context.Context, fileName string) bool {
+	_, err := r.fs.NewObject(ctx, fileName)
+	return err == nil
 }
 
 // RcloneConfig represents the rclone section in the YAML config

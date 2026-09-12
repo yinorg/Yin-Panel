@@ -1,5 +1,5 @@
 /**
- * MoonBox Landing Page JavaScript
+ * Yin-Panel Landing Page JavaScript
  * Adds interactivity and animations to the landing page
  */
 

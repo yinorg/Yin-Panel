@@ -6,22 +6,10 @@ export function getAll<T>() {
   })
 }
 
-export function getCpuState<T>() {
-  return post<T>({
-    url: '/system/monitor/getCpuState',
-  })
-}
-
 export function getDiskStateByPath<T>(path: string) {
   return post<T>({
     url: '/system/monitor/getDiskStateByPath',
     data: { path },
-  })
-}
-
-export function getMemonyState<T>() {
-  return post<T>({
-    url: '/system/monitor/getMemonyState',
   })
 }
 
@@ -35,4 +23,8 @@ export function getEnableStatus<T>() {
   return post<T>({
     url: '/system/monitor/getEnableStatus',
   })
+}
+
+export function getSnapshot<T>() {
+  return post<T>({ url: '/system/monitor/getSnapshot' })
 }

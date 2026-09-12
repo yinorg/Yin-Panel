@@ -1,7 +1,9 @@
 package system
 
 import (
-	"fmt"
+	"crypto/md5"
+	"encoding/hex"
+	"io"
 	"net/http"
 	"path"
 	"strings"
@@ -13,7 +15,6 @@ import (
 	"yin-panel/internal/web/interceptor"
 	"yin-panel/internal/web/model/base"
 	"yin-panel/internal/web/model/response"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -71,8 +72,6 @@ func (a *FileRouter) UploadImg(c *gin.Context) {
 		return
 	}
 
-	fileName := util.Md5(fmt.Sprintf("%s%s", f.Filename, time.Now().String())) + fileExt
-
 	// 打开文件以获取Reader
 	src, err := f.Open()
 	if err != nil {
@@ -86,13 +85,25 @@ func (a *FileRouter) UploadImg(c *gin.Context) {
 			zaplog.Logger.Errorf("Failed to close file. error : %v", err)
 		}
 	}()
-
-	// 使用存储接口上传文件
-	err = global.Storage.Upload(c.Request.Context(), src, fileName)
-	if err != nil {
-		zaplog.Logger.Errorf("Failed to upload file: %v", err)
+	hash := md5.New()
+	if _, err = io.Copy(hash, src); err != nil {
 		response.ErrorByCode(c, constant.CodeUploadFailed)
 		return
+	}
+	fileName := hex.EncodeToString(hash.Sum(nil)) + fileExt
+	if _, err = src.Seek(0, io.SeekStart); err != nil {
+		response.ErrorByCode(c, constant.CodeUploadFailed)
+		return
+	}
+
+	// 使用存储接口上传文件
+	if !global.Storage.Exists(c.Request.Context(), fileName) {
+		err = global.Storage.Upload(c.Request.Context(), src, fileName)
+		if err != nil {
+			zaplog.Logger.Errorf("Failed to upload file: %v", err)
+			response.ErrorByCode(c, constant.CodeUploadFailed)
+			return
+		}
 	}
 
 	// 向数据库添加记录
@@ -128,6 +139,7 @@ func (a *FileRouter) GetList(c *gin.Context) {
 	for _, v := range list {
 		data = append(data, map[string]any{
 			"src":        a.urlPrefix + v.FileName,
+			"fileName":   v.FileName,
 			"id":         v.ID,
 			"createTime": v.CreatedAt,
 			"updateTime": v.UpdatedAt,

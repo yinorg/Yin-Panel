@@ -96,8 +96,9 @@ onMounted(() => {
           <NGridItem v-for=" item, index in imageList" :key="index">
             <NCard size="small" style="border-radius: 5px;" :bordered="true">
               <template #cover>
-                <div class="card transparent-grid">
-                  <NImage :lazy="true" style="object-fit: contain;height: 100%;" :src="item.src" />
+                <div class="card transparent-grid" style="height: 180px; display: flex; align-items: center; justify-content: center;">
+                  <img v-if="item.src.toLowerCase().endsWith('.ico')" :src="item.src" alt="" style="width: 100%; height: 100%; object-fit: contain;">
+                  <NImage v-else :lazy="true" style="width: 100%; height: 100%; object-fit: contain;" :src="item.src" />
                 </div>
               </template>
               <template #footer>

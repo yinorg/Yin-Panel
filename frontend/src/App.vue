@@ -17,7 +17,7 @@ function updateFavicon(url: string | undefined) {
     link.rel = 'icon'
     document.head.appendChild(link)
   }
-  link.href = url || '/favicon.svg'
+  link.href = url || '/assets/favicon.svg'
 }
 
 watch(() => panelState.panelConfig.logoImageSrc, (newUrl) => {

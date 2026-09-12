@@ -103,10 +103,32 @@ func (s *UserService) CreateUser(user *repository.User) error {
 		return err
 	}
 
+	personalSpace := repository.Space{}
+	if repository.Db != nil {
+		personalSpace = repository.Space{
+			Type:        repository.SpaceTypePersonal,
+			Name:        user.Name,
+			OwnerUserID: user.ID,
+		}
+		if err := repository.Db.Create(&personalSpace).Error; err != nil {
+			return err
+		}
+		member := repository.SpaceMember{
+			SpaceID:  personalSpace.ID,
+			UserID:   user.ID,
+			Role:     repository.SpaceRoleAdmin,
+			JoinedAt: time.Now(),
+		}
+		if err := repository.Db.Create(&member).Error; err != nil {
+			return err
+		}
+	}
+
 	defaultGroup := repository.ItemIconGroup{
-		Title:  "APP",
-		UserId: user.ID,
-		Icon:   "material-symbols:ad-group-outline",
+		Title:   "APP",
+		UserId:  user.ID,
+		SpaceID: personalSpace.ID,
+		Icon:    "material-symbols:ad-group-outline",
 	}
 
 	if err := s.itemGroupRepo.Save(&defaultGroup); err != nil {

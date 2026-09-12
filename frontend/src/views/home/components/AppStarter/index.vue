@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { NLayout, NLayoutContent, NLayoutSider, NSpace } from 'naive-ui'
 import { useAuthStore } from '../../../../store'
 import { AppLoader, RoundCardModal, SvgIcon } from '../../../../components/common'
@@ -94,8 +94,12 @@ onMounted(() => {
     auth: 1,
   }
   // 初始化
-  if (authStore.userInfo?.role === 1)
-    apps.value.push(adminApp)
+  const addAdminApp = () => {
+    if (Number(authStore.userInfo?.role) === 1 && !apps.value.some(item => item.componentName === 'Users'))
+      apps.value.push(adminApp)
+  }
+  addAdminApp()
+  watch(() => authStore.userInfo?.role, addAdminApp)
 
   window.addEventListener('resize', handleResize)
   handleResize()

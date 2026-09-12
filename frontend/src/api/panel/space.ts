@@ -1,6 +1,7 @@
 import { get, post } from '../../utils/request'
 
-export interface Space { id: number; type: 'personal' | 'team' | 'shared'; name: string; ownerUserId: number }
+export interface Space { id: number; type: 'personal' | 'team' | 'shared'; name: string; ownerUserId: number; publicEnabled?: boolean; publicId?: string; publicMode?: 'direct' | 'code' }
+export interface PublicConfig { enabled: boolean; publicId: string; mode: 'direct' | 'code'; accessCode?: string }
 export interface SpaceMember { id: number; userId: number; email?: string; role: 'admin' | 'editor' | 'viewer'; source?: string }
 export function spaceDisplayName(space: Space, spaces: Space[], currentUserId?: number, memberView = false) {
   if (space.type === 'personal' && !memberView && space.ownerUserId === currentUserId)
@@ -16,6 +17,8 @@ export function sortSpaces(spaces: Space[], currentUserId?: number) {
   })
 }
 export function getSpaces<T>() { return get<T>({ url: '/spaces' }) }
+export function getPublicConfig<T>(spaceId: number) { return get<T>({ url: `/spaces/${spaceId}/public` }) }
+export function setPublicConfig<T>(spaceId: number, data: PublicConfig) { return post<T>({ url: `/spaces/${spaceId}/public`, data }) }
 export function createTeam<T>(name: string) { return post<T>({ url: '/spaces/teams', data: { name } }) }
 export function getGroups<T>(spaceId: number) { return get<T>({ url: `/spaces/${spaceId}/groups` }) }
 export function getItems<T>(spaceId: number, groupId?: number) { return get<T>({ url: `/spaces/${spaceId}/items`, params: { groupId } }) }

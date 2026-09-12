@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { VueDraggable } from 'vue-draggable-plus'
-import { NBackTop, NButton, NButtonGroup, NDropdown, NInput, NModal, NSkeleton, NSpin, useDialog, useMessage } from 'naive-ui'
+import { NBackTop, NButton, NButtonGroup, NCard, NDropdown, NInput, NModal, NSkeleton, NSpin, NSpace, useDialog, useMessage } from 'naive-ui'
 import { nextTick, onMounted, ref } from 'vue'
 import { createTeam, getGroups, getItems, getSpaces, sortSpaces, spaceDisplayName, type Space } from '../../api/panel/space'
 import { Clock, SearchBox, SystemMonitor } from '../../components/deskModule'
@@ -13,6 +13,7 @@ import { parsePublicCodeFromPath } from '@/utils/request/axios'
 import { usePanelState, useAuthStore } from '@/store'
 import { PanelPanelConfigStyleEnum, PanelStateNetworkModeEnum } from '@/enums'
 import { t } from '@/locales'
+import { getEnableStatus } from '@/api/system/systemMonitor'
 
 interface ItemGroup extends Panel.ItemIconGroup {
   sortStatus?: boolean
@@ -48,9 +49,20 @@ const activeSpace = ref<Space | null>(null)
 const createTeamVisible = ref(false)
 const teamName = ref('')
 const creatingTeam = ref(false)
+const monitorEnabled = ref(false)
 
 const items = ref<ItemGroup[]>([])
 const filterItems = ref<ItemGroup[]>([])
+const publicCode = parsePublicCodeFromPath()
+const publicAccessCode = ref('')
+const publicAccessReady = ref(!publicCode || !!sessionStorage.getItem(`yin-panel-public-access:${publicCode}`))
+
+function unlockPublicAccess() {
+  if (publicAccessCode.value.length < 4 || publicAccessCode.value.length > 12) return
+  sessionStorage.setItem(`yin-panel-public-access:${publicCode}`, publicAccessCode.value)
+  publicAccessReady.value = true
+  loadHomeData()
+}
 
 function openPage(openMethod: number, url: string, title?: string) {
   switch (openMethod) {
@@ -281,7 +293,10 @@ function getDropdownMenuOptions() {
   return dropdownMenuOptions
 }
 
-onMounted(() => {
+function loadHomeData() {
+  getEnableStatus<{ enabled: boolean }>().then(({ code, data }) => {
+    if (code === 0) monitorEnabled.value = data.enabled
+  })
   getSpaces<{ code: number; data: Space[] }>().then(({ code, data }) => {
     if (code === 0 && data?.length) { spaces.value = sortSpaces(data, authStore.userInfo?.id); activeSpace.value = spaces.value[0]; getList() }
   })
@@ -292,6 +307,11 @@ onMounted(() => {
   // 设置标题
   if (panelState.panelConfig.logoText)
     setTitle(panelState.panelConfig.logoText)
+}
+
+onMounted(() => {
+  if (publicCode && !publicAccessReady.value) return
+  loadHomeData()
 })
 
 // 前端搜索过滤
@@ -350,6 +370,15 @@ function handleAddItem(itemIconGroupId?: number) {
 
 <template>
   <div class="w-full h-full sun-main">
+    <NModal :show="!!publicCode && !publicAccessReady" :mask-closable="false" :closable="false">
+      <NCard title="访问验证" style="width: min(92vw, 380px)">
+        <NSpace vertical>
+          <span>请输入访问码后继续访问</span>
+          <NInput v-model:value="publicAccessCode" type="password" show-password-on="click" maxlength="12" placeholder="访问码（4-12个字符）" @keyup.enter="unlockPublicAccess" />
+          <NButton type="primary" block @click="unlockPublicAccess">确认访问</NButton>
+        </NSpace>
+      </NCard>
+    </NModal>
     <div v-if="spaces.length && authStore.token" class="space-status-bar">
       <NDropdown trigger="hover" :options="spaces.map(space => ({ label: spaceDisplayName(space, spaces, authStore.userInfo?.id), key: space.id }))" @select="selectSpace">
         <NButton quaternary class="space-status-button">
@@ -378,8 +407,8 @@ function handleAddItem(itemIconGroupId?: number) {
         }"
       >
         <!-- 头 -->
-        <div class="mx-[auto] w-[80%]">
-          <div class="flex mx-[auto] items-center justify-center text-white">
+        <div class="home-header mx-[auto] w-[80%]">
+          <div class="home-header-row flex mx-[auto] items-center justify-center text-white">
             <div class="logo">
               <span class="text-2xl md:text-6xl font-bold text-shadow">
                 {{ panelState.panelConfig.logoText }}
@@ -400,7 +429,7 @@ function handleAddItem(itemIconGroupId?: number) {
         <!-- 应用盒子 -->
         <div :style="{ marginLeft: `${panelState.panelConfig.marginX}px`, marginRight: `${panelState.panelConfig.marginX}px` }">
           <!-- 系统监控状态 -->
-          <div v-if="panelState.panelConfig.systemMonitorShow" class="flex mx-auto">
+          <div v-if="monitorEnabled && panelState.panelConfig.systemMonitorShow" class="flex mx-auto">
             <SystemMonitor
               :show-title="panelState.panelConfig.systemMonitorShowTitle"
             />
@@ -695,8 +724,30 @@ html {
 }
 
 @media (max-width: 500px) {
+  .space-status-bar {
+    top: 8px;
+    left: auto;
+    right: 8px;
+    transform: none;
+    max-width: calc(100vw - 16px);
+  }
+  .space-status-button {
+    min-width: 0;
+    max-width: calc(100vw - 28px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
   .icon-info-box{
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   }
+
+  .home-header { width: calc(100% - 24px); padding-top: 42px; }
+  .home-header-row { gap: 6px; }
+  .home-header-row .logo span { font-size: 1.35rem; }
+  .home-header-row .divider { margin-left: 4px; margin-right: 4px; }
+  .icon-info-box { gap: 10px; grid-template-columns: 1fr; }
+  .icon-small-box { gap: 12px 8px; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); }
+  .system-monitor { overflow: hidden; }
 }
 </style>

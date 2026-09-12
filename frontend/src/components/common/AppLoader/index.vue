@@ -8,10 +8,25 @@ const props = defineProps<{
 const loading = shallowRef(false)
 const dynamicComponent = shallowRef('')
 
+const componentLoaders: Record<string, () => Promise<unknown>> = {
+  UserInfo: () => import('../../apps/UserInfo/index.vue'),
+  Style: () => import('../../apps/Style/index.vue'),
+  SpaceManage: () => import('../../apps/SpaceManage/index.vue'),
+  UploadFileManager: () => import('../../apps/UploadFileManager/index.vue'),
+  About: () => import('../../apps/About/index.vue'),
+  Users: () => import('../../apps/Users/index.vue'),
+}
+
 function updateComponent() {
   loading.value = true
+  const loader = componentLoaders[props.componentName || '']
+  if (!loader) {
+    dynamicComponent.value = ''
+    loading.value = false
+    return
+  }
   dynamicComponent.value = defineAsyncComponent(() =>
-    import(`../../apps/${props.componentName}/index.vue`)
+    loader()
       .finally(() => {
         loading.value = false
       }).catch(() => {

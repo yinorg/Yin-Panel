@@ -6,11 +6,16 @@ export function parsePublicCodeFromPath(): string {
   const pathSegments = window.location.pathname.split('/')
   if (pathSegments.length > 1 && pathSegments[1] !== '') {
     // Check if code format is valid (only letters and numbers, length of 10)
-    if (/^[a-zA-Z0-9]{10}$/.test(pathSegments[1])) {
+    if (/^[a-z][a-z0-9-]{4,28}[a-z0-9]$/.test(pathSegments[1])) {
       publiccode = pathSegments[1]
     }
   }
   return publiccode
+}
+
+function getPublicAccessCode(): string {
+  const key = `yin-panel-public-access:${parsePublicCodeFromPath()}`
+  return sessionStorage.getItem(key) || ''
 }
 
 const service = axios.create({
@@ -28,6 +33,11 @@ service.interceptors.request.use(
     // 添加 publiccode 到请求头（如果存在）
     if (publiccode)
       config.headers.publiccode = publiccode
+    if (publiccode) {
+      const accessCode = getPublicAccessCode()
+      if (accessCode)
+        config.headers['Public-Access-Code'] = accessCode
+    }
     else
       config.headers.Authorization = `Bearer ${token}`
     

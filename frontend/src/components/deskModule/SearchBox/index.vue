@@ -32,6 +32,11 @@ const isFocused = ref(false)
 const searchSelectListShow = ref(false)
 const defaultSearchEngineList = ref<DeskModule.SearchBox.SearchEngine[]>([
   {
+    iconSrc: SvgSrcBing,
+    title: 'Bing',
+    url: 'https://www.bing.com/search?q=%s',
+  },
+  {
     iconSrc: SvgSrcGoogle,
     title: 'Google',
     url: 'https://www.google.com/search?q=%s',
@@ -41,17 +46,12 @@ const defaultSearchEngineList = ref<DeskModule.SearchBox.SearchEngine[]>([
     title: 'Baidu',
     url: 'https://www.baidu.com/s?wd=%s',
   },
-  {
-    iconSrc: SvgSrcBing,
-    title: 'Bing',
-    url: 'https://www.bing.com/search?q=%s',
-  },
 ])
 
 const defaultState: State = {
   currentSearchEngine: defaultSearchEngineList.value[0],
   searchEngineList: defaultSearchEngineList.value,
-  newWindowOpen: false,
+    newWindowOpen: true,
 }
 
 const state = ref<State>({ ...defaultState })
@@ -107,7 +107,7 @@ function handleClearSearchTerm() {
 onMounted(() => {
   moduleConfig.getValueByNameFromCloud<State>('deskModuleSearchBox').then(({ code, data }) => {
     if (code === 0)
-      state.value = data || defaultState
+      state.value = data ? { ...defaultState, ...data } : defaultState
     else
       state.value = defaultState
   })

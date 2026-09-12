@@ -28,6 +28,7 @@ function formatdiskToByte(v: number): number {
 }
 
 async function getData() {
+  if (document.hidden) return
   try {
     const { data, code } = await getDiskStateByPath<SystemMonitor.DiskInfo>(props.path)
     if (code === 0)

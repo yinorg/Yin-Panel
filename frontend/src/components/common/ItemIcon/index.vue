@@ -37,7 +37,7 @@ const handleImageError = (event: Event) => {
             <img
               v-if="imageSrc"
               :src="imageSrc"
-              class="max-w-full max-h-full object-contain"
+              class="w-full h-full max-w-full max-h-full object-contain"
               alt=""
               @error="handleImageError"
             >

@@ -1,11 +1,55 @@
-ARG REPO_LOWER
 ARG VERSION
+ARG TARGETARCH
 
-FROM ghcr.io/${REPO_LOWER}/temp:${VERSION} AS temp
-FROM ghcr.io/${REPO_LOWER}/backend:${VERSION}
+# Build the frontend into the directory served by the backend.
+FROM node:18.20.6-alpine AS frontend-builder
+
+WORKDIR /build/frontend
+
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
+
+COPY frontend .
+RUN npm run build-only
+
+# Build the backend with CGO enabled for the SQLite driver.
+FROM golang:1.24-alpine AS backend-builder
+
+ARG VERSION
+ARG TARGETARCH
+
+WORKDIR /build
+
+COPY backend/go.mod backend/go.sum ./
+RUN go mod download
+
+COPY backend .
+COPY --from=frontend-builder /build/backend/web ./web
+
+RUN apk add --no-cache gcc musl-dev && \
+    CGO_ENABLED=1 GOOS=linux GOARCH=${TARGETARCH:-amd64} \
+    go build -o yin-panel \
+    -ldflags="-X yin-panel/internal/global.RUNCODE=release -X yin-panel/internal/global.VERSION=${VERSION}" \
+    main.go
+
+# Keep only the runtime dependencies and application assets in the final image.
+FROM alpine:3.19
 
 WORKDIR /app
-COPY --from=temp /build/backend/web /app/web
+
+ARG VERSION
+ENV TZ=Asia/Shanghai
+
+RUN apk add --no-cache bash curl tzdata && \
+    ln -sf /usr/share/zoneinfo/$TZ /etc/localtime && \
+    echo "$TZ" > /etc/timezone && \
+    mkdir -p /app/lang
+
+COPY --from=backend-builder /build/yin-panel /app/yin-panel
+COPY --from=backend-builder /build/web /app/web
+COPY backend/lang /app/lang
+COPY backend/conf.yaml /app/conf.yaml
 
 EXPOSE 3002
-CMD ["./yin-panel"]
+RUN chmod +x /app/yin-panel
+CMD ["/app/yin-panel"]

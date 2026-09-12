@@ -36,7 +36,11 @@ func (r *FileRepo) Get(userId, id uint) (File, error) {
 func (r *FileRepo) GetList(userId uint) ([]File, uint, error) {
 	var list []File
 	var count int64
-	err := Db.Order("created_at desc").Find(&list, "user_id=?", userId).Count(&count).Error
+	query := Db.Model(&File{}).Where("user_id = ?", userId)
+	if err := query.Count(&count).Error; err != nil {
+		return nil, 0, err
+	}
+	err := query.Order("created_at desc").Find(&list).Error
 	return list, uint(count), err
 }
 

@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
+import { inject, onMounted, onUnmounted, ref, watch } from 'vue'
 import GenericProgress from '../components/GenericProgress/index.vue'
 import { correctionNumberByCardStyle } from './common'
-import { getMemonyState } from '../../../../api/system/systemMonitor'
 import type { PanelPanelConfigStyleEnum } from '../../../../enums'
 import { bytesToSize } from '../../../../utils/cmn'
+import { monitorSnapshotKey } from '../snapshot'
 
 interface Prop {
   cardTypeStyle: PanelPanelConfigStyleEnum
@@ -17,16 +17,17 @@ interface Prop {
 const props = defineProps<Prop>()
 let timer: ReturnType<typeof setInterval>
 const memoryState = ref<SystemMonitor.MemoryInfo | null>(null)
+const snapshot = inject(monitorSnapshotKey)
+watch(() => snapshot?.value?.MEMORY_INFO, value => { if (value) memoryState.value = value }, { immediate: true })
 
 function formatMemorySize(v: number): string {
   return bytesToSize(v)
 }
 
 async function getData() {
+  if (snapshot) return
+  if (document.hidden) return
   try {
-    const { data, code } = await getMemonyState<SystemMonitor.MemoryInfo>()
-    if (code === 0)
-      memoryState.value = data
   }
   catch (error) {
 

@@ -13,6 +13,8 @@ import (
 type MonitorRouter struct {
 }
 
+func monitorEnabled() bool { return global.Config != nil && global.Config.Base.EnableMonitor }
+
 func NewMonitorRouter() *MonitorRouter {
 	return &MonitorRouter{}
 }
@@ -22,14 +24,43 @@ func (a *MonitorRouter) InitRouter(router *gin.RouterGroup) {
 	r.Use(interceptor.Auth)
 	{
 		r.POST("/system/monitor/getDiskMountpoints", a.GetDiskMountpoints)
-		r.POST("/system/monitor/getCpuState", a.GetCpuState)
 		r.POST("/system/monitor/getDiskStateByPath", a.GetDiskStateByPath)
-		r.POST("/system/monitor/getMemonyState", a.GetMemonyState)
+		r.POST("/system/monitor/getSnapshot", a.GetSnapshot)
 		r.POST("/system/monitor/getEnableStatus", a.GetEnableStatus)
 	}
 }
 
+func (a *MonitorRouter) GetSnapshot(c *gin.Context) {
+	if !monitorEnabled() {
+		response.Error(c, "system monitor is disabled")
+		return
+	}
+	state, err := global.CacheMonitor.GetSnapshot()
+	if err != nil {
+		response.Error(c, "failed")
+		return
+	}
+	response.SuccessData(c, state)
+}
+
+func (a *MonitorRouter) GetNetState(c *gin.Context) {
+	if !monitorEnabled() {
+		response.Error(c, "system monitor is disabled")
+		return
+	}
+	state, err := global.CacheMonitor.GetNetState()
+	if err != nil {
+		response.Error(c, "failed")
+		return
+	}
+	response.SuccessData(c, state)
+}
+
 func (a *MonitorRouter) GetCpuState(c *gin.Context) {
+	if !monitorEnabled() {
+		response.Error(c, "system monitor is disabled")
+		return
+	}
 	cpuInfo, err := global.CacheMonitor.GetCpuState()
 	if err != nil {
 		response.Error(c, "failed")
@@ -40,6 +71,10 @@ func (a *MonitorRouter) GetCpuState(c *gin.Context) {
 }
 
 func (a *MonitorRouter) GetMemonyState(c *gin.Context) {
+	if !monitorEnabled() {
+		response.Error(c, "system monitor is disabled")
+		return
+	}
 	memoryInfo, err := global.CacheMonitor.GetMemonyState()
 	if err != nil {
 		response.Error(c, "failed")
@@ -50,6 +85,10 @@ func (a *MonitorRouter) GetMemonyState(c *gin.Context) {
 }
 
 func (a *MonitorRouter) GetDiskStateByPath(c *gin.Context) {
+	if !monitorEnabled() {
+		response.Error(c, "system monitor is disabled")
+		return
+	}
 	req := systemApi.MonitorGetDiskStateByPathReq{}
 	if err := c.ShouldBind(&req); err != nil {
 		response.ErrorParamFomat(c, err.Error())
@@ -66,6 +105,10 @@ func (a *MonitorRouter) GetDiskStateByPath(c *gin.Context) {
 }
 
 func (a *MonitorRouter) GetDiskMountpoints(c *gin.Context) {
+	if !monitorEnabled() {
+		response.Error(c, "system monitor is disabled")
+		return
+	}
 	if list, err := monitor.GetDiskMountpoints(); err != nil {
 		response.Error(c, err.Error())
 	} else {

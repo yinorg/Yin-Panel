@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
+import { inject, onMounted, onUnmounted, ref, watch } from 'vue'
 import GenericProgress from '../components/GenericProgress/index.vue'
 import { correctionNumber, correctionNumberByCardStyle } from './common'
-import { getCpuState } from '../../../../api/system/systemMonitor'
 import type { PanelPanelConfigStyleEnum } from '../../../../enums'
+import { monitorSnapshotKey } from '../snapshot'
 
 interface Prop {
   cardTypeStyle: PanelPanelConfigStyleEnum
@@ -16,12 +16,13 @@ interface Prop {
 const props = defineProps<Prop>()
 let timer: ReturnType<typeof setInterval>
 const cpuState = ref<SystemMonitor.CPUInfo | null>(null)
+const snapshot = inject(monitorSnapshotKey)
+watch(() => snapshot?.value?.CPU_INFO, value => { if (value) cpuState.value = value }, { immediate: true })
 
 async function getData() {
+  if (snapshot) return
+  if (document.hidden) return
   try {
-    const { data, code } = await getCpuState<SystemMonitor.CPUInfo>()
-    if (code === 0)
-      cpuState.value = data
   }
   catch (error) {
 

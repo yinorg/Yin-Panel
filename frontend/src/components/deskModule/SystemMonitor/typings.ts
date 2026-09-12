@@ -2,6 +2,7 @@ export enum MonitorType {
   'cpu' = 'cpu', // 图标风格
   'memory' = 'memory', // 详情风格
   'disk' = 'disk',
+  'network' = 'network',
 }
 
 export interface CardStyle {
