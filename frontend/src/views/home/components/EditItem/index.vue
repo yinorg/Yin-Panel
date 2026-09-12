@@ -7,6 +7,7 @@ import { edit, getSiteFavicon } from '../../../../api/panel/itemIcon'
 import { getGroups } from '../../../../api/panel/space'
 import { createItem, updateItem } from '../../../../api/panel/space'
 import { t } from '../../../../locales'
+import { useAuthStore } from '../../../../store'
 
 interface Props {
   visible: boolean
@@ -88,6 +89,16 @@ const show = computed({
 async function editApi() {
   submitLoading.value = true
   try {
+    if (!model.value.id && !model.value.icon?.src && model.value.url) {
+      const fetched = await getIconByUrl(model.value.url, 0, false)
+      if (!fetched) {
+        const libraryIcon = await getPublicLibraryIcon(model.value.title)
+        if (libraryIcon)
+          model.value.icon = libraryIcon
+      }
+      if (!model.value.icon?.src && model.value.icon?.itemType !== 2)
+        model.value.icon = createTextIcon(model.value.title)
+    }
     const { code, data, msg } = await (props.spaceId
       ? (model.value.id ? updateItem<Panel.ItemInfo>(props.spaceId, model.value.id, model.value) : createItem<Panel.ItemInfo>(props.spaceId, model.value))
       : edit<Panel.ItemInfo>(model.value))
@@ -107,6 +118,29 @@ async function editApi() {
   submitLoading.value = false
 }
 
+async function getPublicLibraryIcon(title: string): Promise<Panel.ItemIcon | null> {
+  try {
+    const query = encodeURIComponent(title.trim())
+    const search = await fetch(`https://api.iconify.design/search?query=${query}&limit=1`)
+    if (!search.ok) return null
+    const result = await search.json() as { icons?: string[] }
+    const name = result.icons?.[0]
+    if (!name) return null
+    const image = await fetch(`https://api.iconify.design/${name}.svg`)
+    if (!image.ok) return null
+    const blob = await image.blob()
+    const form = new FormData()
+    form.append('imgfile', new File([blob], `${name.replace('/', '-')}.svg`, { type: 'image/svg+xml' }))
+    const upload = await fetch('/api/file/uploadImg', { method: 'POST', headers: { Authorization: `Bearer ${useAuthStore().token}` }, body: form })
+    if (!upload.ok) return null
+    const response = await upload.json()
+    if (response.code !== 0) return null
+    return { itemType: 2, src: response.data.imageUrl, fileName: response.data.fileName }
+  } catch {
+    return null
+  }
+}
+
 const handleValidateButtonClick = (e: MouseEvent) => {
   e.preventDefault()
   formRef.value?.validate((errors) => {
@@ -115,7 +149,14 @@ const handleValidateButtonClick = (e: MouseEvent) => {
   })
 }
 
-async function getIconByUrl(url: string, loadingIndex: number) {
+function createTextIcon(title: string): Panel.ItemIcon {
+  const chinese = title.match(/[\u3400-\u9fff]/g)?.join('').slice(0, 5) || ''
+  const english = title.match(/[A-Za-z]/g)?.join('').slice(0, 8) || ''
+  const text = chinese || english || title.trim().slice(0, 5) || '?'
+  return { itemType: 1, text, backgroundColor: '#2a2a2a6b' }
+}
+
+async function getIconByUrl(url: string, loadingIndex: number, showError = true): Promise<boolean> {
   getIconLoading.value[loadingIndex] = true
   try {
     const { code, data } = await getSiteFavicon<{ iconUrl: string, fileName: string }>(url)
@@ -127,13 +168,14 @@ async function getIconByUrl(url: string, loadingIndex: number) {
       }
     }
     else {
-      ms.error(t('iconItem.geticonFail'))
+      if (showError) ms.error(t('iconItem.geticonFail'))
     }
   }
   catch (error) {
-    ms.error(t('iconItem.geticonFail'))
+    if (showError) ms.error(t('iconItem.geticonFail'))
   }
   getIconLoading.value[loadingIndex] = false
+  return !!model.value.icon?.src
 }
 
 watch(() => props.visible, (newValue) => {

@@ -647,6 +647,7 @@ func (r *SpaceRouter) CreateItem(c *gin.Context) {
 		response.ErrorParamFomat(c, "invalid item or group")
 		return
 	}
+	ensureItemIcon(&item)
 	var group repository.ItemIconGroup
 	if repository.Db.Where("id = ? AND space_id = ?", item.ItemIconGroupId, id).First(&group).Error != nil {
 		response.ErrorDataNotFound(c)
@@ -690,6 +691,7 @@ func (r *SpaceRouter) UpdateItem(c *gin.Context) {
 		response.ErrorParamFomat(c, "invalid groupId")
 		return
 	}
+	ensureItemIcon(&input)
 	var group repository.ItemIconGroup
 	if repository.Db.Where("id = ? AND space_id = ?", input.ItemIconGroupId, id).First(&group).Error != nil {
 		response.ErrorDataNotFound(c)
@@ -705,6 +707,21 @@ func (r *SpaceRouter) UpdateItem(c *gin.Context) {
 		return
 	}
 	response.Success(c)
+}
+
+func ensureItemIcon(item *repository.ItemIcon) {
+	if item.Icon.ItemType != 4 || item.Icon.Src != "" {
+		return
+	}
+	runes := []rune(strings.TrimSpace(item.Title))
+	if len(runes) > 5 {
+		runes = runes[:5]
+	}
+	text := string(runes)
+	if text == "" {
+		text = "?"
+	}
+	item.Icon = repository.ItemIconIconInfo{ItemType: 1, Text: text, BackgroundColor: "#2a2a2a6b"}
 }
 func (r *SpaceRouter) DeleteItem(c *gin.Context) {
 	user, ok := base.GetCurrentUserInfo(c)

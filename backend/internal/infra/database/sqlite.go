@@ -33,6 +33,21 @@ func (d *SQLiteConfig) Connect() (db *gorm.DB, err error) {
 				SingularTable: true,
 			},
 		})
+		if err != nil {
+			return
+		}
+		// WAL keeps readers independent from the single SQLite writer and makes
+		// recovery after an interrupted commit more reliable.
+		for _, pragma := range []string{
+			"PRAGMA journal_mode=WAL",
+			"PRAGMA synchronous=NORMAL",
+			"PRAGMA busy_timeout=5000",
+			"PRAGMA foreign_keys=ON",
+		} {
+			if err = db.Exec(pragma).Error; err != nil {
+				return
+			}
+		}
 	}
 
 	return

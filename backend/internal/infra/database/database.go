@@ -42,6 +42,16 @@ func DbInit(dbClient DbClient) (db *gorm.DB, dbErr error) {
 }
 
 func initDatabase(db *gorm.DB) (err error) {
+	if db.Dialector.Name() == SQLITE {
+		var check string
+		if err := db.Raw("PRAGMA quick_check").Scan(&check).Error; err != nil {
+			return err
+		}
+		if check != "ok" {
+			return fmt.Errorf("sqlite integrity check failed: %s", check)
+		}
+		log.Printf("SQLite integrity check: %s", check)
+	}
 	// 创建数据表
 	err = db.AutoMigrate(
 		&repository.User{},

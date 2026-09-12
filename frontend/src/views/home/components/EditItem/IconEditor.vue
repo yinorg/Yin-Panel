@@ -27,7 +27,7 @@ const defautSwatchesBackground = [
 ]
 
 const initData: Panel.ItemIcon = {
-  itemType: 2,
+  itemType: 4,
   backgroundColor: '#2a2a2a6b',
 }
 
@@ -85,6 +85,9 @@ const handleUploadFinish = ({
 <template>
   <div>
     <div class="mb-[10px]">
+      <NRadio :checked="itemIconInfo.itemType === 4" :value="4" name="iconType" @change="handleIconTypeRadioChange(4)">
+        自动
+      </NRadio>
       <NRadio
         :checked="itemIconInfo.itemType === 1 "
         :value="1"
