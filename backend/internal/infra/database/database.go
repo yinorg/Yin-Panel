@@ -52,6 +52,9 @@ func initDatabase(db *gorm.DB) (err error) {
 		}
 		log.Printf("SQLite integrity check: %s", check)
 	}
+	if err := PrepareMigrationBackup(db); err != nil {
+		return fmt.Errorf("prepare migration backup: %w", err)
+	}
 	// 创建数据表
 	err = db.AutoMigrate(
 		&repository.User{},
@@ -84,7 +87,10 @@ func initDatabase(db *gorm.DB) (err error) {
 			return err
 		}
 	}
-	return backfillPanelSpaces(db)
+	if err := backfillPanelSpaces(db); err != nil {
+		return err
+	}
+	return RunMigration(db)
 }
 
 func disableUserMonitorConfigs(db *gorm.DB) error {

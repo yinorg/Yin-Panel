@@ -78,6 +78,7 @@ oauth:
       field_mapping_identifier: login
       field_mapping_display_name: name
       field_mapping_email: email
+
     - name: google
       client_id: your_client_id
       client_secret: your_client_secret
@@ -88,6 +89,7 @@ oauth:
       field_mapping_identifier: email
       field_mapping_display_name: name
       field_mapping_email: email
+
     - name: authentik
       client_id: 35XDlL1bVPsRTvktwmCJshhXNb2WsXIjeZ6acdbI
       # Replace with the client secret shown by Authentik.
@@ -97,3 +99,9 @@ oauth:
       field_mapping_identifier: email
       field_mapping_display_name: name
       field_mapping_email: email
+
+# Legacy database and upload migration
+migration:
+  enabled: true
+  dry_run: false
+  backup_path: ./backup

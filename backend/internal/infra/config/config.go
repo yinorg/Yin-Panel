@@ -13,12 +13,19 @@ var AppConfig *Config
 
 // Config represents the application configuration structure
 type Config struct {
-	Base   BaseConfig   `yaml:"base"`
-	SQLite SQLiteConfig `yaml:"sqlite"`
-	MySQL  MySQLConfig  `yaml:"mysql"`
-	Rclone RcloneConfig `yaml:"rclone"`
-	JWT    JWTConfig    `yaml:"jwt"`
-	OAuth  OAuthConfig  `yaml:"oauth"`
+	Base      BaseConfig      `yaml:"base"`
+	SQLite    SQLiteConfig    `yaml:"sqlite"`
+	MySQL     MySQLConfig     `yaml:"mysql"`
+	Rclone    RcloneConfig    `yaml:"rclone"`
+	JWT       JWTConfig       `yaml:"jwt"`
+	OAuth     OAuthConfig     `yaml:"oauth"`
+	Migration MigrationConfig `yaml:"migration"`
+}
+
+type MigrationConfig struct {
+	Enabled    *bool  `yaml:"enabled"`
+	DryRun     bool   `yaml:"dry_run"`
+	BackupPath string `yaml:"backup_path"`
 }
 
 // BaseConfig represents the base section configuration
@@ -109,6 +116,10 @@ func Init(configPath string) (*Config, error) {
 	err = yaml.Unmarshal(data, config)
 	if err != nil {
 		return nil, err
+	}
+	if config.Migration.Enabled == nil {
+		enabled := true
+		config.Migration.Enabled = &enabled
 	}
 
 	// Set global config
