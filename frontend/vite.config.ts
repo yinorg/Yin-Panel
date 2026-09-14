@@ -80,7 +80,9 @@ export default defineConfig((env) => {
       // Use esbuild for minification instead of Terser
       minify: 'esbuild',
       // Increase chunk size warning limit to reduce warnings
-      chunkSizeWarningLimit: 600,
+      // Naive UI is kept in a shared vendor chunk; its current minified size
+      // is about 790 kB and is loaded once by the application.
+      chunkSizeWarningLimit: 850,
       // Empty the output directory before building
       emptyOutDir: true,
       commonjsOptions: {

@@ -39,6 +39,8 @@ const handleImageError = (event: Event) => {
               :src="imageSrc"
               class="w-full h-full max-w-full max-h-full object-contain"
               alt=""
+              loading="lazy"
+              decoding="async"
               @error="handleImageError"
             >
           </div>

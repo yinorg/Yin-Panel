@@ -1,30 +1,39 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { NButton, NCard, NInput, NList, NListItem, NSelect, NSpace, useMessage } from 'naive-ui'
-import { addMember, addOIDCGroup, copySpace, createGroup, createTeam, deleteGroup, deleteOIDCGroup, getGroups, getMembers, getOIDCGroups, getPublicConfig, getSpaces, renameSpace, setPublicConfig, spaceDisplayName, updateGroup, updateMember, type Space, type SpaceMember } from '../../../api/panel/space'
+import { NButton, NCard, NInput, NList, NListItem, NProgress, NSelect, NSpace, useMessage } from 'naive-ui'
+import { addMember, addOIDCGroup, clearSpace, copySpace, createGroup, createTeam, deleteGroup, deleteOIDCGroup, getGroups, getMembers, getOIDCGroups, getPublicConfig, getSpaces, importBookmarks, renameSpace, setPublicConfig, spaceDisplayName, updateGroup, updateMember, type Space, type SpaceMember } from '../../../api/panel/space'
 import { useAuthStore } from '../../../store'
+import { t } from '../../../locales'
 
 const message = useMessage()
 const authStore = useAuthStore()
 const spaces = ref<Space[]>([])
 const selectedSpaceId = ref<number | null>(null)
-const name = ref(''); const groupName = ref(''); const editing = ref<{ spaceId: number; id: number } | null>(null)
+const name = ref(''); const groupName = ref(''); const groupParentId = ref<number | null>(null); const editing = ref<{ spaceId: number; id: number } | null>(null)
 const loading = ref(false)
 const groups = ref<Record<number, { id: number; title: string }[]>>({})
 const members = ref<SpaceMember[]>([]); const oidcRules = ref<any[]>([])
 const rename = ref(''); const memberEmail = ref(''); const memberRole = ref('viewer'); const oidcProvider = ref('authentik'); const oidcGroup = ref(''); const oidcRole = ref('viewer')
 const publicEnabled = ref(false); const publicId = ref(''); const publicMode = ref<'direct' | 'code'>('direct'); const publicAccessCode = ref(''); const publicSaving = ref(false)
 const publicOrigin = typeof window !== 'undefined' ? window.location.origin : ''
+const bookmarkPreview = ref<any[] | null>(null)
+const importing = ref(false); const importProgress = ref(0)
+const bookmarkFileInput = ref<HTMLInputElement | null>(null)
+function exportBookmarks() { if (!selectedSpaceId.value) return; fetch(`/api/spaces/${selectedSpaceId.value}/bookmarks/export`, { headers: { Authorization: `Bearer ${authStore.token}` } }).then(r => r.blob()).then(blob => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `space-${selectedSpaceId.value}-bookmarks.html`; a.click(); URL.revokeObjectURL(a.href) }) }
+function previewBookmarks(event: Event) { const file = (event.target as HTMLInputElement).files?.[0]; if (!file) return; file.text().then(text => { const doc = new DOMParser().parseFromString(text, 'text/html'); const groups: any[] = []; doc.querySelectorAll('h3').forEach(h3 => { const group: any = { title: h3.textContent?.trim() || '未命名分组', items: [] }; let node = h3.parentElement?.nextElementSibling; while (node) { node.querySelectorAll?.('a').forEach((a: HTMLAnchorElement) => group.items.push({ title: a.textContent?.trim() || a.href, url: a.href })); node = node.nextElementSibling } groups.push(group) }); bookmarkPreview.value = groups }) }
+function confirmImport() { if (!selectedSpaceId.value || !bookmarkPreview.value || importing.value) return; const count = bookmarkPreview.value.reduce((sum, group) => sum + group.items.length, 0); if (count > 2000 && !window.confirm(t('spaceManage.importConfirm', { count }))) return; if (count > 2000 && !window.confirm(t('spaceManage.importConfirmAgain'))) return; importing.value = true; importProgress.value = 15; const timer = window.setInterval(() => { if (importProgress.value < 90) importProgress.value += 5 }, 500); importBookmarks(selectedSpaceId.value, { groups: bookmarkPreview.value }).then(({ code }) => { if (code === 0) { importProgress.value = 100; message.success(t('spaceManage.importSuccess')); bookmarkPreview.value = null; loadGroups(selectedSpaceId.value!) } }).finally(() => { window.clearInterval(timer); importing.value = false; importProgress.value = 0 }) }
+function clearCurrentSpace() { if (!selectedSpaceId.value || !window.confirm(t('spaceManage.clearConfirm'))) return; clearSpace(selectedSpaceId.value).then(({ code }) => { if (code === 0) { message.success(t('spaceManage.clearSuccess')); loadGroups(selectedSpaceId.value!) } }) }
 function load() { getSpaces<{ code: number; data: Space[] }>().then(({ data }) => { spaces.value = data || []; if (spaces.value.length && !selectedSpaceId.value) selectedSpaceId.value = spaces.value[0].id; spaces.value.forEach(space => loadGroups(space.id)); if (selectedSpaceId.value) loadDetails(selectedSpaceId.value) }) }
 function loadGroups(spaceId: number) { getGroups<{ code: number; data: { id: number; title: string }[] }>(spaceId).then(({ data }) => { groups.value[spaceId] = data || [] }) }
 function loadDetails(spaceId: number) { getMembers<{ code: number; data: SpaceMember[] }>(spaceId).then(({ data }) => { members.value = data || [] }); getOIDCGroups<{ code: number; data: any[] }>(spaceId).then(({ data }) => { oidcRules.value = data || [] }); getPublicConfig<{ code: number; data: any }>(spaceId).then(({ data }) => { publicEnabled.value = !!data?.enabled; publicId.value = data?.publicId || ''; publicMode.value = data?.mode === 'code' ? 'code' : 'direct'; publicAccessCode.value = '' }) }
-function savePublic() { if (!selectedSpaceId.value || (publicEnabled.value && !/^[a-z][a-z0-9-]{4,28}[a-z0-9]$/.test(publicId.value))) { message.error('FN ID需为6-30位小写字母、数字或连字符'); return }; if (publicMode.value === 'code' && publicEnabled.value && publicAccessCode.value && (publicAccessCode.value.length < 4 || publicAccessCode.value.length > 12)) { message.error('访问码需为4-12个字符'); return }; publicSaving.value = true; setPublicConfig(selectedSpaceId.value, { enabled: publicEnabled.value, publicId: publicId.value, mode: publicMode.value, accessCode: publicAccessCode.value }).then(({ code }) => { if (code === 0) message.success('公开访问配置已保存') }).finally(() => { publicSaving.value = false }) }
+function savePublic() { if (!selectedSpaceId.value || (publicEnabled.value && !/^[a-z][a-z0-9-]{4,28}[a-z0-9]$/.test(publicId.value))) { message.error(t('spaceManage.publicIdInvalid')); return }; if (publicMode.value === 'code' && publicEnabled.value && publicAccessCode.value && (publicAccessCode.value.length < 4 || publicAccessCode.value.length > 12)) { message.error(t('spaceManage.accessCodeInvalid')); return }; publicSaving.value = true; setPublicConfig(selectedSpaceId.value, { enabled: publicEnabled.value, publicId: publicId.value, mode: publicMode.value, accessCode: publicAccessCode.value }).then(({ code }) => { if (code === 0) message.success(t('spaceManage.publicSaved')) }).finally(() => { publicSaving.value = false }) }
 function saveGroup(spaceId: number) {
   const title = groupName.value.trim(); if (!title) return
-  const req = editing.value ? updateGroup(spaceId, editing.value.id, title) : createGroup(spaceId, title)
-  req.then(({ code }) => { if (code === 0) { groupName.value = ''; editing.value = null; loadGroups(spaceId) } })
+  const req = editing.value ? updateGroup(spaceId, editing.value.id, title, '', groupParentId.value) : createGroup(spaceId, title, '', groupParentId.value)
+  req.then(({ code }) => { if (code === 0) { groupName.value = ''; groupParentId.value = null; editing.value = null; loadGroups(spaceId) } })
 }
-function removeGroup(spaceId: number, id: number) { deleteGroup(spaceId, id).then(({ code }) => { if (code === 0) loadGroups(spaceId) }) }
+function editGroup(spaceId: number, group: { id: number; title: string; parentId?: number | null }) { editing.value = { spaceId, id: group.id }; groupName.value = group.title; groupParentId.value = group.parentId || null }
+function removeGroup(spaceId: number, id: number) { if (!window.confirm(t('spaceManage.groupDeleteConfirm'))) return; deleteGroup(spaceId, id).then(({ code }) => { if (code === 0) loadGroups(spaceId) }) }
 function create() {
   if (!name.value.trim() || loading.value) return
   loading.value = true
@@ -42,40 +51,45 @@ onMounted(load)
 
 <template>
   <div class="p-4">
-    <NCard title="空间管理">
+    <NCard :title="$t('spaceManage.title')">
       <NSpace vertical>
         <NSpace>
-          <NInput v-model:value="name" placeholder="新空间名称" maxlength="100" @keyup.enter="create" />
-          <NButton type="primary" :loading="loading" @click="create">创建新空间</NButton>
+          <NInput v-model:value="name" :placeholder="$t('spaceManage.newSpaceName')" maxlength="100" @keyup.enter="create" />
+          <NButton type="primary" :loading="loading" @click="create">{{ $t('spaceManage.createSpace') }}</NButton>
         </NSpace>
-        <NSelect v-model:value="selectedSpaceId" :options="spaces.map(space => ({ label: `${spaceDisplayName(space, spaces, authStore.userInfo?.id, true)} (${space.type === 'shared' || space.type === 'team' ? '共享' : '个人'})`, value: space.id }))" @update:value="(id) => loadDetails(Number(id))" />
-        <NSpace v-if="selectedSpaceId"><NInput v-model:value="rename" :placeholder="selected()?.name || '空间名称'" /><NButton @click="renameCurrent">重命名</NButton><NButton @click="copyCurrent">复制空间</NButton></NSpace>
-        <NCard v-if="selectedSpaceId" title="公开访问">
+        <NSelect v-model:value="selectedSpaceId" :options="spaces.map(space => ({ label: `${spaceDisplayName(space, spaces, authStore.userInfo?.id, true)} (${space.type === 'shared' || space.type === 'team' ? $t('spaceManage.shared') : $t('spaceManage.personal')})`, value: space.id }))" @update:value="(id) => loadDetails(Number(id))" />
+        <NSpace v-if="selectedSpaceId"><NInput v-model:value="rename" :placeholder="selected()?.name || $t('spaceManage.spaceName')" /><NButton @click="renameCurrent">{{ $t('spaceManage.rename') }}</NButton><NButton @click="copyCurrent">{{ $t('spaceManage.copy') }}</NButton></NSpace>
+        <NCard v-if="selectedSpaceId" :title="$t('spaceManage.publicAccess')">
           <NSpace vertical>
-            <label><input v-model="publicEnabled" type="checkbox"> 开启公开访问</label>
-            <NInput v-model:value="publicId" placeholder="FN ID，例如 my-panel" maxlength="30" />
-            <NSelect v-model:value="publicMode" :options="[{ label: '链接直接访问', value: 'direct' }, { label: '访问码验证', value: 'code' }]" />
-            <NInput v-if="publicMode === 'code'" v-model:value="publicAccessCode" type="password" show-password-on="click" placeholder="访问码（4-12个字符，留空保持不变）" maxlength="12" />
+            <label><input v-model="publicEnabled" type="checkbox"> {{ $t('spaceManage.enablePublicAccess') }}</label>
+            <NInput v-model:value="publicId" :placeholder="$t('spaceManage.publicIdPlaceholder')" maxlength="30" />
+            <NSelect v-model:value="publicMode" :options="[{ label: $t('spaceManage.directAccess'), value: 'direct' }, { label: $t('spaceManage.codeAccess'), value: 'code' }]" />
+            <NInput v-if="publicMode === 'code'" v-model:value="publicAccessCode" type="password" show-password-on="click" :placeholder="$t('spaceManage.accessCodePlaceholder')" maxlength="12" />
             <span v-if="publicEnabled && publicId" class="text-gray-500">访问地址：{{ `${publicOrigin}/${publicId}` }}</span>
-            <NButton type="primary" :loading="publicSaving" @click="savePublic">保存公开访问配置</NButton>
+            <NButton type="primary" :loading="publicSaving" @click="savePublic">{{ $t('spaceManage.savePublic') }}</NButton>
           </NSpace>
         </NCard>
+        <NCard v-if="selectedSpaceId" :title="$t('spaceManage.bookmarkTransfer')">
+          <NSpace><NButton @click="exportBookmarks">{{ $t('spaceManage.exportBookmarks') }}</NButton><NButton @click="bookmarkFileInput?.click()">{{ $t('spaceManage.chooseFile') }}</NButton><input ref="bookmarkFileInput" class="hidden" type="file" accept=".html,text/html" @change="previewBookmarks"></NSpace>
+          <NList v-if="bookmarkPreview" class="mt-2"><NListItem v-for="group in bookmarkPreview" :key="group.title"><span>{{ group.title }}（{{ group.items.length }}项）</span></NListItem><NProgress v-if="importing" type="line" :percentage="importProgress" processing /><NButton type="primary" :loading="importing" @click="confirmImport">确认导入</NButton></NList>
+        </NCard>
+        <NButton v-if="selectedSpaceId" type="error" secondary @click="clearCurrentSpace">{{ $t('spaceManage.clearSpace') }}</NButton>
         <NList v-if="selectedSpaceId" bordered>
           <NListItem>
             <div class="w-full">
-              <div class="flex items-center gap-2"><span>当前空间分组</span><span v-if="!groups[selectedSpaceId]?.length" class="text-gray-500">暂无</span></div>
-              <NSpace size="small" class="mt-1"><NButton v-for="group in groups[selectedSpaceId]" :key="group.id" size="tiny" secondary @click="editing = { spaceId: selectedSpaceId!, id: group.id }; groupName = group.title">{{ group.title }}</NButton></NSpace>
-              <NSpace size="small" class="mt-2"><NInput v-model:value="groupName" size="small" placeholder="分组名称" /><NButton size="small" @click="saveGroup(selectedSpaceId!)">{{ editing?.spaceId === selectedSpaceId ? '保存' : '新增分组' }}</NButton><NButton v-if="editing?.spaceId === selectedSpaceId" size="small" type="error" @click="removeGroup(selectedSpaceId!, editing.id)">删除</NButton></NSpace>
+              <div class="flex items-center gap-2"><span>{{ $t('spaceManage.groups') }}</span><span v-if="!groups[selectedSpaceId]?.length" class="text-gray-500">{{ $t('common.noData') }}</span></div>
+              <NSpace vertical size="small" class="mt-1"><NButton v-for="group in groups[selectedSpaceId]" :key="group.id" size="tiny" secondary @click="editGroup(selectedSpaceId!, group)">{{ group.title }}{{ group.parentId ? ' (子分组)' : '' }}</NButton></NSpace>
+              <NSpace size="small" class="mt-2"><NInput v-model:value="groupName" size="small" :placeholder="$t('spaceManage.groupName')" /><NSelect v-model:value="groupParentId" size="small" clearable :placeholder="$t('spaceManage.parentGroupOptional')" :options="(groups[selectedSpaceId] || []).filter(group => group.id !== editing?.id).map(group => ({ label: group.title, value: group.id }))" /><NButton size="small" @click="saveGroup(selectedSpaceId!)">{{ editing?.spaceId === selectedSpaceId ? $t('common.save') : $t('spaceManage.addGroup') }}</NButton><NButton v-if="editing?.spaceId === selectedSpaceId" size="small" type="error" @click="removeGroup(selectedSpaceId!, editing.id)">{{ $t('common.delete') }}</NButton></NSpace>
             </div>
           </NListItem>
         </NList>
-        <NCard v-if="selectedSpaceId" title="成员管理">
-          <NSpace><NInput v-model:value="memberEmail" placeholder="用户邮箱" /><NSelect v-model:value="memberRole" :options="[{ label: '编辑者', value: 'editor' }, { label: '查看者', value: 'viewer' }]" /><NButton @click="addCurrentMember">添加成员</NButton></NSpace>
-          <NList><NListItem v-for="member in members" :key="member.id"><NSpace justify="space-between" class="w-full"><span>{{ member.email || '邮箱未设置' }} ({{ member.source || 'manual' }})</span><NSelect :value="member.role" :options="[{ label: '管理员', value: 'admin' }, { label: '编辑者', value: 'editor' }, { label: '查看者', value: 'viewer' }]" @update:value="role => changeMember(member, role)" /></NSpace></NListItem></NList>
+        <NCard v-if="selectedSpaceId" :title="$t('spaceManage.members')">
+          <NSpace><NInput v-model:value="memberEmail" :placeholder="$t('spaceManage.userEmail')" /><NSelect v-model:value="memberRole" :options="[{ label: $t('spaceManage.editor'), value: 'editor' }, { label: $t('spaceManage.viewer'), value: 'viewer' }]" /><NButton @click="addCurrentMember">{{ $t('spaceManage.addMember') }}</NButton></NSpace>
+          <NList><NListItem v-for="member in members" :key="member.id"><NSpace justify="space-between" class="w-full"><span>{{ member.email || $t('spaceManage.emailMissing') }} ({{ member.source || 'manual' }})</span><NSelect :value="member.role" :options="[{ label: $t('spaceManage.admin'), value: 'admin' }, { label: $t('spaceManage.editor'), value: 'editor' }, { label: $t('spaceManage.viewer'), value: 'viewer' }]" @update:value="role => changeMember(member, role)" /></NSpace></NListItem></NList>
         </NCard>
-        <NCard v-if="selectedSpaceId" title="OIDC 分组授权">
-          <NSpace><NInput v-model:value="oidcProvider" placeholder="Provider" /><NInput v-model:value="oidcGroup" placeholder="分组名称" /><NSelect v-model:value="oidcRole" :options="[{ label: '编辑者', value: 'editor' }, { label: '查看者', value: 'viewer' }]" /><NButton @click="addRule">添加规则</NButton></NSpace>
-          <NList><NListItem v-for="rule in oidcRules" :key="rule.id"><NSpace justify="space-between" class="w-full"><span>{{ rule.provider }} / {{ rule.groupName }} ({{ rule.role }})</span><NButton size="small" @click="removeRule(rule.id)">删除</NButton></NSpace></NListItem></NList>
+        <NCard v-if="selectedSpaceId" :title="$t('spaceManage.oidcTitle')">
+          <NSpace><NInput v-model:value="oidcProvider" placeholder="Provider" /><NInput v-model:value="oidcGroup" :placeholder="$t('spaceManage.groupName')" /><NSelect v-model:value="oidcRole" :options="[{ label: $t('spaceManage.editor'), value: 'editor' }, { label: $t('spaceManage.viewer'), value: 'viewer' }]" /><NButton @click="addRule">{{ $t('spaceManage.addRule') }}</NButton></NSpace>
+          <NList><NListItem v-for="rule in oidcRules" :key="rule.id"><NSpace justify="space-between" class="w-full"><span>{{ rule.provider }} / {{ rule.groupName }} ({{ rule.role }})</span><NButton size="small" @click="removeRule(rule.id)">{{ $t('common.delete') }}</NButton></NSpace></NListItem></NList>
         </NCard>
       </NSpace>
     </NCard>

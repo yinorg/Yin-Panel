@@ -5,11 +5,14 @@ import enUS from './en-US.json'
 import zhCN from './zh-CN.json'
 // import ruRU from './ru-RU'
 
-const defaultLocale = 'zh-CN'
+export const supportedLocales = ['zh-CN', 'en-US'] as const
+export type SupportedLocale = typeof supportedLocales[number]
+const defaultLocale: SupportedLocale = 'zh-CN'
 
 const i18n = createI18n({
   locale: defaultLocale,
-  fallbackLocale: defaultLocale,
+  // Missing translations must never fall back to Simplified Chinese.
+  fallbackLocale: 'en-US',
   allowComposition: true,
   messages: {
     'en-US': enUS,
@@ -24,8 +27,8 @@ export const t = i18n.global.t
 
 // 避免循环依赖appstore(authstore)language此处暂时先使用any
 // 后面有时间调整
-export function setLocale(locale: any) {
-  i18n.global.locale = locale
+export function setLocale(locale: string) {
+  i18n.global.locale = (supportedLocales as readonly string[]).includes(locale) ? locale : defaultLocale
 }
 
 export function setupI18n(app: App) {

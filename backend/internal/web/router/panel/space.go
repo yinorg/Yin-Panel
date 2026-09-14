@@ -5,9 +5,11 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"html"
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode"
 	"yin-panel/internal/biz/repository"
 	"yin-panel/internal/web/interceptor"
 	"yin-panel/internal/web/model/base"
@@ -35,6 +37,9 @@ func (r *SpaceRouter) InitRouter(router *gin.RouterGroup) {
 	g.POST("/:spaceId/items/sort", r.SortItems)
 	g.DELETE("/:spaceId/items/:itemId", r.DeleteItem)
 	g.POST("/:spaceId/items/:itemId/delete", r.DeleteItem)
+	g.GET("/:spaceId/bookmarks/export", r.ExportBookmarks)
+	g.POST("/:spaceId/bookmarks/import", r.ImportBookmarks)
+	g.POST("/:spaceId/clear", r.ClearSpace)
 	g.POST("/:spaceId/groups", r.CreateGroup)
 	g.PUT("/:spaceId/groups/:groupId", r.UpdateGroup)
 	g.POST("/:spaceId/groups/:groupId/update", r.UpdateGroup)
@@ -80,6 +85,149 @@ type publicConfigRequest struct {
 	PublicID   string `json:"publicId"`
 	Mode       string `json:"mode"`
 	AccessCode string `json:"accessCode"`
+}
+
+type bookmarkImportRequest struct {
+	Groups []struct {
+		Title    string `json:"title"`
+		Children []struct {
+			Title string `json:"title"`
+			Items []struct {
+				Title string `json:"title"`
+				URL   string `json:"url"`
+			} `json:"items"`
+		} `json:"children"`
+		Items []struct {
+			Title string `json:"title"`
+			URL   string `json:"url"`
+		} `json:"items"`
+	} `json:"groups"`
+}
+
+func (r *SpaceRouter) ExportBookmarks(c *gin.Context) {
+	user, ok := base.GetCurrentUserInfo(c)
+	if !ok {
+		response.Error(c, "not logged in")
+		return
+	}
+	id, err := spaceID(c)
+	if err != nil || !canAccessSpace(user.ID, id) {
+		response.ErrorNoAccess(c)
+		return
+	}
+	var groups []repository.ItemIconGroup
+	if err = repository.Db.Where("space_id = ?", id).Order("sort, id").Find(&groups).Error; err != nil {
+		response.ErrorDatabase(c, err.Error())
+		return
+	}
+	var items []repository.ItemIcon
+	if err = repository.Db.Where("space_id = ?", id).Order("sort, id").Find(&items).Error; err != nil {
+		response.ErrorDatabase(c, err.Error())
+		return
+	}
+	c.Header("Content-Type", "text/html; charset=utf-8")
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=space-%d-bookmarks.html", id))
+	c.String(200, "<!DOCTYPE NETSCAPE-Bookmark-file-1>\n<META HTTP-EQUIV=\"Content-Type\" CONTENT=\"text/html; charset=UTF-8\">\n<TITLE>Bookmarks</TITLE><H1>Bookmarks</H1><DL><p>"+
+		bookmarkHTML(groups, items)+"</DL><p>")
+}
+
+func (r *SpaceRouter) ClearSpace(c *gin.Context) {
+	user, ok := base.GetCurrentUserInfo(c)
+	if !ok {
+		response.Error(c, "not logged in")
+		return
+	}
+	id, err := spaceID(c)
+	if err != nil || !canManageSpace(user.ID, id) {
+		response.ErrorNoAccess(c)
+		return
+	}
+	err = repository.Db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("space_id = ?", id).Delete(&repository.ItemIcon{}).Error; err != nil {
+			return err
+		}
+		return tx.Where("space_id = ?", id).Delete(&repository.ItemIconGroup{}).Error
+	})
+	if err != nil {
+		response.ErrorDatabase(c, err.Error())
+		return
+	}
+	response.Success(c)
+}
+
+func bookmarkHTML(groups []repository.ItemIconGroup, items []repository.ItemIcon) string {
+	return bookmarkHTMLForParent(groups, items, nil)
+}
+
+func bookmarkHTMLForParent(groups []repository.ItemIconGroup, items []repository.ItemIcon, parent *uint) string {
+	result := ""
+	for _, group := range groups {
+		if (group.ParentID == nil) != (parent == nil) || (parent != nil && *group.ParentID != *parent) {
+			continue
+		}
+		result += "<DT><H3>" + html.EscapeString(group.Title) + "</H3><DL><p>"
+		for _, item := range items {
+			if item.ItemIconGroupId == int(group.ID) {
+				result += "<DT><A HREF=\"" + html.EscapeString(item.Url) + "\">" + html.EscapeString(item.Title) + "</A>"
+			}
+		}
+		result += bookmarkHTMLForParent(groups, items, &group.ID)
+		result += "</DL><p>"
+	}
+	return result
+}
+
+func (r *SpaceRouter) ImportBookmarks(c *gin.Context) {
+	user, ok := base.GetCurrentUserInfo(c)
+	if !ok {
+		response.Error(c, "not logged in")
+		return
+	}
+	id, err := spaceID(c)
+	if err != nil || !canEditSpace(user.ID, id) {
+		response.ErrorNoAccess(c)
+		return
+	}
+	var req bookmarkImportRequest
+	if err = c.ShouldBindJSON(&req); err != nil {
+		response.ErrorParamFomat(c, "invalid bookmarks")
+		return
+	}
+	err = repository.Db.Transaction(func(tx *gorm.DB) error {
+		for _, group := range req.Groups {
+			if strings.TrimSpace(group.Title) == "" {
+				continue
+			}
+			var target repository.ItemIconGroup
+			if err := tx.Where("space_id = ? AND title = ?", id, group.Title).First(&target).Error; err != nil {
+				target = repository.ItemIconGroup{Title: group.Title, UserId: user.ID, SpaceID: id, Sort: 9999}
+				if err := tx.Create(&target).Error; err != nil {
+					return err
+				}
+			}
+			for _, imported := range group.Items {
+				if strings.TrimSpace(imported.URL) == "" {
+					continue
+				}
+				icon := repository.ItemIconIconInfo{ItemType: 4, BackgroundColor: "#2a2a2a6b"}
+				data, _ := json.Marshal(icon)
+				item := repository.ItemIcon{IconJson: string(data), Title: limitTitle(imported.Title), Url: imported.URL, OpenMethod: 2, ItemIconGroupId: int(target.ID), UserId: user.ID, SpaceID: id}
+				item.Icon = icon
+				ensureItemIcon(&item)
+				iconData, _ := json.Marshal(item.Icon)
+				item.IconJson = string(iconData)
+				if err := tx.Create(&item).Error; err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		response.ErrorDatabase(c, err.Error())
+		return
+	}
+	response.Success(c)
 }
 
 var publicIDPattern = regexp.MustCompile(`^[a-z][a-z0-9-]{4,28}[a-z0-9]$`)
@@ -367,8 +515,9 @@ func canEditSpace(userID, spaceID uint) bool {
 }
 
 type groupRequest struct {
-	Title string `json:"title" binding:"required,max=50"`
-	Icon  string `json:"icon"`
+	Title    string `json:"title" binding:"required,max=50"`
+	Icon     string `json:"icon"`
+	ParentID *uint  `json:"parentId"`
 }
 
 func (r *SpaceRouter) CreateGroup(c *gin.Context) {
@@ -387,7 +536,14 @@ func (r *SpaceRouter) CreateGroup(c *gin.Context) {
 		response.ErrorParamFomat(c, err.Error())
 		return
 	}
-	g := repository.ItemIconGroup{Title: req.Title, Icon: req.Icon, UserId: user.ID, SpaceID: id, Sort: 9999}
+	if req.ParentID != nil {
+		var parent repository.ItemIconGroup
+		if repository.Db.Where("id = ? AND space_id = ?", *req.ParentID, id).First(&parent).Error != nil || *req.ParentID == 0 {
+			response.ErrorParamFomat(c, "invalid parent group")
+			return
+		}
+	}
+	g := repository.ItemIconGroup{Title: req.Title, Icon: req.Icon, UserId: user.ID, SpaceID: id, ParentID: req.ParentID, Sort: 9999}
 	if err := repository.Db.Create(&g).Error; err != nil {
 		response.ErrorDatabase(c, err.Error())
 		return
@@ -415,11 +571,39 @@ func (r *SpaceRouter) UpdateGroup(c *gin.Context) {
 		response.ErrorParamFomat(c, err.Error())
 		return
 	}
-	if err := repository.Db.Model(&repository.ItemIconGroup{}).Where("id = ? AND space_id = ?", gid, id).Updates(map[string]any{"title": req.Title, "icon": req.Icon}).Error; err != nil {
+	if req.ParentID != nil && (*req.ParentID == uint(gid) || !groupBelongsToSpace(*req.ParentID, id)) {
+		response.ErrorParamFomat(c, "invalid parent group")
+		return
+	}
+	if req.ParentID != nil && groupHasDescendant(id, uint(gid), *req.ParentID) {
+		response.ErrorParamFomat(c, "group cycle detected")
+		return
+	}
+	if err := repository.Db.Model(&repository.ItemIconGroup{}).Where("id = ? AND space_id = ?", gid, id).Updates(map[string]any{"title": req.Title, "icon": req.Icon, "parent_id": req.ParentID}).Error; err != nil {
 		response.ErrorDatabase(c, err.Error())
 		return
 	}
 	response.Success(c)
+}
+
+func groupBelongsToSpace(groupID, spaceID uint) bool {
+	var group repository.ItemIconGroup
+	return repository.Db.Where("id = ? AND space_id = ?", groupID, spaceID).First(&group).Error == nil
+}
+
+func groupHasDescendant(spaceID, groupID, candidate uint) bool {
+	current := candidate
+	for current != 0 {
+		if current == groupID {
+			return true
+		}
+		var group repository.ItemIconGroup
+		if repository.Db.Select("parent_id").Where("id = ? AND space_id = ?", current, spaceID).First(&group).Error != nil || group.ParentID == nil {
+			return false
+		}
+		current = *group.ParentID
+	}
+	return false
 }
 func (r *SpaceRouter) DeleteGroup(c *gin.Context) {
 	user, ok := base.GetCurrentUserInfo(c)
@@ -438,10 +622,23 @@ func (r *SpaceRouter) DeleteGroup(c *gin.Context) {
 		return
 	}
 	err = repository.Db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("id = ? AND space_id = ?", gid, id).Delete(&repository.ItemIconGroup{}).Error; err != nil {
+		ids := []uint{uint(gid)}
+		for i := 0; i < len(ids); i++ {
+			var children []repository.ItemIconGroup
+			if err := tx.Where("space_id = ? AND parent_id = ?", id, ids[i]).Find(&children).Error; err != nil {
+				return err
+			}
+			for _, child := range children {
+				ids = append(ids, child.ID)
+			}
+		}
+		if err := tx.Where("space_id = ? AND item_icon_group_id IN ?", id, ids).Delete(&repository.ItemIcon{}).Error; err != nil {
 			return err
 		}
-		return tx.Where("item_icon_group_id = ? AND space_id = ?", gid, id).Delete(&repository.ItemIcon{}).Error
+		if err := tx.Where("id IN ? AND space_id = ?", ids, id).Delete(&repository.ItemIconGroup{}).Error; err != nil {
+			return err
+		}
+		return nil
 	})
 	if err != nil {
 		response.ErrorDatabase(c, err.Error())
@@ -619,6 +816,13 @@ func (r *SpaceRouter) Items(c *gin.Context) {
 	if groupID := c.Query("groupId"); groupID != "" {
 		query = query.Where("item_icon_group_id = ?", groupID)
 	}
+	if page, _ := strconv.Atoi(c.Query("page")); page > 0 {
+		pageSize, _ := strconv.Atoi(c.Query("pageSize"))
+		if pageSize < 1 || pageSize > 200 {
+			pageSize = 50
+		}
+		query = query.Offset((page - 1) * pageSize).Limit(pageSize)
+	}
 	if err := query.Find(&items).Error; err != nil {
 		response.ErrorDatabase(c, err.Error())
 		return
@@ -645,6 +849,10 @@ func (r *SpaceRouter) CreateItem(c *gin.Context) {
 	var item repository.ItemIcon
 	if err := c.ShouldBindJSON(&item); err != nil || item.ItemIconGroupId == 0 {
 		response.ErrorParamFomat(c, "invalid item or group")
+		return
+	}
+	if !validItemTitle(item.Title) {
+		response.ErrorParamFomat(c, "title must be at most 20 characters")
 		return
 	}
 	ensureItemIcon(&item)
@@ -691,6 +899,10 @@ func (r *SpaceRouter) UpdateItem(c *gin.Context) {
 		response.ErrorParamFomat(c, "invalid groupId")
 		return
 	}
+	if !validItemTitle(input.Title) {
+		response.ErrorParamFomat(c, "title must be at most 20 characters")
+		return
+	}
 	ensureItemIcon(&input)
 	var group repository.ItemIconGroup
 	if repository.Db.Where("id = ? AND space_id = ?", input.ItemIconGroupId, id).First(&group).Error != nil {
@@ -713,15 +925,45 @@ func ensureItemIcon(item *repository.ItemIcon) {
 	if item.Icon.ItemType != 4 || item.Icon.Src != "" {
 		return
 	}
-	runes := []rune(strings.TrimSpace(item.Title))
-	if len(runes) > 5 {
-		runes = runes[:5]
+	title := []rune(strings.TrimSpace(item.Title))
+	chinese := make([]rune, 0, 5)
+	latin := make([]rune, 0, 8)
+	for _, r := range title {
+		if unicode.Is(unicode.Han, r) && len(chinese) < 5 {
+			chinese = append(chinese, r)
+		}
+		if ((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z')) && len(latin) < 8 {
+			latin = append(latin, r)
+		}
 	}
-	text := string(runes)
+	text := string(chinese)
+	if text == "" {
+		text = string(latin)
+	}
+	if text == "" {
+		for _, r := range title {
+			if !unicode.IsSpace(r) {
+				text += string(r)
+				break
+			}
+		}
+	}
 	if text == "" {
 		text = "?"
 	}
 	item.Icon = repository.ItemIconIconInfo{ItemType: 1, Text: text, BackgroundColor: "#2a2a2a6b"}
+}
+
+func limitTitle(title string) string {
+	runes := []rune(strings.TrimSpace(title))
+	if len(runes) > 20 {
+		runes = runes[:20]
+	}
+	return string(runes)
+}
+
+func validItemTitle(title string) bool {
+	return len([]rune(strings.TrimSpace(title))) <= 20
 }
 func (r *SpaceRouter) DeleteItem(c *gin.Context) {
 	user, ok := base.GetCurrentUserInfo(c)

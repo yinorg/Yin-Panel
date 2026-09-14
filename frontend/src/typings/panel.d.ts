@@ -19,6 +19,7 @@ declare namespace Panel {
         icon?: string
         title?: string
         sort?:number
+        parentId?: number | null
     }
 
     interface ItemIcon {
@@ -71,4 +72,3 @@ declare namespace Panel {
         itemIconGroupId:number
     }
 }
-

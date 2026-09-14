@@ -4,7 +4,7 @@ import { NBackTop, NButton, NButtonGroup, NCard, NDropdown, NInput, NModal, NSke
 import { nextTick, onMounted, ref } from 'vue'
 import { createTeam, getGroups, getItems, getSpaces, sortSpaces, spaceDisplayName, type Space } from '../../api/panel/space'
 import { Clock, SearchBox, SystemMonitor } from '../../components/deskModule'
-import { SvgIcon } from '../../components/common'
+import { SvgIcon, SvgIconOnline } from '../../components/common'
 import { AppIcon, AppStarter, EditItem } from './components'
 import { deleteItem, sortItems } from '@/api/panel/space'
 
@@ -19,6 +19,7 @@ interface ItemGroup extends Panel.ItemIconGroup {
   sortStatus?: boolean
   hoverStatus: boolean
   items?: Panel.ItemInfo[]
+  depth?: number
 }
 
 const ms = useMessage()
@@ -53,6 +54,12 @@ const monitorEnabled = ref(false)
 
 const items = ref<ItemGroup[]>([])
 const filterItems = ref<ItemGroup[]>([])
+const loadedGroups = new Set<number>()
+const loadingGroups = new Set<number>()
+const groupLoadQueue: number[] = []
+let activeGroupLoads = 0
+const collapsedGroups = ref<Set<number>>(new Set())
+let groupObserver: IntersectionObserver | null = null
 const publicCode = parsePublicCodeFromPath()
 const publicAccessCode = ref('')
 const publicAccessReady = ref(!publicCode || !!sessionStorage.getItem(`yin-panel-public-access:${publicCode}`))
@@ -104,8 +111,15 @@ function handWindowIframeIdLoad(payload: Event) {
   windowIframeIsLoad.value = false
 }
 
+function scrollToTop() {
+  scrollContainerRef.value?.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
 // 获取组数据
 function getList() {
+  loadedGroups.clear()
+  loadingGroups.clear()
+  groupLoadQueue.length = 0
   if (!activeSpace.value) {
     items.value = []
     filterItems.value = []
@@ -114,15 +128,56 @@ function getList() {
 
   getGroups<{ code: number; data: ItemGroup[] }>(activeSpace.value.id).then(({ code, data }) => {
     if (code !== 0 || !data) return
-    getItems<{ code: number; data: ItemGroup[] }>(activeSpace.value!.id).then((itemsResponse) => {
-      const allItems = itemsResponse.data || []
-      items.value = data.map(group => ({ ...group, items: allItems.filter(item => item.itemIconGroupId === group.id) }))
-      filterItems.value = items.value
-    })
+    const byParent = new Map<number, ItemGroup[]>()
+    data.forEach(group => { const key = group.parentId || 0; const list = byParent.get(key) || []; list.push({ ...group, items: [] }); byParent.set(key, list) })
+    const flattened: ItemGroup[] = []
+    function append(parentId: number, depth: number) { (byParent.get(parentId) || []).forEach(group => { group.depth = depth; flattened.push(group); append(Number(group.id), depth + 1) }) }
+    append(0, 0)
+    items.value = flattened
+    const initiallyCollapsed = new Set<number>()
+    flattened.forEach(group => { if ((byParent.get(Number(group.id)) || []).length) initiallyCollapsed.add(Number(group.id)) })
+    collapsedGroups.value = initiallyCollapsed
+    filterItems.value = items.value
+    nextTick(() => { document.querySelectorAll('[data-item-group]').forEach((el, index) => observeGroup(el, index)) })
   })
 }
 
+function groupHidden(index: number) {
+  const group = items.value[index]
+  if (!group?.parentId) return false
+  let parent = items.value.find(item => Number(item.id) === Number(group.parentId))
+  while (parent) {
+    if (collapsedGroups.value.has(Number(parent.id))) return true
+    parent = parent.parentId ? items.value.find(item => Number(item.id) === Number(parent?.parentId)) : undefined
+  }
+  return false
+}
+
+function loadGroupItems(index: number) {
+  const group = items.value[index]
+  if (!group || !activeSpace.value || loadedGroups.has(Number(group.id)) || loadingGroups.has(Number(group.id))) return
+  loadingGroups.add(Number(group.id))
+  groupLoadQueue.push(index)
+  processGroupLoadQueue()
+}
+function processGroupLoadQueue() {
+  if (activeGroupLoads >= 2 || groupLoadQueue.length === 0) return
+  const index = groupLoadQueue.shift()!
+  const group = items.value[index]
+  if (!group || !activeSpace.value) { processGroupLoadQueue(); return }
+  activeGroupLoads++
+  const groupId = Number(group.id)
+  getItems<{ code: number; data: Panel.ItemInfo[] }>(activeSpace.value.id, groupId, 1, 100).then(res => { if (res.code === 0) { group.items = res.data || []; if (group.items.length > 40) collapsedGroups.value = new Set([...collapsedGroups.value, groupId]) } }).finally(() => { loadedGroups.add(groupId); loadingGroups.delete(groupId); activeGroupLoads--; processGroupLoadQueue() })
+}
+function toggleGroup(id: number) { const next = new Set(collapsedGroups.value); next.has(id) ? next.delete(id) : next.add(id); collapsedGroups.value = next }
+function observeGroup(el: Element, index: number) {
+  if (!groupObserver) groupObserver = new IntersectionObserver(entries => entries.forEach(entry => { if (entry.isIntersecting) loadGroupItems(Number((entry.target as HTMLElement).dataset.groupIndex)) }), { rootMargin: '100px' })
+  ;(el as HTMLElement).dataset.groupIndex = String(index)
+  groupObserver.observe(el)
+}
+
 function selectSpace(key: string | number) {
+  loadedGroups.clear()
   const selected = spaces.value.find(space => space.id === Number(key))
   if (selected) { activeSpace.value = selected; getList() }
 }
@@ -371,11 +426,11 @@ function handleAddItem(itemIconGroupId?: number) {
 <template>
   <div class="w-full h-full sun-main">
     <NModal :show="!!publicCode && !publicAccessReady" :mask-closable="false" :closable="false">
-      <NCard title="访问验证" style="width: min(92vw, 380px)">
+      <NCard :title="$t('spaceManage.accessVerification')" style="width: min(92vw, 380px)">
         <NSpace vertical>
-          <span>请输入访问码后继续访问</span>
-          <NInput v-model:value="publicAccessCode" type="password" show-password-on="click" maxlength="12" placeholder="访问码（4-12个字符）" @keyup.enter="unlockPublicAccess" />
-          <NButton type="primary" block @click="unlockPublicAccess">确认访问</NButton>
+          <span>{{ $t('spaceManage.enterAccessCode') }}</span>
+          <NInput v-model:value="publicAccessCode" type="password" show-password-on="click" maxlength="12" :placeholder="$t('spaceManage.accessCodeShortPlaceholder')" @keyup.enter="unlockPublicAccess" />
+          <NButton type="primary" block @click="unlockPublicAccess">{{ $t('spaceManage.confirmAccess') }}</NButton>
         </NSpace>
       </NCard>
     </NModal>
@@ -438,15 +493,20 @@ function handleAddItem(itemIconGroupId?: number) {
           <!-- 组纵向排列 -->
           <div
             v-for="(itemGroup, itemGroupIndex) in filterItems" :key="itemGroupIndex"
-            class="item-list mt-[50px]"
+            v-show="!groupHidden(itemGroupIndex)"
+            data-item-group
+            class="item-list mt-[50px] min-h-[110px]"
             :class="itemGroup.sortStatus ? 'shadow-2xl border shadow-[0_0_30px_10px_rgba(0,0,0,0.3)]  p-[10px] rounded-2xl' : ''"
             @mouseenter="handleSetHoverStatus(itemGroupIndex, true)"
             @mouseleave="handleSetHoverStatus(itemGroupIndex, false)"
           >
             <!-- 分组标题 -->
-            <div class="text-white text-xl font-extrabold mb-[20px] ml-[10px] flex items-center">
+            <div class="text-white text-xl font-extrabold mb-[20px] flex items-center" :style="{ marginLeft: `${10 + (itemGroup.depth || 0) * 24}px` }">
               <span class="group-title text-shadow">
                 {{ itemGroup.title }}
+              </span>
+              <span class="ml-2 cursor-pointer" :title="collapsedGroups.has(Number(itemGroup.id)) ? $t('spaceManage.expandGroup') : $t('spaceManage.collapseGroup')" @click="toggleGroup(Number(itemGroup.id))">
+                <SvgIconOnline :icon="collapsedGroups.has(Number(itemGroup.id)) ? 'mdi:chevron-down' : 'mdi:chevron-up'" />
               </span>
               <div
                 v-if="parsePublicCodeFromPath() === '' && authStore.token"
@@ -464,7 +524,7 @@ function handleAddItem(itemIconGroupId?: number) {
 
             <!-- 详情图标 -->
             <div v-if="panelState.panelConfig.iconStyle === PanelPanelConfigStyleEnum.info">
-              <div v-if="itemGroup.items">
+              <div v-if="itemGroup.items && !collapsedGroups.has(Number(itemGroup.id))">
                 <VueDraggable
                   v-model="itemGroup.items" item-key="sort" :animation="300"
                   class="icon-info-box"
@@ -500,7 +560,7 @@ function handleAddItem(itemIconGroupId?: number) {
 
             <!-- APP图标宫型盒子 -->
             <div v-if="panelState.panelConfig.iconStyle === PanelPanelConfigStyleEnum.icon">
-              <div v-if="itemGroup.items">
+              <div v-if="itemGroup.items && !collapsedGroups.has(Number(itemGroup.id))">
                 <VueDraggable
                   v-model="itemGroup.items" item-key="sort" :animation="300"
                   class="icon-small-box"
@@ -564,6 +624,11 @@ function handleAddItem(itemIconGroupId?: number) {
     <!-- 悬浮按钮 -->
     <div v-if="parsePublicCodeFromPath() === '' && authStore.token" class="fixed-element shadow-[0_0_10px_2px_rgba(0,0,0,0.2)]">
       <NButtonGroup vertical>
+        <NButton color="#2a2a2a6b" :title="$t('spaceManage.backToTop')" @click="scrollToTop">
+          <template #icon>
+            <SvgIcon class="text-white font-xl" icon="icon-park-outline:to-top" />
+          </template>
+        </NButton>
         <!-- 网络模式切换按钮组 -->
         <NButton
           v-if="panelState.networkMode === PanelStateNetworkModeEnum.lan && panelState.panelConfig.netModeChangeButtonShow" color="#2a2a2a6b"
@@ -638,8 +703,8 @@ function handleAddItem(itemIconGroupId?: number) {
       </div>
     </NModal>
   </div>
-  <NModal v-model:show="createTeamVisible" preset="dialog" title="创建团队空间" positive-text="创建" negative-text="取消" :loading="creatingTeam" @positive-click="submitCreateTeam">
-    <NInput v-model:value="teamName" placeholder="团队名称" maxlength="100" show-count @keyup.enter="submitCreateTeam" />
+  <NModal v-model:show="createTeamVisible" preset="dialog" :title="$t('spaceManage.createTeamSpace')" :positive-text="$t('spaceManage.createSpace')" :negative-text="$t('common.cancel')" :loading="creatingTeam" @positive-click="submitCreateTeam">
+    <NInput v-model:value="teamName" :placeholder="$t('spaceManage.teamName')" maxlength="100" show-count @keyup.enter="submitCreateTeam" />
   </NModal>
 </template>
 

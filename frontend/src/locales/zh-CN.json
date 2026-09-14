@@ -244,6 +244,18 @@
     "openLanUrl": "打开局域网地址",
     "openWanUrl": "打开公网地址"
   },
+  "spaceManage": { "mySpace": "我的空间", "chooseFile": "选择文件", "oidcTitle": "OIDC 分组授权", "addRule": "添加规则", "shared": "共享", "personal": "个人", "emailMissing": "邮箱未设置", "admin": "管理员",
+    "title": "空间管理", "newSpaceName": "新空间名称", "createSpace": "创建新空间", "spaceName": "空间名称", "rename": "重命名", "copy": "复制空间", "publicAccess": "公开访问", "enablePublicAccess": "开启公开访问", "publicIdPlaceholder": "FN ID，例如 my-panel", "directAccess": "链接直接访问", "codeAccess": "访问码验证", "accessCodePlaceholder": "访问码（4-12个字符）", "savePublic": "保存公开访问配置", "bookmarkTransfer": "书签导入导出", "exportBookmarks": "导出 Chrome 书签", "clearSpace": "清空当前空间", "groups": "分组", "groupName": "分组名称", "parentGroupOptional": "父分组（可选）", "addGroup": "新增分组", "members": "成员管理", "userEmail": "用户邮箱", "editor": "编辑者", "viewer": "查看者", "addMember": "添加成员", "accessVerification": "访问验证", "enterAccessCode": "请输入访问码后继续访问", "accessCodeShortPlaceholder": "访问码（4-12个字符）", "confirmAccess": "确认访问", "expandGroup": "展开分组", "collapseGroup": "收缩分组", "backToTop": "回到顶端", "createTeamSpace": "创建团队空间", "teamName": "团队名称",
+    "importConfirm": "即将导入 {count} 个项目，确认继续吗？",
+    "importConfirmAgain": "这是第二次确认：确认执行书签导入吗？",
+    "importSuccess": "书签导入成功",
+    "clearConfirm": "确认清空当前空间的全部分组和项目吗？",
+    "clearSuccess": "空间已清空",
+    "publicIdInvalid": "FN ID需为6-30位小写字母、数字或连字符",
+    "accessCodeInvalid": "访问码需为4-12个字符",
+    "publicSaved": "公开访问配置已保存",
+    "groupDeleteConfirm": "确认删除此分组及其子分组和项目吗？"
+  },
   "settingUserInfo": {
     "confirmLogoutText": "你确定要退出登录吗？",
     "confirmPassword": "确认新密码",

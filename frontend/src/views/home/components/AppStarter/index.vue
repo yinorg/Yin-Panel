@@ -39,7 +39,7 @@ const apps = ref<App[]>([
     icon: 'ion-color-palette-outline',
   },
   {
-    name: '空间管理',
+    name: t('spaceManage.title'),
     componentName: 'SpaceManage',
     icon: 'material-symbols:groups',
   },
