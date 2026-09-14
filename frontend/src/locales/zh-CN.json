@@ -146,6 +146,7 @@
     "inputPlaceholder": "请输入",
     "inputPlaceholderByText": "请输入{text}",
     "language": "语言",
+    "followBrowser": "跟随浏览器",
     "leastOne": "请至少保留一项",
     "networkError": "网络错误，请稍后重试",
     "nickName": "昵称",

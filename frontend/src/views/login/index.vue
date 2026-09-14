@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { NButton, NCard, NForm, NFormItem, NGradientText, NInput, NSelect, useMessage, NDivider } from 'naive-ui'
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { login } from '../../api'
 import { useAppStore, useAuthStore } from '../../store'
 import { SvgIcon, SvgIconOnline } from '../../components/common'
@@ -16,6 +16,7 @@ const appStore = useAppStore()
 const ms = useMessage()
 const loading = ref(false)
 const languageValue = ref<Language>(appStore.language)
+const localizedLanguageOptions = computed(() => languageOptions.map(option => ({ ...option, label: option.key === 'auto' ? t('common.followBrowser') : option.label })))
 const oauthEnabled = ref(false)
 const oauthProviders = ref<string[]>([])
 const oauthLoading = ref(false)
@@ -135,7 +136,7 @@ function getProviderLabel(provider: string) {
           <SvgIcon icon="ion-language" style="width: 20;height: 20;" />
         </div>
         <div class="min-w-[100px]">
-          <NSelect v-model:value="languageValue" size="small" :options="languageOptions" @update-value="handleChangeLanuage" />
+          <NSelect v-model:value="languageValue" size="small" :options="localizedLanguageOptions" @update-value="handleChangeLanuage" />
         </div>
       </div>
 

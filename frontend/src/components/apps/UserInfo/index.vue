@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { FormInst, FormRules } from 'naive-ui'
 import { NButton, NCard, NDivider, NForm, NFormItem, NInput, NSelect, useDialog, useMessage } from 'naive-ui'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { RoundCardModal, SvgIcon } from '../../common'
 import { useAppStore, useAuthStore, usePanelState } from '@/store'
 import { languageOptions } from '@/utils/defaultData'
@@ -24,6 +24,7 @@ const publicVisitUrl = ref('')
 const publicVisitLoading = ref(false)
 
 const languageValue = ref(appStore.language)
+const localizedLanguageOptions = computed(() => languageOptions.map(option => ({ ...option, label: option.key === 'auto' ? t('common.followBrowser') : option.label })))
 const themeValue = ref(appStore.theme)
 const nickName = ref(authStore.userInfo?.name || '')
 const isEditNickNameStatus = ref(false)
@@ -248,7 +249,7 @@ const handleTogglePublicVisit = async (value: boolean) => {
           {{ $t('common.language') }}
         </div>
         <div class="max-w-[200px]">
-          <NSelect v-model:value="languageValue" :options="languageOptions" @update-value="handleChangeLanuage" />
+          <NSelect v-model:value="languageValue" :options="localizedLanguageOptions" @update-value="handleChangeLanuage" />
         </div>
       </div>
 

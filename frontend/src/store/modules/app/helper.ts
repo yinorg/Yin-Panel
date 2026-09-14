@@ -4,7 +4,7 @@ const LOCAL_NAME = 'appSetting'
 
 export type Theme = 'light' | 'dark' | 'auto'
 
-export type Language = 'zh-CN' | 'en-US'
+export type Language = 'auto' | 'zh-CN' | 'en-US' | 'zh-TW' | 'ja-JP' | 'ko-KR' | 'de-DE' | 'fr-FR' | 'es-ES' | 'pt-BR' | 'ru-RU'
 
 export interface AppState {
   siderCollapsed: boolean
@@ -13,12 +13,7 @@ export interface AppState {
 }
 
 export function defaultSetting(): AppState {
-  const lan = (navigator.language).toLowerCase()
-  let language: Language = 'en-US'
-  if (lan.includes('zh'))
-    language = 'zh-CN'
-
-  return { siderCollapsed: false, theme: 'auto', language }
+  return { siderCollapsed: false, theme: 'auto', language: 'auto' }
 }
 
 export function getLocalSetting(): AppState {
