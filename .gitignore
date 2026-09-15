@@ -39,6 +39,8 @@ backend/database
 backend/web
 backend/uploads
 backend/yin-panel
+backend/backup
+backend/data
 
 # Local planning notes
 docs/optimization-goals.md

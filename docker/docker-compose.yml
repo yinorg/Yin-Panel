@@ -1,7 +1,7 @@
 services:
   yin-panel:
-    image: ${YIN_PANEL_IMAGE:-yin-panel/monolith:local}
-    pull_policy: never
+    image: ${YIN_PANEL_IMAGE:-ghcr.io/yinorg/yin-panel-ce:0.3.11}
+    pull_policy: missing
     container_name: yin-panel
     restart: unless-stopped
     volumes:

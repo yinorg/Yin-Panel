@@ -46,7 +46,7 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ghcr.io/yinorg/yin-panel:${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
-            ghcr.io/yinorg/yin-panel:latest
+            ghcr.io/yinorg/yin-panel-ce:${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+            ghcr.io/yinorg/yin-panel-ce:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max

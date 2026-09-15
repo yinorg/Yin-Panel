@@ -29,7 +29,7 @@ COPY --from=frontend-builder /build/backend/web ./web
 RUN apk add --no-cache gcc musl-dev && \
     CGO_ENABLED=1 GOOS=linux GOARCH=${TARGETARCH:-amd64} \
     go build -o yin-panel \
-    -ldflags="-X yin-panel/internal/global.RUNCODE=release -X yin-panel/internal/global.VERSION=${VERSION}" \
+    -ldflags="-X github.com/yinorg/Yin-Panel/backend/internal/global.RUNCODE=release -X github.com/yinorg/Yin-Panel/backend/internal/global.VERSION=${VERSION}" \
     main.go
 
 # Keep only the runtime dependencies and application assets in the final image.

@@ -4,7 +4,7 @@ fullnameOverride: yin-panel
 replicaCount: 1
 
 image:
-  repository: ghcr.io/phantommaa/yin-panel/monolith
+  repository: ghcr.io/yinorg/yin-panel-ce
   pullPolicy: IfNotPresent
   tag: ""
 
@@ -17,7 +17,8 @@ resources:
     memory: 20Mi
 
 service:
-  port: 3030
+  type: ClusterIP
+  port: 3002
 
 nodeSelector: {}
 
@@ -33,7 +34,7 @@ appConfig:
     # Root URL
     root_url: http://127.0.0.1:3002
     # Database driver [mysql/sqlite(Default)]
-    database_drive: mysql
+    database_drive: sqlite
     # Enable static file server. Default:true
     enable_static_server: true
     # Enable system monitor feature. Default:true
@@ -41,7 +42,7 @@ appConfig:
     # Enable proxy feature to solve some network issues. Default:false
     enable_node_proxy: false
     # Used as prefix to generate file url. For example, it will lookup to "/uploads/xxxx.png"
-    url_prefix: /api/file/s3/
+    url_prefix: /uploads/
 
   # SQLite configuration (valid when database_drive=sqlite)
   sqlite:
@@ -56,11 +57,11 @@ appConfig:
     db_name: sunpanel
     wait_timeout: 100
 
-  # Use rclone to store files. Both support local and remote storage
+  # Core CE uses local storage. S3 is available in the EE image.
   rclone:
     # dir path of local or bucket of remote storage. this item config not belong to rclone
-    type: s3
-    bucket: bucket_name
+    type: local
+    bucket: uploads
     rclone.conf: |-
       # type = s3
       # provider = AWS
