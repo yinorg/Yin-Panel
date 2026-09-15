@@ -2,7 +2,7 @@ package jwt
 
 import (
 	"errors"
-	"yin-panel/internal/infra/config"
+	"github.com/yinorg/Yin-Panel/backend/internal/infra/config"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"

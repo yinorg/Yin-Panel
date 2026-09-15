@@ -1,4 +1,4 @@
-module yin-panel
+module github.com/yinorg/Yin-Panel/backend
 
 go 1.23.0
 

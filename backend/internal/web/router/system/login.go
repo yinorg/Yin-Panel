@@ -2,15 +2,15 @@ package system
 
 import (
 	"errors"
+	"github.com/yinorg/Yin-Panel/backend/internal/constant"
+	"github.com/yinorg/Yin-Panel/backend/internal/global"
+	"github.com/yinorg/Yin-Panel/backend/internal/infra/zaplog"
+	"github.com/yinorg/Yin-Panel/backend/internal/util"
+	"github.com/yinorg/Yin-Panel/backend/internal/util/jwt"
+	"github.com/yinorg/Yin-Panel/backend/internal/web/interceptor"
+	"github.com/yinorg/Yin-Panel/backend/internal/web/model/base"
+	"github.com/yinorg/Yin-Panel/backend/internal/web/model/response"
 	"strings"
-	"yin-panel/internal/constant"
-	"yin-panel/internal/global"
-	"yin-panel/internal/infra/zaplog"
-	"yin-panel/internal/util"
-	"yin-panel/internal/util/jwt"
-	"yin-panel/internal/web/interceptor"
-	"yin-panel/internal/web/model/base"
-	"yin-panel/internal/web/model/response"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"

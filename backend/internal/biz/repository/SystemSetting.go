@@ -3,7 +3,7 @@ package repository
 import (
 	"encoding/json"
 	"errors"
-	"yin-panel/internal/util"
+	"github.com/yinorg/Yin-Panel/backend/internal/util"
 
 	"gorm.io/gorm"
 )

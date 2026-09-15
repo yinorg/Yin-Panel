@@ -21,7 +21,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/oauth2"
 
-	"yin-panel/internal/infra/config"
+	"github.com/yinorg/Yin-Panel/backend/internal/infra/config"
 )
 
 // oauthLoginState is short lived and single use. Keeping the PKCE verifier on

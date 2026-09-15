@@ -1,10 +1,10 @@
 package i18n
 
 import (
+	"github.com/yinorg/Yin-Panel/backend/internal/infra/zaplog"
+	"github.com/yinorg/Yin-Panel/backend/internal/util"
 	"os"
 	"strings"
-	"yin-panel/internal/infra/zaplog"
-	"yin-panel/internal/util"
 
 	"gopkg.in/ini.v1"
 )

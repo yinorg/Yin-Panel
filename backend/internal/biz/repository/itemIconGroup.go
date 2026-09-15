@@ -1,7 +1,7 @@
 package repository
 
 import (
-	"yin-panel/internal/web/model/param/commonApi"
+	"github.com/yinorg/Yin-Panel/backend/internal/web/model/param/commonApi"
 
 	"gorm.io/gorm"
 )

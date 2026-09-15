@@ -3,18 +3,18 @@ package system
 import (
 	"crypto/md5"
 	"encoding/hex"
+	"github.com/yinorg/Yin-Panel/backend/internal/constant"
+	"github.com/yinorg/Yin-Panel/backend/internal/global"
+	"github.com/yinorg/Yin-Panel/backend/internal/infra/config"
+	"github.com/yinorg/Yin-Panel/backend/internal/infra/zaplog"
+	"github.com/yinorg/Yin-Panel/backend/internal/util"
+	"github.com/yinorg/Yin-Panel/backend/internal/web/interceptor"
+	"github.com/yinorg/Yin-Panel/backend/internal/web/model/base"
+	"github.com/yinorg/Yin-Panel/backend/internal/web/model/response"
 	"io"
 	"net/http"
 	"path"
 	"strings"
-	"yin-panel/internal/constant"
-	"yin-panel/internal/global"
-	"yin-panel/internal/infra/config"
-	"yin-panel/internal/infra/zaplog"
-	"yin-panel/internal/util"
-	"yin-panel/internal/web/interceptor"
-	"yin-panel/internal/web/model/base"
-	"yin-panel/internal/web/model/response"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -33,7 +33,6 @@ func NewFileRouter() *FileRouter {
 func (a *FileRouter) InitRouter(router *gin.RouterGroup) {
 	// 公开接口
 	router.GET("/file/s3/*filepath", a.GetS3File)
-
 	r := router.Group("")
 	r.Use(interceptor.Auth)
 	{
@@ -41,6 +40,10 @@ func (a *FileRouter) InitRouter(router *gin.RouterGroup) {
 		r.POST("/file/delete", a.Delete)
 		r.GET("/file/getList", a.GetList)
 	}
+}
+
+func (a *FileRouter) InitPublicRouter(router *gin.RouterGroup) {
+	router.GET(a.urlPrefix+"*filepath", a.GetS3File)
 }
 
 func (a *FileRouter) UploadImg(c *gin.Context) {
@@ -97,7 +100,12 @@ func (a *FileRouter) UploadImg(c *gin.Context) {
 	}
 
 	// 使用存储接口上传文件
-	if !global.Storage.Exists(c.Request.Context(), fileName) {
+	exists, err := global.Storage.Exists(c.Request.Context(), fileName)
+	if err != nil {
+		response.ErrorByCode(c, constant.CodeUploadFailed)
+		return
+	}
+	if !exists {
 		err = global.Storage.Upload(c.Request.Context(), src, fileName)
 		if err != nil {
 			zaplog.Logger.Errorf("Failed to upload file: %v", err)

@@ -1,12 +1,12 @@
 package global
 
 import (
-	"yin-panel/internal/biz/cache"
-	"yin-panel/internal/biz/repository"
-	"yin-panel/internal/biz/service"
-	"yin-panel/internal/infra/config"
-	"yin-panel/internal/infra/kvcache"
-	"yin-panel/internal/infra/storage"
+	"github.com/yinorg/Yin-Panel/backend/internal/biz/cache"
+	"github.com/yinorg/Yin-Panel/backend/internal/biz/repository"
+	"github.com/yinorg/Yin-Panel/backend/internal/biz/service"
+	"github.com/yinorg/Yin-Panel/backend/internal/infra/config"
+	"github.com/yinorg/Yin-Panel/backend/internal/infra/kvcache"
+	"github.com/yinorg/Yin-Panel/backend/pkg/storage"
 	"time"
 )
 
@@ -18,7 +18,7 @@ var (
 
 var (
 	Config  *config.Config
-	Storage *storage.RcloneStorage
+	Storage storage.Storage
 )
 
 // repositories

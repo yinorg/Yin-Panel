@@ -1,8 +1,8 @@
 package panelApi
 
 import (
-	"yin-panel/internal/biz/repository"
-	"yin-panel/internal/web/model/param/commonApi"
+	"github.com/yinorg/Yin-Panel/backend/internal/biz/repository"
+	"github.com/yinorg/Yin-Panel/backend/internal/web/model/param/commonApi"
 )
 
 type ItemIconEditRequest struct {

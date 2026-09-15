@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"yin-panel/internal/biz/repository"
-	"yin-panel/internal/infra/config"
+	"github.com/yinorg/Yin-Panel/backend/internal/biz/repository"
+	"github.com/yinorg/Yin-Panel/backend/internal/infra/config"
 
 	"gorm.io/gorm"
 )

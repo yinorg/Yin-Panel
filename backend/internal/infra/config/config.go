@@ -2,8 +2,8 @@ package config
 
 import (
 	"errors"
+	"github.com/yinorg/Yin-Panel/backend/internal/util"
 	"os"
-	"yin-panel/internal/util"
 
 	"gopkg.in/yaml.v3"
 )

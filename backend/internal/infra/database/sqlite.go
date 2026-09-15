@@ -1,6 +1,7 @@
 package database
 
 import (
+	"github.com/yinorg/Yin-Panel/backend/internal/util"
 	_ "gorm.io/driver/mysql"
 	"gorm.io/driver/sqlite"
 	_ "gorm.io/driver/sqlite"
@@ -8,7 +9,6 @@ import (
 	"gorm.io/gorm/schema"
 	"os"
 	"path"
-	"yin-panel/internal/util"
 )
 
 type SQLiteConfig struct {

@@ -2,10 +2,10 @@ package cache
 
 import (
 	"fmt"
+	"github.com/yinorg/Yin-Panel/backend/internal/infra/kvcache"
+	"github.com/yinorg/Yin-Panel/backend/internal/util/monitor"
 	"sync"
 	"time"
-	"yin-panel/internal/infra/kvcache"
-	"yin-panel/internal/util/monitor"
 )
 
 type Monitor struct {

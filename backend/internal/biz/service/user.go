@@ -17,11 +17,11 @@ import (
 	"golang.org/x/oauth2"
 	"gorm.io/gorm"
 
-	"yin-panel/internal/biz/repository"
-	"yin-panel/internal/infra/config"
-	"yin-panel/internal/infra/kvcache"
-	"yin-panel/internal/infra/zaplog"
-	"yin-panel/internal/util"
+	"github.com/yinorg/Yin-Panel/backend/internal/biz/repository"
+	"github.com/yinorg/Yin-Panel/backend/internal/infra/config"
+	"github.com/yinorg/Yin-Panel/backend/internal/infra/kvcache"
+	"github.com/yinorg/Yin-Panel/backend/internal/infra/zaplog"
+	"github.com/yinorg/Yin-Panel/backend/internal/util"
 )
 
 type UserService struct {

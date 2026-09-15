@@ -1,10 +1,11 @@
 package router
 
 import (
-	"yin-panel/internal/infra/config"
-	"yin-panel/internal/infra/zaplog"
-	"yin-panel/internal/web/router/panel"
-	"yin-panel/internal/web/router/system"
+	"github.com/yinorg/Yin-Panel/backend/internal/infra/config"
+	"github.com/yinorg/Yin-Panel/backend/internal/infra/zaplog"
+	"github.com/yinorg/Yin-Panel/backend/internal/web/router/panel"
+	"github.com/yinorg/Yin-Panel/backend/internal/web/router/system"
+	"github.com/yinorg/Yin-Panel/backend/pkg/extension"
 
 	"github.com/gin-gonic/gin"
 )
@@ -16,6 +17,7 @@ type IRouter interface {
 func RouterArray() []IRouter {
 	return []IRouter{
 		system.NewAboutRouter(),
+		system.NewCapabilitiesRouter(),
 		system.NewLoginRouter(),
 		system.NewFileRouter(),
 		system.NewUserRouter(),
@@ -39,6 +41,12 @@ func InitRouters(addr string) error {
 	for _, router := range RouterArray() {
 		router.InitRouter(routerGroup)
 	}
+	for _, module := range extension.Modules() {
+		if module.RegisterRoutes != nil {
+			module.RegisterRoutes(routerGroup)
+		}
+	}
+	system.NewFileRouter().InitPublicRouter(rootRouter)
 
 	// WEB文件服务
 	if config.AppConfig.Base.EnableStaticServer {

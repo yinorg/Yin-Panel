@@ -1,11 +1,11 @@
 package system
 
 import (
-	"yin-panel/internal/global"
-	"yin-panel/internal/util/monitor"
-	"yin-panel/internal/web/interceptor"
-	"yin-panel/internal/web/model/param/systemApi"
-	"yin-panel/internal/web/model/response"
+	"github.com/yinorg/Yin-Panel/backend/internal/global"
+	"github.com/yinorg/Yin-Panel/backend/internal/util/monitor"
+	"github.com/yinorg/Yin-Panel/backend/internal/web/interceptor"
+	"github.com/yinorg/Yin-Panel/backend/internal/web/model/param/systemApi"
+	"github.com/yinorg/Yin-Panel/backend/internal/web/model/response"
 
 	"github.com/gin-gonic/gin"
 )

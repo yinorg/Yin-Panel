@@ -2,8 +2,8 @@ package publiccode
 
 import (
 	"errors"
-	"yin-panel/internal/global"
-	"yin-panel/internal/infra/zaplog"
+	"github.com/yinorg/Yin-Panel/backend/internal/global"
+	"github.com/yinorg/Yin-Panel/backend/internal/infra/zaplog"
 
 	gonanoid "github.com/matoous/go-nanoid/v2"
 )

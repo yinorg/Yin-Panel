@@ -1,7 +1,7 @@
 package response
 
 import (
-	"yin-panel/internal/util/i18n"
+	"github.com/yinorg/Yin-Panel/backend/internal/util/i18n"
 
 	"github.com/gin-gonic/gin"
 )

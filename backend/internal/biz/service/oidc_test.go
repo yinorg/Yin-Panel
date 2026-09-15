@@ -17,10 +17,10 @@ import (
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 
-	"yin-panel/internal/biz/repository"
-	"yin-panel/internal/infra/config"
-	"yin-panel/internal/infra/zaplog"
-	"yin-panel/internal/web/model/param/commonApi"
+	"github.com/yinorg/Yin-Panel/backend/internal/biz/repository"
+	"github.com/yinorg/Yin-Panel/backend/internal/infra/config"
+	"github.com/yinorg/Yin-Panel/backend/internal/infra/zaplog"
+	"github.com/yinorg/Yin-Panel/backend/internal/web/model/param/commonApi"
 )
 
 func TestAuthentikOIDCAuthorizationCodeFlow(t *testing.T) {

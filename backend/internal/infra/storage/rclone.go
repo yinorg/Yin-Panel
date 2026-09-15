@@ -4,11 +4,11 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"github.com/yinorg/Yin-Panel/backend/internal/infra/zaplog"
 	"io"
 	"os"
 	"strings"
 	"time"
-	"yin-panel/internal/infra/zaplog"
 
 	"github.com/rclone/rclone/fs"
 	rconfig "github.com/rclone/rclone/fs/config"
@@ -23,9 +23,9 @@ type RcloneStorage struct {
 	fs fs.Fs
 }
 
-func (r *RcloneStorage) Exists(ctx context.Context, fileName string) bool {
+func (r *RcloneStorage) Exists(ctx context.Context, fileName string) (bool, error) {
 	_, err := r.fs.NewObject(ctx, fileName)
-	return err == nil
+	return err == nil, err
 }
 
 // RcloneConfig represents the rclone section in the YAML config

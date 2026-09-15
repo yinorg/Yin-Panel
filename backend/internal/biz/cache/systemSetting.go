@@ -3,9 +3,9 @@ package cache
 import (
 	"encoding/json"
 	"errors"
+	"github.com/yinorg/Yin-Panel/backend/internal/biz/repository"
+	"github.com/yinorg/Yin-Panel/backend/internal/infra/kvcache"
 	"gorm.io/gorm"
-	"yin-panel/internal/biz/repository"
-	"yin-panel/internal/infra/kvcache"
 )
 
 type SystemSetting struct {

@@ -1,13 +1,13 @@
 package panel
 
 import (
-	"yin-panel/internal/constant"
-	"yin-panel/internal/global"
-	"yin-panel/internal/infra/zaplog"
-	"yin-panel/internal/util/publiccode"
-	"yin-panel/internal/web/interceptor"
-	"yin-panel/internal/web/model/base"
-	"yin-panel/internal/web/model/response"
+	"github.com/yinorg/Yin-Panel/backend/internal/constant"
+	"github.com/yinorg/Yin-Panel/backend/internal/global"
+	"github.com/yinorg/Yin-Panel/backend/internal/infra/zaplog"
+	"github.com/yinorg/Yin-Panel/backend/internal/util/publiccode"
+	"github.com/yinorg/Yin-Panel/backend/internal/web/interceptor"
+	"github.com/yinorg/Yin-Panel/backend/internal/web/model/base"
+	"github.com/yinorg/Yin-Panel/backend/internal/web/model/response"
 
 	"github.com/gin-gonic/gin"
 )
