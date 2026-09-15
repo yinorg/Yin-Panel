@@ -4,19 +4,20 @@ Parameters
 
 Licensor: Alkaid / yinorg
 Licensed Work: Yin-Panel
-Change Date: 2029-09-15
+Change Date: Three years after the first publicly available distribution of each version of the Licensed Work
 Change License: AGPL-3.0-or-later
 
 Additional Use Grant
 
-You may use the Licensed Work for personal, internal, and commercial
-production use without charge. You may not offer the Licensed Work or a
-substantially similar product as a paid hosted or SaaS service that competes
-with Yin-Panel, or distribute a modified version as a separately sold product,
-before the Change Date.
+You may use the Licensed Work in production for your own personal use
+or for the internal business operations of your organization without
+charge.
 
 Notice
 
-This license applies to the Licensed Work from this commit onward. On the
-Change Date, the Licensed Work will be governed by the Change License above.
-See https://mariadb.com/bsl11/ for the BSL 1.1 terms.
+This license applies to the Licensed Work from this commit onward.
+Effective on the Change Date, the Licensed Work will be governed by the
+Change License specified above.
+
+For the complete terms of the Business Source License 1.1, see:
+https://mariadb.com/bsl11/
