@@ -64,13 +64,6 @@ func InitRouters(addr string) error {
 		// Public space links are handled by the SPA router.
 		router.GET("/:publicId", func(c *gin.Context) { c.File(webPath + "/index.html") })
 
-		if config.AppConfig.Rclone.Type == "local" {
-			// 使用本次存储时，为本次存储设置静态文件服务
-			bucket := config.AppConfig.Rclone.Bucket
-			urlPrefix := config.AppConfig.Base.URLPrefix
-			router.Static(urlPrefix, bucket)
-		}
-
 		zaplog.Logger.Info("Static file server is enabled")
 	} else {
 		zaplog.Logger.Info("Static file server is disabled")
