@@ -4,12 +4,11 @@ declare namespace User{
 		id?:number
 		name ?:string
 		createTime?:string
-		username?:string
 		password?:string
 		headImage?:string
 		status?:number
 		role?:number
-		mail?:string
+        mail?:string
 		token?:string
 		oauthProvider?:string
 		oauthId?:string

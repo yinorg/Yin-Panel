@@ -27,7 +27,7 @@ const oauthProviderMeta: Record<string, { icon: string; label: string }> = {
 }
 
 const form = ref<Login.LoginReqest>({
-  username: '',
+  mail: '',
   password: '',
 })
 
@@ -147,7 +147,7 @@ function getProviderLabel(provider: string) {
       </div>
       <NForm :model="form" label-width="100px" @keydown.enter="handleSubmit">
         <NFormItem>
-          <NInput v-model:value="form.username" :placeholder="$t('login.usernamePlaceholder')">
+          <NInput v-model:value="form.mail" :placeholder="$t('login.usernamePlaceholder')">
             <template #prefix>
               <SvgIcon icon="ph:user-bold" />
             </template>

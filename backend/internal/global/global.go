@@ -13,7 +13,7 @@ import (
 // 构建时，通过 --ldflags 注入
 var (
 	RUNCODE = "debug" // 运行模式：debug | release
-	VERSION = "v1.0.0"
+	VERSION = "v0.3.15"
 )
 
 var (

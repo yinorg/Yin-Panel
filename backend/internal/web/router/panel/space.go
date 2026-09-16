@@ -46,8 +46,8 @@ func (r *SpaceRouter) InitRouter(router *gin.RouterGroup) {
 	g.DELETE("/:spaceId/groups/:groupId", r.DeleteGroup)
 	g.POST("/:spaceId/groups/:groupId/delete", r.DeleteGroup)
 	g.GET("/:spaceId/members", r.Members)
-	g.POST("/teams", r.CreateTeam)
-	g.POST("/shared", r.CreateTeam)
+	g.POST("/teams", r.CreateSpace)
+	g.POST("/shared", r.CreateSpace)
 	g.PUT("/:spaceId", r.Rename)
 	// The frontend request wrapper uses POST for JSON mutations.
 	g.POST("/:spaceId", r.Rename)
@@ -1028,7 +1028,7 @@ func (r *SpaceRouter) SortItems(c *gin.Context) {
 	}
 	response.Success(c)
 }
-func (r *SpaceRouter) CreateTeam(c *gin.Context) {
+func (r *SpaceRouter) CreateSpace(c *gin.Context) {
 	user, ok := base.GetCurrentUserInfo(c)
 	if !ok {
 		response.Error(c, "not logged in")

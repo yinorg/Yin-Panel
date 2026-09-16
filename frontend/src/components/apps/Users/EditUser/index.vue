@@ -23,7 +23,7 @@ interface Emit {
 
 const formInitValue = {
   name: '',
-  username: '',
+  mail: '',
   role: 2,
   status: 3,
 }
@@ -43,7 +43,7 @@ const roleOtions = ref([
 ])
 
 const rules: FormRules = {
-  username: [
+  mail: [
     {
       required: true,
       trigger: 'blur',
@@ -110,8 +110,8 @@ const handleValidateButtonClick = (e: MouseEvent) => {
 <template>
   <RoundCardModal v-model:show="show" size="small" preset="card" style="width: 400px" :title="`${userInfo?.id ? $t('common.edit') : $t('common.add')}`">
     <NForm ref="formRef" :model="model" :rules="rules">
-      <NFormItem path="username" :label="$t('common.username')">
-        <NInput v-model:value="model.username" type="text" :placeholder="$t('common.inputPlaceholder')" />
+      <NFormItem path="mail" :label="$t('spaceManage.userEmail')">
+        <NInput v-model:value="model.mail" type="text" :placeholder="$t('common.inputPlaceholder')" />
       </NFormItem>
 
       <NFormItem path="name" :label="$t('common.nickName')">

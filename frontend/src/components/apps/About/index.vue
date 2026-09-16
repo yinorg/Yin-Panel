@@ -33,7 +33,7 @@ onMounted(() => {
     <div class="flex mt-[10px] flex-wrap justify-center">
       <div class="flex items-center mx-[10px]">
         <img class="w-[20px] h-[20px] mr-[5px]" :src="favicon" alt="">
-        <a href="https://moon.phantomlab.top/site/" target="_blank" class="link">Yin-Panel Site</a>
+        <a href="https://github.com/yinorg/Yin-Panel" target="_blank" class="link">Yin-Panel Site</a>
       </div>
     </div>
     <div class="flex flex-col items-center justify-center text-base">

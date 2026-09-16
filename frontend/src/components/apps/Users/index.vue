@@ -23,12 +23,12 @@ const createColumns = ({
 }): DataTableColumns<User.Info> => {
   return [
     {
-      title: t('common.username'),
-      key: 'username',
+        title: t('spaceManage.userEmail'),
+      key: 'mail',
       render(row: User.Info) {
-        if (row.username === authStore.userInfo?.username)
-          return `${row.username} (${t('adminSettingUsers.currentUseUsername')})`
-        return row.username
+        if (row.mail === authStore.userInfo?.mail)
+          return `${row.mail} (${t('adminSettingUsers.currentUseUsername')})`
+        return row.mail
       },
     },
     {
@@ -88,7 +88,7 @@ const createColumns = ({
               case 'delete':
                 dialog.warning({
                   title: t('common.warning'),
-                  content: t('adminSettingUsers.deletePromptContent', { name: row.name, username: row.username }),
+                  content: t('adminSettingUsers.deletePromptContent', { name: row.name, username: row.mail }),
                   positiveText: t('common.confirm'),
                   negativeText: t('common.cancel'),
                   onPositiveClick: () => {

@@ -45,20 +45,20 @@ func (a UsersRouter) Create(c *gin.Context) {
 		return
 	}
 
-	param.Username = strings.TrimSpace(param.Username)
-	if len(param.Username) < 5 {
+	param.Mail = strings.ToLower(strings.TrimSpace(param.Mail))
+	if len(param.Mail) < 5 {
 		response.ErrorParamFomat(c, "The account must be no less than 5 characters long")
 		return
 	}
 
 	// 验证账号是否存在
-	if _, err := global.UserRepo.CheckUsernameExist(param.Username, ""); err != nil {
+	if _, err := global.UserRepo.GetByMail(param.Mail); err == nil {
 		response.ErrorByCode(c, constant.CodeAccountAlreadyExist)
 		return
 	}
 
 	mUser := repository.User{
-		Username:      strings.TrimSpace(param.Username),
+		Mail:          param.Mail,
 		Password:      util.PasswordEncryption(param.Password),
 		Name:          param.Name,
 		HeadImage:     param.HeadImage,
@@ -121,10 +121,16 @@ func (a UsersRouter) Update(c *gin.Context) {
 		return
 	}
 
-	user.Username = strings.Trim(user.Username, " ")
-	if len(user.Username) < 3 {
+	// Accounts are email-based. Keep the account and the email shown in
+	// space membership lists synchronized when an administrator edits a user.
+	user.Mail = strings.ToLower(strings.TrimSpace(user.Mail))
+	if len(user.Mail) < 3 {
 		// 账号不得少于3个字符
 		response.ErrorParamFomat(c, "The account must be no less than 3 characters long")
+		return
+	}
+	if existing, err := global.UserRepo.GetByMail(user.Mail); err == nil && existing.ID != user.ID {
+		response.ErrorByCode(c, constant.CodeAccountAlreadyExist)
 		return
 	}
 

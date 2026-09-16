@@ -20,7 +20,7 @@ type LoginRouter struct {
 }
 
 type LoginLoginVerify struct {
-	Username string `json:"username" validate:"required"`
+	Mail     string `json:"mail" validate:"required,email"`
 	Password string `json:"password" validate:"required,max=50"`
 	VCode    string `json:"vcode" validate:"max=6"`
 	Email    string `json:"email"`
@@ -54,8 +54,8 @@ func (l *LoginRouter) Login(c *gin.Context) {
 		return
 	}
 
-	param.Username = strings.TrimSpace(param.Username)
-	user, err := global.UserRepo.GetByUsernameAndPassword(param.Username, util.PasswordEncryption(param.Password), constant.OAuthProviderBuildin)
+	param.Mail = strings.ToLower(strings.TrimSpace(param.Mail))
+	user, err := global.UserRepo.GetByMailAndPassword(param.Mail, util.PasswordEncryption(param.Password), constant.OAuthProviderBuildin)
 	if err != nil {
 		// 未找到记录 账号或密码错误
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -87,7 +87,7 @@ func (l *LoginRouter) Login(c *gin.Context) {
 		ID:         user.ID,
 		Name:       user.Name,
 		Role:       user.Role,
-		Username:   user.Username,
+		Mail:       user.Mail,
 		Publiccode: user.Publiccode,
 		Token:      user.Token,
 	}

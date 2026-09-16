@@ -2,7 +2,7 @@
 import { VueDraggable } from 'vue-draggable-plus'
 import { NBackTop, NButton, NButtonGroup, NCard, NDropdown, NInput, NModal, NSkeleton, NSpin, NSpace, useDialog, useMessage } from 'naive-ui'
 import { nextTick, onMounted, onUnmounted, ref } from 'vue'
-import { createTeam, getGroups, getItems, getSpaces, sortSpaces, spaceDisplayName, type Space } from '../../api/panel/space'
+import { createSpace, getGroups, getItems, getSpaces, sortSpaces, spaceDisplayName, type Space } from '../../api/panel/space'
 import { Clock, SearchBox, SystemMonitor } from '../../components/deskModule'
 import { SvgIcon, SvgIconOnline } from '../../components/common'
 import { AppIcon, AppStarter, EditItem } from './components'
@@ -47,9 +47,9 @@ const currentAddItenIconGroupId = ref<number | undefined>()
 const settingModalShow = ref(false)
 const spaces = ref<Space[]>([])
 const activeSpace = ref<Space | null>(null)
-const createTeamVisible = ref(false)
-const teamName = ref('')
-const creatingTeam = ref(false)
+const createSpaceVisible = ref(false)
+const spaceName = ref('')
+const creatingSpace = ref(false)
 const monitorEnabled = ref(false)
 
 const items = ref<ItemGroup[]>([])
@@ -192,13 +192,13 @@ function reloadSpaces(selectLatest = false) {
     getList()
   })
 }
-function submitCreateTeam() {
-  const name = teamName.value.trim()
-  if (!name || creatingTeam.value) return
-  creatingTeam.value = true
-  createTeam<{ code: number }>(name).then(({ code }) => {
-    if (code === 0) { createTeamVisible.value = false; teamName.value = ''; reloadSpaces(true) }
-  }).finally(() => { creatingTeam.value = false })
+function submitCreateSpace() {
+	const name = spaceName.value.trim()
+	if (!name || creatingSpace.value) return
+	creatingSpace.value = true
+	createSpace<{ code: number }>(name).then(({ code }) => {
+		if (code === 0) { createSpaceVisible.value = false; spaceName.value = ''; reloadSpaces(true) }
+	}).finally(() => { creatingSpace.value = false })
 }
 
 // 从后端获取组下面的图标
@@ -710,8 +710,8 @@ function handleAddItem(itemIconGroupId?: number) {
       </div>
     </NModal>
   </div>
-  <NModal v-model:show="createTeamVisible" preset="dialog" :title="$t('spaceManage.createTeamSpace')" :positive-text="$t('spaceManage.createSpace')" :negative-text="$t('common.cancel')" :loading="creatingTeam" @positive-click="submitCreateTeam">
-    <NInput v-model:value="teamName" :placeholder="$t('spaceManage.teamName')" maxlength="100" show-count @keyup.enter="submitCreateTeam" />
+  <NModal v-model:show="createSpaceVisible" preset="dialog" :title="$t('spaceManage.createSpace')" :positive-text="$t('common.confirm')" :negative-text="$t('common.cancel')" :loading="creatingSpace" @positive-click="submitCreateSpace">
+    <NInput v-model:value="spaceName" :placeholder="$t('spaceManage.newSpaceName')" maxlength="100" show-count @keyup.enter="submitCreateSpace" />
   </NModal>
 </template>
 

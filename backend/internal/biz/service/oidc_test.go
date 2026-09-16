@@ -145,7 +145,7 @@ func TestAuthentikOIDCAuthorizationCodeFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("handle Authentik OIDC callback: %v", err)
 	}
-	if user.Username != "alice@example.test" || user.Name != "Alice Example" || user.Mail != "alice@example.test" {
+	if user.Mail != "alice@example.test" || user.Name != "Alice Example" {
 		t.Fatalf("unexpected OIDC user: %#v", user)
 	}
 	if _, err := service.HandleOAuthCallback("authentik", "authentik-code", redirectURI, state); err == nil {
@@ -180,7 +180,7 @@ func (r *memoryUserRepo) Get(id uint) (repository.User, error) {
 	return repository.User{}, gorm.ErrRecordNotFound
 }
 func (r *memoryUserRepo) Count() (uint, error) { return uint(len(r.users)), nil }
-func (r *memoryUserRepo) GetByUsernameAndPassword(string, string, string) (repository.User, error) {
+func (r *memoryUserRepo) GetByMailAndPassword(string, string, string) (repository.User, error) {
 	return repository.User{}, gorm.ErrRecordNotFound
 }
 func (r *memoryUserRepo) GetByOAuthID(provider, oauthID string) (repository.User, error) {
@@ -206,9 +206,6 @@ func (r *memoryUserRepo) GetList(repository.PagedParam) ([]repository.User, uint
 func (r *memoryUserRepo) Update(uint, *repository.User) error       { return nil }
 func (r *memoryUserRepo) UpdateUserInfo(uint, map[string]any) error { return nil }
 func (r *memoryUserRepo) Delete(uint) ([]string, error)             { return nil, nil }
-func (r *memoryUserRepo) CheckUsernameExist(string, string) (repository.User, error) {
-	return repository.User{}, gorm.ErrRecordNotFound
-}
 func (r *memoryUserRepo) GetByPubliccode(string) (repository.User, error) {
 	return repository.User{}, gorm.ErrRecordNotFound
 }

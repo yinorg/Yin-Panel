@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { NButton, NCard, NInput, NList, NListItem, NProgress, NSelect, NSpace, useMessage } from 'naive-ui'
-import { addMember, addOIDCGroup, clearSpace, copySpace, createGroup, createTeam, deleteGroup, deleteOIDCGroup, getGroups, getMembers, getOIDCGroups, getPublicConfig, getSpaces, importBookmarks, renameSpace, setPublicConfig, spaceDisplayName, updateGroup, updateMember, type Space, type SpaceMember } from '../../../api/panel/space'
+import { NButton, NCard, NInput, NList, NListItem, NModal, NProgress, NSelect, NSpace, useMessage } from 'naive-ui'
+import { addMember, addOIDCGroup, clearSpace, copySpace, createGroup, createSpace, deleteGroup, deleteOIDCGroup, getGroups, getMembers, getOIDCGroups, getPublicConfig, getSpaces, importBookmarks, renameSpace, setPublicConfig, spaceDisplayName, updateGroup, updateMember, type Space, type SpaceMember } from '../../../api/panel/space'
 import { useAuthStore } from '../../../store'
 import { t } from '../../../locales'
 
@@ -11,6 +11,11 @@ const spaces = ref<Space[]>([])
 const selectedSpaceId = ref<number | null>(null)
 const name = ref(''); const groupName = ref(''); const groupParentId = ref<number | null>(null); const editing = ref<{ spaceId: number; id: number } | null>(null)
 const loading = ref(false)
+const createDialogVisible = ref(false)
+const renameDialogVisible = ref(false)
+const groupDialogVisible = ref(false)
+const memberDialogVisible = ref(false)
+const oidcDialogVisible = ref(false)
 const groups = ref<Record<number, { id: number; title: string }[]>>({})
 const members = ref<SpaceMember[]>([]); const oidcRules = ref<any[]>([])
 const rename = ref(''); const memberEmail = ref(''); const memberRole = ref('viewer'); const oidcProvider = ref('authentik'); const oidcGroup = ref(''); const oidcRole = ref('viewer')
@@ -28,23 +33,82 @@ function loadGroups(spaceId: number) { getGroups<{ code: number; data: { id: num
 function loadDetails(spaceId: number) { getMembers<{ code: number; data: SpaceMember[] }>(spaceId).then(({ data }) => { members.value = data || [] }); getOIDCGroups<{ code: number; data: any[] }>(spaceId).then(({ data }) => { oidcRules.value = data || [] }); getPublicConfig<{ code: number; data: any }>(spaceId).then(({ data }) => { publicEnabled.value = !!data?.enabled; publicId.value = data?.publicId || ''; publicMode.value = data?.mode === 'code' ? 'code' : 'direct'; publicAccessCode.value = '' }) }
 function savePublic() { if (!selectedSpaceId.value || (publicEnabled.value && !/^[a-z][a-z0-9-]{4,28}[a-z0-9]$/.test(publicId.value))) { message.error(t('spaceManage.publicIdInvalid')); return }; if (publicMode.value === 'code' && publicEnabled.value && publicAccessCode.value && (publicAccessCode.value.length < 4 || publicAccessCode.value.length > 12)) { message.error(t('spaceManage.accessCodeInvalid')); return }; publicSaving.value = true; setPublicConfig(selectedSpaceId.value, { enabled: publicEnabled.value, publicId: publicId.value, mode: publicMode.value, accessCode: publicAccessCode.value }).then(({ code }) => { if (code === 0) message.success(t('spaceManage.publicSaved')) }).finally(() => { publicSaving.value = false }) }
 function saveGroup(spaceId: number) {
-  const title = groupName.value.trim(); if (!title) return
+  const title = groupName.value.trim(); if (!title) return false
   const req = editing.value ? updateGroup(spaceId, editing.value.id, title, '', groupParentId.value) : createGroup(spaceId, title, '', groupParentId.value)
-  req.then(({ code }) => { if (code === 0) { groupName.value = ''; groupParentId.value = null; editing.value = null; loadGroups(spaceId) } })
+  return req.then(({ code }) => {
+    if (code !== 0) return false
+    groupName.value = ''
+    groupParentId.value = null
+    editing.value = null
+    groupDialogVisible.value = false
+    loadGroups(spaceId)
+    return true
+  })
 }
-function editGroup(spaceId: number, group: { id: number; title: string; parentId?: number | null }) { editing.value = { spaceId, id: group.id }; groupName.value = group.title; groupParentId.value = group.parentId || null }
+function openAddGroup(spaceId: number) { editing.value = null; groupName.value = ''; groupParentId.value = null; groupDialogVisible.value = true }
+function editGroup(spaceId: number, group: { id: number; title: string; parentId?: number | null }) { editing.value = { spaceId, id: group.id }; groupName.value = group.title; groupParentId.value = group.parentId || null; groupDialogVisible.value = true }
 function removeGroup(spaceId: number, id: number) { if (!window.confirm(t('spaceManage.groupDeleteConfirm'))) return; deleteGroup(spaceId, id).then(({ code }) => { if (code === 0) loadGroups(spaceId) }) }
-function create() {
-  if (!name.value.trim() || loading.value) return
+function openCreateDialog() {
+  name.value = ''
+  createDialogVisible.value = true
+}
+async function create() {
+  if (!name.value.trim() || loading.value) return false
   loading.value = true
-  createTeam<{ code: number }>(name.value.trim()).then(({ code }) => { if (code === 0) { message.success('团队创建成功'); name.value = ''; load() } }).finally(() => { loading.value = false })
+  try {
+    const { code } = await createSpace<{ code: number }>(name.value.trim())
+    if (code !== 0) return false
+    message.success('空间创建成功')
+    name.value = ''
+    createDialogVisible.value = false
+    load()
+    return true
+  }
+  finally {
+    loading.value = false
+  }
 }
 function selected() { return spaces.value.find(space => space.id === selectedSpaceId.value) }
-function renameCurrent() { const value = rename.value.trim(); if (value && selectedSpaceId.value) renameSpace(selectedSpaceId.value, value).then(({ code }) => { if (code === 0) { message.success('空间名称已更新'); load() } }) }
+function openRenameDialog() {
+  rename.value = selected()?.name || ''
+  renameDialogVisible.value = true
+}
+async function renameCurrent() {
+  const value = rename.value.trim()
+  if (!value || !selectedSpaceId.value) return false
+  const { code } = await renameSpace(selectedSpaceId.value, value)
+  if (code !== 0) return false
+  message.success('空间名称已更新')
+  renameDialogVisible.value = false
+  load()
+  return true
+}
 function copyCurrent() { if (selectedSpaceId.value) copySpace<{ code: number }>(selectedSpaceId.value).then(({ code }) => { if (code === 0) { message.success('空间已复制'); load() } }) }
-function addCurrentMember() { const email = memberEmail.value.trim(); if (selectedSpaceId.value && email) addMember(selectedSpaceId.value, email, memberRole.value).then(({ code }) => { if (code === 0) { memberEmail.value = ''; loadDetails(selectedSpaceId.value!) } }) }
+async function addCurrentMember() {
+  const email = memberEmail.value.trim()
+  if (!selectedSpaceId.value || !email) return false
+  const { code } = await addMember(selectedSpaceId.value, email, memberRole.value)
+  if (code !== 0) return false
+  memberEmail.value = ''
+  memberRole.value = 'viewer'
+  memberDialogVisible.value = false
+  loadDetails(selectedSpaceId.value)
+  return true
+}
+function openAddMember() { memberEmail.value = ''; memberRole.value = 'viewer'; memberDialogVisible.value = true }
 function changeMember(member: SpaceMember, role: string) { if (selectedSpaceId.value) updateMember(selectedSpaceId.value, member.userId, role).then(() => loadDetails(selectedSpaceId.value!)) }
-function addRule() { if (selectedSpaceId.value && oidcGroup.value.trim()) addOIDCGroup(selectedSpaceId.value, oidcProvider.value, oidcGroup.value.trim(), oidcRole.value).then(({ code }) => { if (code === 0) { oidcGroup.value = ''; loadDetails(selectedSpaceId.value!) } }) }
+async function addRule() {
+  if (!selectedSpaceId.value || !oidcGroup.value.trim()) return false
+  const { code } = await addOIDCGroup(selectedSpaceId.value, oidcProvider.value, oidcGroup.value.trim(), oidcRole.value)
+  if (code !== 0) return false
+  oidcGroup.value = ''
+  oidcProvider.value = 'authentik'
+  oidcRole.value = 'viewer'
+  oidcDialogVisible.value = false
+  loadDetails(selectedSpaceId.value)
+  return true
+}
+function openAddRule() { oidcProvider.value = 'authentik'; oidcGroup.value = ''; oidcRole.value = 'viewer'; oidcDialogVisible.value = true }
 function removeRule(id: number) { if (selectedSpaceId.value) deleteOIDCGroup(selectedSpaceId.value, id).then(() => loadDetails(selectedSpaceId.value!)) }
 onMounted(load)
 </script>
@@ -54,11 +118,16 @@ onMounted(load)
     <NCard :title="$t('spaceManage.title')">
       <NSpace vertical>
         <NSpace>
-          <NInput v-model:value="name" :placeholder="$t('spaceManage.newSpaceName')" maxlength="100" @keyup.enter="create" />
-          <NButton type="primary" :loading="loading" @click="create">{{ $t('spaceManage.createSpace') }}</NButton>
+          <NButton type="primary" @click="openCreateDialog">{{ $t('spaceManage.createSpace') }}</NButton>
         </NSpace>
+        <NModal v-model:show="createDialogVisible" preset="dialog" :title="$t('spaceManage.createSpace')" :positive-text="$t('common.confirm')" :negative-text="$t('common.cancel')" :loading="loading" @positive-click="create">
+          <NInput v-model:value="name" :placeholder="$t('spaceManage.newSpaceName')" maxlength="100" @keyup.enter="create" />
+        </NModal>
         <NSelect v-model:value="selectedSpaceId" :options="spaces.map(space => ({ label: `${spaceDisplayName(space, spaces, authStore.userInfo?.id, true)} (${space.type === 'shared' || space.type === 'team' ? $t('spaceManage.shared') : $t('spaceManage.personal')})`, value: space.id }))" @update:value="(id) => loadDetails(Number(id))" />
-        <NSpace v-if="selectedSpaceId"><NInput v-model:value="rename" :placeholder="selected()?.name || $t('spaceManage.spaceName')" /><NButton @click="renameCurrent">{{ $t('spaceManage.rename') }}</NButton><NButton @click="copyCurrent">{{ $t('spaceManage.copy') }}</NButton></NSpace>
+        <NSpace v-if="selectedSpaceId"><NButton @click="openRenameDialog">{{ $t('spaceManage.rename') }}</NButton><NButton @click="copyCurrent">{{ $t('spaceManage.copy') }}</NButton></NSpace>
+        <NModal v-model:show="renameDialogVisible" preset="dialog" :title="$t('spaceManage.rename')" :positive-text="$t('common.confirm')" :negative-text="$t('common.cancel')" @positive-click="renameCurrent">
+          <NInput v-model:value="rename" :placeholder="$t('spaceManage.spaceName')" maxlength="100" @keyup.enter="renameCurrent" />
+        </NModal>
         <NCard v-if="selectedSpaceId" :title="$t('spaceManage.publicAccess')">
           <NSpace vertical>
             <label><input v-model="publicEnabled" type="checkbox"> {{ $t('spaceManage.enablePublicAccess') }}</label>
@@ -77,20 +146,38 @@ onMounted(load)
         <NList v-if="selectedSpaceId" bordered>
           <NListItem>
             <div class="w-full">
-              <div class="flex items-center gap-2"><span>{{ $t('spaceManage.groups') }}</span><span v-if="!groups[selectedSpaceId]?.length" class="text-gray-500">{{ $t('common.noData') }}</span></div>
+              <div class="flex items-center gap-2"><span>{{ $t('spaceManage.groups') }}</span><NButton size="tiny" type="primary" @click="openAddGroup(selectedSpaceId!)">{{ $t('spaceManage.addGroup') }}</NButton><span v-if="!groups[selectedSpaceId]?.length" class="text-gray-500">{{ $t('common.noData') }}</span></div>
               <NSpace vertical size="small" class="mt-1"><NButton v-for="group in groups[selectedSpaceId]" :key="group.id" size="tiny" secondary @click="editGroup(selectedSpaceId!, group)">{{ group.title }}{{ group.parentId ? ' (子分组)' : '' }}</NButton></NSpace>
-              <NSpace size="small" class="mt-2"><NInput v-model:value="groupName" size="small" :placeholder="$t('spaceManage.groupName')" /><NSelect v-model:value="groupParentId" size="small" clearable :placeholder="$t('spaceManage.parentGroupOptional')" :options="(groups[selectedSpaceId] || []).filter(group => group.id !== editing?.id).map(group => ({ label: group.title, value: group.id }))" /><NButton size="small" @click="saveGroup(selectedSpaceId!)">{{ editing?.spaceId === selectedSpaceId ? $t('common.save') : $t('spaceManage.addGroup') }}</NButton><NButton v-if="editing?.spaceId === selectedSpaceId" size="small" type="error" @click="removeGroup(selectedSpaceId!, editing.id)">{{ $t('common.delete') }}</NButton></NSpace>
             </div>
           </NListItem>
         </NList>
+        <NModal v-if="selectedSpaceId" v-model:show="groupDialogVisible" preset="dialog" :title="editing ? $t('common.edit') : $t('spaceManage.addGroup')" :positive-text="$t('common.confirm')" :negative-text="$t('common.cancel')" @positive-click="saveGroup(selectedSpaceId!)">
+          <NSpace vertical>
+            <NInput v-model:value="groupName" :placeholder="$t('spaceManage.groupName')" maxlength="100" @keyup.enter="saveGroup(selectedSpaceId!)" />
+            <NSelect v-model:value="groupParentId" clearable :placeholder="$t('spaceManage.parentGroupOptional')" :options="(groups[selectedSpaceId] || []).filter(group => group.id !== editing?.id).map(group => ({ label: group.title, value: group.id }))" />
+          </NSpace>
+        </NModal>
         <NCard v-if="selectedSpaceId" :title="$t('spaceManage.members')">
-          <NSpace><NInput v-model:value="memberEmail" :placeholder="$t('spaceManage.userEmail')" /><NSelect v-model:value="memberRole" :options="[{ label: $t('spaceManage.editor'), value: 'editor' }, { label: $t('spaceManage.viewer'), value: 'viewer' }]" /><NButton @click="addCurrentMember">{{ $t('spaceManage.addMember') }}</NButton></NSpace>
+          <template #header-extra><NButton size="tiny" type="primary" @click="openAddMember">{{ $t('spaceManage.addMember') }}</NButton></template>
           <NList><NListItem v-for="member in members" :key="member.id"><NSpace justify="space-between" class="w-full"><span>{{ member.email || $t('spaceManage.emailMissing') }} ({{ member.source || 'manual' }})</span><NSelect :value="member.role" :options="[{ label: $t('spaceManage.admin'), value: 'admin' }, { label: $t('spaceManage.editor'), value: 'editor' }, { label: $t('spaceManage.viewer'), value: 'viewer' }]" @update:value="role => changeMember(member, role)" /></NSpace></NListItem></NList>
         </NCard>
+        <NModal v-if="selectedSpaceId" v-model:show="memberDialogVisible" preset="dialog" :title="$t('spaceManage.addMember')" :positive-text="$t('common.confirm')" :negative-text="$t('common.cancel')" @positive-click="addCurrentMember">
+          <NSpace vertical>
+            <NInput v-model:value="memberEmail" :placeholder="$t('spaceManage.userEmail')" @keyup.enter="addCurrentMember" />
+            <NSelect v-model:value="memberRole" :options="[{ label: $t('spaceManage.editor'), value: 'editor' }, { label: $t('spaceManage.viewer'), value: 'viewer' }]" />
+          </NSpace>
+        </NModal>
         <NCard v-if="selectedSpaceId" :title="$t('spaceManage.oidcTitle')">
-          <NSpace><NInput v-model:value="oidcProvider" placeholder="Provider" /><NInput v-model:value="oidcGroup" :placeholder="$t('spaceManage.groupName')" /><NSelect v-model:value="oidcRole" :options="[{ label: $t('spaceManage.editor'), value: 'editor' }, { label: $t('spaceManage.viewer'), value: 'viewer' }]" /><NButton @click="addRule">{{ $t('spaceManage.addRule') }}</NButton></NSpace>
+          <template #header-extra><NButton size="tiny" type="primary" @click="openAddRule">{{ $t('spaceManage.addRule') }}</NButton></template>
           <NList><NListItem v-for="rule in oidcRules" :key="rule.id"><NSpace justify="space-between" class="w-full"><span>{{ rule.provider }} / {{ rule.groupName }} ({{ rule.role }})</span><NButton size="small" @click="removeRule(rule.id)">{{ $t('common.delete') }}</NButton></NSpace></NListItem></NList>
         </NCard>
+        <NModal v-if="selectedSpaceId" v-model:show="oidcDialogVisible" preset="dialog" :title="$t('spaceManage.addRule')" :positive-text="$t('common.confirm')" :negative-text="$t('common.cancel')" @positive-click="addRule">
+          <NSpace vertical>
+            <NInput v-model:value="oidcProvider" placeholder="Provider" />
+            <NInput v-model:value="oidcGroup" :placeholder="$t('spaceManage.groupName')" @keyup.enter="addRule" />
+            <NSelect v-model:value="oidcRole" :options="[{ label: $t('spaceManage.editor'), value: 'editor' }, { label: $t('spaceManage.viewer'), value: 'viewer' }]" />
+          </NSpace>
+        </NModal>
       </NSpace>
     </NCard>
   </div>

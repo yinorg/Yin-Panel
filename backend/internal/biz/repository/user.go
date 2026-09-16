@@ -8,18 +8,17 @@ import (
 
 type User struct {
 	BaseModel
-	Username      string `gorm:"type:varchar(255);uniqueIndex:idx_username_oauth_provider" json:"username"`     // 账号
-	Password      string `gorm:"type:varchar(255)" json:"password"`                                             // 密码
-	Name          string `gorm:"type:varchar(20)" json:"name"`                                                  // 名称
-	HeadImage     string `gorm:"type:varchar(255)" json:"headImage"`                                            // 头像地址
-	Status        int8   `gorm:"type:tinyint" json:"status"`                                                    // 状态 1.启用 2.停用 3.未激活
-	Role          int8   `gorm:"type:tinyint" json:"role"`                                                      // 角色 1.管理员 2.普通用户
-	Mail          string `gorm:"type:varchar(255)" json:"mail"`                                                 // 邮箱
-	Token         string `gorm:"-" json:"token"`                                                                // 仅用于API返回
-	OauthProvider string `gorm:"type:varchar(50);uniqueIndex:idx_username_oauth_provider" json:"oauthProvider"` // OAuth来源 (github, google)
-	OauthID       string `gorm:"type:varchar(255);index" json:"oauthId"`                                        // OAuth提供商中的用户ID
-	Publiccode    string `gorm:"type:varchar(50);uniqueIndex:uk_publiccode" json:"publiccode"`                  // 公开访问代码
-	TokenVersion  uint   `gorm:"not null;default:0" json:"-"`                                                   // 用于撤销已签发的JWT
+	Password      string `gorm:"type:varchar(255)" json:"password"`                            // 密码
+	Name          string `gorm:"type:varchar(20)" json:"name"`                                 // 名称
+	HeadImage     string `gorm:"type:varchar(255)" json:"headImage"`                           // 头像地址
+	Status        int8   `gorm:"type:tinyint" json:"status"`                                   // 状态 1.启用 2.停用 3.未激活
+	Role          int8   `gorm:"type:tinyint" json:"role"`                                     // 角色 1.管理员 2.普通用户
+	Mail          string `gorm:"type:varchar(255)" json:"mail"`                                // 邮箱
+	Token         string `gorm:"-" json:"token"`                                               // 仅用于API返回
+	OauthProvider string `gorm:"type:varchar(50)" json:"oauthProvider"`                        // OAuth来源 (github, google)
+	OauthID       string `gorm:"type:varchar(255);index" json:"oauthId"`                       // OAuth提供商中的用户ID
+	Publiccode    string `gorm:"type:varchar(50);uniqueIndex:uk_publiccode" json:"publiccode"` // 公开访问代码
+	TokenVersion  uint   `gorm:"not null;default:0" json:"-"`                                  // 用于撤销已签发的JWT
 }
 
 func (r *UserRepo) GetByMail(mail string) (User, error) {
@@ -34,7 +33,7 @@ type UserRepo struct {
 type IUserRepo interface {
 	Get(id uint) (User, error)
 	Count() (uint, error)
-	GetByUsernameAndPassword(username, password, oauthProvider string) (User, error)
+	GetByMailAndPassword(mail, password, oauthProvider string) (User, error)
 	GetByOAuthID(source, oauthID string) (User, error)
 	GetByMail(mail string) (User, error)
 	GetList(pagedParam PagedParam) ([]User, uint, error)
@@ -42,7 +41,6 @@ type IUserRepo interface {
 	UpdateUserInfo(id uint, updateInfo map[string]any) error
 	Create(user *User) error
 	Delete(userId uint) ([]string, error)
-	CheckUsernameExist(username, oauthProvider string) (User, error)
 	GetByPubliccode(publiccode string) (User, error)
 	InvalidateTokens(userID uint) error
 }
@@ -63,9 +61,9 @@ func (r *UserRepo) Count() (uint, error) {
 	return uint(count), err
 }
 
-func (r *UserRepo) GetByUsernameAndPassword(username, password, oauthProvider string) (User, error) {
+func (r *UserRepo) GetByMailAndPassword(mail, password, oauthProvider string) (User, error) {
 	user := User{}
-	err := Db.Where("username=?", username).Where("oauth_provider=?", oauthProvider).
+	err := Db.Where("mail=?", mail).Where("oauth_provider=?", oauthProvider).
 		Where("password=?", password).First(&user).Error
 	return user, err
 }
@@ -119,14 +117,6 @@ func (r *UserRepo) UpdateUserInfo(userId uint, updateInfo map[string]any) error 
 			return errors.New("the mail already exists")
 		}
 		data["mail"] = v
-	}
-	if v, ok := updateInfo["username"]; ok {
-		hasUser := User{}
-		count := Db.Where("username=?", updateInfo["username"]).First(&hasUser).RowsAffected
-		if count != 0 && hasUser.ID != userId {
-			return errors.New("the username already exists")
-		}
-		data["username"] = v
 	}
 	if v, ok := updateInfo["password"]; ok {
 		data["password"] = v
@@ -185,16 +175,6 @@ func (r *UserRepo) Delete(userId uint) ([]string, error) {
 	})
 
 	return fileNames, err
-}
-
-func (r *UserRepo) CheckUsernameExist(username, oauthProvider string) (User, error) {
-	hasUser := User{}
-	count := Db.Where("username=?", username).Where("oauth_provider=?", oauthProvider).First(&hasUser).RowsAffected
-	if count != 0 {
-		return hasUser, errors.New("该用户名已被注册")
-	}
-
-	return hasUser, nil
 }
 
 // GetByPubliccode 根据 public visit 代码获取用户

@@ -16,7 +16,7 @@ type UserInfo struct {
 	ID         uint   `json:"id"`
 	Name       string `json:"name"`
 	Role       int8   `json:"role"`
-	Username   string `json:"username"`
+	Mail       string `json:"mail"`
 	Publiccode string `json:"publiccode"`
 	Token      string `json:"token"`
 }

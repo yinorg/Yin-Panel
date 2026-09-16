@@ -79,7 +79,7 @@ func Auth(c *gin.Context) {
 		ID:         user.ID,
 		Name:       user.Name,
 		Role:       user.Role,
-		Username:   user.Username,
+		Mail:       user.Mail,
 		Publiccode: user.Publiccode,
 		Token:      user.Token,
 	}

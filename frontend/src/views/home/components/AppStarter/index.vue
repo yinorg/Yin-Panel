@@ -41,17 +41,12 @@ const apps = ref<App[]>([
   {
     name: t('spaceManage.title'),
     componentName: 'SpaceManage',
-    icon: 'material-symbols:groups',
+    icon: 'ic-baseline-add-business',
   },
   {
     name: t('apps.uploadsFileManager.appName'),
     componentName: 'UploadFileManager',
     icon: 'tabler:file-upload',
-  },
-  {
-    name: t('apps.about.appName'),
-    componentName: 'About',
-    icon: 'lucide-info',
   },
 ])
 
@@ -93,12 +88,18 @@ onMounted(() => {
     icon: 'lucide-users',
     auth: 1,
   }
+  const aboutApp: App = {
+    name: t('apps.about.appName'),
+    componentName: 'About',
+    icon: 'lucide-info',
+  }
   // 初始化
   const addAdminApp = () => {
     if (Number(authStore.userInfo?.role) === 1 && !apps.value.some(item => item.componentName === 'Users'))
       apps.value.push(adminApp)
   }
   addAdminApp()
+  apps.value.push(aboutApp)
   watch(() => authStore.userInfo?.role, addAdminApp)
 
   window.addEventListener('resize', handleResize)

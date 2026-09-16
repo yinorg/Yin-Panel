@@ -204,9 +204,9 @@ const handleTogglePublicVisit = async (value: boolean) => {
     <NCard style="border-radius:10px" size="small">
       <div>
         <div class="text-slate-500 font-bold">
-          {{ $t('common.username') }}
+          {{ $t('spaceManage.userEmail') }}
         </div>
-        {{ authStore.userInfo?.username }}
+          {{ authStore.userInfo?.mail }}
       </div>
 
       <div class="mt-[10px]">

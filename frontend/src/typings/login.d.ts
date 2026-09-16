@@ -1,7 +1,7 @@
 declare namespace Login{
 
     interface LoginReqest{
-        username:string 
+        mail:string
         password:string
         vcode?:string
     }

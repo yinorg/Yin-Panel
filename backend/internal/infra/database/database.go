@@ -74,6 +74,13 @@ func initDatabase(db *gorm.DB) (err error) {
 	if err != nil {
 		return err
 	}
+	// Backfill email accounts from the legacy username column before the
+	// application stops reading username.
+	if db.Migrator().HasColumn("user", "username") {
+		if err := db.Exec("UPDATE user SET mail = username WHERE (mail IS NULL OR mail = '') AND username IS NOT NULL AND username <> ''").Error; err != nil {
+			return err
+		}
+	}
 	if err := normalizeEmptyPublicIDs(db); err != nil {
 		return err
 	}
@@ -200,13 +207,12 @@ func CreateDefaultUser() error {
 
 	if count == 0 {
 		mUser := repository.User{}
-		mail := "admin@sun.cc"
+		mail := "admin@yiniot.com"
 		mUser.Mail = mail
-		mUser.Username = mail
 		mUser.Name = mail
 		mUser.Status = 1
 		mUser.Role = 1
-		mUser.Password = util.PasswordEncryption("12345678")
+		mUser.Password = util.PasswordEncryption("admin@yiniot.com")
 		mUser.OauthProvider = constant.OAuthProviderBuildin
 		if errCreate := global.UserService.CreateUser(&mUser); errCreate != nil {
 			return errCreate

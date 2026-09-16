@@ -240,13 +240,10 @@ func (s *UserService) findOrCreateOAuthUser(provider string, providerConfig conf
 		if user.Status != 1 {
 			return nil, errors.New("user account is disabled or inactive")
 		}
-		// Keep legacy OAuth accounts readable after switching from subject-based
-		// usernames to email-based usernames.
-		if email != "" && user.Username != email {
-			if err := s.userRepo.UpdateUserInfo(user.ID, map[string]any{"username": email, "mail": email}); err != nil {
+		if email != "" && user.Mail != email {
+			if err := s.userRepo.UpdateUserInfo(user.ID, map[string]any{"mail": email}); err != nil {
 				return nil, err
 			}
-			user.Username = email
 			user.Mail = email
 		}
 		s.syncOIDCGroups(user.ID, provider, userInfo)
@@ -280,7 +277,6 @@ func (s *UserService) findOrCreateOAuthUser(provider string, providerConfig conf
 
 	// OAuth users don't need a password as they authenticate through the provider
 	newUser := &repository.User{
-		Username:      email,
 		Password:      "", // No password needed for OAuth users
 		Name:          displayName,
 		Mail:          email,

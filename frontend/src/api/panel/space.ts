@@ -22,7 +22,7 @@ export function getPublicConfig<T>(spaceId: number) { return get<T>({ url: `/spa
 export function setPublicConfig<T>(spaceId: number, data: PublicConfig) { return post<T>({ url: `/spaces/${spaceId}/public`, data }) }
 export function importBookmarks<T>(spaceId: number, data: any) { return post<T>({ url: `/spaces/${spaceId}/bookmarks/import`, data }) }
 export function clearSpace<T>(spaceId: number) { return post<T>({ url: `/spaces/${spaceId}/clear` }) }
-export function createTeam<T>(name: string) { return post<T>({ url: '/spaces/teams', data: { name } }) }
+export function createSpace<T>(name: string) { return post<T>({ url: '/spaces/teams', data: { name } }) }
 export function getGroups<T>(spaceId: number) { return get<T>({ url: `/spaces/${spaceId}/groups` }) }
 export function getItems<T>(spaceId: number, groupId?: number, page = 1, pageSize = 50) { return get<T>({ url: `/spaces/${spaceId}/items`, data: { groupId, page, pageSize } }) }
 export function createItem<T>(spaceId: number, data: any) { return post<T>({ url: `/spaces/${spaceId}/items`, data }) }
