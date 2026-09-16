@@ -279,7 +279,11 @@ func (r *SpaceRouter) SetPublicConfig(c *gin.Context) {
 		response.ErrorParamFomat(c, "invalid access code")
 		return
 	}
-	updates := map[string]any{"public_enabled": req.Enabled, "public_id": req.PublicID, "public_mode": req.Mode}
+	var publicID *string
+	if req.Enabled {
+		publicID = &req.PublicID
+	}
+	updates := map[string]any{"public_enabled": req.Enabled, "public_id": publicID, "public_mode": req.Mode}
 	if req.Mode == "code" && req.AccessCode != "" {
 		sum := sha256.Sum256([]byte(req.AccessCode))
 		updates["public_code_hash"] = hex.EncodeToString(sum[:])

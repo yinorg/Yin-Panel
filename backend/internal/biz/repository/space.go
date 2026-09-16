@@ -15,14 +15,14 @@ const (
 // Space is the common container for personal and team panels.
 type Space struct {
 	BaseModel
-	Type           string `gorm:"type:varchar(20);not null;index" json:"type"`
-	Name           string `gorm:"type:varchar(100);not null" json:"name"`
-	OwnerUserID    uint   `gorm:"not null;index" json:"ownerUserId"`
-	TeamID         *uint  `gorm:"index" json:"teamId,omitempty"`
-	PublicEnabled  bool   `gorm:"not null;default:false" json:"publicEnabled"`
-	PublicID       string `gorm:"type:varchar(30);uniqueIndex" json:"publicId,omitempty"`
-	PublicMode     string `gorm:"type:varchar(20);not null;default:'direct'" json:"publicMode"`
-	PublicCodeHash string `gorm:"type:varchar(128)" json:"-"`
+	Type           string  `gorm:"type:varchar(20);not null;index" json:"type"`
+	Name           string  `gorm:"type:varchar(100);not null" json:"name"`
+	OwnerUserID    uint    `gorm:"not null;index" json:"ownerUserId"`
+	TeamID         *uint   `gorm:"index" json:"teamId,omitempty"`
+	PublicEnabled  bool    `gorm:"not null;default:false" json:"publicEnabled"`
+	PublicID       *string `gorm:"type:varchar(30);uniqueIndex" json:"publicId,omitempty"`
+	PublicMode     string  `gorm:"type:varchar(20);not null;default:'direct'" json:"publicMode"`
+	PublicCodeHash string  `gorm:"type:varchar(128)" json:"-"`
 }
 
 type SpaceMember struct {
