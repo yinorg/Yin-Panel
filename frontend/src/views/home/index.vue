@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { VueDraggable } from 'vue-draggable-plus'
 import { NBackTop, NButton, NButtonGroup, NCard, NDropdown, NInput, NModal, NSkeleton, NSpin, NSpace, useDialog, useMessage } from 'naive-ui'
-import { nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { nextTick, onMounted, ref } from 'vue'
 import { createTeam, getGroups, getItems, getSpaces, sortSpaces, spaceDisplayName, type Space } from '../../api/panel/space'
 import { Clock, SearchBox, SystemMonitor } from '../../components/deskModule'
 import { SvgIcon, SvgIconOnline } from '../../components/common'
@@ -117,8 +117,6 @@ function scrollToTop() {
 
 // 获取组数据
 function getList() {
-  groupObserver?.disconnect()
-  groupObserver = null
   loadedGroups.clear()
   loadingGroups.clear()
   groupLoadQueue.length = 0
@@ -369,11 +367,6 @@ function loadHomeData() {
 onMounted(() => {
   if (publicCode && !publicAccessReady.value) return
   loadHomeData()
-})
-
-onUnmounted(() => {
-  groupObserver?.disconnect()
-  groupObserver = null
 })
 
 // 前端搜索过滤
