@@ -16,7 +16,7 @@ permissions:
   packages: write
 
 jobs:
-  build:
+  frontend:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -28,8 +28,86 @@ jobs:
             echo "Only standard version tags such as 0.3.1 are published."
             exit 1
           }
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Build frontend
+        working-directory: frontend
+        run: npm ci && npm run build-only
+      - name: Upload frontend build
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: backend/web
+          retention-days: 1
+
+  backend:
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+          cache-dependency-path: backend/go.sum
+      - name: Install musl compiler
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+      - name: Build backend
+        working-directory: backend
+        env:
+          CGO_ENABLED: '1'
+          CC: musl-gcc
+          GOOS: linux
+          GOARCH: ${{ matrix.arch }}
+          VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+        run: |
+          mkdir -p ../build-output
+          go build -o ../build-output/yin-panel \
+            -ldflags="-X github.com/yinorg/Yin-Panel/backend/internal/global.RUNCODE=release -X github.com/yinorg/Yin-Panel/backend/internal/global.VERSION=${VERSION}" \
+            main.go
+
+      - name: Upload backend build
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-build-${{ matrix.arch }}
+          path: build-output/yin-panel
+          retention-days: 1
+
+  image:
+    needs: [frontend, backend]
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Download frontend build
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-build
+          path: backend/web
+      - name: Download backend build
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-build-${{ matrix.arch }}
+          path: build-output
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Log in to GHCR
@@ -38,15 +116,35 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build and push image
+      - name: Package and push architecture image
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ./distribution/docker-image/Dockerfile_monolith
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/${{ matrix.arch }}
           push: true
-          tags: |
-            ghcr.io/yinorg/yin-panel-ce:${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
-            ghcr.io/yinorg/yin-panel-ce:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          build-args: |
+            VERSION=${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          tags: ghcr.io/yinorg/yin-panel-ce:${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}-${{ matrix.arch }}
+
+  manifest:
+    needs: image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish multi-architecture image
+        env:
+          VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+        run: |
+          docker buildx imagetools create \
+            -t ghcr.io/yinorg/yin-panel-ce:${VERSION} \
+            -t ghcr.io/yinorg/yin-panel-ce:latest \
+            ghcr.io/yinorg/yin-panel-ce:${VERSION}-amd64 \
+            ghcr.io/yinorg/yin-panel-ce:${VERSION}-arm64
