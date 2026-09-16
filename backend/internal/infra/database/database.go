@@ -74,6 +74,9 @@ func initDatabase(db *gorm.DB) (err error) {
 	if err != nil {
 		return err
 	}
+	if err := normalizeEmptyPublicIDs(db); err != nil {
+		return err
+	}
 	if err := EnsurePersonalSpaces(db); err != nil {
 		return err
 	}
@@ -91,6 +94,13 @@ func initDatabase(db *gorm.DB) (err error) {
 		return err
 	}
 	return RunMigration(db)
+}
+
+// Empty public IDs must be NULL so the unique index only applies to configured links.
+func normalizeEmptyPublicIDs(db *gorm.DB) error {
+	return db.Model(&repository.Space{}).
+		Where("public_id = ?", "").
+		UpdateColumn("public_id", nil).Error
 }
 
 func disableUserMonitorConfigs(db *gorm.DB) error {
