@@ -17,6 +17,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'update:visible', visible: boolean): void
+  (e: 'spaces-changed'): void
 }>()
 
 const componentName = ref('UserInfo')
@@ -174,7 +175,7 @@ onUnmounted(() => {
             </NLayoutSider>
             <NLayoutContent :content-style="{ height }">
               <div class="rounded-2xl h-full overflow-auto transition-all duration-500 min-w-[300px] h-full" :class="(isSmallScreen && !collapsed) ? 'opacity-0' : 'opacity-100'">
-                <AppLoader :component-name="componentName" class="h-full" />
+                <AppLoader :component-name="componentName" class="h-full" @spaces-changed="emit('spaces-changed')" />
               </div>
             </NLayoutContent>
           </NLayout>

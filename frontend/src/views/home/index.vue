@@ -186,11 +186,16 @@ function selectSpace(key: string | number) {
 
 function reloadSpaces(selectLatest = false) {
   getSpaces<{ code: number; data: Space[] }>().then(({ code, data }) => {
-    if (code !== 0 || !data?.length) return
-    spaces.value = sortSpaces(data, authStore.userInfo?.id)
-    if (selectLatest) activeSpace.value = data[data.length - 1]
+    if (code !== 0) return
+    const nextSpaces = sortSpaces(data || [], authStore.userInfo?.id)
+    const targetSpaceId = selectLatest ? data?.[data.length - 1]?.id : activeSpace.value?.id
+    spaces.value = nextSpaces
+    activeSpace.value = nextSpaces.find(space => space.id === targetSpaceId) || nextSpaces[0] || null
     getList()
   })
+}
+function handleSpacesChanged() {
+  reloadSpaces()
 }
 function submitCreateSpace() {
 	const name = spaceName.value.trim()
@@ -662,7 +667,7 @@ function handleAddItem(itemIconGroupId?: number) {
         </NButton>
       </NButtonGroup>
 
-      <AppStarter v-model:visible="settingModalShow" />
+      <AppStarter v-model:visible="settingModalShow" @spaces-changed="handleSpacesChanged" />
     </div>
 
     <NBackTop
