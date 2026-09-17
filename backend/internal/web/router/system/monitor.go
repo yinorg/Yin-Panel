@@ -118,7 +118,12 @@ func (a *MonitorRouter) GetDiskMountpoints(c *gin.Context) {
 
 // GetEnableStatus returns the enableMonitor configuration from conf.ini
 func (a *MonitorRouter) GetEnableStatus(c *gin.Context) {
+	refreshInterval := global.Config.Base.MonitorRefreshInterval
+	if refreshInterval <= 0 {
+		refreshInterval = 10
+	}
 	response.SuccessData(c, gin.H{
-		"enabled": global.Config.Base.EnableMonitor,
+		"enabled":          global.Config.Base.EnableMonitor,
+		"refresh_interval": refreshInterval,
 	})
 }

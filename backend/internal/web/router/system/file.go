@@ -225,6 +225,8 @@ func (a *FileRouter) GetS3File(c *gin.Context) {
 	// 设置响应头
 	c.Header("Content-Type", contentType)
 	c.Header("Content-Disposition", "inline; filename="+path.Base(filepath))
+	// Uploaded files use content-hash filenames, so they can be cached indefinitely.
+	c.Header("Cache-Control", "public, max-age=31536000, immutable")
 
 	zaplog.Logger.Infof("Successfully serving file: %s with content type: %s", filepath, contentType)
 	// 返回文件内容

@@ -7,6 +7,15 @@ import { SvgIcon } from '../../common'
 const SvgSrcBaidu = '/assets/search_engine_svg/baidu.svg'
 const SvgSrcBing = '/assets/search_engine_svg/bing.svg'
 const SvgSrcGoogle = '/assets/search_engine_svg/google.svg'
+const SvgSrcDuckDuckGo = '/assets/search_engine_svg/duckduckgo.svg'
+const SvgSrcYahoo = '/assets/search_engine_svg/yahoo.svg'
+const SvgSrcYandex = '/assets/search_engine_svg/yandex.png'
+const SvgSrcEcosia = '/assets/search_engine_svg/ecosia.svg'
+const SvgSrcBrave = '/assets/search_engine_svg/brave.svg'
+const SvgSrcStartpage = '/assets/search_engine_svg/startpage.svg'
+const SvgSrcSogou = '/assets/search_engine_svg/sogou.svg'
+const SvgSrc360 = '/assets/search_engine_svg/360.png'
+const SvgSrcAol = '/assets/search_engine_svg/aol.svg'
 import { useModuleConfig } from '@/store'
 
 withDefaults(defineProps<{
@@ -45,6 +54,51 @@ const defaultSearchEngineList = ref<DeskModule.SearchBox.SearchEngine[]>([
     iconSrc: SvgSrcBaidu,
     title: 'Baidu',
     url: 'https://www.baidu.com/s?wd=%s',
+  },
+  {
+    iconSrc: SvgSrcDuckDuckGo,
+    title: 'DuckDuckGo',
+    url: 'https://duckduckgo.com/?q=%s',
+  },
+  {
+    iconSrc: SvgSrcYahoo,
+    title: 'Yahoo',
+    url: 'https://search.yahoo.com/search?p=%s',
+  },
+  {
+    iconSrc: SvgSrcYandex,
+    title: 'Yandex',
+    url: 'https://yandex.com/search/?text=%s',
+  },
+  {
+    iconSrc: SvgSrcEcosia,
+    title: 'Ecosia',
+    url: 'https://www.ecosia.org/search?q=%s',
+  },
+  {
+    iconSrc: SvgSrcBrave,
+    title: 'Brave Search',
+    url: 'https://search.brave.com/search?q=%s',
+  },
+  {
+    iconSrc: SvgSrcStartpage,
+    title: 'Startpage',
+    url: 'https://www.startpage.com/sp/search?query=%s',
+  },
+  {
+    iconSrc: SvgSrcSogou,
+    title: 'Sogou',
+    url: 'https://www.sogou.com/web?query=%s',
+  },
+  {
+    iconSrc: SvgSrc360,
+    title: '360 Search',
+    url: 'https://www.so.com/s?q=%s',
+  },
+  {
+    iconSrc: SvgSrcAol,
+    title: 'AOL',
+    url: 'https://search.aol.com/aol/search?q=%s',
   },
 ])
 
@@ -133,13 +187,13 @@ onMounted(() => {
 
     <!-- 搜索引擎选择 -->
     <div v-if="searchSelectListShow" class="w-full mt-[10px] rounded-xl p-[10px]" :style="{ background }">
-      <div class="flex items-center">
         <div class="flex items-center">
+          <div class="flex items-center flex-wrap">
           <div
             v-for="item, index in defaultSearchEngineList"
             :key="index"
             :title="item.title"
-            class="w-[40px] h-[40px] mr-[10px]  cursor-pointer bg-[#ffffff] flex items-center justify-center rounded-xl"
+            class="w-[40px] h-[40px] cursor-pointer bg-[#ffffff] flex items-center justify-center rounded-xl mr-[10px] mb-[10px]"
             @click="handleEngineUpdate(item)"
           >
             <NAvatar :src="item.iconSrc" style="background-color: transparent;" :size="20" />

@@ -17,6 +17,23 @@ Do not stop at a plan when the user asked to execute. Do not re-ask for paths, b
 
 Every command must run in the directory stated by its `cd` or tool working-directory setting. Before running Go commands, verify `go.mod` is present in the current directory. Before running npm commands, verify `package.json` is present. Never infer that a prior tool call's `cd` persists into a later tool call.
 
+## Git Collaboration Rules
+
+- Keep `master` usable at all times. Never make code changes, commits, or direct pushes on `master`.
+- At the start of a task, inspect the current branch and worktree before fetching or switching branches.
+- Determine `<username>` from `git config user.name`, converted to lowercase. Never use the Linux login name.
+- When the worktree is clean, fetch remote updates, switch to `master`, and fast-forward it with `git pull --ff-only origin master`. Create a temporary task branch as `<username>/<YYYYMMDD-HHmm>` from the synchronized `master`.
+- When `master` has uncommitted or untracked changes, do not pull, reset, discard, or overwrite them. Create a temporary branch as `<username>/<YYYYMMDD-HHmm>` from the current `master` and carry the complete worktree into that branch before continuing.
+- Before merging, first merge the latest `master` into the temporary branch, run the required local verification, summarize the final scope, and rename the branch to `<username>/<short-summary>`.
+- Use lowercase English and hyphens in `short-summary`, normally 2 to 4 words describing the main theme. Do not enumerate files, dates, or every individual feature in the branch name; record those details in commits and the pull request.
+- Use descriptive prefixes such as `feature/`, `fix/`, `refactor/`, and `docs/` only when they clarify the task; the username is required for temporary and final task branches.
+- To determine the final summary, inspect `git merge-base master HEAD`, `git log --oneline <base>..HEAD`, `git diff <base>...HEAD`, `git status --short`, `git diff --stat`, and `git diff --cached --stat`. Include intended untracked files in the review before renaming.
+- Complete the required build, test, and `git diff --check` verification on the task branch before merging.
+- Merge the final task branch into `master`, preferably through a pull request or an equivalent non-direct merge workflow.
+- After merging, verify that `master` remains buildable and usable. Only after that verification succeeds, delete both the local and remote task branches, then push the merged `master`.
+- If the task branch was already pushed under its temporary name, push the renamed final branch first and delete the old remote name only after the new branch is confirmed complete.
+- Never delete a task branch before confirming that its commits exist in `master`.
+
 ## Project Facts
 
 - Repository: `https://github.com/yinorg/Yin-Panel`
@@ -61,14 +78,14 @@ For backend-only work, skip the frontend entirely. Run `gofmt`, `go test ./...`,
 
 The service runs from `/home/hsy/project/backup/backend`, with that directory as its working directory so `conf.yaml` is found. Never replace its database or uploads with repository copies.
 
-After successful builds, preserve old runtime files and replace only the binary and static files:
+After successful builds, replace only the changed runtime artifact. Preserve old binaries, but do not keep backups of frontend static files:
 
 ```bash
 run_dir=/home/hsy/project/backup/backend
 stamp=$(date +%Y%m%d-%H%M%S)
 cp -a "$run_dir/yin-panel" "$run_dir/yin-panel.previous-$stamp"
 cp -a /tmp/yin-panel-build/yin-panel "$run_dir/yin-panel"
-mv "$run_dir/web" "$run_dir/web.previous-$stamp"
+rm -rf "$run_dir/web"
 cp -a /home/hsy/project/Yin-Panel/backend/web "$run_dir/web"
 ```
 

@@ -14,6 +14,7 @@ import { usePanelState, useAuthStore } from '@/store'
 import { PanelPanelConfigStyleEnum, PanelStateNetworkModeEnum } from '@/enums'
 import { t } from '@/locales'
 import { getEnableStatus } from '@/api/system/systemMonitor'
+import { clearSpaceCache, readSpaceCache, readSpacesCache, writeSpaceCache, writeSpacesCache } from '@/utils/spaceCache'
 
 interface ItemGroup extends Panel.ItemIconGroup {
   sortStatus?: boolean
@@ -55,14 +56,19 @@ const monitorEnabled = ref(false)
 const items = ref<ItemGroup[]>([])
 const filterItems = ref<ItemGroup[]>([])
 const loadedGroups = new Set<number>()
-const loadingGroups = new Set<number>()
+const loadingGroups = ref<Set<number>>(new Set())
 const groupLoadQueue: number[] = []
 let activeGroupLoads = 0
+let groupLoadGeneration = 0
 const collapsedGroups = ref<Set<number>>(new Set())
 let groupObserver: IntersectionObserver | null = null
 const publicCode = parsePublicCodeFromPath()
 const publicAccessCode = ref('')
 const publicAccessReady = ref(!publicCode || !!sessionStorage.getItem(`yin-panel-public-access:${publicCode}`))
+
+function getCachedSpace(spaceId: number) { return readSpaceCache(spaceId, authStore.userInfo?.id) }
+function saveCachedSpace(spaceId: number, cache: any) { writeSpaceCache(spaceId, cache, authStore.userInfo?.id) }
+function clearCachedSpace(spaceId: number) { clearSpaceCache(spaceId, authStore.userInfo?.id) }
 
 function unlockPublicAccess() {
   if (publicAccessCode.value.length < 4 || publicAccessCode.value.length > 12) return
@@ -116,11 +122,12 @@ function scrollToTop() {
 }
 
 // 获取组数据
-function getList() {
+async function getList(forceRefresh = false) {
+  const generation = ++groupLoadGeneration
   groupObserver?.disconnect()
   groupObserver = null
   loadedGroups.clear()
-  loadingGroups.clear()
+  loadingGroups.value = new Set()
   groupLoadQueue.length = 0
   if (!activeSpace.value) {
     items.value = []
@@ -128,8 +135,26 @@ function getList() {
     return
   }
 
-  getGroups<{ code: number; data: ItemGroup[] }>(activeSpace.value.id).then(({ code, data }) => {
-    if (code !== 0 || !data) return
+  const spaceId = activeSpace.value.id
+  if (!forceRefresh) {
+    const cached = getCachedSpace(spaceId)
+    if (cached.groups) {
+      applyGroups(cached.groups)
+      return
+    }
+  }
+  if (forceRefresh) clearCachedSpace(spaceId)
+  const { code, data } = await getGroups<{ code: number; data: ItemGroup[] }>(spaceId)
+  if (code !== 0 || !data) return
+  if (generation === groupLoadGeneration && activeSpace.value?.id === spaceId) {
+    const cache = getCachedSpace(spaceId)
+    cache.groups = data
+    saveCachedSpace(spaceId, cache)
+    applyGroups(data)
+  }
+}
+
+function applyGroups(data: ItemGroup[]) {
     const byParent = new Map<number, ItemGroup[]>()
     data.forEach(group => { const key = group.parentId || 0; const list = byParent.get(key) || []; list.push({ ...group, items: [] }); byParent.set(key, list) })
     const flattened: ItemGroup[] = []
@@ -141,7 +166,6 @@ function getList() {
     collapsedGroups.value = initiallyCollapsed
     filterItems.value = items.value
     nextTick(() => { document.querySelectorAll('[data-item-group]').forEach((el, index) => observeGroup(el, index)) })
-  })
 }
 
 function groupHidden(index: number) {
@@ -157,8 +181,8 @@ function groupHidden(index: number) {
 
 function loadGroupItems(index: number) {
   const group = items.value[index]
-  if (!group || !activeSpace.value || loadedGroups.has(Number(group.id)) || loadingGroups.has(Number(group.id))) return
-  loadingGroups.add(Number(group.id))
+  if (!group || !activeSpace.value || loadedGroups.has(Number(group.id)) || loadingGroups.value.has(Number(group.id))) return
+  loadingGroups.value = new Set(loadingGroups.value).add(Number(group.id))
   groupLoadQueue.push(index)
   processGroupLoadQueue()
 }
@@ -168,8 +192,38 @@ function processGroupLoadQueue() {
   const group = items.value[index]
   if (!group || !activeSpace.value) { processGroupLoadQueue(); return }
   activeGroupLoads++
+  const spaceId = activeSpace.value.id
+  const generation = groupLoadGeneration
   const groupId = Number(group.id)
-  getItems<{ code: number; data: Panel.ItemInfo[] }>(activeSpace.value.id, groupId, 1, 100).then(res => { if (res.code === 0) { group.items = res.data || []; if (group.items.length > 40) collapsedGroups.value = new Set([...collapsedGroups.value, groupId]) } }).finally(() => { loadedGroups.add(groupId); loadingGroups.delete(groupId); activeGroupLoads--; processGroupLoadQueue() })
+  const cached = getCachedSpace(spaceId).items[String(groupId)]
+  if (cached !== undefined) {
+    group.items = cached
+    loadedGroups.add(groupId)
+    const nextLoading = new Set(loadingGroups.value)
+    nextLoading.delete(groupId)
+    loadingGroups.value = nextLoading
+    activeGroupLoads--
+    processGroupLoadQueue()
+    return
+  }
+  getItems<{ code: number; data: Panel.ItemInfo[] }>(spaceId, groupId, 1, 100).then(res => {
+    if (generation === groupLoadGeneration && activeSpace.value?.id === spaceId && res.code === 0) {
+      group.items = res.data || []
+      const spaceCache = getCachedSpace(spaceId)
+      spaceCache.items[String(groupId)] = group.items
+      saveCachedSpace(spaceId, spaceCache)
+      if (group.items.length > 40) collapsedGroups.value = new Set([...collapsedGroups.value, groupId])
+    }
+  }).finally(() => {
+    if (generation === groupLoadGeneration) {
+      if (activeSpace.value?.id === spaceId) loadedGroups.add(groupId)
+      const nextLoading = new Set(loadingGroups.value)
+      nextLoading.delete(groupId)
+      loadingGroups.value = nextLoading
+    }
+    activeGroupLoads--
+    processGroupLoadQueue()
+  })
 }
 function toggleGroup(id: number) { const next = new Set(collapsedGroups.value); next.has(id) ? next.delete(id) : next.add(id); collapsedGroups.value = next }
 function observeGroup(el: Element, index: number) {
@@ -179,9 +233,27 @@ function observeGroup(el: Element, index: number) {
 }
 
 function selectSpace(key: string | number) {
+  groupLoadGeneration++
   loadedGroups.clear()
+  loadingGroups.value = new Set()
   const selected = spaces.value.find(space => space.id === Number(key))
   if (selected) { activeSpace.value = selected; getList() }
+}
+
+async function refreshCurrentSpace() {
+  const authStorage = localStorage.getItem('authStorage')
+  localStorage.clear()
+  if (authStorage !== null) localStorage.setItem('authStorage', authStorage)
+  sessionStorage.clear()
+  if ('serviceWorker' in navigator) {
+    const registrations = await navigator.serviceWorker.getRegistrations()
+    await Promise.all(registrations.map(registration => registration.unregister()))
+  }
+  if (typeof caches !== 'undefined') {
+    const cacheNames = await caches.keys()
+    await Promise.all(cacheNames.map(cacheName => caches.delete(cacheName)))
+  }
+  window.location.reload()
 }
 
 function reloadSpaces(selectLatest = false) {
@@ -191,6 +263,7 @@ function reloadSpaces(selectLatest = false) {
     const targetSpaceId = selectLatest ? data?.[data.length - 1]?.id : activeSpace.value?.id
     spaces.value = nextSpaces
     activeSpace.value = nextSpaces.find(space => space.id === targetSpaceId) || nextSpaces[0] || null
+    writeSpacesCache(spaces.value, authStore.userInfo?.id)
     getList()
   })
 }
@@ -246,7 +319,8 @@ function handleRightMenuSelect(key: string | number) {
           deleteItem(activeSpace.value!.id, currentRightSelectItem.value?.id as number).then(({ code, msg }) => {
             if (code === 0) {
               ms.success(t('common.deleteSuccess'))
-              getList()
+              clearCachedSpace(activeSpace.value!.id)
+              getList(true)
             }
             else {
               ms.error(`${t('common.deleteFail')}:${msg}`)
@@ -281,7 +355,8 @@ function onClickoutside() {
 }
 
 function handleEditSuccess(item: Panel.ItemInfo) {
-  getList()
+  if (activeSpace.value) clearCachedSpace(activeSpace.value.id)
+  getList(true)
 }
 
 function handleChangeNetwork(mode: PanelStateNetworkModeEnum) {
@@ -314,6 +389,8 @@ function handleSaveSort(itemGroup: ItemGroup) {
       if (code === 0) {
         ms.success(t('common.saveSuccess'))
         itemGroup.sortStatus = false
+        clearCachedSpace(activeSpace.value!.id)
+        getList(true)
       }
       else {
         ms.error(`${t('common.saveFail')}:${msg}`)
@@ -359,9 +436,27 @@ function loadHomeData() {
   getEnableStatus<{ enabled: boolean }>().then(({ code, data }) => {
     if (code === 0) monitorEnabled.value = data.enabled
   })
-  getSpaces<{ code: number; data: Space[] }>().then(({ code, data }) => {
-    if (code === 0 && data?.length) { spaces.value = sortSpaces(data, authStore.userInfo?.id); activeSpace.value = spaces.value[0]; getList() }
-  })
+  const useCachedSpaces = () => {
+    const cached = readSpacesCache(authStore.userInfo?.id) as Space[]
+    if (cached.length) {
+      spaces.value = sortSpaces(cached, authStore.userInfo?.id)
+      activeSpace.value = spaces.value[0]
+      getList()
+    }
+  }
+  if (!navigator.onLine) {
+    useCachedSpaces()
+  }
+  else {
+    getSpaces<{ code: number; data: Space[] }>().then(({ code, data }) => {
+      if (code === 0 && data?.length) {
+        spaces.value = sortSpaces(data, authStore.userInfo?.id)
+        writeSpacesCache(spaces.value, authStore.userInfo?.id)
+        activeSpace.value = spaces.value[0]
+        getList()
+      }
+    }).catch(useCachedSpaces)
+  }
 
   // 更新同步云端配置
   panelState.updatePanelConfigByCloud()
@@ -377,6 +472,8 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  groupLoadGeneration++
+  loadingGroups.value = new Set()
   groupObserver?.disconnect()
   groupObserver = null
 })
@@ -536,7 +633,10 @@ function handleAddItem(itemIconGroupId?: number) {
 
             <!-- 详情图标 -->
             <div v-if="panelState.panelConfig.iconStyle === PanelPanelConfigStyleEnum.info">
-              <div v-if="itemGroup.items && !collapsedGroups.has(Number(itemGroup.id))">
+              <div v-if="loadingGroups.has(Number(itemGroup.id))" class="flex min-h-[80px] items-center justify-center">
+                <NSpin size="medium" />
+              </div>
+              <div v-else-if="itemGroup.items && !collapsedGroups.has(Number(itemGroup.id))">
                 <VueDraggable
                   v-model="itemGroup.items" item-key="sort" :animation="300"
                   class="icon-info-box"
@@ -555,7 +655,7 @@ function handleAddItem(itemIconGroupId?: number) {
                     />
                   </div>
 
-                  <div v-if="itemGroup.items.length === 0" class="not-drag">
+                  <div v-if="itemGroup.items.length === 0 && loadedGroups.has(Number(itemGroup.id))" class="not-drag">
                     <AppIcon
                       :class="itemGroup.sortStatus ? 'cursor-move' : 'cursor-pointer'"
                       :item-info="{ icon: { itemType: 3, text: 'subway:add' }, title: t('common.add'), url: '', openMethod: 0 }"
@@ -572,7 +672,10 @@ function handleAddItem(itemIconGroupId?: number) {
 
             <!-- APP图标宫型盒子 -->
             <div v-if="panelState.panelConfig.iconStyle === PanelPanelConfigStyleEnum.icon">
-              <div v-if="itemGroup.items && !collapsedGroups.has(Number(itemGroup.id))">
+              <div v-if="loadingGroups.has(Number(itemGroup.id))" class="flex min-h-[80px] items-center justify-center">
+                <NSpin size="medium" />
+              </div>
+              <div v-else-if="itemGroup.items && !collapsedGroups.has(Number(itemGroup.id))">
                 <VueDraggable
                   v-model="itemGroup.items" item-key="sort" :animation="300"
                   class="icon-small-box"
@@ -592,7 +695,7 @@ function handleAddItem(itemIconGroupId?: number) {
                     />
                   </div>
 
-                  <div v-if="itemGroup.items.length === 0" class="not-drag">
+                  <div v-if="itemGroup.items.length === 0 && loadedGroups.has(Number(itemGroup.id))" class="not-drag">
                     <AppIcon
                       class="cursor-pointer"
                       :item-info="{ icon: { itemType: 3, text: 'subway:add' }, title: $t('common.add'), url: '', openMethod: 0 }"
@@ -636,6 +739,11 @@ function handleAddItem(itemIconGroupId?: number) {
     <!-- 悬浮按钮 -->
     <div v-if="parsePublicCodeFromPath() === '' && authStore.token" class="fixed-element shadow-[0_0_10px_2px_rgba(0,0,0,0.2)]">
       <NButtonGroup vertical>
+        <NButton color="#2a2a2a6b" :title="$t('common.refresh')" @click="refreshCurrentSpace">
+          <template #icon>
+            <SvgIcon class="text-white font-xl" icon="material-symbols:refresh-rounded" />
+          </template>
+        </NButton>
         <NButton color="#2a2a2a6b" :title="$t('spaceManage.backToTop')" @click="scrollToTop">
           <template #icon>
             <SvgIcon class="text-white font-xl" icon="icon-park-outline:to-top" />

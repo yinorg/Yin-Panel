@@ -4,6 +4,7 @@ import { NButton, NCard, NInput, NList, NListItem, NModal, NProgress, NSelect, N
 import { addMember, addOIDCGroup, clearSpace, copySpace, createGroup, createSpace, deleteGroup, deleteOIDCGroup, getGroups, getMembers, getOIDCGroups, getPublicConfig, getSpaces, importBookmarks, renameSpace, setPublicConfig, spaceDisplayName, updateGroup, updateMember, type Space, type SpaceMember } from '../../../api/panel/space'
 import { useAuthStore } from '../../../store'
 import { t } from '../../../locales'
+import { clearSpaceCache } from '@/utils/spaceCache'
 
 const message = useMessage()
 const authStore = useAuthStore()
@@ -27,10 +28,11 @@ const publicOrigin = typeof window !== 'undefined' ? window.location.origin : ''
 const bookmarkPreview = ref<any[] | null>(null)
 const importing = ref(false); const importProgress = ref(0)
 const bookmarkFileInput = ref<HTMLInputElement | null>(null)
+function invalidateSpaceCache(spaceId: number) { clearSpaceCache(spaceId, authStore.userInfo?.id) }
 function exportBookmarks() { if (!selectedSpaceId.value) return; fetch(`/api/spaces/${selectedSpaceId.value}/bookmarks/export`, { headers: { Authorization: `Bearer ${authStore.token}` } }).then(r => r.blob()).then(blob => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `space-${selectedSpaceId.value}-bookmarks.html`; a.click(); URL.revokeObjectURL(a.href) }) }
 function previewBookmarks(event: Event) { const file = (event.target as HTMLInputElement).files?.[0]; if (!file) return; file.text().then(text => { const doc = new DOMParser().parseFromString(text, 'text/html'); const groups: any[] = []; doc.querySelectorAll('h3').forEach(h3 => { const group: any = { title: h3.textContent?.trim() || '未命名分组', items: [] }; let node = h3.parentElement?.nextElementSibling; while (node) { node.querySelectorAll?.('a').forEach((a: HTMLAnchorElement) => group.items.push({ title: a.textContent?.trim() || a.href, url: a.href })); node = node.nextElementSibling } groups.push(group) }); bookmarkPreview.value = groups }) }
-function confirmImport() { if (!selectedSpaceId.value || !bookmarkPreview.value || importing.value) return; const count = bookmarkPreview.value.reduce((sum, group) => sum + group.items.length, 0); if (count > 2000 && !window.confirm(t('spaceManage.importConfirm', { count }))) return; if (count > 2000 && !window.confirm(t('spaceManage.importConfirmAgain'))) return; importing.value = true; importProgress.value = 15; const timer = window.setInterval(() => { if (importProgress.value < 90) importProgress.value += 5 }, 500); importBookmarks(selectedSpaceId.value, { groups: bookmarkPreview.value }).then(({ code }) => { if (code === 0) { importProgress.value = 100; message.success(t('spaceManage.importSuccess')); bookmarkPreview.value = null; loadGroups(selectedSpaceId.value!) } }).finally(() => { window.clearInterval(timer); importing.value = false; importProgress.value = 0 }) }
-function clearCurrentSpace() { if (!selectedSpaceId.value || !window.confirm(t('spaceManage.clearConfirm'))) return; clearSpace(selectedSpaceId.value).then(({ code }) => { if (code === 0) { message.success(t('spaceManage.clearSuccess')); loadGroups(selectedSpaceId.value!) } }) }
+function confirmImport() { if (!selectedSpaceId.value || !bookmarkPreview.value || importing.value) return; const count = bookmarkPreview.value.reduce((sum, group) => sum + group.items.length, 0); if (count > 2000 && !window.confirm(t('spaceManage.importConfirm', { count }))) return; if (count > 2000 && !window.confirm(t('spaceManage.importConfirmAgain'))) return; importing.value = true; importProgress.value = 15; const timer = window.setInterval(() => { if (importProgress.value < 90) importProgress.value += 5 }, 500); importBookmarks(selectedSpaceId.value, { groups: bookmarkPreview.value }).then(({ code }) => { if (code === 0) { invalidateSpaceCache(selectedSpaceId.value!); importProgress.value = 100; message.success(t('spaceManage.importSuccess')); bookmarkPreview.value = null; loadGroups(selectedSpaceId.value!) } }).finally(() => { window.clearInterval(timer); importing.value = false; importProgress.value = 0 }) }
+function clearCurrentSpace() { if (!selectedSpaceId.value || !window.confirm(t('spaceManage.clearConfirm'))) return; clearSpace(selectedSpaceId.value).then(({ code }) => { if (code === 0) { invalidateSpaceCache(selectedSpaceId.value!); message.success(t('spaceManage.clearSuccess')); loadGroups(selectedSpaceId.value!) } }) }
 function load() { getSpaces<{ code: number; data: Space[] }>().then(({ data }) => { spaces.value = data || []; if (spaces.value.length && !selectedSpaceId.value) selectedSpaceId.value = spaces.value[0].id; spaces.value.forEach(space => loadGroups(space.id)); if (selectedSpaceId.value) loadDetails(selectedSpaceId.value) }) }
 function loadGroups(spaceId: number) { getGroups<{ code: number; data: { id: number; title: string }[] }>(spaceId).then(({ data }) => { groups.value[spaceId] = data || [] }) }
 function loadDetails(spaceId: number) { getMembers<{ code: number; data: SpaceMember[] }>(spaceId).then(({ data }) => { members.value = data || [] }); getOIDCGroups<{ code: number; data: any[] }>(spaceId).then(({ data }) => { oidcRules.value = data || [] }); getPublicConfig<{ code: number; data: any }>(spaceId).then(({ data }) => { publicEnabled.value = !!data?.enabled; publicId.value = data?.publicId || ''; publicMode.value = data?.mode === 'code' ? 'code' : 'direct'; publicAccessCode.value = '' }) }
@@ -44,13 +46,14 @@ function saveGroup(spaceId: number) {
     groupParentId.value = null
     editing.value = null
     groupDialogVisible.value = false
+    invalidateSpaceCache(spaceId)
     loadGroups(spaceId)
     return true
   })
 }
 function openAddGroup(spaceId: number) { editing.value = null; groupName.value = ''; groupParentId.value = null; groupDialogVisible.value = true }
 function editGroup(spaceId: number, group: { id: number; title: string; parentId?: number | null }) { editing.value = { spaceId, id: group.id }; groupName.value = group.title; groupParentId.value = group.parentId || null; groupDialogVisible.value = true }
-function removeGroup(spaceId: number, id: number) { if (!window.confirm(t('spaceManage.groupDeleteConfirm'))) return; deleteGroup(spaceId, id).then(({ code }) => { if (code === 0) loadGroups(spaceId) }) }
+function removeGroup(spaceId: number, id: number) { if (!window.confirm(t('spaceManage.groupDeleteConfirm'))) return; deleteGroup(spaceId, id).then(({ code }) => { if (code === 0) { invalidateSpaceCache(spaceId); loadGroups(spaceId) } }) }
 function openCreateDialog() {
   name.value = ''
   createDialogVisible.value = true
