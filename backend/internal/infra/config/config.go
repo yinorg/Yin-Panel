@@ -30,13 +30,14 @@ type MigrationConfig struct {
 
 // BaseConfig represents the base section configuration
 type BaseConfig struct {
-	HTTPPort           string `yaml:"http_port"`
-	RootURL            string `yaml:"root_url"`
-	DatabaseDrive      string `yaml:"database_drive"`
-	EnableStaticServer bool   `yaml:"enable_static_server"`
-	EnableMonitor      bool   `yaml:"enable_monitor"`
-	EnableNodeProxy    bool   `yaml:"enable_node_proxy"`
-	URLPrefix          string `yaml:"url_prefix"`
+	HTTPPort               string `yaml:"http_port"`
+	RootURL                string `yaml:"root_url"`
+	DatabaseDrive          string `yaml:"database_drive"`
+	EnableStaticServer     bool   `yaml:"enable_static_server"`
+	EnableMonitor          bool   `yaml:"enable_monitor"`
+	MonitorRefreshInterval int    `yaml:"monitor_refresh_interval"`
+	EnableNodeProxy        bool   `yaml:"enable_node_proxy"`
+	URLPrefix              string `yaml:"url_prefix"`
 }
 
 // SQLiteConfig represents the sqlite section configuration

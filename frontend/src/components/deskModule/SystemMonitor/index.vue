@@ -10,7 +10,7 @@ import { usePanelState } from '../../../store'
 import { PanelPanelConfigStyleEnum } from '../../../enums'
 import { SvgIcon } from '../../common'
 import { t } from '../../../locales'
-import { getSnapshot } from '../../../api/system/systemMonitor'
+import { getEnableStatus, getSnapshot } from '../../../api/system/systemMonitor'
 import { monitorSnapshotKey, type MonitorSnapshot } from './snapshot'
 
 interface MonitorGroup extends Panel.ItemIconGroup {
@@ -68,6 +68,7 @@ const monitorDatas = ref<MonitorData[]>([])
 const monitorSnapshot = ref<MonitorSnapshot | null>(null)
 let snapshotTimer: ReturnType<typeof setInterval>
 let snapshotFailures = 0
+const defaultSnapshotInterval = 10000
 provide(monitorSnapshotKey, monitorSnapshot)
 
 async function updateSnapshot() {
@@ -146,10 +147,23 @@ async function getData() {
   }
 }
 
-onMounted(() => {
+async function getSnapshotInterval() {
+  try {
+    const res = await getEnableStatus<{ refresh_interval?: number }>()
+    if (res.code !== 0) return defaultSnapshotInterval
+    if (res.data.refresh_interval && res.data.refresh_interval > 0)
+      return res.data.refresh_interval * 1000
+  }
+  catch {
+    // Use the default when the optional monitor configuration is unavailable.
+  }
+  return defaultSnapshotInterval
+}
+
+onMounted(async () => {
   getData()
   updateSnapshot()
-  snapshotTimer = setInterval(updateSnapshot, 3000)
+  snapshotTimer = setInterval(updateSnapshot, await getSnapshotInterval())
 })
 
 onUnmounted(() => clearInterval(snapshotTimer))

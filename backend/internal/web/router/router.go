@@ -1,6 +1,8 @@
 package router
 
 import (
+	"strconv"
+
 	"github.com/yinorg/Yin-Panel/backend/internal/infra/config"
 	"github.com/yinorg/Yin-Panel/backend/internal/infra/zaplog"
 	"github.com/yinorg/Yin-Panel/backend/internal/web/router/panel"
@@ -9,6 +11,17 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
+
+func cacheStatic(maxAge int, immutable bool) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		value := "public, max-age=" + strconv.Itoa(maxAge)
+		if immutable {
+			value += ", immutable"
+		}
+		c.Header("Cache-Control", value)
+		c.Next()
+	}
+}
 
 type IRouter interface {
 	InitRouter(Router *gin.RouterGroup)
@@ -53,8 +66,13 @@ func InitRouters(addr string) error {
 		webPath := "./web"
 
 		// 使用StaticFS处理所有静态资源
-		router.StaticFS("/assets", gin.Dir(webPath+"/assets", false))
-		router.StaticFS("/custom", gin.Dir(webPath+"/custom", false))
+		router.Group("/assets").Use(cacheStatic(31536000, true)).StaticFS("", gin.Dir(webPath+"/assets", false))
+		router.Group("/custom").Use(cacheStatic(86400, false)).StaticFS("", gin.Dir(webPath+"/custom", false))
+		// PWA files are emitted at the web root and must be served before SPA fallback routes.
+		router.StaticFile("/registerSW.js", webPath+"/registerSW.js")
+		router.StaticFile("/sw.js", webPath+"/sw.js")
+		router.StaticFile("/workbox-3625d7b0.js", webPath+"/workbox-3625d7b0.js")
+		router.StaticFile("/manifest.webmanifest", webPath+"/manifest.webmanifest")
 
 		// 处理根目录下的特定文件
 		router.StaticFile("/", webPath+"/index.html")
