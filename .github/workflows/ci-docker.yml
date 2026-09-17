@@ -151,6 +151,15 @@ jobs:
       - name: Remove architecture-only tags
         env:
           VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          docker buildx imagetools rm ghcr.io/yinorg/yin-panel-ce:${VERSION}-amd64
-          docker buildx imagetools rm ghcr.io/yinorg/yin-panel-ce:${VERSION}-arm64
+          for arch in amd64 arm64; do
+            version_id=$(gh api --paginate \
+              /orgs/yinorg/packages/container/yin-panel-ce/versions \
+              --jq ".[] | select(.metadata.container.tags[]? == \"${VERSION}-${arch}\") | .id" | head -n 1)
+            if [ -z "$version_id" ]; then
+              echo "Architecture tag ${VERSION}-${arch} was not found"
+              exit 1
+            fi
+            gh api --method DELETE "/orgs/yinorg/packages/container/yin-panel-ce/versions/${version_id}"
+          done
