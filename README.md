@@ -1,92 +1,115 @@
-# Yin-Panel
+## Yin-Panel
 
-Yin-Panel 是一个轻量、可自托管的个人与团队导航面板，适合家庭网络、NAS、服务器和小型团队。
+Yin-Panel 是一个轻量、开源、可自托管的个人与共享空间导航面板，适合家庭网络、NAS、服务器和小型组织。
 
-当前版本：`0.3.11`
+当前版本：`0.3.15`
 
 ## 功能
 
-- 个人空间和共享空间，支持复制、重命名、管理员转让
-- 分组树、书签和图标按空间隔离
-- 管理员、编辑者、查看者三种角色
-- OIDC/OAuth 登录、账号关联和基础 OIDC 分组授权
-- 自定义图标、主题、语言、网络模式和网页小窗
-- 图片上传、SHA-256 去重和私有 `/uploads/` 代理访问
-- SQLite 默认开箱即用，也支持 MySQL、Docker、ARM64 和 Kubernetes
+- 个人空间与共享空间，内容彼此隔离
+- 空间创建、重命名、复制和管理员转让
+- 分组树、书签、图标和排序管理
+- Chrome 书签导入和导出
+- 空间成员管理：管理员、编辑者、查看者
+- OIDC/OAuth 登录、账号关联和 OIDC 分组授权
+- 邮箱作为登录账号，昵称独立维护
+- 自定义图标、主题、语言、背景、网络模式和网页小窗
+- 支持 SQLite、MySQL、Docker、ARM64 和 Kubernetes
 
-## Open Core
+## 快速开始
 
-本仓库是公开 Core 的唯一来源，发布 `yin-panel-ce` 镜像。CE 只包含 Core 功能和本地文件存储。企业版位于私有仓库 [yinorg/Yin-Panel-EE](https://github.com/yinorg/Yin-Panel-EE)，通过公开 `backend/pkg/app`、`backend/pkg/extension` 和 `backend/pkg/storage` 接口接入企业模块。
-
-S3 兼容存储、离线许可证、审计日志和高级 OIDC 组同步只存在于 EE 后端。运行中的发行版可通过 `GET /api/system/capabilities` 查询发行版、模块和只读状态；前端可见性不构成后端授权边界。
-
-## 系统要求
-
-预构建镜像需要 Docker 20.10+ 和 Compose v2，容器默认监听 `3002`。建议至少分配 128 MB RAM，并为数据库和上传目录配置持久化磁盘。源码开发需要 Go `1.24`、Node.js `18+`、pnpm 和 SQLite 所需的 C 编译器。
-
-## Docker Compose
+### Docker Compose
 
 ```bash
-cd docker
-cp ../backend/conf.yaml conf.yaml
+mkdir yin-panel && cd yin-panel
+curl -LO https://raw.githubusercontent.com/yinorg/Yin-Panel/master/docker/docker-compose.yml
+curl -LO https://raw.githubusercontent.com/yinorg/Yin-Panel/master/backend/conf.yaml
+mkdir -p database uploads
 docker compose up -d
 ```
 
-访问 <http://localhost:3002>。首次部署请修改 `conf.yaml` 中的 `base.root_url` 和 `jwt.secret`，并通过反向代理启用 HTTPS。Compose 持久化 `database/`、`uploads/` 和 `conf.yaml`。
+打开 <http://localhost:3002>。
 
-指定版本或自建镜像：
+默认管理员：`admin@yiniot.com`，默认密码：`admin@yiniot.com`。首次登录后请立即修改密码，并修改 `conf.yaml` 中的 `base.root_url` 和 `jwt.secret`。
 
-```bash
-YIN_PANEL_IMAGE=ghcr.io/yinorg/yin-panel-ce:0.3.11 docker compose up -d
-```
-
-## 源码运行
+指定版本：
 
 ```bash
-pnpm --dir frontend install
-pnpm --dir frontend run build-only
-cd backend
-go test ./...
-go build -o ../yin-panel ./main.go
-./../yin-panel -c conf.yaml
+YIN_PANEL_IMAGE=ghcr.io/yinorg/yin-panel-ce:0.3.15 docker compose up -d
 ```
 
-前端开发使用 `pnpm --dir frontend run dev`。后端配置中的相对路径以进程工作目录为准。
+### GHCR 镜像
+
+```bash
+docker pull ghcr.io/yinorg/yin-panel-ce:0.3.15
+docker pull ghcr.io/yinorg/yin-panel-ce:latest
+```
+
+`0.3.15` 和 `latest` 都是 multi-arch 镜像，可直接在 amd64 或 arm64 主机使用。`-amd64`、`-arm64` 仅作为构建过程中的临时 tag，不属于最终发布 tag。
 
 ## 配置与 OIDC
 
-核心配置位于 `backend/conf.yaml`，Docker/Helm 会挂载到 `/app/conf.yaml`。重要字段包括 `base.root_url`、`base.database_drive`、`base.url_prefix`、`sqlite.file_path`、`rclone.bucket` 和 `jwt.secret`。CE 的 `rclone.type` 必须为 `local`；上传对象按 SHA-256 分片存储，例如 `ab/cd/<sha256>.png`，读取统一经过应用代理。
+常用配置包括 `base.root_url`、`base.http_port`、`base.database_drive`、`sqlite.file_path`、`rclone.type`、`rclone.bucket`、`jwt.secret` 和 `oauth.providers`。
 
-在 `oauth.providers` 中填写 provider、客户端凭据、issuer 和 `openid profile email` scopes。回调地址为：
+OIDC 回调地址：
 
 ```text
 <base.root_url>/api/oauth/<provider>/callback
 ```
 
-Provider 必须返回已验证邮箱。系统使用 `provider + sub` 识别外部身份，并按规范化邮箱关联本地账号。
+Provider 必须返回已验证邮箱。系统使用 `provider + sub` 识别外部身份，并使用邮箱关联本地账号。
 
 ## 空间与权限
 
-空间管理员可以管理空间、成员、角色和 OIDC 规则；编辑者可以维护分组与书签；查看者只能读取内容。手工成员不会因 OIDC 组同步而被删除。空间名称允许重复，界面会附加空间 ID 以便区分。
+空间权限使用内部 `UserID` 关联，不依赖邮箱作为权限主键。因此修改邮箱后，已有空间权限仍然有效，成员列表会显示最新邮箱。
+
+- 管理员：管理空间、成员、角色和 OIDC 规则
+- 编辑者：维护分组和书签
+- 查看者：只读访问
+
+创建空间、重命名、添加分组、添加成员和添加 OIDC 规则均使用弹窗操作。
 
 ## Helm
 
 ```bash
 helm upgrade --install yin-panel ./distribution/helm-chart/yin-panel \
-  --set image.tag=0.3.11
+  --set image.tag=0.3.15
 ```
 
-默认使用 SQLite、本地上传目录和服务端口 `3002`。生产环境请配置持久化卷、`base.root_url`、JWT secret 和数据库连接，并先执行 `helm template` 检查渲染结果。EE 配置不应写入 CE values。
+部署前建议运行 `helm template yin-panel ./distribution/helm-chart/yin-panel` 检查渲染结果。
+
+## 源码开发
+
+环境要求：Go `1.24`、Node.js `18+` 和 npm/pnpm。
+
+```bash
+cd frontend
+npm ci
+npm run build-only
+```
+
+```bash
+cd backend
+go test ./...
+go build -o /tmp/yin-panel-build/yin-panel .
+```
+
+完整的 AI 开发、发布和重启约定见 [AGENT-DEV.md](./AGENT-DEV.md)。
 
 ## 备份与升级
 
-升级前备份数据库、上传目录、配置文件和 Helm values。Core 会保留空间、分组、书签及文件引用；迁移失败时从升级前备份恢复。EE 降级到 CE 不会自动回滚企业表，必须先按 EE 文档恢复备份。
+升级前请备份数据库、`uploads/`、`conf.yaml` 和 Helm values。迁移会保留用户、空间、分组、书签和文件引用。发生异常时使用升级前备份恢复，不要直接删除数据库重建。
 
-## 开发检查
+## Open Core
 
-```bash
-cd backend && go test ./...
-cd frontend && pnpm run type-check && pnpm run build-only
-```
+Yin-Panel Core 版本永久免费，并会持续维护和更新。本仓库是公开 Core 的唯一来源，发布 `yin-panel-ce` 镜像。企业版位于私有仓库 [yinorg/Yin-Panel-EE](https://github.com/yinorg/Yin-Panel-EE)，通过公开接口接入企业模块。
 
-EE 必须依赖已发布的 Core tag，不得复制 Core 源码或导入 Core `internal` 包。许可证见 [LICENSE](./LICENSE)，问题和建议请提交到 [GitHub Issues](https://github.com/yinorg/Yin-Panel/issues)。
+运行中的发行版可通过 `GET /api/system/capabilities` 查询发行版、模块和只读状态。许可证见 [LICENSE](./LICENSE)。问题和建议请提交到 [GitHub Issues](https://github.com/yinorg/Yin-Panel/issues)。
+
+## 项目沿革与致谢
+
+Yin-Panel 基于开源项目 [hslr-s/sun-panel](https://github.com/hslr-s/sun-panel) 发展，感谢原作者建立了项目基础。
+
+同时感谢 [PhantomMaa/sun-panel](https://github.com/PhantomMaa/sun-panel) 对项目进行的优化和维护工作。Yin-Panel 在此基础上接任后续维护，并持续加入新的功能、交互体验和适合自托管场景的改进。
+
+感谢所有原作者、贡献者和使用者。
