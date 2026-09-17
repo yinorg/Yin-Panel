@@ -117,15 +117,24 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Package and push architecture image
+        id: build-image
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ./distribution/docker-image/Dockerfile_monolith
           platforms: linux/${{ matrix.arch }}
           push: true
+          outputs: type=image,name=ghcr.io/yinorg/yin-panel-ce,push-by-digest=true,name-canonical=false,push=true
           build-args: |
             VERSION=${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
-          tags: ghcr.io/yinorg/yin-panel-ce:${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}-${{ matrix.arch }}
+      - name: Save image digest
+        run: echo "${{ steps.build-image.outputs.digest }}" > digest
+      - name: Upload image digest
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-digest-${{ matrix.arch }}
+          path: digest
+          retention-days: 1
 
   manifest:
     needs: image
@@ -139,18 +148,24 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Download amd64 image digest
+        uses: actions/download-artifact@v4
+        with:
+          name: image-digest-amd64
+          path: digests/amd64
+      - name: Download arm64 image digest
+        uses: actions/download-artifact@v4
+        with:
+          name: image-digest-arm64
+          path: digests/arm64
       - name: Publish multi-architecture image
         env:
           VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
         run: |
+          AMD64_DIGEST=$(cat digests/amd64/digest)
+          ARM64_DIGEST=$(cat digests/arm64/digest)
           docker buildx imagetools create \
             -t ghcr.io/yinorg/yin-panel-ce:${VERSION} \
             -t ghcr.io/yinorg/yin-panel-ce:latest \
-            ghcr.io/yinorg/yin-panel-ce:${VERSION}-amd64 \
-            ghcr.io/yinorg/yin-panel-ce:${VERSION}-arm64
-      - name: Remove architecture-only tags
-        env:
-          VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
-        run: |
-          docker buildx imagetools rm ghcr.io/yinorg/yin-panel-ce:${VERSION}-amd64
-          docker buildx imagetools rm ghcr.io/yinorg/yin-panel-ce:${VERSION}-arm64
+            ghcr.io/yinorg/yin-panel-ce@${AMD64_DIGEST} \
+            ghcr.io/yinorg/yin-panel-ce@${ARM64_DIGEST}
