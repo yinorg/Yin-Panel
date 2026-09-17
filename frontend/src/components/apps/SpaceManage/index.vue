@@ -8,6 +8,9 @@ import { clearSpaceCache } from '@/utils/spaceCache'
 
 const message = useMessage()
 const authStore = useAuthStore()
+const emit = defineEmits<{
+  (e: 'spaces-changed'): void
+}>()
 const spaces = ref<Space[]>([])
 const selectedSpaceId = ref<number | null>(null)
 const name = ref(''); const groupName = ref(''); const groupParentId = ref<number | null>(null); const editing = ref<{ spaceId: number; id: number } | null>(null)
@@ -65,6 +68,7 @@ async function create() {
     name.value = ''
     createDialogVisible.value = false
     load()
+    emit('spaces-changed')
     return true
   }
   finally {
@@ -84,9 +88,10 @@ async function renameCurrent() {
   message.success('空间名称已更新')
   renameDialogVisible.value = false
   load()
+  emit('spaces-changed')
   return true
 }
-function copyCurrent() { if (selectedSpaceId.value) copySpace<{ code: number }>(selectedSpaceId.value).then(({ code }) => { if (code === 0) { message.success('空间已复制'); load() } }) }
+function copyCurrent() { if (selectedSpaceId.value) copySpace<{ code: number }>(selectedSpaceId.value).then(({ code }) => { if (code === 0) { message.success('空间已复制'); load(); emit('spaces-changed') } }) }
 async function addCurrentMember() {
   const email = memberEmail.value.trim()
   if (!selectedSpaceId.value || !email) return false
