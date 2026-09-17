@@ -148,3 +148,9 @@ jobs:
             -t ghcr.io/yinorg/yin-panel-ce:latest \
             ghcr.io/yinorg/yin-panel-ce:${VERSION}-amd64 \
             ghcr.io/yinorg/yin-panel-ce:${VERSION}-arm64
+      - name: Remove architecture-only tags
+        env:
+          VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+        run: |
+          docker buildx imagetools rm ghcr.io/yinorg/yin-panel-ce:${VERSION}-amd64
+          docker buildx imagetools rm ghcr.io/yinorg/yin-panel-ce:${VERSION}-arm64
