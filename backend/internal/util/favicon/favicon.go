@@ -33,14 +33,19 @@ func GetOneFaviconURL(urlStr string) (string, error) {
 		return "", err
 	}
 
+	pageURL, err := url.Parse(urlStr)
+	if err != nil || pageURL.Scheme == "" || pageURL.Host == "" {
+		return "", fmt.Errorf("invalid page URL")
+	}
+
 	for _, v := range iconURLs {
-		// 标准的路径地址
-		if IsHTTPURL(v) {
-			return v, nil
-		} else {
-			urlInfo, _ := url.Parse(urlStr)
-			fullUrl := urlInfo.Scheme + "://" + urlInfo.Host + "/" + strings.TrimPrefix(v, "/")
-			return fullUrl, nil
+		iconURL, err := url.Parse(strings.TrimSpace(v))
+		if err != nil || iconURL.IsAbs() && iconURL.Scheme != "http" && iconURL.Scheme != "https" {
+			continue
+		}
+		resolved := pageURL.ResolveReference(iconURL)
+		if resolved.Scheme == "http" || resolved.Scheme == "https" {
+			return resolved.String(), nil
 		}
 	}
 	return "", fmt.Errorf("not found ico")
@@ -146,11 +151,11 @@ func DownloadImage(ctx context.Context, url string) (string, error) {
 	return fileName, nil
 }
 
-func getFaviconURL(url string) ([]string, error) {
+func getFaviconURL(pageURLString string) ([]string, error) {
 	var icons []string
 	icons = make([]string, 0)
 	client := &http.Client{}
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("GET", pageURLString, nil)
 	if err != nil {
 		return icons, err
 	}
@@ -190,6 +195,13 @@ func getFaviconURL(url string) ([]string, error) {
 	})
 
 	if len(icons) == 0 {
+		// Many sites serve the conventional favicon without declaring it in HTML.
+		// Keep this fallback after parsing the page so an explicitly declared icon
+		// still takes precedence.
+		pageURL, parseErr := url.Parse(pageURLString)
+		if parseErr == nil && pageURL.Scheme != "" && pageURL.Host != "" {
+			return []string{pageURL.Scheme + "://" + pageURL.Host + "/favicon.ico"}, nil
+		}
 		return icons, errors.New("favicon not found on the page")
 	}
 

@@ -66,43 +66,6 @@ func (a *ItemIconRouter) Edit(c *gin.Context) {
 	response.SuccessData(c, itemIcon)
 }
 
-// 添加多个图标
-func (a *ItemIconRouter) AddMultiple(c *gin.Context) {
-	userInfo, exist := base.GetCurrentUserInfo(c)
-	if !exist || userInfo.ID == 0 {
-		response.ErrorByCode(c, constant.CodeNotLogin)
-		return
-	}
-
-	// type Request
-	var req []repository.ItemIcon
-
-	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
-		response.ErrorParamFomat(c, err.Error())
-		return
-	}
-
-	for i := range req {
-		if req[i].ItemIconGroupId == 0 {
-			response.ErrorParamFomat(c, "Group is mandatory")
-			return
-		}
-
-		req[i].UserId = userInfo.ID
-		// json转字符串
-		if j, err := json.Marshal(req[i].Icon); err == nil {
-			req[i].IconJson = string(j)
-		}
-	}
-
-	if err := global.ItemIconRepo.BatchSave(req); err != nil {
-		response.ErrorDatabase(c, err.Error())
-		return
-	}
-
-	response.SuccessData(c, req)
-}
-
 func (a *ItemIconRouter) GetIcons(c *gin.Context) {
 	type ParamsStruct struct {
 		ItemIconGroupId uint `form:"itemIconGroupId" json:"itemIconGroupId"`

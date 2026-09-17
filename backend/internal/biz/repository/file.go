@@ -3,7 +3,7 @@ package repository
 type File struct {
 	BaseModel
 	UserId   uint   `gorm:"index" json:"userId"`
-	FileName string `gorm:"type:varchar(50)" json:"fileName"`
+	FileName string `gorm:"type:varchar(100)" json:"fileName"`
 }
 
 type FileRepo struct{}

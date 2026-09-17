@@ -6,10 +6,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/yinorg/Yin-Panel/backend/internal/biz/repository"
+	"github.com/yinorg/Yin-Panel/backend/internal/constant"
+	"github.com/yinorg/Yin-Panel/backend/internal/global"
 	"github.com/yinorg/Yin-Panel/backend/internal/web/interceptor"
 	"github.com/yinorg/Yin-Panel/backend/internal/web/model/base"
 	"github.com/yinorg/Yin-Panel/backend/internal/web/model/response"
 	"html"
+	"io"
+	"mime/multipart"
+	"path"
 	"regexp"
 	"strconv"
 	"strings"
@@ -39,6 +44,7 @@ func (r *SpaceRouter) InitRouter(router *gin.RouterGroup) {
 	g.POST("/:spaceId/items/:itemId/delete", r.DeleteItem)
 	g.GET("/:spaceId/bookmarks/export", r.ExportBookmarks)
 	g.POST("/:spaceId/bookmarks/import", r.ImportBookmarks)
+	g.POST("/:spaceId/bookmarks/import-batch", r.ImportBookmarksBatch)
 	g.POST("/:spaceId/clear", r.ClearSpace)
 	g.POST("/:spaceId/groups", r.CreateGroup)
 	g.PUT("/:spaceId/groups/:groupId", r.UpdateGroup)
@@ -93,15 +99,169 @@ type bookmarkImportRequest struct {
 		Children []struct {
 			Title string `json:"title"`
 			Items []struct {
-				Title string `json:"title"`
-				URL   string `json:"url"`
+				Title string                      `json:"title"`
+				URL   string                      `json:"url"`
+				Icon  repository.ItemIconIconInfo `json:"icon"`
 			} `json:"items"`
 		} `json:"children"`
 		Items []struct {
-			Title string `json:"title"`
-			URL   string `json:"url"`
+			Title string                      `json:"title"`
+			URL   string                      `json:"url"`
+			Icon  repository.ItemIconIconInfo `json:"icon"`
 		} `json:"items"`
 	} `json:"groups"`
+}
+
+type bookmarkBatchRequest struct {
+	Groups []struct {
+		Title string `json:"title"`
+		Items []struct {
+			Title     string                      `json:"title"`
+			URL       string                      `json:"url"`
+			UploadKey string                      `json:"uploadKey"`
+			Icon      repository.ItemIconIconInfo `json:"icon"`
+		} `json:"items"`
+	} `json:"groups"`
+}
+
+func (r *SpaceRouter) ImportBookmarksBatch(c *gin.Context) {
+	user, ok := base.GetCurrentUserInfo(c)
+	if !ok {
+		response.Error(c, "not logged in")
+		return
+	}
+	id, err := spaceID(c)
+	if err != nil || !canEditSpace(user.ID, id) {
+		response.ErrorNoAccess(c)
+		return
+	}
+	var req bookmarkBatchRequest
+	if err = json.Unmarshal([]byte(c.PostForm("bookmarks")), &req); err != nil {
+		response.ErrorParamFomat(c, "invalid bookmarks")
+		return
+	}
+	form, err := c.MultipartForm()
+	if err != nil {
+		response.ErrorParamFomat(c, "invalid files")
+		return
+	}
+	files := map[string]*multipart.FileHeader{}
+	for key, list := range form.File {
+		if len(list) != 1 || strings.TrimSpace(key) == "" {
+			response.ErrorParamFomat(c, "invalid file")
+			return
+		}
+		files[key] = list[0]
+	}
+	icons := map[string]repository.ItemIconIconInfo{}
+	for key, fh := range files {
+		if fh.Size > 5*1024*1024 {
+			response.ErrorParamFomat(c, "icon too large")
+			return
+		}
+		ext := strings.ToLower(path.Ext(fh.Filename))
+		if !map[string]bool{".png": true, ".jpg": true, ".jpeg": true, ".gif": true, ".webp": true, ".svg": true, ".ico": true}[ext] {
+			response.ErrorParamFomat(c, "unsupported icon")
+			return
+		}
+		f, e := fh.Open()
+		if e != nil {
+			response.ErrorParamFomat(c, "invalid file")
+			return
+		}
+		h := sha256.New()
+		_, e = io.Copy(h, io.LimitReader(f, 5*1024*1024+1))
+		f.Close()
+		if e != nil {
+			response.ErrorParamFomat(c, "invalid file")
+			return
+		}
+		name := hex.EncodeToString(h.Sum(nil)) + ext
+		icons[key] = repository.ItemIconIconInfo{ItemType: 2, Src: urlPrefix + name, FileName: name}
+		f, e = fh.Open()
+		if e != nil {
+			response.ErrorParamFomat(c, "invalid file")
+			return
+		}
+		exists, e := global.Storage.Exists(c.Request.Context(), name)
+		// Local rclone returns an error for a missing object. A missing object is
+		// the normal first-upload case, so continue with the upload in either
+		// state unless the upload itself fails.
+		if e != nil || !exists {
+			e = global.Storage.Upload(c.Request.Context(), f, name)
+		}
+		f.Close()
+		if e != nil {
+			response.ErrorByCode(c, constant.CodeUploadFailed)
+			return
+		}
+	}
+	err = repository.Db.Transaction(func(tx *gorm.DB) error {
+		newFiles := []repository.File{}
+		for _, icon := range icons {
+			var n int64
+			if e := tx.Model(&repository.File{}).Where("user_id=? AND file_name=?", user.ID, icon.FileName).Count(&n).Error; e != nil {
+				return e
+			}
+			if n == 0 {
+				newFiles = append(newFiles, repository.File{UserId: user.ID, FileName: icon.FileName})
+			}
+		}
+		if len(newFiles) > 0 {
+			if e := tx.CreateInBatches(&newFiles, 100).Error; e != nil {
+				return e
+			}
+		}
+		groups := []repository.ItemIconGroup{}
+		items := []repository.ItemIcon{}
+		for _, g := range req.Groups {
+			if strings.TrimSpace(g.Title) == "" {
+				continue
+			}
+			var target repository.ItemIconGroup
+			e := tx.Where("space_id=? AND title=?", id, g.Title).First(&target).Error
+			if e == gorm.ErrRecordNotFound {
+				target = repository.ItemIconGroup{Title: g.Title, UserId: user.ID, SpaceID: id, Sort: 9999}
+				if e = tx.Create(&target).Error; e != nil {
+					return e
+				}
+			} else if e != nil {
+				return e
+			}
+			groups = append(groups, target)
+			for _, b := range g.Items {
+				if strings.TrimSpace(b.URL) == "" {
+					continue
+				}
+				icon := b.Icon
+				if b.UploadKey != "" {
+					var exists bool
+					_, exists = icons[b.UploadKey]
+					if !exists {
+						return fmt.Errorf("invalid uploadKey")
+					}
+					icon = icons[b.UploadKey]
+				}
+				if icon.ItemType == 0 {
+					icon.ItemType = 4
+				}
+				item := repository.ItemIcon{Title: limitTitle(b.Title), Url: b.URL, OpenMethod: 2, ItemIconGroupId: int(target.ID), UserId: user.ID, SpaceID: id, Icon: icon}
+				ensureItemIcon(&item)
+				data, _ := json.Marshal(icon)
+				item.IconJson = string(data)
+				items = append(items, item)
+			}
+		}
+		if len(items) > 0 {
+			return tx.CreateInBatches(&items, 100).Error
+		}
+		return nil
+	})
+	if err != nil {
+		response.ErrorDatabase(c, err.Error())
+		return
+	}
+	response.SuccessData(c, gin.H{"files": icons})
 }
 
 func (r *SpaceRouter) ExportBookmarks(c *gin.Context) {
@@ -209,10 +369,11 @@ func (r *SpaceRouter) ImportBookmarks(c *gin.Context) {
 				if strings.TrimSpace(imported.URL) == "" {
 					continue
 				}
-				icon := repository.ItemIconIconInfo{ItemType: 4, BackgroundColor: "#2a2a2a6b"}
-				data, _ := json.Marshal(icon)
-				item := repository.ItemIcon{IconJson: string(data), Title: limitTitle(imported.Title), Url: imported.URL, OpenMethod: 2, ItemIconGroupId: int(target.ID), UserId: user.ID, SpaceID: id}
-				item.Icon = icon
+				item := repository.ItemIcon{Title: limitTitle(imported.Title), Url: imported.URL, OpenMethod: 2, ItemIconGroupId: int(target.ID), UserId: user.ID, SpaceID: id}
+				item.Icon = imported.Icon
+				if item.Icon.ItemType == 0 {
+					item.Icon.ItemType = 4
+				}
 				ensureItemIcon(&item)
 				iconData, _ := json.Marshal(item.Icon)
 				item.IconJson = string(iconData)

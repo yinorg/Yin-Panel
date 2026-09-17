@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { NButton, NCard, NInput, NList, NListItem, NModal, NProgress, NSelect, NSpace, useMessage } from 'naive-ui'
-import { addMember, addOIDCGroup, clearSpace, copySpace, createGroup, createSpace, deleteGroup, deleteOIDCGroup, getGroups, getMembers, getOIDCGroups, getPublicConfig, getSpaces, importBookmarks, renameSpace, setPublicConfig, spaceDisplayName, updateGroup, updateMember, type Space, type SpaceMember } from '../../../api/panel/space'
+import { addMember, addOIDCGroup, clearSpace, copySpace, createGroup, createSpace, deleteGroup, deleteOIDCGroup, getGroups, getMembers, getOIDCGroups, getPublicConfig, getSpaces, renameSpace, setPublicConfig, spaceDisplayName, updateGroup, updateMember, type Space, type SpaceMember } from '../../../api/panel/space'
 import { useAuthStore } from '../../../store'
 import { t } from '../../../locales'
 import { clearSpaceCache } from '@/utils/spaceCache'
+import { fetchIconsFromExtension, getIconByUrl, iconFileFromBytes, isIconExtensionAvailable } from '@/utils/itemIcon'
+import { importBookmarksBatch } from '@/api/panel/space'
 
 const message = useMessage()
 const authStore = useAuthStore()
@@ -29,9 +31,65 @@ const bookmarkPreview = ref<any[] | null>(null)
 const importing = ref(false); const importProgress = ref(0)
 const bookmarkFileInput = ref<HTMLInputElement | null>(null)
 function invalidateSpaceCache(spaceId: number) { clearSpaceCache(spaceId, authStore.userInfo?.id) }
+function createTextIcon(title: string): Panel.ItemIcon {
+  const chinese = title.match(/[\u3400-\u9fff]/g)?.join('').slice(0, 5) || ''
+  const english = title.match(/[A-Za-z]/g)?.join('').slice(0, 8) || ''
+  return { itemType: 1, text: chinese || english || title.trim().slice(0, 5) || '?', backgroundColor: '#2a2a2a6b' }
+}
+async function enrichBookmarkIcons(groups: any[], onProgress: (completed: number) => void) {
+  const items = groups.flatMap(group => group.items)
+  let nextIndex = 0; const uploads = new Map<string, File>()
+  let completed = 0
+  const extensionResults = await (await isIconExtensionAvailable() ? fetchIconsFromExtension(items.map(item => item.url)) : Promise.resolve(null))
+  const extensionIcons = new Map((extensionResults || []).map(item => [item.url, item]))
+  const worker = async () => {
+    while (nextIndex < items.length) {
+      const item = items[nextIndex++]
+      try {
+        const fetched = await iconFileFromBytes(extensionIcons.get(item.url)!)
+        if (fetched) { const key = `${fetched.hash}${fetched.ext}`; uploads.set(key, fetched.file); item.uploadKey = key; item.icon = { itemType: 2, fileName: fetched.file.name } }
+        else item.icon = await getIconByUrl(item.url) || createTextIcon(item.title)
+      } catch {
+        item.icon = createTextIcon(item.title)
+      } finally {
+        onProgress(++completed)
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(1000, items.length) }, () => worker()))
+  return uploads
+}
 function exportBookmarks() { if (!selectedSpaceId.value) return; fetch(`/api/spaces/${selectedSpaceId.value}/bookmarks/export`, { headers: { Authorization: `Bearer ${authStore.token}` } }).then(r => r.blob()).then(blob => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `space-${selectedSpaceId.value}-bookmarks.html`; a.click(); URL.revokeObjectURL(a.href) }) }
 function previewBookmarks(event: Event) { const file = (event.target as HTMLInputElement).files?.[0]; if (!file) return; file.text().then(text => { const doc = new DOMParser().parseFromString(text, 'text/html'); const groups: any[] = []; doc.querySelectorAll('h3').forEach(h3 => { const group: any = { title: h3.textContent?.trim() || '未命名分组', items: [] }; let node = h3.parentElement?.nextElementSibling; while (node) { node.querySelectorAll?.('a').forEach((a: HTMLAnchorElement) => group.items.push({ title: a.textContent?.trim() || a.href, url: a.href })); node = node.nextElementSibling } groups.push(group) }); bookmarkPreview.value = groups }) }
-function confirmImport() { if (!selectedSpaceId.value || !bookmarkPreview.value || importing.value) return; const count = bookmarkPreview.value.reduce((sum, group) => sum + group.items.length, 0); if (count > 2000 && !window.confirm(t('spaceManage.importConfirm', { count }))) return; if (count > 2000 && !window.confirm(t('spaceManage.importConfirmAgain'))) return; importing.value = true; importProgress.value = 15; const timer = window.setInterval(() => { if (importProgress.value < 90) importProgress.value += 5 }, 500); importBookmarks(selectedSpaceId.value, { groups: bookmarkPreview.value }).then(({ code }) => { if (code === 0) { invalidateSpaceCache(selectedSpaceId.value!); importProgress.value = 100; message.success(t('spaceManage.importSuccess')); bookmarkPreview.value = null; loadGroups(selectedSpaceId.value!) } }).finally(() => { window.clearInterval(timer); importing.value = false; importProgress.value = 0 }) }
+async function confirmImport() {
+  if (!selectedSpaceId.value || !bookmarkPreview.value || importing.value) return
+  const count = bookmarkPreview.value.reduce((sum, group) => sum + group.items.length, 0)
+  if (count > 2000 && !window.confirm(t('spaceManage.importConfirm', { count }))) return
+  if (count > 2000 && !window.confirm(t('spaceManage.importConfirmAgain'))) return
+  importing.value = true
+  importProgress.value = 5
+  try {
+    importProgress.value = count ? 10 : 80
+    const uploads = await enrichBookmarkIcons(bookmarkPreview.value, completed => {
+      importProgress.value = 10 + Math.round(completed / Math.max(count, 1) * 70)
+    })
+    importProgress.value = 85
+    const form = new FormData(); form.append('bookmarks', JSON.stringify({ groups: bookmarkPreview.value }))
+    uploads.forEach((file, key) => form.append(key, file, file.name))
+    const { code } = await importBookmarksBatch(selectedSpaceId.value, form)
+    if (code === 0) {
+      invalidateSpaceCache(selectedSpaceId.value)
+      importProgress.value = 100
+      message.success(t('spaceManage.importSuccess'))
+      bookmarkPreview.value = null
+      loadGroups(selectedSpaceId.value)
+      emit('spaces-changed')
+    }
+  } finally {
+    importing.value = false
+    importProgress.value = 0
+  }
+}
 function clearCurrentSpace() { if (!selectedSpaceId.value || !window.confirm(t('spaceManage.clearConfirm'))) return; clearSpace(selectedSpaceId.value).then(({ code }) => { if (code === 0) { invalidateSpaceCache(selectedSpaceId.value!); message.success(t('spaceManage.clearSuccess')); loadGroups(selectedSpaceId.value!) } }) }
 function load() { getSpaces<{ code: number; data: Space[] }>().then(({ data }) => { spaces.value = data || []; if (spaces.value.length && !selectedSpaceId.value) selectedSpaceId.value = spaces.value[0].id; spaces.value.forEach(space => loadGroups(space.id)); if (selectedSpaceId.value) loadDetails(selectedSpaceId.value) }) }
 function loadGroups(spaceId: number) { getGroups<{ code: number; data: { id: number; title: string }[] }>(spaceId).then(({ data }) => { groups.value[spaceId] = data || [] }) }
