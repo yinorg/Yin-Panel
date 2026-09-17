@@ -36,6 +36,15 @@ func (d *SQLiteConfig) Connect() (db *gorm.DB, err error) {
 		if err != nil {
 			return
 		}
+		sqlDB, dbErr := db.DB()
+		if dbErr != nil {
+			err = dbErr
+			return
+		}
+		// SQLite has a single writer. Serialize application writes so concurrent
+		// favicon uploads wait instead of returning "database is locked".
+		sqlDB.SetMaxOpenConns(1)
+		sqlDB.SetMaxIdleConns(1)
 		// WAL keeps readers independent from the single SQLite writer and makes
 		// recovery after an interrupted commit more reliable.
 		for _, pragma := range []string{

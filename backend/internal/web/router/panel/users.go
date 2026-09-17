@@ -113,8 +113,17 @@ func (a UsersRouter) Update(c *gin.Context) {
 		return
 	}
 
+	existingUser, err := global.UserRepo.Get(user.ID)
+	if err != nil {
+		response.ErrorParamFomat(c, err.Error())
+		return
+	}
+
 	if user.Password == "" {
-		user.Password = "-" // 修改不允许修改密码，为了验证通过
+		// An empty password means the administrator is only editing profile
+		// fields. Preserve the existing password instead of persisting the
+		// validation placeholder.
+		user.Password = existingUser.Password
 	}
 
 	if errMsg, err := base.ValidateInputStruct(user); err != nil {
@@ -135,16 +144,9 @@ func (a UsersRouter) Update(c *gin.Context) {
 		return
 	}
 
-	// 密码不为默认“-”空，修改密码
-	if user.Password != "-" {
+	// Only encrypt a newly supplied plaintext password.
+	if user.Password != existingUser.Password {
 		user.Password = util.PasswordEncryption(user.Password)
-	}
-
-	// 验证账号是否存在
-	_, err := global.UserRepo.Get(user.ID)
-	if err != nil {
-		response.ErrorParamFomat(c, err.Error())
-		return
 	}
 
 	user.Token = "" // 修改资料就重置token

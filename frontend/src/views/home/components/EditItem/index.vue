@@ -3,11 +3,12 @@ import { computed, defineEmits, defineProps, ref, watch } from 'vue'
 import type { FormInst, FormRules } from 'naive-ui'
 import { NButton, NForm, NFormItem, NGrid, NGridItem, NInput, NInputGroup, NModal, NSelect, useMessage } from 'naive-ui'
 import IconEditor from './IconEditor.vue'
-import { edit, getSiteFavicon } from '../../../../api/panel/itemIcon'
+import { edit } from '../../../../api/panel/itemIcon'
 import { getGroups } from '../../../../api/panel/space'
 import { createItem, updateItem } from '../../../../api/panel/space'
 import { t } from '../../../../locales'
 import { useAuthStore } from '../../../../store'
+import { getIconByUrl as fetchIconByUrl } from '@/utils/itemIcon'
 
 interface Props {
   visible: boolean
@@ -158,24 +159,15 @@ function createTextIcon(title: string): Panel.ItemIcon {
 
 async function getIconByUrl(url: string, loadingIndex: number, showError = true): Promise<boolean> {
   getIconLoading.value[loadingIndex] = true
-  try {
-    const { code, data } = await getSiteFavicon<{ iconUrl: string, fileName: string }>(url)
-    if (code === 0) {
-      model.value.icon = {
-        itemType: 2,
-        src: data.iconUrl,
-        fileName: data.fileName,
-      }
-    }
-    else {
-      if (showError) ms.error(t('iconItem.geticonFail'))
-    }
+  const icon = await fetchIconByUrl(url)
+  if (icon) {
+    model.value.icon = icon
   }
-  catch (error) {
-    if (showError) ms.error(t('iconItem.geticonFail'))
+  else if (showError) {
+    ms.error(t('iconItem.geticonFail'))
   }
   getIconLoading.value[loadingIndex] = false
-  return !!model.value.icon?.src
+  return !!icon
 }
 
 watch(() => props.visible, (newValue) => {
