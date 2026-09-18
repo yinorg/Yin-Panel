@@ -251,6 +251,27 @@ func (s *UserService) findOrCreateOAuthUser(provider string, providerConfig conf
 		return nil, errors.New("OAuth provider did not return a verified email")
 	}
 
+	// OAuthIdentity is the canonical identity key. Check it before the legacy
+	// fields on user so repeated logins cannot insert the same identity twice.
+	if repository.Db != nil {
+		var identity repository.OAuthIdentity
+		identityErr := repository.Db.Where("provider = ? AND subject = ?", provider, identifier).First(&identity).Error
+		if identityErr == nil {
+			var linked repository.User
+			if err := repository.Db.First(&linked, identity.UserID).Error; err != nil {
+				return nil, err
+			}
+			if linked.Status != 1 {
+				return nil, errors.New("user account is disabled or inactive")
+			}
+			s.syncOIDCGroups(linked.ID, provider, userInfo)
+			return &linked, nil
+		}
+		if !errors.Is(identityErr, gorm.ErrRecordNotFound) {
+			return nil, identityErr
+		}
+	}
+
 	// Check if user already exists
 	user, err := s.userRepo.GetByOAuthID(provider, identifier)
 	if err == nil {
@@ -272,7 +293,8 @@ func (s *UserService) findOrCreateOAuthUser(provider string, providerConfig conf
 	if err == nil {
 		identity := &repository.OAuthIdentity{UserID: user.ID, Provider: provider, Subject: identifier, Email: email}
 		if repository.Db != nil {
-			if err := repository.Db.Create(identity).Error; err != nil {
+			if err := repository.Db.Where("provider = ? AND subject = ?", provider, identifier).
+				Assign(map[string]any{"user_id": user.ID, "email": email}).FirstOrCreate(identity).Error; err != nil {
 				return nil, err
 			}
 		}
