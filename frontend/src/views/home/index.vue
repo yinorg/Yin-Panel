@@ -97,18 +97,22 @@ function openPage(openMethod: number, url: string, title?: string) {
   }
 }
 
+function getItemOpenUrl(item: Panel.ItemInfo, forceWan = false): string {
+  const isLan = panelState.networkMode === PanelStateNetworkModeEnum.lan
+  if (!forceWan && isLan)
+    return item.lanUrl || item.url
+  const userAgent = typeof navigator === 'undefined' ? '' : navigator.userAgent
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|Tablet/i.test(userAgent)
+  return isMobile && item.mobileUrl ? item.mobileUrl : item.url
+}
+
 function handleItemClick(itemGroupIndex: number, item: Panel.ItemInfo) {
   if (items.value[itemGroupIndex] && items.value[itemGroupIndex].sortStatus) {
     handleEditItem(item)
     return
   }
 
-  let jumpUrl = ''
-
-  if (item)
-    jumpUrl = (panelState.networkMode === PanelStateNetworkModeEnum.lan ? item.lanUrl : item.url) as string
-  if (item.lanUrl === '')
-    jumpUrl = item.url
+  const jumpUrl = getItemOpenUrl(item)
 
   openPage(item.openMethod, jumpUrl, item.title)
 }
@@ -290,16 +294,14 @@ function updateItemIconGroupByNet(itemIconGroupIndex: number, itemIconGroupId: n
 function handleRightMenuSelect(key: string | number) {
   dropdownShow.value = false
   // console.log(currentRightSelectItem, key)
-  let jumpUrl = panelState.networkMode === PanelStateNetworkModeEnum.lan ? currentRightSelectItem.value?.lanUrl : currentRightSelectItem.value?.url
-  if (currentRightSelectItem.value?.lanUrl === '')
-    jumpUrl = currentRightSelectItem.value.url
+  const jumpUrl = currentRightSelectItem.value ? getItemOpenUrl(currentRightSelectItem.value) : ''
   switch (key) {
     case 'newWindows':
       window.open(jumpUrl)
       break
     case 'openWanUrl':
       if (currentRightSelectItem.value)
-        openPage(currentRightSelectItem.value?.openMethod, currentRightSelectItem.value?.url, currentRightSelectItem.value?.title)
+        openPage(currentRightSelectItem.value.openMethod, getItemOpenUrl(currentRightSelectItem.value, true), currentRightSelectItem.value.title)
       break
     case 'openLanUrl':
       if (currentRightSelectItem.value && currentRightSelectItem.value.lanUrl)

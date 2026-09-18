@@ -222,6 +222,8 @@
     "inputIconUrlOrUpload": "Enter icon URL or upload",
     "lanUrl": "LAN URL",
     "lanUrlInputPlaceholder": "http(s):// (LAN mode, will redirect to this address)",
+    "mobileUrl": "Mobile URL",
+    "mobileUrlInputPlaceholder": "http(s):// (mobile devices in WAN mode only)",
     "newWindowOpen": "In neuem Fenster öffnen",
     "onlineIcon": "Online icon",
     "onlineIconLibrary": "Online icon library",

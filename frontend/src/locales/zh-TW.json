@@ -222,6 +222,8 @@
     "inputIconUrlOrUpload": "輸入圖標地址或上傳",
     "lanUrl": "內網地址",
     "lanUrlInputPlaceholder": "http(s)://（內網模式，會跳轉該地址）",
+    "mobileUrl": "手機版地址",
+    "mobileUrlInputPlaceholder": "http(s)://（僅手機訪問且 WAN 模式生效）",
     "newWindowOpen": "新窗口打開",
     "onlineIcon": "在線圖標",
     "onlineIconLibrary": "在線圖標庫",

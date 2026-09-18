@@ -37,6 +37,7 @@ func (r *SpaceRouter) InitRouter(router *gin.RouterGroup) {
 	g.GET("/:spaceId/groups", r.Groups)
 	g.GET("/:spaceId/items", r.Items)
 	g.POST("/:spaceId/items", r.CreateItem)
+	g.POST("/:spaceId/items/with-icon", r.CreateItemWithIcon)
 	g.PUT("/:spaceId/items/:itemId", r.UpdateItem)
 	g.POST("/:spaceId/items/:itemId/update", r.UpdateItem)
 	g.POST("/:spaceId/items/sort", r.SortItems)
@@ -1039,6 +1040,97 @@ func (r *SpaceRouter) CreateItem(c *gin.Context) {
 	}
 	response.SuccessData(c, item)
 }
+
+func (r *SpaceRouter) CreateItemWithIcon(c *gin.Context) {
+	user, ok := base.GetCurrentUserInfo(c)
+	if !ok {
+		response.Error(c, "not logged in")
+		return
+	}
+	id, err := spaceID(c)
+	if err != nil || !canEditSpace(user.ID, id) {
+		response.ErrorNoAccess(c)
+		return
+	}
+	var item repository.ItemIcon
+	if err := json.Unmarshal([]byte(c.PostForm("item")), &item); err != nil || item.ItemIconGroupId == 0 || !validItemTitle(item.Title) {
+		response.ErrorParamFomat(c, "invalid item or group")
+		return
+	}
+	var group repository.ItemIconGroup
+	if repository.Db.Where("id = ? AND space_id = ?", item.ItemIconGroupId, id).First(&group).Error != nil {
+		response.ErrorDataNotFound(c)
+		return
+	}
+	item.UserId, item.SpaceID = user.ID, id
+
+	var fileName string
+	if fh, e := c.FormFile("imgfile"); e == nil {
+		if fh.Size > 5*1024*1024 {
+			response.ErrorParamFomat(c, "icon too large")
+			return
+		}
+		ext := strings.ToLower(path.Ext(fh.Filename))
+		if !map[string]bool{".png": true, ".jpg": true, ".jpeg": true, ".gif": true, ".webp": true, ".svg": true, ".ico": true}[ext] {
+			response.ErrorParamFomat(c, "unsupported icon")
+			return
+		}
+		f, e := fh.Open()
+		if e != nil {
+			response.ErrorParamFomat(c, "invalid file")
+			return
+		}
+		h := sha256.New()
+		_, e = io.Copy(h, io.LimitReader(f, 5*1024*1024+1))
+		f.Close()
+		if e != nil {
+			response.ErrorParamFomat(c, "invalid file")
+			return
+		}
+		fileName = hex.EncodeToString(h.Sum(nil)) + ext
+		f, e = fh.Open()
+		if e != nil {
+			response.ErrorParamFomat(c, "invalid file")
+			return
+		}
+		exists, existsErr := global.Storage.Exists(c.Request.Context(), fileName)
+		if existsErr != nil || !exists {
+			e = global.Storage.Upload(c.Request.Context(), f, fileName)
+		}
+		f.Close()
+		if e != nil {
+			response.ErrorByCode(c, constant.CodeUploadFailed)
+			return
+		}
+		item.Icon = repository.ItemIconIconInfo{ItemType: 2, Src: urlPrefix + fileName, FileName: fileName}
+	}
+	if fileName == "" {
+		ensureItemIcon(&item)
+	}
+	iconJSON, err := json.Marshal(item.Icon)
+	if err != nil {
+		response.ErrorParamFomat(c, "invalid icon")
+		return
+	}
+	item.IconJson = string(iconJSON)
+	err = repository.Db.Transaction(func(tx *gorm.DB) error {
+		if fileName != "" {
+			var count int64
+			if e := tx.Model(&repository.File{}).Where("user_id = ? AND file_name = ?", user.ID, fileName).Count(&count).Error; e != nil {
+				return e
+			}
+			if count == 0 && tx.Create(&repository.File{UserId: user.ID, FileName: fileName}).Error != nil {
+				return fmt.Errorf("create file record")
+			}
+		}
+		return tx.Create(&item).Error
+	})
+	if err != nil {
+		response.ErrorDatabase(c, err.Error())
+		return
+	}
+	response.SuccessData(c, item)
+}
 func (r *SpaceRouter) UpdateItem(c *gin.Context) {
 	user, ok := base.GetCurrentUserInfo(c)
 	if !ok {
@@ -1079,7 +1171,7 @@ func (r *SpaceRouter) UpdateItem(c *gin.Context) {
 		response.ErrorParamFomat(c, "invalid icon")
 		return
 	}
-	if err := repository.Db.Model(&repository.ItemIcon{}).Where("id = ? AND space_id = ?", iid, id).Updates(map[string]any{"icon_json": string(iconJSON), "title": input.Title, "url": input.Url, "lan_url": input.LanUrl, "description": input.Description, "open_method": input.OpenMethod, "sort": input.Sort, "item_icon_group_id": input.ItemIconGroupId}).Error; err != nil {
+	if err := repository.Db.Model(&repository.ItemIcon{}).Where("id = ? AND space_id = ?", iid, id).Updates(map[string]any{"icon_json": string(iconJSON), "title": input.Title, "url": input.Url, "lan_url": input.LanUrl, "mobile_url": input.MobileUrl, "description": input.Description, "open_method": input.OpenMethod, "sort": input.Sort, "item_icon_group_id": input.ItemIconGroupId}).Error; err != nil {
 		response.ErrorDatabase(c, err.Error())
 		return
 	}

@@ -10,6 +10,7 @@ declare namespace Panel {
         url: string
         sort?: number
         lanUrl?: string
+        mobileUrl?: string
         description?: string
         openMethod: number
         itemIconGroupId ?:number

@@ -17,6 +17,22 @@ export async function getIconByUrl(url: string): Promise<Panel.ItemIcon | null> 
   }
 }
 
+export async function getAutomaticIconFileByUrl(url: string): Promise<File | null> {
+  try {
+    if (await isIconExtensionAvailable()) {
+      const results = await fetchIconsFromExtension([url])
+      const file = await iconFileFromBytes(results?.[0])
+      if (file) return file.file
+    }
+  }
+  catch { /* Extension unavailable. */ }
+  return null
+}
+
+export async function getAutomaticIconByUrl(url: string): Promise<Panel.ItemIcon | null> {
+  return getIconByUrl(url)
+}
+
 export async function fetchIconFile(url: string): Promise<{ file: File; hash: string; ext: string } | null> {
   try {
     const page = new URL(url)

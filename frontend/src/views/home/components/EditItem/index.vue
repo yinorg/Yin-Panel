@@ -5,10 +5,10 @@ import { NButton, NForm, NFormItem, NGrid, NGridItem, NInput, NInputGroup, NModa
 import IconEditor from './IconEditor.vue'
 import { edit } from '../../../../api/panel/itemIcon'
 import { getGroups } from '../../../../api/panel/space'
-import { createItem, updateItem } from '../../../../api/panel/space'
+import { createItem, createItemWithIcon, updateItem } from '../../../../api/panel/space'
 import { t } from '../../../../locales'
 import { useAuthStore } from '../../../../store'
-import { getIconByUrl as fetchIconByUrl } from '@/utils/itemIcon'
+import { getAutomaticIconFileByUrl, getAutomaticIconByUrl, getIconByUrl as fetchIconByUrl } from '@/utils/itemIcon'
 
 interface Props {
   visible: boolean
@@ -32,6 +32,7 @@ const restoreDefault: Panel.Info = {
   title: '',
   url: '',
   lanUrl: '',
+  mobileUrl: '',
   description: '',
   openMethod: 2,
 }
@@ -90,9 +91,15 @@ const show = computed({
 async function editApi() {
   submitLoading.value = true
   try {
-    if (!model.value.id && !model.value.icon?.src && model.value.url) {
-      const fetched = await getIconByUrl(model.value.url, 0, false)
-      if (!fetched) {
+    const isAutomaticIcon = !model.value.icon || model.value.icon.itemType === 4
+    let automaticIconFile: File | null = null
+    if (!model.value.id && isAutomaticIcon && model.value.url) {
+      automaticIconFile = await getAutomaticIconFileByUrl(model.value.url)
+      if (!automaticIconFile) {
+        const fetched = await getAutomaticIconByUrl(model.value.url)
+        if (fetched) model.value.icon = fetched
+      }
+      if (!automaticIconFile && !model.value.icon?.src) {
         const libraryIcon = await getPublicLibraryIcon(model.value.title)
         if (libraryIcon)
           model.value.icon = libraryIcon
@@ -101,7 +108,7 @@ async function editApi() {
         model.value.icon = createTextIcon(model.value.title)
     }
     const { code, data, msg } = await (props.spaceId
-      ? (model.value.id ? updateItem<Panel.ItemInfo>(props.spaceId, model.value.id, model.value) : createItem<Panel.ItemInfo>(props.spaceId, model.value))
+      ? (model.value.id ? updateItem<Panel.ItemInfo>(props.spaceId, model.value.id, model.value) : automaticIconFile ? createItemWithIcon<Panel.ItemInfo>(props.spaceId, model.value, automaticIconFile) : createItem<Panel.ItemInfo>(props.spaceId, model.value))
       : edit<Panel.ItemInfo>(model.value))
     if (code === 0) {
       show.value = false
@@ -246,6 +253,9 @@ function getGroupListOptions() {
               {{ $t('iconItem.getIcon') }}
             </NButton>
           </NInputGroup>
+        </NFormItem>
+        <NFormItem path="mobileUrl" :label="$t('iconItem.mobileUrl')">
+          <NInput v-model:value="model.mobileUrl" type="text" :maxlength="1000" :placeholder="$t('iconItem.mobileUrlInputPlaceholder')" />
         </NFormItem>
         <NFormItem path="description" :label="$t('common.description')">
           <NInput v-model:value="model.description" type="text" show-count :maxlength="100" />

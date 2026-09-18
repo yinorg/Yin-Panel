@@ -22,6 +22,7 @@ type ItemIcon struct {
 	Title           string           `gorm:"type:varchar(50)" json:"title"`
 	Url             string           `gorm:"type:varchar(1000)" json:"url"`
 	LanUrl          string           `gorm:"type:varchar(1000)" json:"lanUrl"`
+	MobileUrl       string           `gorm:"type:varchar(1000)" json:"mobileUrl"`
 	Description     string           `gorm:"type:varchar(1000)" json:"description"`
 	OpenMethod      int              `gorm:"type:tinyint(1)" json:"openMethod"`
 	Sort            int              `gorm:"type:int(11)" json:"sort"`

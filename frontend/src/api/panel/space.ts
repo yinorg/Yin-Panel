@@ -27,6 +27,12 @@ export function createSpace<T>(name: string) { return post<T>({ url: '/spaces/te
 export function getGroups<T>(spaceId: number) { return get<T>({ url: `/spaces/${spaceId}/groups` }) }
 export function getItems<T>(spaceId: number, groupId?: number, page = 1, pageSize = 50) { return get<T>({ url: `/spaces/${spaceId}/items`, data: { groupId, page, pageSize } }) }
 export function createItem<T>(spaceId: number, data: any) { return post<T>({ url: `/spaces/${spaceId}/items`, data }) }
+export function createItemWithIcon<T>(spaceId: number, item: any, file: File) {
+  const data = new FormData()
+  data.append('item', JSON.stringify(item))
+  data.append('imgfile', file, file.name)
+  return post<T>({ url: `/spaces/${spaceId}/items/with-icon`, data })
+}
 export function updateItem<T>(spaceId: number, id: number, data: any) { return post<T>({ url: `/spaces/${spaceId}/items/${id}/update`, data }) }
 export function deleteItem<T>(spaceId: number, id: number) { return post<T>({ url: `/spaces/${spaceId}/items/${id}/delete` }) }
 export function sortItems<T>(spaceId: number, groupId: number, sortItems: any[]) { return post<T>({ url: `/spaces/${spaceId}/items/sort`, data: { groupId, sortItems } }) }
