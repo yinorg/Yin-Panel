@@ -259,7 +259,16 @@ func (s *UserService) findOrCreateOAuthUser(provider string, providerConfig conf
 		if identityErr == nil {
 			var linked repository.User
 			if err := repository.Db.First(&linked, identity.UserID).Error; err != nil {
-				return nil, err
+				if !errors.Is(err, gorm.ErrRecordNotFound) {
+					return nil, err
+				}
+				// Repair identities left behind by an interrupted account creation.
+				if emailErr := repository.Db.Where("mail = ?", email).First(&linked).Error; emailErr != nil {
+					return nil, err
+				}
+				if updateErr := repository.Db.Model(&identity).Updates(map[string]any{"user_id": linked.ID, "email": email}).Error; updateErr != nil {
+					return nil, updateErr
+				}
 			}
 			if linked.Status != 1 {
 				return nil, errors.New("user account is disabled or inactive")
