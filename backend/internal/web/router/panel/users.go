@@ -79,6 +79,7 @@ func (a UsersRouter) Create(c *gin.Context) {
 func (a UsersRouter) Delete(c *gin.Context) {
 	type Param struct {
 		UserId uint
+		Force  bool `json:"force"`
 	}
 	param := Param{}
 	if err := c.ShouldBindBodyWith(&param, binding.JSON); err != nil {
@@ -88,7 +89,14 @@ func (a UsersRouter) Delete(c *gin.Context) {
 	}
 
 	// 执行用户删除操作，同时获取需要从存储中删除的文件名列表
-	fileNames, err := global.UserRepo.Delete(param.UserId)
+	deleter, ok := global.UserRepo.(interface {
+		DeleteWithSpaces(uint, bool) ([]string, error)
+	})
+	if !ok {
+		response.Error(c, "space-aware user deletion is unavailable")
+		return
+	}
+	fileNames, err := deleter.DeleteWithSpaces(param.UserId, param.Force)
 	if err != nil {
 		response.ErrorDatabase(c, err.Error())
 		return

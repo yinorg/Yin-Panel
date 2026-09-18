@@ -243,6 +243,14 @@ function selectSpace(key: string | number) {
   const selected = spaces.value.find(space => space.id === Number(key))
   if (selected) { activeSpace.value = selected; getList() }
 }
+function togglePanelSide() {
+  if (!activeSpace.value?.pairedSpaceId) return
+  const yin = activeSpace.value
+  const target = yin.side === 'yang'
+    ? spaces.value.find(space => space.id === yin.pairId)
+    : { ...yin, id: yin.pairedSpaceId, name: `${yin.name}-B`, side: 'yang' as const, pairId: yin.id, pairedSpaceId: yin.id }
+  if (target) { activeSpace.value = target; clearCachedSpace(target.id); getList() }
+}
 
 async function refreshCurrentSpace() {
   const authStorage = localStorage.getItem('authStorage')
@@ -575,9 +583,9 @@ function handleAddItem(itemIconGroupId?: number) {
         <!-- 头 -->
         <div class="home-header mx-[auto] w-[80%]">
           <div class="home-header-row flex mx-[auto] items-center justify-center text-white">
-            <div class="logo">
+            <div class="logo cursor-pointer" @click="togglePanelSide">
               <span class="text-2xl md:text-6xl font-bold text-shadow">
-                {{ panelState.panelConfig.logoText }}
+                {{ activeSpace?.side === 'yang' ? 'Yang Panel' : 'Yin-Panel' }}
               </span>
             </div>
             <div class="divider text-base lg:text-2xl mx-[10px]">

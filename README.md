@@ -94,7 +94,7 @@ go test ./...
 go build -o /tmp/yin-panel-build/yin-panel .
 ```
 
-完整的 AI 开发、发布和重启约定见 [AGENT-DEV.md](./AGENT-DEV.md)。
+完整的 AI 开发、发布和重启约定见 [AGENTS.md](./AGENTS.md)。
 
 ## 备份与升级
 
