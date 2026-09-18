@@ -133,8 +133,52 @@ func (r *UserRepo) Create(user *User) error {
 }
 
 func (r *UserRepo) Delete(userId uint) ([]string, error) {
+	return r.DeleteWithSpaces(userId, false)
+}
+
+func (r *UserRepo) DeleteWithSpaces(userId uint, force bool) ([]string, error) {
 	var fileNames []string
 	err := Db.Transaction(func(tx *gorm.DB) error {
+		var owned []Space
+		if err := tx.Where("owner_user_id = ?", userId).Find(&owned).Error; err != nil {
+			return err
+		}
+		for _, space := range owned {
+			if space.Type == SpaceTypeShared && !force {
+				return errors.New("user owns shared spaces; transfer them before deletion")
+			}
+		}
+		spaceIDs := make([]uint, 0, len(owned))
+		for _, space := range owned {
+			spaceIDs = append(spaceIDs, space.ID)
+		}
+		if len(spaceIDs) > 0 {
+			var paired []Space
+			if err := tx.Where("pair_id IN ?", spaceIDs).Find(&paired).Error; err != nil {
+				return err
+			}
+			for _, space := range paired {
+				spaceIDs = append(spaceIDs, space.ID)
+			}
+			if err := tx.Where("space_id IN ?", spaceIDs).Delete(&ItemIcon{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where("space_id IN ?", spaceIDs).Delete(&ItemIconGroup{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where("space_id IN ?", spaceIDs).Delete(&SpaceMember{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where("space_id IN ?", spaceIDs).Delete(&SpaceOIDCGroup{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where("id IN ?", spaceIDs).Delete(&Space{}).Error; err != nil {
+				return err
+			}
+		}
+		if err := tx.Where("user_id = ?", userId).Delete(&OAuthIdentity{}).Error; err != nil {
+			return err
+		}
 		// Get all files of the user before deletion
 		var files []File
 		if err := tx.Where("user_id = ?", userId).Find(&files).Error; err != nil {

@@ -104,13 +104,22 @@ func (s *UserService) CreateUser(user *repository.User) error {
 	}
 
 	personalSpace := repository.Space{}
+	yang := repository.Space{}
 	if repository.Db != nil {
 		personalSpace = repository.Space{
 			Type:        repository.SpaceTypePersonal,
 			Name:        user.Name,
 			OwnerUserID: user.ID,
+			Side:        "yin",
 		}
 		if err := repository.Db.Create(&personalSpace).Error; err != nil {
+			return err
+		}
+		if err := repository.Db.Model(&personalSpace).Update("pair_id", personalSpace.ID).Error; err != nil {
+			return err
+		}
+		yang = repository.Space{Type: repository.SpaceTypePersonal, Name: user.Name + "-B", OwnerUserID: user.ID, PairID: personalSpace.ID, Side: "yang"}
+		if err := repository.Db.Create(&yang).Error; err != nil {
 			return err
 		}
 		member := repository.SpaceMember{
@@ -120,6 +129,9 @@ func (s *UserService) CreateUser(user *repository.User) error {
 			JoinedAt: time.Now(),
 		}
 		if err := repository.Db.Create(&member).Error; err != nil {
+			return err
+		}
+		if err := repository.Db.Create(&repository.SpaceMember{SpaceID: yang.ID, UserID: user.ID, Role: repository.SpaceRoleAdmin, JoinedAt: time.Now()}).Error; err != nil {
 			return err
 		}
 	}
@@ -133,6 +145,11 @@ func (s *UserService) CreateUser(user *repository.User) error {
 
 	if err := s.itemGroupRepo.Save(&defaultGroup); err != nil {
 		return err
+	}
+	if repository.Db != nil {
+		if err := s.itemGroupRepo.Save(&repository.ItemIconGroup{Title: "APP", UserId: user.ID, SpaceID: yang.ID, Icon: "material-symbols:ad-group-outline"}); err != nil {
+			return err
+		}
 	}
 
 	return nil

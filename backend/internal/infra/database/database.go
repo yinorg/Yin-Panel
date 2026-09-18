@@ -100,7 +100,232 @@ func initDatabase(db *gorm.DB) (err error) {
 	if err := backfillPanelSpaces(db); err != nil {
 		return err
 	}
+	if err := mergeDuplicatePersonalSpaces(db); err != nil {
+		return err
+	}
+	if err := cleanupOrphanSpaceData(db); err != nil {
+		return err
+	}
+	if err := ensureSpacePairs(db); err != nil {
+		return err
+	}
 	return RunMigration(db)
+}
+
+func cleanupOrphanSpaceData(db *gorm.DB) error {
+	var groups []repository.ItemIconGroup
+	if err := db.Find(&groups).Error; err != nil {
+		return err
+	}
+	for _, group := range groups {
+		var count int64
+		if err := db.Model(&repository.Space{}).Where("id = ?", group.SpaceID).Count(&count).Error; err != nil {
+			return err
+		}
+		if count == 0 {
+			if err := db.Where("item_icon_group_id = ?", group.ID).Delete(&repository.ItemIcon{}).Error; err != nil {
+				return err
+			}
+			if err := db.Delete(&group).Error; err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// mergeDuplicatePersonalSpaces keeps the oldest personal Yin space and folds
+// later accidental accounts/spaces into its pair before normal pairing runs.
+func mergeDuplicatePersonalSpaces(db *gorm.DB) error {
+	var spaces []repository.Space
+	if err := db.Where("type = ? AND (side = ? OR side = '' OR side IS NULL)", repository.SpaceTypePersonal, "yin").Order("owner_user_id, created_at, id").Find(&spaces).Error; err != nil {
+		return err
+	}
+	canonical := make(map[uint]repository.Space)
+	return db.Transaction(func(tx *gorm.DB) error {
+		for _, duplicate := range spaces {
+			keep, ok := canonical[duplicate.OwnerUserID]
+			if !ok {
+				canonical[duplicate.OwnerUserID] = duplicate
+				continue
+			}
+			if err := mergeSpaceData(tx, keep.ID, duplicate.ID); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+func mergeSpaceData(tx *gorm.DB, targetID, duplicateID uint) error {
+	var groups []repository.ItemIconGroup
+	if err := tx.Where("space_id = ?", duplicateID).Find(&groups).Error; err != nil {
+		return err
+	}
+	for _, group := range groups {
+		oldID := group.ID
+		group.ID = 0
+		group.SpaceID = targetID
+		var count int64
+		if err := tx.Model(&repository.ItemIconGroup{}).Where("space_id = ? AND title = ?", targetID, group.Title).Count(&count).Error; err != nil {
+			return err
+		}
+		if count > 0 {
+			group.Title = group.Title + " (merged)"
+		}
+		if err := tx.Create(&group).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&repository.ItemIcon{}).Where("space_id = ? AND item_icon_group_id = ?", duplicateID, oldID).Updates(map[string]any{"space_id": targetID, "item_icon_group_id": group.ID}).Error; err != nil {
+			return err
+		}
+		if err := tx.Delete(&repository.ItemIconGroup{}, oldID).Error; err != nil {
+			return err
+		}
+	}
+	if err := tx.Model(&repository.ItemIcon{}).Where("space_id = ?", duplicateID).Update("space_id", targetID).Error; err != nil {
+		return err
+	}
+	var members []repository.SpaceMember
+	if err := tx.Where("space_id = ?", duplicateID).Find(&members).Error; err != nil {
+		return err
+	}
+	for _, member := range members {
+		var existing repository.SpaceMember
+		err := tx.Where("space_id = ? AND user_id = ?", targetID, member.UserID).First(&existing).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			member.ID = 0
+			member.SpaceID = targetID
+			if err := tx.Create(&member).Error; err != nil {
+				return err
+			}
+		} else if err != nil {
+			return err
+		} else if roleRank(member.Role) > roleRank(existing.Role) {
+			if err := tx.Model(&existing).Updates(map[string]any{"role": member.Role, "source": member.Source}).Error; err != nil {
+				return err
+			}
+		}
+		if err := tx.Where("space_id = ? AND user_id = ?", duplicateID, member.UserID).Delete(&repository.SpaceMember{}).Error; err != nil {
+			return err
+		}
+	}
+	var rules []repository.SpaceOIDCGroup
+	if err := tx.Where("space_id = ?", duplicateID).Find(&rules).Error; err != nil {
+		return err
+	}
+	for _, rule := range rules {
+		var existing repository.SpaceOIDCGroup
+		err := tx.Where("space_id = ? AND provider = ? AND group_name = ?", targetID, rule.Provider, rule.GroupName).First(&existing).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			rule.ID = 0
+			rule.SpaceID = targetID
+			if err := tx.Create(&rule).Error; err != nil {
+				return err
+			}
+		} else if err != nil {
+			return err
+		} else if roleRank(rule.Role) > roleRank(existing.Role) {
+			if err := tx.Model(&existing).Update("role", rule.Role).Error; err != nil {
+				return err
+			}
+		}
+	}
+	if err := tx.Where("space_id = ?", duplicateID).Delete(&repository.SpaceOIDCGroup{}).Error; err != nil {
+		return err
+	}
+	var duplicate, target repository.Space
+	if err := tx.First(&duplicate, duplicateID).Error; err != nil {
+		return err
+	}
+	if err := tx.First(&target, targetID).Error; err != nil {
+		return err
+	}
+	updates := map[string]any{}
+	if target.PublicID == nil && duplicate.PublicID != nil {
+		updates["public_id"] = duplicate.PublicID
+	}
+	if !target.PublicEnabled && duplicate.PublicEnabled {
+		updates["public_enabled"] = true
+	}
+	if target.PublicMode == "direct" && duplicate.PublicMode != "direct" {
+		updates["public_mode"] = duplicate.PublicMode
+	}
+	if target.PublicCodeHash == "" && duplicate.PublicCodeHash != "" {
+		updates["public_code_hash"] = duplicate.PublicCodeHash
+	}
+	if len(updates) > 0 {
+		if err := tx.Model(&target).Updates(updates).Error; err != nil {
+			return err
+		}
+	}
+	var duplicateYang repository.Space
+	if tx.Where("pair_id = ? AND side = ?", duplicateID, "yang").First(&duplicateYang).Error == nil {
+		var targetYang repository.Space
+		if tx.Where("pair_id = ? AND side = ?", targetID, "yang").First(&targetYang).Error == nil {
+			if err := mergeSpaceData(tx, targetYang.ID, duplicateYang.ID); err != nil {
+				return err
+			}
+			if err := tx.Delete(&repository.Space{}, duplicateYang.ID).Error; err != nil {
+				return err
+			}
+		}
+	}
+	return tx.Delete(&repository.Space{}, duplicateID).Error
+}
+
+func roleRank(role string) int {
+	switch role {
+	case repository.SpaceRoleAdmin:
+		return 3
+	case repository.SpaceRoleEditor:
+		return 2
+	case repository.SpaceRoleViewer:
+		return 1
+	default:
+		return 0
+	}
+}
+
+// ensureSpacePairs upgrades legacy spaces in place. PairID always points at
+// the Yin row, so the original space ID remains stable for existing clients.
+func ensureSpacePairs(db *gorm.DB) error {
+	var spaces []repository.Space
+	if err := db.Where("side = ? OR side = '' OR side IS NULL", "yin").Find(&spaces).Error; err != nil {
+		return err
+	}
+	for _, yin := range spaces {
+		if yin.PairID == 0 {
+			if err := db.Model(&repository.Space{}).Where("id = ?", yin.ID).Updates(map[string]any{"pair_id": yin.ID, "side": "yin"}).Error; err != nil {
+				return err
+			}
+		}
+		var yang repository.Space
+		if err := db.Where("pair_id = ? AND side = ?", yin.ID, "yang").First(&yang).Error; err == nil {
+			continue
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+		yang = repository.Space{Type: yin.Type, Name: yin.Name + "-B", OwnerUserID: yin.OwnerUserID, TeamID: yin.TeamID, PairID: yin.ID, Side: "yang"}
+		if err := db.Create(&yang).Error; err != nil {
+			return err
+		}
+		var members []repository.SpaceMember
+		if err := db.Where("space_id = ?", yin.ID).Find(&members).Error; err != nil {
+			return err
+		}
+		for _, m := range members {
+			m.ID = 0
+			m.SpaceID = yang.ID
+			if err := db.Create(&m).Error; err != nil {
+				return err
+			}
+		}
+		if err := db.Create(&repository.ItemIconGroup{Title: "APP", Icon: "material-symbols:apps", UserId: yin.OwnerUserID, SpaceID: yang.ID}).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Empty public IDs must be NULL so the unique index only applies to configured links.
