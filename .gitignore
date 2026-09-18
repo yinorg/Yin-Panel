@@ -33,6 +33,8 @@ coverage
 # Environment variables files
 .history
 service_node
+.env.local
+.env.*.local
 
 backend/my_conf.yaml
 backend/database
