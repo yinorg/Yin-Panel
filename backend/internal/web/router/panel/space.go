@@ -540,7 +540,24 @@ func (r *SpaceRouter) Rename(c *gin.Context) {
 		response.ErrorParamFomat(c, "invalid name")
 		return
 	}
-	if err := repository.Db.Model(&repository.Space{}).Where("id = ?", id).Update("name", req.Name).Error; err != nil {
+	var space repository.Space
+	if repository.Db.First(&space, id).Error != nil {
+		response.ErrorDataNotFound(c)
+		return
+	}
+	if err := repository.Db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&repository.Space{}).Where("id = ?", id).Update("name", req.Name).Error; err != nil {
+			return err
+		}
+		for _, sid := range pairedIDs(tx, space) {
+			if sid != id {
+				if err := tx.Model(&repository.Space{}).Where("id = ?", sid).Update("name", req.Name+"-B").Error; err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	}); err != nil {
 		response.ErrorDatabase(c, err.Error())
 		return
 	}
@@ -687,6 +704,10 @@ type groupRequest struct {
 }
 
 func (r *SpaceRouter) CreateGroup(c *gin.Context) {
+	if _, public := c.Get("publicSpaceID"); public {
+		response.ErrorNoAccess(c)
+		return
+	}
 	user, ok := base.GetCurrentUserInfo(c)
 	if !ok {
 		response.Error(c, "not logged in")
@@ -848,6 +869,16 @@ func canAccessSpace(userID, spaceID uint) bool {
 	var member repository.SpaceMember
 	return repository.Db.Where("space_id = ? AND user_id = ?", spaceID, userID).First(&member).Error == nil
 }
+func pairedIDs(tx *gorm.DB, space repository.Space) []uint {
+	if space.PairID == 0 {
+		return []uint{space.ID}
+	}
+	var pair repository.Space
+	if tx.Where("pair_id = ? AND side = ?", space.PairID, "yang").First(&pair).Error == nil {
+		return []uint{space.PairID, pair.ID}
+	}
+	return []uint{space.PairID}
+}
 func (r *SpaceRouter) AddMember(c *gin.Context) {
 	user, ok := base.GetCurrentUserInfo(c)
 	if !ok {
@@ -869,12 +900,24 @@ func (r *SpaceRouter) AddMember(c *gin.Context) {
 		response.ErrorDataNotFound(c)
 		return
 	}
-	m := repository.SpaceMember{SpaceID: id, UserID: targetUser.ID, Role: req.Role}
-	if err := repository.Db.Where("space_id = ? AND user_id = ?", id, targetUser.ID).Assign(m).FirstOrCreate(&m).Error; err != nil {
+	var space repository.Space
+	if repository.Db.First(&space, id).Error != nil {
+		response.ErrorDataNotFound(c)
+		return
+	}
+	if err := repository.Db.Transaction(func(tx *gorm.DB) error {
+		for _, sid := range pairedIDs(tx, space) {
+			m := repository.SpaceMember{SpaceID: sid, UserID: targetUser.ID, Role: req.Role}
+			if err := tx.Where("space_id = ? AND user_id = ?", sid, targetUser.ID).Assign(m).FirstOrCreate(&m).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
 		response.ErrorDatabase(c, err.Error())
 		return
 	}
-	response.SuccessData(c, m)
+	response.Success(c)
 }
 func (r *SpaceRouter) UpdateMember(c *gin.Context) {
 	user, ok := base.GetCurrentUserInfo(c)
@@ -897,7 +940,12 @@ func (r *SpaceRouter) UpdateMember(c *gin.Context) {
 		response.ErrorParamFomat(c, "invalid role")
 		return
 	}
-	if err := repository.Db.Model(&repository.SpaceMember{}).Where("space_id = ? AND user_id = ?", id, uid).Update("role", req.Role).Error; err != nil {
+	var space repository.Space
+	if repository.Db.First(&space, id).Error != nil {
+		response.ErrorDataNotFound(c)
+		return
+	}
+	if err := repository.Db.Model(&repository.SpaceMember{}).Where("space_id IN ? AND user_id = ?", pairedIDs(repository.Db, space), uid).Update("role", req.Role).Error; err != nil {
 		response.ErrorDatabase(c, err.Error())
 		return
 	}
@@ -919,7 +967,12 @@ func (r *SpaceRouter) RemoveMember(c *gin.Context) {
 		response.ErrorParamFomat(c, "invalid userId")
 		return
 	}
-	if err := repository.Db.Where("space_id = ? AND user_id = ?", id, uid).Delete(&repository.SpaceMember{}).Error; err != nil {
+	var space repository.Space
+	if repository.Db.First(&space, id).Error != nil {
+		response.ErrorDataNotFound(c)
+		return
+	}
+	if err := repository.Db.Where("space_id IN ? AND user_id = ?", pairedIDs(repository.Db, space), uid).Delete(&repository.SpaceMember{}).Error; err != nil {
 		response.ErrorDatabase(c, err.Error())
 		return
 	}
@@ -935,7 +988,7 @@ func (r *SpaceRouter) List(c *gin.Context) {
 		return
 	}
 	var spaces []repository.Space
-	query := repository.Db.Where("owner_user_id = ? OR id IN (SELECT space_id FROM space_member WHERE user_id = ?)", user.ID, user.ID)
+	query := repository.Db.Where("(owner_user_id = ? OR id IN (SELECT space_id FROM space_member WHERE user_id = ?)) AND side = ?", user.ID, user.ID, "yin")
 	if publicID, exists := c.Get("publicSpaceID"); exists {
 		query = query.Where("id = ?", publicID)
 	}
@@ -943,6 +996,12 @@ func (r *SpaceRouter) List(c *gin.Context) {
 	if err != nil {
 		response.ErrorDatabase(c, err.Error())
 		return
+	}
+	for i := range spaces {
+		var paired repository.Space
+		if repository.Db.Where("pair_id = ? AND side = ?", spaces[i].ID, "yang").First(&paired).Error == nil {
+			spaces[i].PairedSpaceID = paired.ID
+		}
 	}
 	response.SuccessData(c, spaces)
 }
@@ -1297,14 +1356,26 @@ func (r *SpaceRouter) CreateSpace(c *gin.Context) {
 		if err := tx.Create(&team).Error; err != nil {
 			return err
 		}
-		space := repository.Space{Type: repository.SpaceTypeTeam, Name: req.Name, OwnerUserID: user.ID, TeamID: &team.ID}
+		space := repository.Space{Type: repository.SpaceTypeTeam, Name: req.Name, OwnerUserID: user.ID, TeamID: &team.ID, Side: "yin"}
 		if err := tx.Create(&space).Error; err != nil {
 			return err
 		}
-		if err := tx.Create(&repository.SpaceMember{SpaceID: space.ID, UserID: user.ID, Role: repository.SpaceRoleAdmin}).Error; err != nil {
+		if err := tx.Model(&space).Update("pair_id", space.ID).Error; err != nil {
 			return err
 		}
-		return tx.Create(&repository.ItemIconGroup{Title: "APP", Icon: "material-symbols:apps", Sort: 0, UserId: user.ID, SpaceID: space.ID}).Error
+		yang := repository.Space{Type: space.Type, Name: req.Name + "-B", OwnerUserID: user.ID, TeamID: &team.ID, PairID: space.ID, Side: "yang"}
+		if err := tx.Create(&yang).Error; err != nil {
+			return err
+		}
+		for _, sid := range []uint{space.ID, yang.ID} {
+			if err := tx.Create(&repository.SpaceMember{SpaceID: sid, UserID: user.ID, Role: repository.SpaceRoleAdmin}).Error; err != nil {
+				return err
+			}
+		}
+		if err := tx.Create(&repository.ItemIconGroup{Title: "APP", Icon: "material-symbols:apps", Sort: 0, UserId: user.ID, SpaceID: space.ID}).Error; err != nil {
+			return err
+		}
+		return tx.Create(&repository.ItemIconGroup{Title: "APP", Icon: "material-symbols:apps", Sort: 0, UserId: user.ID, SpaceID: yang.ID}).Error
 	})
 	if err != nil {
 		response.ErrorDatabase(c, err.Error())

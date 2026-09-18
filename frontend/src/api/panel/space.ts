@@ -1,7 +1,7 @@
 import { get, post } from '../../utils/request'
 import { t } from '../../locales'
 
-export interface Space { id: number; type: 'personal' | 'team' | 'shared'; name: string; ownerUserId: number; publicEnabled?: boolean; publicId?: string; publicMode?: 'direct' | 'code' }
+export interface Space { id: number; type: 'personal' | 'team' | 'shared'; name: string; ownerUserId: number; pairId?: number; side?: 'yin' | 'yang'; pairedSpaceId?: number; publicEnabled?: boolean; publicId?: string; publicMode?: 'direct' | 'code' }
 export interface PublicConfig { enabled: boolean; publicId: string; mode: 'direct' | 'code'; accessCode?: string }
 export interface SpaceMember { id: number; userId: number; email?: string; role: 'admin' | 'editor' | 'viewer'; source?: string }
 export function spaceDisplayName(space: Space, spaces: Space[], currentUserId?: number, memberView = false) {
@@ -11,7 +11,14 @@ export function spaceDisplayName(space: Space, spaces: Space[], currentUserId?: 
   return sameName.length > 1 ? `${space.name} ${space.id}` : space.name
 }
 export function sortSpaces(spaces: Space[], currentUserId?: number) {
-  return [...spaces].sort((a, b) => {
+  const seenPersonal = new Set<number>()
+  const unique = spaces.filter((space) => {
+    if (space.type !== 'personal' || space.ownerUserId !== currentUserId) return true
+    if (seenPersonal.has(space.ownerUserId)) return false
+    seenPersonal.add(space.ownerUserId)
+    return true
+  })
+  return unique.sort((a, b) => {
     const aMine = a.type === 'personal' && a.ownerUserId === currentUserId ? 0 : 1
     const bMine = b.type === 'personal' && b.ownerUserId === currentUserId ? 0 : 1
     return aMine - bMine || a.name.localeCompare(b.name) || a.id - b.id

@@ -171,10 +171,24 @@ async function getList(page: number | null) {
 }
 
 async function deleteUser(id: number) {
-  const { code } = await usersDeleteUser(id)
+  const { code, msg } = await usersDeleteUser(id)
   if (code === 0) {
     message.success(t('common.deleteSuccess'))
     await getList(null)
+  } else if (msg?.includes('shared spaces')) {
+    dialog.warning({
+      title: t('common.warning'),
+      content: `${msg}. This permanently deletes the user's shared spaces and all their data. Continue?`,
+      positiveText: t('common.confirm'),
+      negativeText: t('common.cancel'),
+      onPositiveClick: async () => {
+        const result = await usersDeleteUser(id, true)
+        if (result.code === 0) { message.success(t('common.deleteSuccess')); await getList(null) }
+        else message.error(result.msg || t('common.deleteFail'))
+      },
+    })
+  } else if (msg) {
+    message.error(msg)
   }
 }
 
