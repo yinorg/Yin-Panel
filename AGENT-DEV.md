@@ -10,7 +10,7 @@ For every code-change task, follow this order without asking the user to repeat 
 2. Make the smallest scoped change while preserving unrelated worktree changes.
 3. For frontend-only changes, run the frontend build only. Do not compile or restart the backend.
 4. For backend changes, build the frontend first only when the backend serves a changed frontend bundle; then format, test, and compile the backend.
-5. If the user asks to update the running service, deploy only the changed artifact: replace `web/` for frontend-only changes, or replace the binary for backend changes. Restart only when the binary changed; preserve timestamped backups and verify port `3002` after a restart.
+5. If the user asks to update the running service, deploy only the changed artifact: replace `web/` for frontend-only changes, or replace the binary for backend changes. Restart only when the binary changed; preserve timestamped backups and verify the configured port after a restart.
 6. Report exact checks run and any skipped checks. Do not claim success from an unrun or failed check.
 
 Do not stop at a plan when the user asked to execute. Do not re-ask for paths, build order, or restart procedure already specified here.
@@ -36,14 +36,32 @@ Every command must run in the directory stated by its `cd` or tool working-direc
 
 ## Project Facts
 
-- Repository: `https://github.com/yinorg/Yin-Panel`
+- Core repository: `https://github.com/yinorg/Yin-Panel`
+- Browser extension repository: `https://github.com/yinorg/yin-panel-extension`
+- E2E project: configure its location with `YIN_PANEL_E2E_DIR`; it is separate from Core.
 - Frontend: `frontend/`
 - Backend: `backend/`
 - Frontend production output: `backend/web/`
-- Current local runtime directory: `/home/hsy/project/backup/backend`
-- Current local binary: `/home/hsy/project/backup/backend/yin-panel`
-- Current local HTTP port: `3002`
+- Local runtime directory: `YIN_PANEL_RUNTIME_DIR` (required for deployment)
+- Local binary: `$YIN_PANEL_RUNTIME_DIR/yin-panel`
+- Local HTTP port: `${YIN_PANEL_PORT:-3002}`
 - Current local service is a standalone process, not a Docker container.
+
+All paths outside this repository are machine-specific. Use `git rev-parse --show-toplevel`, `YIN_PANEL_RUNTIME_DIR`, `YIN_PANEL_EXTENSION_DIR`, and `YIN_PANEL_E2E_DIR`; never commit a developer home directory or machine-specific absolute path.
+
+Load local-only values for a shell session with:
+
+```bash
+repo_root="$(git rev-parse --show-toplevel)"
+env_file="${YIN_PANEL_ENV_FILE:-$repo_root/.env.local}"
+if [ -f "$env_file" ]; then
+    set -a
+    . "$env_file"
+    set +a
+fi
+```
+
+`.env.example` documents supported variables. `.env.local` may contain test credentials and must remain untracked. Never print `SUDO_PASSWORD`, put it in command arguments, or write it to logs; prefer `sudo -v` or an OS credential helper when possible.
 
 ## Before Changes
 
@@ -57,11 +75,12 @@ Every command must run in the directory stated by its `cd` or tool working-direc
 For a combined release, build the frontend first, then build and test the backend:
 
 ```bash
-cd /home/hsy/project/Yin-Panel/frontend
+repo_root="$(git rev-parse --show-toplevel)"
+cd "$repo_root/frontend"
 npm ci                         # only when node_modules is absent or stale
 npm run build-only             # writes production files to ../backend/web
 
-cd /home/hsy/project/Yin-Panel/backend
+cd "$repo_root/backend"
 gofmt -w <changed-go-files>
 go test ./...
 mkdir -p /tmp/yin-panel-build
@@ -76,33 +95,34 @@ For backend-only work, skip the frontend entirely. Run `gofmt`, `go test ./...`,
 
 ## Local Deployment
 
-The service runs from `/home/hsy/project/backup/backend`, with that directory as its working directory so `conf.yaml` is found. Never replace its database or uploads with repository copies.
+The service runs from `$YIN_PANEL_RUNTIME_DIR`, with that directory as its working directory so `conf.yaml` is found. Require this variable before deployment. Never replace its database or uploads with repository copies.
 
 After successful builds, replace only the changed runtime artifact. Preserve old binaries, but do not keep backups of frontend static files:
 
 ```bash
-run_dir=/home/hsy/project/backup/backend
+repo_root="$(git rev-parse --show-toplevel)"
+run_dir="${YIN_PANEL_RUNTIME_DIR:?Set YIN_PANEL_RUNTIME_DIR before deployment}"
 stamp=$(date +%Y%m%d-%H%M%S)
 cp -a "$run_dir/yin-panel" "$run_dir/yin-panel.previous-$stamp"
 cp -a /tmp/yin-panel-build/yin-panel "$run_dir/yin-panel"
 rm -rf "$run_dir/web"
-cp -a /home/hsy/project/Yin-Panel/backend/web "$run_dir/web"
+cp -a "$repo_root/backend/web" "$run_dir/web"
 ```
 
-Identify the listener with `ss -ltnp | grep ':3002'`. Stop only the Yin-Panel process, then start it detached from the terminal:
+Identify the listener with `ss -ltnp | grep ":${YIN_PANEL_PORT:-3002}"`. Stop only the Yin-Panel process, then start it detached from the terminal:
 
 ```bash
 kill <yin-panel-pid>
-cd /home/hsy/project/backup/backend
+cd "$run_dir"
 setsid ./yin-panel > yin-panel.log 2>&1 < /dev/null &
 ```
 
 Verify the process and HTTP service:
 
 ```bash
-ss -ltnp | grep ':3002'
-curl --noproxy '*' -fsS http://127.0.0.1:3002/ -o /tmp/yin-panel-home.html
-tail -30 /home/hsy/project/backup/backend/yin-panel.log
+ss -ltnp | grep ":${YIN_PANEL_PORT:-3002}"
+curl --noproxy '*' -fsS "http://127.0.0.1:${YIN_PANEL_PORT:-3002}/" -o /tmp/yin-panel-home.html
+tail -30 "$run_dir/yin-panel.log"
 ```
 
 Do not start the binary from another working directory; it will exit because it cannot find `conf.yaml`.
@@ -131,11 +151,12 @@ The Docker workflow publishes standard version tags such as `0.3.1`. It expects 
 For combined or backend changes, run:
 
 ```bash
-cd /home/hsy/project/Yin-Panel/backend && go test ./...
-cd /home/hsy/project/Yin-Panel/frontend && npm run build-only
-cd /home/hsy/project/Yin-Panel && git diff --check
+repo_root="$(git rev-parse --show-toplevel)"
+cd "$repo_root/backend" && go test ./...
+cd "$repo_root/frontend" && npm run build-only
+cd "$repo_root" && git diff --check
 ```
 
-For frontend-only changes, run `cd /home/hsy/project/Yin-Panel/frontend && npm run build-only` and `cd /home/hsy/project/Yin-Panel && git diff --check`; skip backend tests and backend compilation.
+For frontend-only changes, run the equivalent commands from the repository root and `git diff --check`; skip backend tests and backend compilation.
 
-After deployment, verify port `3002`, the root page, the startup log, and the changed feature through the running HTTP service. Report every skipped check and its reason.
+After deployment, verify `${YIN_PANEL_PORT:-3002}`, the root page, the startup log, and the changed feature through the running HTTP service. Report every skipped check and its reason.

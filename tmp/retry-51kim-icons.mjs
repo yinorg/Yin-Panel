@@ -5,14 +5,19 @@ import { existsSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
+const envFile = process.env.YIN_PANEL_ENV_FILE || path.resolve('.env.local')
+try { process.loadEnvFile(envFile) } catch (error) {
+  if (error.code !== 'ENOENT') throw error
+}
+
 const sourceFile = path.resolve('tmp/51kim-bookmarks.html')
 const retryFile = path.resolve('tmp/51kim-icon-retry.html')
-const extensionPath = process.env.YIN_PANEL_EXTENSION || '/home/hsy/project/yin-panel-extension'
-const panelUrl = process.env.YIN_PANEL_URL || 'http://127.0.0.1:3002/'
-const proxy = process.env.ICON_PROXY || 'http://192.168.31.10:7890'
+const extensionPath = process.env.YIN_PANEL_EXTENSION_DIR
+const panelUrl = process.env.YIN_PANEL_URL
+const proxy = process.env.ICON_PROXY
 const timeout = Number(process.env.ICON_TIMEOUT || 30000)
 const batchSize = Number(process.env.ICON_BATCH_SIZE || 20)
-const e2eRoot = process.env.YIN_PANEL_E2E || '/home/hsy/project/yin-panel-e2e'
+const e2eRoot = process.env.YIN_PANEL_E2E_DIR
 
 const decode = value => value.replaceAll('&quot;', '"').replaceAll('&lt;', '<').replaceAll('&gt;', '>').replaceAll('&amp;', '&')
 const encode = value => value.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
@@ -72,6 +77,8 @@ async function requestIcons(page, urls) {
 async function run() {
   if (process.argv.includes('--initialize')) return initialize()
   if (!existsSync(retryFile)) throw new Error(`Missing ${retryFile}; run --initialize first`)
+  for (const [name, value] of Object.entries({ YIN_PANEL_EXTENSION_DIR: extensionPath, YIN_PANEL_URL: panelUrl, ICON_PROXY: proxy, YIN_PANEL_E2E_DIR: e2eRoot }))
+    if (!value) throw new Error(`Missing ${name}; configure it in .env.local or the shell`)
   const { chromium } = await loadPlaywright()
   const records = parseBookmarks(await fs.readFile(retryFile, 'utf8'))
   let remaining = records
