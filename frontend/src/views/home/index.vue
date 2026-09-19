@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { VueDraggable } from 'vue-draggable-plus'
 import { NBackTop, NButton, NButtonGroup, NCard, NDropdown, NInput, NModal, NSkeleton, NSpin, NSpace, useDialog, useMessage } from 'naive-ui'
-import { nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { defineAsyncComponent, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { createSpace, getGroups, getItems, getSpaces, sortSpaces, spaceDisplayName, type Space } from '../../api/panel/space'
-import { Clock, SearchBox, SystemMonitor } from '../../components/deskModule'
-import { SvgIcon, SvgIconOnline } from '../../components/common'
-import { AppIcon, AppStarter, EditItem } from './components'
+import Clock from '../../components/deskModule/Clock/index.vue'
+import SearchBox from '../../components/deskModule/SearchBox/index.vue'
+import SvgIcon from '../../components/common/SvgIcon/index.vue'
+import SvgIconOnline from '../../components/common/SvgIconOnline/index.vue'
+import AppIcon from './components/AppIcon/index.vue'
 import { deleteItem, sortItems } from '@/api/panel/space'
 
 import { setTitle } from '@/utils/cmn'
@@ -15,6 +17,10 @@ import { PanelPanelConfigStyleEnum, PanelStateNetworkModeEnum } from '@/enums'
 import { t } from '@/locales'
 import { getEnableStatus } from '@/api/system/systemMonitor'
 import { clearSpaceCache, readSpaceCache, readSpacesCache, writeSpaceCache, writeSpacesCache } from '@/utils/spaceCache'
+
+const SystemMonitor = defineAsyncComponent(() => import('../../components/deskModule/SystemMonitor/index.vue'))
+const AppStarter = defineAsyncComponent(() => import('./components/AppStarter/index.vue'))
+const EditItem = defineAsyncComponent(() => import('./components/EditItem/index.vue'))
 
 interface ItemGroup extends Panel.ItemIconGroup {
   sortStatus?: boolean
@@ -583,7 +589,7 @@ function handleAddItem(itemIconGroupId?: number) {
         <!-- 头 -->
         <div class="home-header mx-[auto] w-[80%]">
           <div class="home-header-row flex mx-[auto] items-center justify-center text-white">
-            <div class="logo cursor-pointer" @click="togglePanelSide">
+            <div class="logo cursor-pointer" data-lcp="brand" @click="togglePanelSide">
               <span class="text-2xl md:text-6xl font-bold text-shadow">
                 {{ activeSpace?.side === 'yang' ? 'Yang Panel' : 'Yin-Panel' }}
               </span>

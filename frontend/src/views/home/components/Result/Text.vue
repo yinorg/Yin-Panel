@@ -7,6 +7,9 @@ import hljs from 'highlight.js'
 import { NAlert } from 'naive-ui'
 import { useBasicLayout } from '../../../../hooks/useBasicLayout'
 import { t } from '../../../../locales'
+import 'katex/dist/katex.min.css'
+import '../../../../styles/lib/highlight.less'
+import '../../../../styles/lib/github-markdown.less'
 
 interface Props {
   error?: boolean

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { NEllipsis } from 'naive-ui'
-import { ItemIcon } from '../../../../components/common'
+import ItemIcon from '../../../../components/common/ItemIcon/index.vue'
 import { PanelPanelConfigStyleEnum } from '@/enums'
 
 interface Prop {

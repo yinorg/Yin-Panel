@@ -2,7 +2,9 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { NLayout, NLayoutContent, NLayoutSider, NSpace } from 'naive-ui'
 import { useAuthStore } from '../../../../store'
-import { AppLoader, RoundCardModal, SvgIcon } from '../../../../components/common'
+import AppLoader from '../../../../components/common/AppLoader/index.vue'
+import RoundCardModal from '../../../../components/common/RoundCardModal/index.vue'
+import SvgIcon from '../../../../components/common/SvgIcon/index.vue'
 import { t } from '../../../../locales'
 
 interface App {

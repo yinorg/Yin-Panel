@@ -27,6 +27,8 @@ func cacheStatic(maxAge int, immutable bool) gin.HandlerFunc {
 func noCacheStatic() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Header("Cache-Control", "no-store, no-cache, must-revalidate")
+		c.Header("CDN-Cache-Control", "no-store")
+		c.Header("Surrogate-Control", "no-store")
 		c.Header("Pragma", "no-cache")
 		c.Header("Expires", "0")
 		c.Next()
