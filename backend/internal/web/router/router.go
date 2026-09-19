@@ -76,7 +76,7 @@ func InitRouters(addr string) error {
 		webPath := "./web"
 
 		// 使用StaticFS处理所有静态资源
-		router.Group("/assets").Use(cacheStatic(31536000, true)).StaticFS("", gin.Dir(webPath+"/assets", false))
+		router.Group("/assets").Use(cacheStatic(2592000, true)).StaticFS("", gin.Dir(webPath+"/assets", false))
 		router.Group("/custom").Use(cacheStatic(86400, false)).StaticFS("", gin.Dir(webPath+"/custom", false))
 
 		// Entry documents and PWA control files must always be revalidated. The
@@ -98,7 +98,7 @@ func InitRouters(addr string) error {
 		// The Workbox runtime has a content hash in its filename and can be
 		// cached like the other immutable build assets. Keep the route dynamic so
 		// upgrading vite-plugin-pwa does not require a backend route change.
-		workboxGroup := router.Group("/").Use(cacheStatic(31536000, true))
+		workboxGroup := router.Group("/").Use(cacheStatic(2592000, true))
 		workboxGroup.GET("/workbox-:filename", func(c *gin.Context) {
 			filename := c.Param("filename")
 			if !strings.HasSuffix(filename, ".js") || strings.Contains(filename, "/") {
