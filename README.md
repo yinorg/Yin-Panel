@@ -111,7 +111,7 @@ go build -o /tmp/yin-panel-build/yin-panel .
 
 绕过缓存：`/`、`/index.html`、`/login`、`/sw.js`、`/registerSW.js`、`/manifest.webmanifest` 和 `/api/*`。
 
-长期缓存：`/assets/*` 和 `/workbox-*.js`。这些文件由构建系统生成 hash 文件名，源站会返回一年有效期和 `immutable`。
+长期缓存：`/assets/*` 和 `/workbox-*.js`。这些文件由构建系统生成 hash 文件名，源站会返回 30 天有效期和 `immutable`。
 
 不要对整个站点启用 `Cache Everything`。发布后只清理入口文件和 Service Worker 的 Cloudflare 缓存，带 hash 的资源可以继续复用边缘缓存。
 
