@@ -167,6 +167,31 @@ func TestAuthentikOIDCAuthorizationCodeFlow(t *testing.T) {
 	}
 }
 
+func TestGitHubVerifiedEmailEnrichment(t *testing.T) {
+	config.AppConfig = &config.Config{}
+	zaplog.Logger = zap.NewNop().Sugar()
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.Header.Get("Authorization") != "Bearer github-token" {
+			t.Errorf("unexpected authorization header: %q", request.Header.Get("Authorization"))
+		}
+		writeJSON(writer, []map[string]any{
+			{"email": "secondary@example.test", "primary": false, "verified": true},
+			{"email": "primary@example.test", "primary": true, "verified": true},
+		})
+	}))
+	defer server.Close()
+
+	service := NewUserService(&memoryUserRepo{}, memoryItemIconGroupRepo{})
+	userInfo := map[string]interface{}{"id": float64(42), "email": nil}
+	provider := config.OAuthProviderConfig{ClientID: "github-client", UserInfoEmailURL: server.URL}
+	if err := service.enrichVerifiedEmail(provider, "github-token", userInfo); err != nil {
+		t.Fatalf("enrich GitHub email: %v", err)
+	}
+	if userInfo["email"] != "primary@example.test" || userInfo["email_verified"] != true {
+		t.Fatalf("unexpected enriched GitHub identity: %#v", userInfo)
+	}
+}
+
 func writeJSON(writer http.ResponseWriter, value any) {
 	writer.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(writer).Encode(value)

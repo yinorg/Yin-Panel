@@ -87,6 +87,7 @@ type OAuthProviderConfig struct {
 	AuthURL                 string `yaml:"auth_url"`
 	TokenURL                string `yaml:"token_url"`
 	UserInfoURL             string `yaml:"user_info_url"`
+	UserInfoEmailURL        string `yaml:"user_info_email_url"`
 	Scopes                  string `yaml:"scopes"`
 	FieldMappingIdentifier  string `yaml:"field_mapping_identifier"`
 	FieldMappingDisplayName string `yaml:"field_mapping_display_name"`

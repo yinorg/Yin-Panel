@@ -225,6 +225,18 @@ func (s *UserService) HandleOAuthCallback(provider, code, redirectURI, state str
 		zaplog.Logger.Error("Failed to fetch user info: " + err.Error())
 		return nil, err
 	}
+	if providerConfig.UserInfoEmailURL != "" {
+		if err := s.enrichVerifiedEmail(*providerConfig, accessToken, userInfo); err != nil {
+			return nil, err
+		}
+	}
+	if _, ok := userInfo["sub"].(string); !ok && providerConfig.FieldMappingIdentifier != "" {
+		if identifier, ok := userInfo[providerConfig.FieldMappingIdentifier].(string); ok {
+			userInfo["sub"] = identifier
+		} else if identifier, ok := userInfo[providerConfig.FieldMappingIdentifier].(float64); ok {
+			userInfo["sub"] = strconv.FormatInt(int64(identifier), 10)
+		}
+	}
 
 	return s.findOrCreateOAuthUser(provider, *providerConfig, userInfo)
 }
@@ -506,4 +518,44 @@ func (s *UserService) fetchUserInfo(config config.OAuthProviderConfig, accessTok
 	}
 
 	return userInfo, nil
+}
+
+// enrichVerifiedEmail supports providers such as GitHub whose user endpoint
+// omits private email addresses. The first verified primary address wins.
+func (s *UserService) enrichVerifiedEmail(provider config.OAuthProviderConfig, accessToken string, userInfo map[string]interface{}) error {
+	token := &oauth2.Token{AccessToken: accessToken, TokenType: "Bearer"}
+	oauthConfig := &oauth2.Config{ClientID: provider.ClientID, ClientSecret: provider.ClientSecret}
+	ctx, cancel := s.createProxyContext(10 * time.Second)
+	defer cancel()
+	response, err := oauthConfig.Client(ctx, token).Get(provider.UserInfoEmailURL)
+	if err != nil {
+		return fmt.Errorf("fetch verified OAuth email: %w", err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		return fmt.Errorf("fetch verified OAuth email returned HTTP %d", response.StatusCode)
+	}
+	var emails []struct {
+		Email    string `json:"email"`
+		Primary  bool   `json:"primary"`
+		Verified bool   `json:"verified"`
+	}
+	if err := json.NewDecoder(io.LimitReader(response.Body, 1<<20)).Decode(&emails); err != nil {
+		return fmt.Errorf("decode verified OAuth emails: %w", err)
+	}
+	for _, candidate := range emails {
+		if candidate.Verified && candidate.Primary {
+			userInfo["email"] = candidate.Email
+			userInfo["email_verified"] = true
+			return nil
+		}
+	}
+	for _, candidate := range emails {
+		if candidate.Verified {
+			userInfo["email"] = candidate.Email
+			userInfo["email_verified"] = true
+			return nil
+		}
+	}
+	return errors.New("OAuth provider did not return a verified email")
 }

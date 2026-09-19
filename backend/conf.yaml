@@ -76,8 +76,9 @@ oauth:
       auth_url: https://github.com/login/oauth/authorize
       token_url: https://github.com/login/oauth/access_token
       user_info_url: https://api.github.com/user
-      scopes: read:user
-      field_mapping_identifier: login
+      user_info_email_url: https://api.github.com/user/emails
+      scopes: read:user user:email
+      field_mapping_identifier: id
       field_mapping_display_name: name
       field_mapping_email: email
 
