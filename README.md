@@ -25,8 +25,13 @@ mkdir yin-panel && cd yin-panel
 curl -LO https://raw.githubusercontent.com/yinorg/Yin-Panel/master/docker/docker-compose.yml
 curl -LO https://raw.githubusercontent.com/yinorg/Yin-Panel/master/backend/conf.yaml
 mkdir -p database uploads
+jwt_secret="$(openssl rand -hex 32)"
+sed -i "s#^  secret: your_secret_key$#  secret: ${jwt_secret}#" conf.yaml
+unset jwt_secret
 docker compose up -d
 ```
+
+每个部署实例都应使用独立的随机 `jwt.secret`。运行目录中的 `conf.yaml` 包含实例密钥和 OAuth 凭据，请勿提交到 Git。
 
 打开 <http://localhost:3002>。
 
