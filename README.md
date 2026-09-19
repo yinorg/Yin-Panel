@@ -105,6 +105,16 @@ go build -o /tmp/yin-panel-build/yin-panel .
 
 升级前请备份数据库、`uploads/`、`conf.yaml` 和 Helm values。迁移会保留用户、空间、分组、书签和文件引用。发生异常时使用升级前备份恢复，不要直接删除数据库重建。
 
+## Cloudflare 缓存
+
+如果域名启用了 Cloudflare 橙色小云，建议使用 Cache Rules 保持入口文件实时更新、只长期缓存带 hash 的静态资源。
+
+绕过缓存：`/`、`/index.html`、`/login`、`/sw.js`、`/registerSW.js`、`/manifest.webmanifest` 和 `/api/*`。
+
+长期缓存：`/assets/*` 和 `/workbox-*.js`。这些文件由构建系统生成 hash 文件名，源站会返回一年有效期和 `immutable`。
+
+不要对整个站点启用 `Cache Everything`。发布后只清理入口文件和 Service Worker 的 Cloudflare 缓存，带 hash 的资源可以继续复用边缘缓存。
+
 ## Open Core
 
 Yin-Panel Core 版本永久免费，并会持续维护和更新。本仓库是公开 Core 的唯一来源，发布 `yin-panel-ce` 镜像。企业版位于私有仓库 [yinorg/Yin-Panel-EE](https://github.com/yinorg/Yin-Panel-EE)，通过公开接口接入企业模块。

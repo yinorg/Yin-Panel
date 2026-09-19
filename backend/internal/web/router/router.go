@@ -2,6 +2,7 @@ package router
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/yinorg/Yin-Panel/backend/internal/infra/config"
 	"github.com/yinorg/Yin-Panel/backend/internal/infra/zaplog"
@@ -19,6 +20,15 @@ func cacheStatic(maxAge int, immutable bool) gin.HandlerFunc {
 			value += ", immutable"
 		}
 		c.Header("Cache-Control", value)
+		c.Next()
+	}
+}
+
+func noCacheStatic() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Header("Cache-Control", "no-store, no-cache, must-revalidate")
+		c.Header("Pragma", "no-cache")
+		c.Header("Expires", "0")
 		c.Next()
 	}
 }
@@ -68,19 +78,35 @@ func InitRouters(addr string) error {
 		// 使用StaticFS处理所有静态资源
 		router.Group("/assets").Use(cacheStatic(31536000, true)).StaticFS("", gin.Dir(webPath+"/assets", false))
 		router.Group("/custom").Use(cacheStatic(86400, false)).StaticFS("", gin.Dir(webPath+"/custom", false))
-		// PWA files are emitted at the web root and must be served before SPA fallback routes.
-		router.StaticFile("/registerSW.js", webPath+"/registerSW.js")
-		router.StaticFile("/sw.js", webPath+"/sw.js")
-		router.StaticFile("/workbox-3625d7b0.js", webPath+"/workbox-3625d7b0.js")
-		router.StaticFile("/manifest.webmanifest", webPath+"/manifest.webmanifest")
+
+		// Entry documents and PWA control files must always be revalidated. The
+		// hashed assets they reference are safe to cache independently.
+		noCacheGroup := router.Group("/").Use(noCacheStatic())
+		noCacheGroup.StaticFile("/index.html", webPath+"/index.html")
+		noCacheGroup.StaticFile("/registerSW.js", webPath+"/registerSW.js")
+		noCacheGroup.StaticFile("/sw.js", webPath+"/sw.js")
+		noCacheGroup.StaticFile("/manifest.webmanifest", webPath+"/manifest.webmanifest")
 
 		// 处理根目录下的特定文件
-		router.StaticFile("/", webPath+"/index.html")
+		noCacheGroup.StaticFile("/", webPath+"/index.html")
 		// Vue history mode routes (for example the OAuth /login redirect)
 		// must fall back to the SPA entry document.
-		router.StaticFile("/login", webPath+"/index.html")
+		noCacheGroup.StaticFile("/login", webPath+"/index.html")
 		// Public space links are handled by the SPA router.
-		router.GET("/:publicId", func(c *gin.Context) { c.File(webPath + "/index.html") })
+		noCacheGroup.GET("/:publicId", func(c *gin.Context) { c.File(webPath + "/index.html") })
+
+		// The Workbox runtime has a content hash in its filename and can be
+		// cached like the other immutable build assets. Keep the route dynamic so
+		// upgrading vite-plugin-pwa does not require a backend route change.
+		workboxGroup := router.Group("/").Use(cacheStatic(31536000, true))
+		workboxGroup.GET("/workbox-:filename", func(c *gin.Context) {
+			filename := c.Param("filename")
+			if !strings.HasSuffix(filename, ".js") || strings.Contains(filename, "/") {
+				c.Status(404)
+				return
+			}
+			c.File(webPath + "/workbox-" + filename)
+		})
 
 		zaplog.Logger.Info("Static file server is enabled")
 	} else {
