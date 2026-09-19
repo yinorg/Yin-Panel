@@ -25,12 +25,17 @@ Every command must run in the directory stated by its `cd` or tool working-direc
 - By default, use a local long-lived development branch named `<username>-dev`; normally create it once and do not delete it proactively.
 - Unless the user explicitly requests it, do not proactively create a temporary task branch. If the user explicitly requests one, it may be created and used for that task.
 - If `<username>-dev` does not exist and no temporary branch was requested, synchronize local `master` with `origin/master` first, then create `<username>-dev` from that commit.
+- Before any `fetch`, `checkout`, branch rename, `rebase`, merge, or push, inspect the current worktree with `git status --short --branch`, `git diff --stat`, and the untracked-file list. If it is dirty, do not switch branches or rewrite refs until the changes have been reviewed.
+- For a dirty worktree, inspect the complete tracked diff and every untracked file, classify changes as task-related, existing user work, generated output, or unclear, and report that classification before staging anything. The default is to ask the user how to handle existing code; never stage, commit, stash, reset, discard, delete, or overwrite it without explicit approval.
+- If the user approves including existing code, stage only the reviewed files, keep one coherent feature together, inspect `git diff --cached --stat` and `git diff --cached --check`, then commit. If the user does not approve inclusion, preserve the original worktree and use a clean temporary worktree for the task and integration.
+- If the current local non-`master` branch is the intended development branch and the user requests normalization, rename that local branch to `<username>-dev`; do not recreate it from another commit or push it merely because it was renamed. Keep `<username>-dev` local by default and do not require a remote upstream.
 - Before each task and before each merge, check the worktree, fetch `origin`, switch to the source branch, and rebase it onto `origin/master`:
   ```bash
   git checkout <source-branch>
   git fetch origin
   git rebase origin/master
   ```
+- Rebase only after the source worktree is clean and the user-approved change boundary is committed. If unrelated user changes prevent a checkout or rebase, use a clean temporary worktree for verification and integration instead of using stash, reset, discard, or overwrite commands.
 - Resolve rebase conflicts only on `<source-branch>`. Never resolve conflicts on `master`, and never use stash, reset, discard, or overwrite commands to hide unrelated user changes.
 - `master` accepts only fast-forward integration:
   ```bash
@@ -43,6 +48,7 @@ Every command must run in the directory stated by its `cd` or tool working-direc
 - Do not proactively push non-`master` branches to the remote. If the user explicitly requests a non-`master` push, push only the branch they specified.
 - Never use `--force` or `--force-with-lease` when pushing `master`.
 - Existing merge commits and existing remote branches are not rewritten or deleted by this policy unless the user explicitly requests a separate migration.
+- After a commit, merge, or push, verify with `git status --short --branch`, `git branch -vv`, and `git ls-remote --heads origin`; report retained local branches, remote branches deleted by explicit request, and any stale upstream tracking references.
 
 ## Project Facts
 
