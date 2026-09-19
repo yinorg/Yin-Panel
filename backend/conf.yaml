@@ -64,44 +64,49 @@ jwt:
   # JWT token expiration time in hours, default: 2160 (90 days). Values <= 0 use the default.
   expire: 2160
 
-# OAuth providers configuration
+# OAuth 2.0 / OpenID Connect providers
 oauth:
   # Enable OAuth login, default: false
-  enable: true
-  # List of OAuth providers
-  providers:
-    - name: github
-      client_id: your_client_id
-      client_secret: your_client_secret
-      auth_url: https://github.com/login/oauth/authorize
-      token_url: https://github.com/login/oauth/access_token
-      user_info_url: https://api.github.com/user
-      user_info_email_url: https://api.github.com/user/emails
-      scopes: read:user user:email
-      field_mapping_identifier: id
-      field_mapping_display_name: name
-      field_mapping_email: email
+  enable: false
+  # Add one or more providers and set enable: true to enable OAuth login.
+  providers: []
+    # GitHub (OAuth 2.0)
+    # Register <base.root_url>/api/oauth/github/callback as the callback URL.
+    # - name: github
+    #   client_id: your_github_client_id
+    #   client_secret: your_github_client_secret
+    #   auth_url: https://github.com/login/oauth/authorize
+    #   token_url: https://github.com/login/oauth/access_token
+    #   user_info_url: https://api.github.com/user
+    #   user_info_email_url: https://api.github.com/user/emails
+    #   scopes: read:user user:email
+    #   field_mapping_identifier: id
+    #   field_mapping_display_name: name
+    #   field_mapping_email: email
 
-    - name: google
-      client_id: your_client_id
-      client_secret: your_client_secret
-      auth_url: https://accounts.google.com/o/oauth2/v2/auth
-      token_url: https://oauth2.googleapis.com/token
-      user_info_url: https://www.googleapis.com/oauth2/v3/userinfo
-      scopes: profile email
-      field_mapping_identifier: email
-      field_mapping_display_name: name
-      field_mapping_email: email
+    # GitLab (standard OIDC)
+    # Register <base.root_url>/api/oauth/gitlab/callback as the callback URL.
+    # - name: gitlab
+    #   client_id: your_gitlab_client_id
+    #   client_secret: your_gitlab_client_secret
+    #   issuer_url: https://gitlab.com
+    #   scopes: openid profile email
+    #   field_mapping_identifier: sub
+    #   field_mapping_display_name: name
+    #   field_mapping_email: email
 
-    - name: authentik
-      client_id: 35XDlL1bVPsRTvktwmCJshhXNb2WsXIjeZ6acdbI
-      # Replace with the client secret shown by Authentik.
-      client_secret: KRbNFbtsHAba2JOBxD8z54Q3FeKWz1t7sNlLzJhSzVlRoxJMTOvSiJXxwLwIm09xhDI3uxv7QJ2p28QlZe9eYriVHXUqjXSFgcta46NvgrbxD5KRPjxaN4vNoM1jIUCM
-      issuer_url: http://192.168.31.132:9000/application/o/test/
-      scopes: openid profile email
-      field_mapping_identifier: email
-      field_mapping_display_name: name
-      field_mapping_email: email
+    # Google (OAuth 2.0)
+    # Register <base.root_url>/api/oauth/google/callback as the callback URL.
+    # - name: google
+    #   client_id: your_google_client_id
+    #   client_secret: your_google_client_secret
+    #   auth_url: https://accounts.google.com/o/oauth2/v2/auth
+    #   token_url: https://oauth2.googleapis.com/token
+    #   user_info_url: https://www.googleapis.com/oauth2/v3/userinfo
+    #   scopes: profile email
+    #   field_mapping_identifier: sub
+    #   field_mapping_display_name: name
+    #   field_mapping_email: email
 
 # Legacy database and upload migration
 migration:

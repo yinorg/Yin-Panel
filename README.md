@@ -52,9 +52,11 @@ docker pull ghcr.io/yinorg/yin-panel-ce:latest
 
 `0.3.15` 和 `latest` 都是 multi-arch 镜像，可直接在 amd64 或 arm64 主机使用。`-amd64`、`-arm64` 仅作为构建过程中的临时 tag，不属于最终发布 tag。
 
-## 配置与 OIDC
+## 配置与 OAuth/OIDC
 
-常用配置包括 `base.root_url`、`base.http_port`、`base.database_drive`、`sqlite.file_path`、`rclone.type`、`rclone.bucket`、`jwt.secret` 和 `oauth.providers`。
+`oauth` 是 OAuth 2.0 和 OpenID Connect（OIDC）的统一配置入口。默认配置模板提供了三个已验证的示例：GitHub（OAuth 2.0）、GitLab（标准 OIDC）和 Google（OAuth 2.0）。示例默认全部注释，填写实际凭据并将 `oauth.enable` 设置为 `true` 后才会启用。
+
+标准 OIDC provider 需要支持 discovery、authorization code + PKCE、JWKS 签名校验，并在用户信息中提供 `email` 和 `email_verified` claims。符合这些标准的 OIDC provider 理论上可用，但不同服务商可能仍需要额外的字段映射配置。
 
 OIDC 回调地址：
 
@@ -62,7 +64,7 @@ OIDC 回调地址：
 <base.root_url>/api/oauth/<provider>/callback
 ```
 
-Provider 必须返回已验证邮箱。系统使用 `provider + sub` 识别外部身份，并使用邮箱关联本地账号。
+回调完成后，Provider 必须返回已验证邮箱。系统使用 `provider + sub` 识别外部身份，并使用邮箱关联本地账号。
 
 ## 空间与权限
 

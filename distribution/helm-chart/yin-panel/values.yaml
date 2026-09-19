@@ -89,22 +89,39 @@ appConfig:
     # JWT token expiration time in hours, default: 2160 (90 days). Values <= 0 use the default.
     expire: 2160
 
-  # OAuth providers configuration
+  # OAuth 2.0 / OpenID Connect providers
   oauth:
     # Enable OAuth login, default: false
     enable: false
-    # List of OAuth providers
+    # Add one or more providers and set enable: true to enable OAuth login.
     providers: []
+      # GitHub (OAuth 2.0)
+      # Register <base.root_url>/api/oauth/github/callback as the callback URL.
       # - name: github
-      #   client_id: your_client_id
-      #   client_secret: your_client_secret
+      #   client_id: your_github_client_id
+      #   client_secret: your_github_client_secret
       #   auth_url: https://github.com/login/oauth/authorize
       #   token_url: https://github.com/login/oauth/access_token
       #   user_info_url: https://api.github.com/user
-      #   scopes: read:user
-      #   field_mapping_identifier: login
+      #   user_info_email_url: https://api.github.com/user/emails
+      #   scopes: read:user user:email
+      #   field_mapping_identifier: id
       #   field_mapping_display_name: name
       #   field_mapping_email: email
+
+      # GitLab (standard OIDC)
+      # Register <base.root_url>/api/oauth/gitlab/callback as the callback URL.
+      # - name: gitlab
+      #   client_id: your_gitlab_client_id
+      #   client_secret: your_gitlab_client_secret
+      #   issuer_url: https://gitlab.com
+      #   scopes: openid profile email
+      #   field_mapping_identifier: sub
+      #   field_mapping_display_name: name
+      #   field_mapping_email: email
+
+      # Google (OAuth 2.0)
+      # Register <base.root_url>/api/oauth/google/callback as the callback URL.
       # - name: google
       #   client_id: your_google_client_id
       #   client_secret: your_google_client_secret
@@ -112,15 +129,6 @@ appConfig:
       #   token_url: https://oauth2.googleapis.com/token
       #   user_info_url: https://www.googleapis.com/oauth2/v3/userinfo
       #   scopes: profile email
-      #   field_mapping_identifier: sub
-      #   field_mapping_display_name: name
-      #   field_mapping_email: email
-      # - name: authentik
-      #   client_id: yin-panel
-      #   client_secret: your_client_secret
-      #   issuer_url: https://auth.example.com/application/o/yin-panel/
-      #   scopes: openid profile email
-      #   # Register <base.root_url>/api/oauth/authentik/callback in Authentik.
       #   field_mapping_identifier: sub
       #   field_mapping_display_name: name
       #   field_mapping_email: email
