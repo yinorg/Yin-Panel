@@ -3,7 +3,8 @@ import { NButton, NCard, NForm, NFormItem, NGradientText, NInput, NSelect, useMe
 import { computed, ref, onMounted } from 'vue'
 import { login } from '../../api'
 import { useAppStore, useAuthStore } from '../../store'
-import { SvgIcon, SvgIconOnline } from '../../components/common'
+import SvgIcon from '../../components/common/SvgIcon/index.vue'
+import SvgIconOnline from '../../components/common/SvgIconOnline/index.vue'
 import { router } from '../../router'
 import { t } from '../../locales'
 import { languageOptions } from '../../utils/defaultData'
@@ -140,7 +141,7 @@ function getProviderLabel(provider: string) {
         </div>
       </div>
 
-      <div class="login-title  ">
+      <div class="login-title" data-lcp="brand">
         <NGradientText :size="30" type="success" class="!font-bold">
           {{ $t('common.appName') }}
         </NGradientText>

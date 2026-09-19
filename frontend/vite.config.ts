@@ -13,6 +13,7 @@ function setupPlugins(env: ImportMetaEnv): PluginOption[] {
       registerType: 'autoUpdate',
       workbox: {
         navigateFallback: '/index.html',
+        navigateFallbackDenylist: [/^\/api(?:\/|$)/],
       },
       manifest: {
         name: 'Yin-Panel',
@@ -102,7 +103,6 @@ export default defineConfig((env) => {
           // Improve chunking to reduce large bundle sizes
           manualChunks: {
             'vue-vendor': ['vue', 'vue-router', 'pinia'],
-            'ui-vendor': ['naive-ui'],
           },
         },
       },

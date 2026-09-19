@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { defineEmits, onMounted, ref } from 'vue'
 import { NAvatar, NCheckbox } from 'naive-ui'
-import { SvgIcon } from '../../common'
+import SvgIcon from '../../common/SvgIcon/index.vue'
 
 // 定义图标资源路径
 const SvgSrcBaidu = '/assets/search_engine_svg/baidu.svg'

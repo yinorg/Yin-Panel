@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { NConfigProvider } from 'naive-ui'
-import { NaiveProvider } from './components/common'
+import NaiveProvider from './components/common/NaiveProvider/index.vue'
 import { useTheme } from './hooks/useTheme'
 import { useLanguage } from './hooks/useLanguage'
 import { usePanelState } from './store'
