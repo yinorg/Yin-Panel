@@ -560,7 +560,21 @@ function handleAddItem(itemIconGroupId?: number) {
       </NCard>
     </NModal>
     <div v-if="spaces.length && authStore.token" class="space-status-bar">
-      <NDropdown trigger="hover" :options="spaces.map(space => ({ label: spaceDisplayName(space, spaces, authStore.userInfo?.id), key: space.id }))" @select="selectSpace">
+      <NDropdown
+        trigger="hover"
+        :options="spaces.map(space => ({ label: spaceDisplayName(space, spaces, authStore.userInfo?.id), key: space.id }))"
+        :theme-overrides="{
+          color: 'rgba(18, 22, 28, 0.72)',
+          optionTextColor: 'rgba(255, 255, 255, 0.92)',
+          optionTextColorHover: '#fff',
+          optionColorHover: 'rgba(255, 255, 255, 0.14)',
+          optionColorActive: 'rgba(125, 211, 252, 0.18)',
+          dividerColor: 'rgba(255, 255, 255, 0.18)',
+          borderRadius: '10px',
+          boxShadow: '0 12px 32px rgba(0, 0, 0, 0.28)',
+        }"
+        @select="selectSpace"
+      >
         <NButton quaternary class="space-status-button">
           <span class="space-status-dot" />
           {{ activeSpace ? spaceDisplayName(activeSpace, spaces, authStore.userInfo?.id) : '' }}
