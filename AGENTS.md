@@ -97,19 +97,32 @@ For backend-only work, skip the frontend entirely. Run `gofmt`, `go test ./...`,
 
 The service runs from `$YIN_PANEL_RUNTIME_DIR`, with that directory as its working directory so `conf.yaml` is found. Require this variable before deployment. Never replace its database or uploads with repository copies.
 
-After successful builds, replace only the changed runtime artifact. Preserve old binaries, but do not keep backups of frontend static files:
+After successful builds, replace only the changed runtime artifact. A running Linux executable cannot be overwritten reliably and may fail with `Text file busy`; always stop the current Yin-Panel process and confirm its PID has exited before replacing the binary. If the process does not exit, do not replace the binary or kill unrelated processes; report the blocker. Preserve old binaries, but do not keep backups of frontend static files:
 
 ```bash
 repo_root="$(git rev-parse --show-toplevel)"
 run_dir="${YIN_PANEL_RUNTIME_DIR:?Set YIN_PANEL_RUNTIME_DIR before deployment}"
 stamp=$(date +%Y%m%d-%H%M%S)
 cp -a "$run_dir/yin-panel" "$run_dir/yin-panel.previous-$stamp"
+pid=$(ss -ltnp | awk '/:'"${YIN_PANEL_PORT:-3002}"' / {match($0,/pid=[0-9]+/); if (RSTART) {print substr($0,RSTART+4,RLENGTH-4); exit}}')
+test -n "$pid"
+kill "$pid"
+for i in $(seq 1 100); do
+    if ! kill -0 "$pid" 2>/dev/null; then
+        break
+    fi
+    sleep 0.1
+done
+if kill -0 "$pid" 2>/dev/null; then
+    echo "Yin-Panel process did not exit" >&2
+    exit 1
+fi
 cp -a /tmp/yin-panel-build/yin-panel "$run_dir/yin-panel"
 rm -rf "$run_dir/web"
 cp -a "$repo_root/backend/web" "$run_dir/web"
 ```
 
-Identify the listener with `ss -ltnp | grep ":${YIN_PANEL_PORT:-3002}"`. Stop only the Yin-Panel process, then start it detached from the terminal:
+Identify the listener with `ss -ltnp | grep ":${YIN_PANEL_PORT:-3002}"`. Resolve and record the Yin-Panel PID before stopping it. Stop only that process, confirm it exited as shown above, then start it detached from the terminal:
 
 ```bash
 kill <yin-panel-pid>
