@@ -236,7 +236,15 @@
     "passwordPlaceholder": "密码",
     "usernamePlaceholder": "账号",
     "welcomeMessage": "欢迎回来！",
-    "thirdPartyLogin": "第三方登录"
+    "thirdPartyLogin": "第三方登录",
+    "oauthProcessing": "正在完成登录",
+    "oauthSuccess": "登录成功",
+    "oauthFailed": "登录失败",
+    "oauthProviderDenied": "第三方服务拒绝了登录请求。",
+    "oauthStateInvalid": "登录会话已过期或无效。",
+    "oauthMissingCode": "第三方服务未返回登录凭证。",
+    "oauthCallbackFailed": "无法完成登录，请重试。",
+    "oauthBackToLogin": "返回登录"
   },
   "panelHome": {
     "changeToLanModel": "切换为内网模式",

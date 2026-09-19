@@ -10,7 +10,6 @@ import { t } from '../../locales'
 import { languageOptions } from '../../utils/defaultData'
 import type { Language } from '../../store/modules/app/helper'
 import service from '../../utils/request/axios'
-import { getUser } from '@/api/system/user'
 
 const authStore = useAuthStore()
 const appStore = useAppStore()
@@ -44,32 +43,6 @@ onMounted(async () => {
     console.error('Failed to fetch OAuth config:', error)
   }
 
-  // OIDC/OAuth callback returns the application's session token to this route.
-  const callbackURL = new URL(window.location.href)
-  const token = callbackURL.searchParams.get('token')
-  if (token) {
-    callbackURL.searchParams.delete('token')
-    window.history.replaceState({}, document.title, `${callbackURL.pathname}${callbackURL.search}${callbackURL.hash}`)
-
-    authStore.setToken(token)
-    authStore.saveStorage()
-      
-    try {
-      const { data } = await getUser()
-      if (data) {
-        authStore.setUserInfo(data)
-        authStore.saveStorage()
-
-        ms.success(`Hi ${data.name}, ${t('login.welcomeMessage')}`)
-        router.push({ path: '/' })
-      } else {
-        console.error('Failed to get user info:', data)
-      }
-    }
-    catch (error) {
-      console.error('Error during OAuth login:', error)
-    }
-  }
 })
 
 const loginPost = async () => {

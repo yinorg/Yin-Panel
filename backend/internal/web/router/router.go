@@ -94,6 +94,7 @@ func InitRouters(addr string) error {
 		// Vue history mode routes (for example the OAuth /login redirect)
 		// must fall back to the SPA entry document.
 		noCacheGroup.StaticFile("/login", webPath+"/index.html")
+		noCacheGroup.StaticFile("/oauth/callback", webPath+"/index.html")
 		// Public space links are handled by the SPA router.
 		noCacheGroup.GET("/:publicId", func(c *gin.Context) { c.File(webPath + "/index.html") })
 

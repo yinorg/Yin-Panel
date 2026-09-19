@@ -236,7 +236,15 @@
     "passwordPlaceholder": "パスワード",
     "usernamePlaceholder": "ユーザー名",
     "welcomeMessage": "おかえりなさい！",
-    "thirdPartyLogin": "サードパーティログイン"
+    "thirdPartyLogin": "サードパーティログイン",
+    "oauthProcessing": "サインインを完了しています",
+    "oauthSuccess": "サインインに成功しました",
+    "oauthFailed": "サインインに失敗しました",
+    "oauthProviderDenied": "プロバイダーによってサインインが拒否されました。",
+    "oauthStateInvalid": "サインインセッションが期限切れか無効です。",
+    "oauthMissingCode": "プロバイダーからサインインコードが返されませんでした。",
+    "oauthCallbackFailed": "サインインを完了できません。もう一度お試しください。",
+    "oauthBackToLogin": "ログインに戻る"
   },
   "panelHome": {
     "changeToLanModel": "LANモードに切り替え",

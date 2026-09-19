@@ -236,7 +236,15 @@
     "passwordPlaceholder": "Mot de passe",
     "usernamePlaceholder": "Nom d’utilisateur",
     "welcomeMessage": "Willkommen zurück!",
-    "thirdPartyLogin": "Anmeldung über Drittanbieter"
+    "thirdPartyLogin": "Anmeldung über Drittanbieter",
+    "oauthProcessing": "Completing sign-in",
+    "oauthSuccess": "Sign-in successful",
+    "oauthFailed": "Sign-in failed",
+    "oauthProviderDenied": "The provider denied the sign-in request.",
+    "oauthStateInvalid": "The sign-in session expired or was invalid.",
+    "oauthMissingCode": "The provider did not return a sign-in code.",
+    "oauthCallbackFailed": "Unable to complete sign-in. Please try again.",
+    "oauthBackToLogin": "Back to login"
   },
   "panelHome": {
     "changeToLanModel": "Switch to LAN mode",

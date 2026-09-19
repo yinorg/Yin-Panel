@@ -15,6 +15,11 @@ const routes: RouteRecordRaw[] = [
     name: 'login',
     component: () => import('../views/login/index.vue'),
   },
+  {
+    path: '/oauth/callback',
+    name: 'oauthCallback',
+    component: () => import('../views/oauth/callback/index.vue'),
+  },
 
   {
     path: '/404',

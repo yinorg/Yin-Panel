@@ -236,7 +236,15 @@
     "passwordPlaceholder": "密碼",
     "usernamePlaceholder": "賬號",
     "welcomeMessage": "歡迎回來！",
-    "thirdPartyLogin": "第三方登錄"
+    "thirdPartyLogin": "第三方登錄",
+    "oauthProcessing": "正在完成登錄",
+    "oauthSuccess": "登錄成功",
+    "oauthFailed": "登錄失敗",
+    "oauthProviderDenied": "第三方服務拒絕了登錄請求。",
+    "oauthStateInvalid": "登錄會話已過期或無效。",
+    "oauthMissingCode": "第三方服務未返回登錄憑證。",
+    "oauthCallbackFailed": "無法完成登錄，請重試。",
+    "oauthBackToLogin": "返回登錄"
   },
   "panelHome": {
     "changeToLanModel": "切換為內網模式",

@@ -22,17 +22,27 @@ Every command must run in the directory stated by its `cd` or tool working-direc
 - Keep `master` usable at all times. Never make code changes, commits, or direct pushes on `master`.
 - At the start of a task, inspect the current branch and worktree before fetching or switching branches.
 - Determine `<username>` from `git config user.name`, converted to lowercase. Never use the Linux login name.
-- When the worktree is clean, fetch remote updates, switch to `master`, and fast-forward it with `git pull --ff-only origin master`. Create a temporary task branch as `<username>/<YYYYMMDD-HHmm>` from the synchronized `master`.
-- When `master` has uncommitted or untracked changes, do not pull, reset, discard, or overwrite them. Create a temporary branch as `<username>/<YYYYMMDD-HHmm>` from the current `master` and carry the complete worktree into that branch before continuing.
-- Before merging, first merge the latest `master` into the temporary branch, run the required local verification, summarize the final scope, and rename the branch to `<username>/<short-summary>`.
-- Use lowercase English and hyphens in `short-summary`, normally 2 to 4 words describing the main theme. Do not enumerate files, dates, or every individual feature in the branch name; record those details in commits and the pull request.
-- Use descriptive prefixes such as `feature/`, `fix/`, `refactor/`, and `docs/` only when they clarify the task; the username is required for temporary and final task branches.
-- To determine the final summary, inspect `git merge-base master HEAD`, `git log --oneline <base>..HEAD`, `git diff <base>...HEAD`, `git status --short`, `git diff --stat`, and `git diff --cached --stat`. Include intended untracked files in the review before renaming.
-- Complete the required build, test, and `git diff --check` verification on the task branch before merging.
-- Merge the final task branch into `master`, preferably through a pull request or an equivalent non-direct merge workflow.
-- After merging, verify that `master` remains buildable and usable. Only after that verification succeeds, delete both the local and remote task branches, then push the merged `master`.
-- If the task branch was already pushed under its temporary name, push the renamed final branch first and delete the old remote name only after the new branch is confirmed complete.
-- Never delete a task branch before confirming that its commits exist in `master`.
+- By default, use a local long-lived development branch named `<username>-dev`; normally create it once and do not delete it proactively.
+- Unless the user explicitly requests it, do not proactively create a temporary task branch. If the user explicitly requests one, it may be created and used for that task.
+- If `<username>-dev` does not exist and no temporary branch was requested, synchronize local `master` with `origin/master` first, then create `<username>-dev` from that commit.
+- Before each task and before each merge, check the worktree, fetch `origin`, switch to the source branch, and rebase it onto `origin/master`:
+  ```bash
+  git checkout <source-branch>
+  git fetch origin
+  git rebase origin/master
+  ```
+- Resolve rebase conflicts only on `<source-branch>`. Never resolve conflicts on `master`, and never use stash, reset, discard, or overwrite commands to hide unrelated user changes.
+- `master` accepts only fast-forward integration:
+  ```bash
+  git checkout master
+  git merge --ff-only <source-branch>
+  ```
+  Use `<username>-dev` by default. If the user explicitly requested a temporary task branch, that branch may be used as `<source-branch>`. Ordinary merge and `--no-ff` are prohibited.
+- Run the required build, test, and `git diff --check` verification after the final rebase and before the fast-forward merge.
+- Push `master` only after the fast-forward merge and successful verification. If the merge or push fails because `origin/master` advanced, return to `<source-branch>`, fetch, rebase, verify, and retry.
+- Do not proactively push non-`master` branches to the remote. If the user explicitly requests a non-`master` push, push only the branch they specified.
+- Never use `--force` or `--force-with-lease` when pushing `master`.
+- Existing merge commits and existing remote branches are not rewritten or deleted by this policy unless the user explicitly requests a separate migration.
 
 ## Project Facts
 

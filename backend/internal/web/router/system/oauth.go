@@ -87,16 +87,28 @@ func (r *OAuthRouter) OAuthCallback(c *gin.Context) {
 	provider := c.Param("provider")
 	code := c.Query("code")
 	state := c.Query("state")
+	redirectFailure := func(reason string) {
+		c.Redirect(http.StatusFound, config.AppConfig.Base.RootURL+"/oauth/callback?error="+url.QueryEscape(reason))
+	}
 
 	// 检查是否支持该OAuth提供商
 	if !r.isProviderSupported(provider) {
-		response.Error(c, "不支持的OAuth提供商")
+		redirectFailure("provider_unsupported")
+		return
+	}
+	// Consume the one-time state cookie on every callback outcome.
+	r.setOAuthStateCookie(c, provider, "", -1)
+	if c.Query("error") != "" {
+		redirectFailure("provider_denied")
+		return
+	}
+	if code == "" {
+		redirectFailure("missing_code")
 		return
 	}
 	stateCookie, err := c.Cookie(oauthStateCookieName(provider))
-	r.setOAuthStateCookie(c, provider, "", -1)
 	if err != nil || subtle.ConstantTimeCompare([]byte(state), []byte(stateCookie)) != 1 {
-		response.Error(c, "OAuth state校验失败")
+		redirectFailure("state_invalid")
 		return
 	}
 
@@ -104,7 +116,7 @@ func (r *OAuthRouter) OAuthCallback(c *gin.Context) {
 	user, err := global.UserService.HandleOAuthCallback(provider, code, util.RedirectURL(config.AppConfig.Base.RootURL, provider), state)
 	if err != nil {
 		zaplog.Logger.Error("处理OAuth回调失败:", err)
-		response.Error(c, "处理OAuth回调失败")
+		redirectFailure("callback_failed")
 		return
 	}
 
@@ -112,11 +124,11 @@ func (r *OAuthRouter) OAuthCallback(c *gin.Context) {
 	token, err := jwt.GenerateToken(user.ID, user.TokenVersion)
 	if err != nil {
 		zaplog.Logger.Error("生成token失败:", err)
-		response.Error(c, "生成token失败")
+		redirectFailure("token_failed")
 		return
 	}
 
-	redirectUrl := config.AppConfig.Base.RootURL + "/login?token=" + token
+	redirectUrl := config.AppConfig.Base.RootURL + "/oauth/callback?token=" + url.QueryEscape(token)
 	c.Redirect(302, redirectUrl)
 }
 
