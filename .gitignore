@@ -1,54 +1,121 @@
-# Logs
-logs
+# Operating system files
+.DS_Store
+._*
+Thumbs.db
+Thumbs.db:encryptable
+desktop.ini
+$RECYCLE.BIN/
+.Spotlight-V100/
+.Trashes/
+
+# Logs and runtime files
+logs/
 *.log
+*.log.*
+*.pid
+*.pid.lock
+*.seed
+*.stackdump
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-.DS_Store
-dist
-dist-ssr
-coverage
+# Environment variables and local secrets
+.env
+.env.*
+!.env.example
+!frontend/.env
 *.local
+secrets.txt
 
+# Node.js, Vite and frontend tooling
+node_modules/
+.npm/
+.pnpm-store/
+.yarn/cache/
+.yarn/install-state.gz
+dist/
+dist-ssr/
+build/
+out/
+.cache/
+.vite/
+coverage/
+.eslintcache
+.stylelintcache
+*.tsbuildinfo
 /cypress/videos/
 /cypress/screenshots/
+/playwright-report/
+/test-results/
+/blob-report/
+/.nyc_output/
+
+# Go build and profiling output
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+*.prof
+coverage.out
+
+# Python caches, virtual environments and packaging output
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+.venv/
+venv/
+env/
+ENV/
+*.egg-info/
 
 # Editor directories and files
 .vscode/*
 !.vscode/launch.json
 !.vscode/settings.json
 !.vscode/extensions.json
-.idea
+.idea/
+.fleet/
+.history/
 *.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-.pnpm-store
+*.user
+*.userossc
+*.sln.docstates
+*.iml
+*.swp
+*.swo
 
-# Environment variables files
-.history
-service_node
-.env.local
-.env.*.local
+# Docker local overrides
+docker-compose.override.yml
+docker-compose.*.local.yml
 
+# Application data and local build output
 backend/my_conf.yaml
-backend/database
-backend/web
-backend/uploads
+backend/database/
+backend/web/
+backend/uploads/
 backend/yin-panel
-backend/backup
-backend/data
+backend/backup/
+backend/data/
 
 # Local planning notes
 docs/optimization-goals.md
 
-# Secrets
-secrets.txt
-
 # Temporary files
 /tmp/
+*.tmp
+*.temp
