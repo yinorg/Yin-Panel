@@ -13,7 +13,7 @@ RUN apk add --no-cache bash curl tzdata && \
 COPY build-output/yin-panel /app/yin-panel
 COPY backend/web /app/web
 COPY backend/lang /app/lang
-COPY backend/conf.yaml /app/conf.yaml
+COPY backend/conf.yaml.example /app/conf.yaml
 
 EXPOSE 3002
 RUN chmod +x /app/yin-panel
