@@ -29,26 +29,29 @@ Every command must run in the directory stated by its `cd` or tool working-direc
 - For a dirty worktree, inspect the complete tracked diff and every untracked file, classify changes as task-related, existing user work, generated output, or unclear, and report that classification before staging anything. The default is to ask the user how to handle existing code; never stage, commit, stash, reset, discard, delete, or overwrite it without explicit approval.
 - If the user approves including existing code, stage only the reviewed files, keep one coherent feature together, inspect `git diff --cached --stat` and `git diff --cached --check`, then commit. If the user does not approve inclusion, preserve the original worktree and use a clean temporary worktree for the task and integration.
 - If the current local non-`master` branch is the intended development branch and the user requests normalization, rename that local branch to `<username>-dev`; do not recreate it from another commit or push it merely because it was renamed. Keep `<username>-dev` local by default and do not require a remote upstream.
-- Before each task and before each merge, check the worktree, fetch `origin`, switch to the source branch, and rebase it onto `origin/master`:
+- Ordinary code-change tasks default to the **local commit** mode: after implementation and required verification, commit the approved changes on `<username>-dev` and stop. Do not automatically rebase, merge, or push.
+- The prompt `本地提交`, `只提交`, or `提交到开发分支` means local commit mode only. The prompt `不要提交`, `只改文件`, or `暂不提交` overrides the default and leaves the changes uncommitted after verification.
+- The prompt `回灌主分支`, `把代码回灌到 master`, or `走 Git 规范到远程 master` means the **backfill master** mode. Only then fetch the remote, rebase `<username>-dev`, fast-forward merge it into `master`, and push `master`.
+- The prompt `提交并回灌`, `完成 1-2`, or `提交后推送远程` means execute local commit mode followed by backfill master mode.
+- In local commit mode, after staging only the reviewed files, inspect `git diff --cached --stat` and `git diff --cached --check`, commit on `<username>-dev`, and verify the result with `git status --short --branch`, `git branch -vv`, and `git ls-remote --heads origin`. Do not switch to `master` or push as part of this mode.
+- In backfill master mode, before changing refs inspect `git status --short --branch`, `git diff --stat`, and the untracked-file list, then run:
   ```bash
-  git checkout <source-branch>
   git fetch origin
+  git checkout <source-branch>
   git rebase origin/master
+  # Run required verification after the final rebase.
+  git checkout master
+  git merge --ff-only <source-branch>
+  git push origin master
   ```
 - Rebase only after the source worktree is clean and the user-approved change boundary is committed. If unrelated user changes prevent a checkout or rebase, use a clean temporary worktree for verification and integration instead of using stash, reset, discard, or overwrite commands.
 - Resolve rebase conflicts only on `<source-branch>`. Never resolve conflicts on `master`, and never use stash, reset, discard, or overwrite commands to hide unrelated user changes.
-- `master` accepts only fast-forward integration:
-  ```bash
-  git checkout master
-  git merge --ff-only <source-branch>
-  ```
-  Use `<username>-dev` by default. If the user explicitly requested a temporary task branch, that branch may be used as `<source-branch>`. Ordinary merge and `--no-ff` are prohibited.
-- Run the required build, test, and `git diff --check` verification after the final rebase and before the fast-forward merge.
-- Push `master` only after the fast-forward merge and successful verification. If the merge or push fails because `origin/master` advanced, return to `<source-branch>`, fetch, rebase, verify, and retry.
+- Use `<username>-dev` as `<source-branch>` by default. If the user explicitly requested a temporary task branch, that branch may be used instead. Ordinary merge and `--no-ff` are prohibited; `master` accepts only fast-forward integration.
+- Run the required build, test, and `git diff --check` verification after the final rebase and before the fast-forward merge. If `origin/master` advances or the merge/push fails, return to `<source-branch>`, fetch, rebase, verify, and retry.
 - Do not proactively push non-`master` branches to the remote. If the user explicitly requests a non-`master` push, push only the branch they specified.
 - Never use `--force` or `--force-with-lease` when pushing `master`.
 - Existing merge commits and existing remote branches are not rewritten or deleted by this policy unless the user explicitly requests a separate migration.
-- After a commit, merge, or push, verify with `git status --short --branch`, `git branch -vv`, and `git ls-remote --heads origin`; report retained local branches, remote branches deleted by explicit request, and any stale upstream tracking references.
+- After a local commit, merge, or push, verify with `git status --short --branch`, `git branch -vv`, and `git ls-remote --heads origin`; report retained local branches, remote branches deleted by explicit request, and any stale upstream tracking references.
 
 ## Project Facts
 
