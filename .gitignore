@@ -49,3 +49,6 @@ docs/optimization-goals.md
 
 # Secrets
 secrets.txt
+
+# Temporary files
+/tmp/
