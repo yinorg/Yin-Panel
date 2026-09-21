@@ -956,8 +956,7 @@ html {
 }
 
 .taiji-symbol {
-  --taiji-top: #18212b;
-  --taiji-bottom: #f4efe2;
+  --taiji-start-angle: 90deg;
   position: relative;
   z-index: 1;
   width: 58%;
@@ -965,14 +964,13 @@ html {
   overflow: hidden;
   border: 3px solid rgba(255, 255, 255, 0.82);
   border-radius: 50%;
-  background: linear-gradient(to bottom, var(--taiji-top) 0 50%, var(--taiji-bottom) 50%);
+  background: linear-gradient(90deg, #18212b 0 50%, #f4efe2 50%);
   box-shadow: 0 0 34px rgba(255, 255, 255, 0.3), 0 0 80px rgba(13, 18, 24, 0.3);
   animation: taiji-spin 1000ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
 }
 
 .taiji-symbol.taiji-yang {
-  --taiji-top: #f4efe2;
-  --taiji-bottom: #18212b;
+  --taiji-start-angle: 270deg;
 }
 
 .taiji-symbol::before,
@@ -987,12 +985,12 @@ html {
 
 .taiji-symbol::before {
   top: 0;
-  background: var(--taiji-bottom);
+  background: #f4efe2;
 }
 
 .taiji-symbol::after {
   bottom: 0;
-  background: var(--taiji-top);
+  background: #18212b;
 }
 
 .taiji-dot {
@@ -1006,13 +1004,13 @@ html {
 .taiji-dot-dark {
   top: 25%;
   left: 44%;
-  background: var(--taiji-top);
+  background: #18212b;
 }
 
 .taiji-dot-light {
   bottom: 25%;
   left: 44%;
-  background: var(--taiji-bottom);
+  background: #f4efe2;
 }
 
 .taiji-bagua {
@@ -1051,8 +1049,8 @@ html {
 }
 
 @keyframes taiji-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(180deg); }
+  from { transform: rotate(var(--taiji-start-angle, 0deg)); }
+  to { transform: rotate(calc(var(--taiji-start-angle, 0deg) + 180deg)); }
 }
 
 @media (prefers-reduced-motion: reduce) {
