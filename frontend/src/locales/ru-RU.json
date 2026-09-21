@@ -131,6 +131,7 @@
     "cancel": "Отмена",
     "confirm": "Подтвердить",
     "continue": "Weiter",
+    "copyUrl": "Копировать URL",
     "delete": "Удалить",
     "deleteConfirm": "Are you sure you want to delete?",
     "deleteConfirmByName": "Are you sure you want to delete {name}?",

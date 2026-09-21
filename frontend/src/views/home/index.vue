@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { VueDraggable } from 'vue-draggable-plus'
 import { NBackTop, NButton, NButtonGroup, NCard, NDropdown, NInput, NModal, NSkeleton, NSpin, NSpace, useDialog, useMessage } from 'naive-ui'
-import { defineAsyncComponent, nextTick, onMounted, onUnmounted, ref } from 'vue'
-import { createSpace, getGroups, getItems, getSpaces, sortSpaces, spaceDisplayName, type Space } from '../../api/panel/space'
+import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { createGroup, createSpace, getGroups, getItems, getSpaces, sortSpaces, spaceDisplayName, type Space } from '../../api/panel/space'
 import Clock from '../../components/deskModule/Clock/index.vue'
 import SearchBox from '../../components/deskModule/SearchBox/index.vue'
 import SvgIcon from '../../components/common/SvgIcon/index.vue'
 import SvgIconOnline from '../../components/common/SvgIconOnline/index.vue'
 import AppIcon from './components/AppIcon/index.vue'
+import CommandCenter from './components/CommandCenter/index.vue'
 import { deleteItem, sortItems } from '@/api/panel/space'
 
 import { setTitle } from '@/utils/cmn'
@@ -60,6 +61,13 @@ const creatingSpace = ref(false)
 const monitorEnabled = ref(false)
 const sideSwitching = ref(false)
 let sideSwitchTimer: ReturnType<typeof setTimeout> | undefined
+const commandCenterVisible = ref(false)
+const commandCenterMode = ref<'search' | 'command'>('search')
+const commandCenterQuery = ref('')
+const commandCenterSelectedIndex = ref(0)
+const groupCreateVisible = ref(false)
+const groupName = ref('')
+const creatingGroup = ref(false)
 
 const items = ref<ItemGroup[]>([])
 const filterItems = ref<ItemGroup[]>([])
@@ -266,6 +274,121 @@ function togglePanelSide() {
     sideSwitching.value = false
     sideSwitchTimer = undefined
   }, 1000)
+}
+
+const commandDefinitions = computed(() => [
+  { key: 'add', label: t('iconItem.add') },
+  { key: 'group', label: t('spaceManage.addGroup') },
+  { key: 'space', label: t('spaceManage.createSpace') },
+  { key: 'settings', label: t('appLauncher.title') },
+  { key: 'top', label: t('spaceManage.backToTop') },
+  { key: 'open', label: t('iconItem.currentPageOpen') },
+  { key: 'lan', label: t('panelHome.openLanUrl') },
+  { key: 'wan', label: t('panelHome.openWanUrl') },
+  { key: 'edit', label: t('iconItem.edit') },
+  { key: 'copy', label: t('common.copyUrl') },
+])
+
+const filteredCommandDefinitions = computed(() => {
+  const query = commandCenterQuery.value.replace(/^\//, '').trim().toLowerCase()
+  return commandDefinitions.value.filter(command => command.key.includes(query) || command.label.toLowerCase().includes(query))
+})
+
+const allCommandItems = computed(() => items.value.flatMap(group => group.items || []))
+
+const commandCenterItems = computed(() => {
+  const query = commandCenterQuery.value.trim().toLowerCase()
+  if (commandCenterMode.value === 'command' || !query) return []
+  const seen = new Set<number>()
+  return allCommandItems.value.filter((item) => {
+    if (item.id !== undefined && seen.has(Number(item.id))) return false
+    if (item.id !== undefined) seen.add(Number(item.id))
+    return [item.title, item.url, item.description].some(value => value?.toLowerCase().includes(query))
+  })
+})
+
+function openCommandCenter(mode: 'search' | 'command', query: string) {
+  commandCenterMode.value = mode
+  commandCenterQuery.value = query
+  commandCenterSelectedIndex.value = 0
+  commandCenterVisible.value = true
+}
+
+function closeCommandCenter() {
+  commandCenterVisible.value = false
+  commandCenterQuery.value = ''
+  commandCenterSelectedIndex.value = 0
+}
+
+function moveCommandSelection(offset: number) {
+  const length = commandCenterMode.value === 'command' ? filteredCommandDefinitions.value.length : commandCenterItems.value.length
+  if (!length) return
+  commandCenterSelectedIndex.value = (commandCenterSelectedIndex.value + offset + length) % length
+}
+
+function findCommandItem(query: string) {
+  const keyword = query.trim().toLowerCase()
+  return allCommandItems.value.find(item => !keyword || [item.title, item.url, item.description].some(value => value?.toLowerCase().includes(keyword)))
+}
+
+function executeCommand(command: string) {
+  const parts = commandCenterQuery.value.trim().replace(/^\//, '').split(/\s+/)
+  const keyword = parts.slice(1).join(' ')
+  if (command === 'add') handleAddItem()
+  else if (command === 'group') groupCreateVisible.value = true
+  else if (command === 'space') createSpaceVisible.value = true
+  else if (command === 'settings') settingModalShow.value = true
+  else if (command === 'top') scrollToTop()
+  else {
+    const item = findCommandItem(keyword)
+    if (!item) return
+    if (command === 'open') openPage(item.openMethod, getItemOpenUrl(item), item.title)
+    else if (command === 'lan' && item.lanUrl) openPage(item.openMethod, item.lanUrl, item.title)
+    else if (command === 'wan') openPage(item.openMethod, getItemOpenUrl(item, true), item.title)
+    else if (command === 'edit') handleEditItem({ ...item })
+    else if (command === 'copy') navigator.clipboard?.writeText(item.url)
+  }
+  closeCommandCenter()
+}
+
+function executeCommandItem(item: Panel.ItemInfo) {
+  openPage(item.openMethod, getItemOpenUrl(item), item.title)
+  closeCommandCenter()
+}
+
+function isEditableTarget(target: EventTarget | null) {
+  const element = target as HTMLElement | null
+  return !!element?.closest('input, textarea, select, [contenteditable="true"]')
+}
+
+function hasBlockingLayer() {
+  if (settingModalShow.value || editItemInfoShow.value || createSpaceVisible.value || groupCreateVisible.value || windowShow.value || dropdownShow.value) return true
+  return Array.from(document.querySelectorAll('.n-modal-container, .n-drawer-container')).some((element) => {
+    const style = window.getComputedStyle(element)
+    return style.display !== 'none' && style.visibility !== 'hidden' && Number(style.opacity) !== 0
+  })
+}
+
+function handleGlobalKeydown(event: KeyboardEvent) {
+  if (commandCenterVisible.value || !authStore.token || (publicCode && !publicAccessReady.value)) return
+  if (event.isComposing || isEditableTarget(event.target) || hasBlockingLayer()) return
+  if (event.ctrlKey || event.metaKey || event.altKey || event.key.length !== 1) return
+  event.preventDefault()
+  openCommandCenter(event.key === '/' ? 'command' : 'search', event.key === '/' ? '/' : event.key)
+}
+
+function submitCreateGroup() {
+  const title = groupName.value.trim()
+  if (!title || !activeSpace.value || creatingGroup.value) return
+  creatingGroup.value = true
+  createGroup<{ code: number }>(activeSpace.value.id, title).then(({ code }) => {
+    if (code === 0) {
+      groupName.value = ''
+      groupCreateVisible.value = false
+      clearCachedSpace(activeSpace.value!.id)
+      getList(true)
+    }
+  }).finally(() => { creatingGroup.value = false })
 }
 
 async function refreshCurrentSpace() {
@@ -495,11 +618,13 @@ function loadHomeData() {
 }
 
 onMounted(() => {
+  window.addEventListener('keydown', handleGlobalKeydown)
   if (publicCode && !publicAccessReady.value) return
   loadHomeData()
 })
 
 onUnmounted(() => {
+  window.removeEventListener('keydown', handleGlobalKeydown)
   if (sideSwitchTimer) clearTimeout(sideSwitchTimer)
   groupLoadGeneration++
   loadingGroups.value = new Set()
@@ -563,6 +688,19 @@ function handleAddItem(itemIconGroupId?: number) {
 
 <template>
   <div class="w-full h-full sun-main" :class="{ 'side-switching': sideSwitching }">
+    <CommandCenter
+      :visible="commandCenterVisible"
+      :mode="commandCenterMode"
+      :query="commandCenterQuery"
+      :items="commandCenterItems"
+      :commands="commandCenterMode === 'command' ? filteredCommandDefinitions : []"
+      :selected-index="commandCenterSelectedIndex"
+      @update:query="commandCenterQuery = $event"
+      @move="moveCommandSelection"
+      @execute-item="executeCommandItem"
+      @execute-command="executeCommand"
+      @close="closeCommandCenter"
+    />
     <div v-if="sideSwitching" class="taiji-transition" aria-hidden="true">
       <div class="taiji-aura">
         <div class="taiji-bagua">
@@ -879,6 +1017,9 @@ function handleAddItem(itemIconGroupId?: number) {
   </div>
   <NModal v-model:show="createSpaceVisible" preset="dialog" :title="$t('spaceManage.createSpace')" :positive-text="$t('common.confirm')" :negative-text="$t('common.cancel')" :loading="creatingSpace" @positive-click="submitCreateSpace">
     <NInput v-model:value="spaceName" :placeholder="$t('spaceManage.newSpaceName')" maxlength="100" show-count @keyup.enter="submitCreateSpace" />
+  </NModal>
+  <NModal v-model:show="groupCreateVisible" preset="dialog" :title="$t('spaceManage.addGroup')" :positive-text="$t('common.confirm')" :negative-text="$t('common.cancel')" :loading="creatingGroup" @positive-click="submitCreateGroup">
+    <NInput v-model:value="groupName" :placeholder="$t('spaceManage.groupName')" maxlength="100" @keyup.enter="submitCreateGroup" />
   </NModal>
 </template>
 

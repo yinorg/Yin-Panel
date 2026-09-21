@@ -131,6 +131,7 @@
     "cancel": "取消",
     "confirm": "確定",
     "continue": "繼續",
+    "copyUrl": "複製網址",
     "delete": "刪除",
     "deleteConfirm": "你確定要刪除嗎？",
     "deleteConfirmByName": "你確定要刪除{name}嗎？",

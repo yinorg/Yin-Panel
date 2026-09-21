@@ -131,6 +131,7 @@
     "cancel": "Abbrechen",
     "confirm": "Bestätigen",
     "continue": "Weiter",
+    "copyUrl": "URL kopieren",
     "delete": "Löschen",
     "deleteConfirm": "Are you sure you want to delete?",
     "deleteConfirmByName": "Are you sure you want to delete {name}?",
