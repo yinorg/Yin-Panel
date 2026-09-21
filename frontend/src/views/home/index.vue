@@ -58,6 +58,8 @@ const createSpaceVisible = ref(false)
 const spaceName = ref('')
 const creatingSpace = ref(false)
 const monitorEnabled = ref(false)
+const sideSwitching = ref(false)
+let sideSwitchTimer: ReturnType<typeof setTimeout> | undefined
 
 const items = ref<ItemGroup[]>([])
 const filterItems = ref<ItemGroup[]>([])
@@ -250,12 +252,20 @@ function selectSpace(key: string | number) {
   if (selected) { activeSpace.value = selected; getList() }
 }
 function togglePanelSide() {
-  if (!activeSpace.value?.pairedSpaceId) return
+  if (sideSwitching.value || !activeSpace.value?.pairedSpaceId) return
   const yin = activeSpace.value
   const target = yin.side === 'yang'
     ? spaces.value.find(space => space.id === yin.pairId)
     : { ...yin, id: yin.pairedSpaceId, name: `${yin.name}-B`, side: 'yang' as const, pairId: yin.id, pairedSpaceId: yin.id }
-  if (target) { activeSpace.value = target; getList() }
+  if (!target) return
+  activeSpace.value = target
+  getList()
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+  sideSwitching.value = true
+  sideSwitchTimer = setTimeout(() => {
+    sideSwitching.value = false
+    sideSwitchTimer = undefined
+  }, 650)
 }
 
 async function refreshCurrentSpace() {
@@ -490,6 +500,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  if (sideSwitchTimer) clearTimeout(sideSwitchTimer)
   groupLoadGeneration++
   loadingGroups.value = new Set()
   groupObserver?.disconnect()
@@ -551,7 +562,7 @@ function handleAddItem(itemIconGroupId?: number) {
 </script>
 
 <template>
-  <div class="w-full h-full sun-main">
+  <div class="w-full h-full sun-main" :class="{ 'side-switching': sideSwitching }">
     <NModal :show="!!publicCode && !publicAccessReady" :mask-closable="false" :closable="false">
       <NCard :title="$t('spaceManage.accessVerification')" style="width: min(92vw, 380px)">
         <NSpace vertical>
@@ -897,6 +908,34 @@ html {
 
 .sun-main {
   user-select: none;
+  transform-origin: center;
+  will-change: transform;
+}
+
+.sun-main.side-switching {
+  perspective: 1200px;
+  animation: panel-side-switch 650ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+@keyframes panel-side-switch {
+  0% {
+    transform: perspective(1200px) rotateY(0deg) scale(1);
+    filter: brightness(1);
+  }
+  50% {
+    transform: perspective(1200px) rotateY(180deg) scale(0.97);
+    filter: brightness(0.72);
+  }
+  100% {
+    transform: perspective(1200px) rotateY(360deg) scale(1);
+    filter: brightness(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sun-main.side-switching {
+    animation: none;
+  }
 }
 
 .cover {
