@@ -142,6 +142,19 @@ onUnmounted(() => window.removeEventListener('yin-panel-search-config-saved', ha
   padding: 2px 10px;
   backdrop-filter:blur(2px)
 }
+
+.search-container input {
+  background-color: transparent;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  height: 40px;
+  padding: 10px 5px;
+  border: none;
+  outline: none;
+  font-size: 17px;
+}
+
 .focused, .search-container:hover {
   box-shadow: 0px 0px 30px -5px rgba(41, 41, 41, 0.45);
   -webkit-box-shadow: 0px 0px 30px -5px rgba(0, 0, 0, 0.45);
