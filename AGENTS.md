@@ -66,6 +66,15 @@ Every command must run in the directory stated by its `cd` or tool working-direc
 - Local HTTP port: `${YIN_PANEL_PORT:-3002}`
 - Current local service is a standalone process, not a Docker container.
 
+## Test Placement and Ownership
+
+- Keep unit and subsystem integration tests with the code they exercise: backend tests belong under `backend/`, and frontend tests belong under `frontend/` using the local framework conventions.
+- Put cross-repository acceptance tests and real-browser workflows in the separate E2E repository at `YIN_PANEL_E2E_DIR`, under its `tests/` directory.
+- Scenarios that load the browser extension, exercise `chrome_url_overrides`, or verify Core plus extension behavior belong in E2E, even when the reported defect is in extension code.
+- Do not copy Core or extension source into the E2E repository. Load the tested extension through `YIN_PANEL_EXTENSION_DIR` and record the tested source commit in CI or the test run context.
+- When a change spans repositories, keep implementation and fast local tests in their owning repositories; add the cross-repository regression test to E2E.
+- Keep Playwright reports, traces, screenshots, videos, and other generated test output ignored and untracked.
+
 All paths outside this repository are machine-specific. Use `git rev-parse --show-toplevel`, `YIN_PANEL_RUNTIME_DIR`, `YIN_PANEL_EXTENSION_DIR`, and `YIN_PANEL_E2E_DIR`; never commit a developer home directory or machine-specific absolute path.
 
 Load local-only values for a shell session with:
