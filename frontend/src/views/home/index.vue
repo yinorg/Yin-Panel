@@ -909,6 +909,7 @@ html {
 .sun-main {
   user-select: none;
   transform-origin: center;
+  backface-visibility: hidden;
   will-change: transform;
 }
 
@@ -927,7 +928,7 @@ html {
     filter: brightness(0.72);
   }
   100% {
-    transform: perspective(1200px) rotateY(360deg) scale(1);
+    transform: perspective(1200px) rotateY(180deg) scale(1);
     filter: brightness(1);
   }
 }
