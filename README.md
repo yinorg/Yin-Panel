@@ -101,6 +101,14 @@ go test ./...
 go build -o /tmp/yin-panel-build/yin-panel .
 ```
 
+本地完整更新（前端、后端、部署和重启）统一使用：
+
+```bash
+./scripts/deploy-local.sh
+```
+
+脚本默认将仓库内的 `backend/` 作为运行目录，要求其中存在本地 `conf.yaml`；可通过 `.env.local` 中的 `YIN_PANEL_RUNTIME_DIR` 覆盖。脚本会在构建和测试全部通过后，使用 `sudo` 删除旧二进制与静态文件并替换新产物，不会修改数据库、上传文件或配置文件。
+
 完整的 AI 开发、发布和重启约定见 [AGENTS.md](./AGENTS.md)。
 
 ## 备份与升级

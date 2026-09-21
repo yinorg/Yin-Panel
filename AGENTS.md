@@ -10,7 +10,7 @@ For every code-change task, follow this order without asking the user to repeat 
 2. Make the smallest scoped change while preserving unrelated worktree changes.
 3. For frontend-only changes, run the frontend build only. Do not compile or restart the backend.
 4. For backend changes, build the frontend first only when the backend serves a changed frontend bundle; then format, test, and compile the backend.
-5. If the user asks to update the running service, deploy only the changed artifact: replace `web/` for frontend-only changes, or replace the binary for backend changes. Restart only when the binary changed; preserve timestamped backups and verify the configured port after a restart.
+5. If the user asks to update the running local service, use `scripts/deploy-local.sh`, which performs the complete build, replacement, restart, and verification SOP. Do not use an external backup directory as an implicit deployment target.
 6. Report exact checks run and any skipped checks. Do not claim success from an unrun or failed check.
 
 Do not stop at a plan when the user asked to execute. Do not re-ask for paths, build order, or restart procedure already specified here.
@@ -61,7 +61,7 @@ Every command must run in the directory stated by its `cd` or tool working-direc
 - Frontend: `frontend/`
 - Backend: `backend/`
 - Frontend production output: `backend/web/`
-- Local runtime directory: `YIN_PANEL_RUNTIME_DIR` (required for deployment)
+- Local runtime directory: repository `backend/` by default; `YIN_PANEL_RUNTIME_DIR` may explicitly override it
 - Local binary: `$YIN_PANEL_RUNTIME_DIR/yin-panel`
 - Local HTTP port: `${YIN_PANEL_PORT:-3002}`
 - Current local service is a standalone process, not a Docker container.
@@ -100,73 +100,23 @@ fi
 
 ## Standard Build Order
 
-For a combined release, build the frontend first, then build and test the backend:
-
-```bash
-repo_root="$(git rev-parse --show-toplevel)"
-cd "$repo_root/frontend"
-npm ci                         # only when node_modules is absent or stale
-npm run build-only             # writes production files to ../backend/web
-
-cd "$repo_root/backend"
-gofmt -w <changed-go-files>
-go test ./...
-mkdir -p /tmp/yin-panel-build
-go build -o /tmp/yin-panel-build/yin-panel .
-```
+For a combined release, run `scripts/deploy-local.sh`. It builds the frontend first, then tests and compiles the backend, replaces both runtime artifacts, restarts the service, and verifies the running HTTP service.
 
 `npm run type-check` may report pre-existing project-wide TypeScript errors. Do not claim it passed unless it exits successfully. `npm run build-only` is the required frontend acceptance check.
 
-For frontend-only work, stop after `npm run build-only` and deploy `backend/web/` if a running instance must be updated. Do not run `go build` or restart the service.
-
-For backend-only work, skip the frontend entirely. Run `gofmt`, `go test ./...`, and `go build`; deploy only the backend binary and restart the service. Do not replace `web/`.
+The local update SOP intentionally rebuilds and deploys both artifacts every time so the running frontend and backend cannot become version-mismatched.
 
 ## Local Deployment
 
-The service runs from `$YIN_PANEL_RUNTIME_DIR`, with that directory as its working directory so `conf.yaml` is found. Require this variable before deployment. Never replace its database or uploads with repository copies.
+The service runs from the repository `backend/` directory by default, with that directory as its working directory so `conf.yaml` is found. `YIN_PANEL_RUNTIME_DIR` can explicitly override the target. Never replace its database or uploads with repository copies.
 
-After successful builds, replace only the changed runtime artifact. A running Linux executable cannot be overwritten reliably and may fail with `Text file busy`; always stop the current Yin-Panel process and confirm its PID has exited before replacing the binary. If the process does not exit, do not replace the binary or kill unrelated processes; report the blocker. Preserve old binaries, but do not keep backups of frontend static files:
-
-```bash
-repo_root="$(git rev-parse --show-toplevel)"
-run_dir="${YIN_PANEL_RUNTIME_DIR:?Set YIN_PANEL_RUNTIME_DIR before deployment}"
-stamp=$(date +%Y%m%d-%H%M%S)
-cp -a "$run_dir/yin-panel" "$run_dir/yin-panel.previous-$stamp"
-pid=$(ss -ltnp | awk '/:'"${YIN_PANEL_PORT:-3002}"' / {match($0,/pid=[0-9]+/); if (RSTART) {print substr($0,RSTART+4,RLENGTH-4); exit}}')
-test -n "$pid"
-kill "$pid"
-for i in $(seq 1 100); do
-    if ! kill -0 "$pid" 2>/dev/null; then
-        break
-    fi
-    sleep 0.1
-done
-if kill -0 "$pid" 2>/dev/null; then
-    echo "Yin-Panel process did not exit" >&2
-    exit 1
-fi
-cp -a /tmp/yin-panel-build/yin-panel "$run_dir/yin-panel"
-rm -rf "$run_dir/web"
-cp -a "$repo_root/backend/web" "$run_dir/web"
-```
-
-Identify the listener with `ss -ltnp | grep ":${YIN_PANEL_PORT:-3002}"`. Resolve and record the Yin-Panel PID before stopping it. Stop only that process, confirm it exited as shown above, then start it detached from the terminal:
+Run the complete local deployment with:
 
 ```bash
-kill <yin-panel-pid>
-cd "$run_dir"
-setsid ./yin-panel > yin-panel.log 2>&1 < /dev/null &
+./scripts/deploy-local.sh
 ```
 
-Verify the process and HTTP service:
-
-```bash
-ss -ltnp | grep ":${YIN_PANEL_PORT:-3002}"
-curl --noproxy '*' -fsS "http://127.0.0.1:${YIN_PANEL_PORT:-3002}/" -o /tmp/yin-panel-home.html
-tail -30 "$run_dir/yin-panel.log"
-```
-
-Do not start the binary from another working directory; it will exit because it cannot find `conf.yaml`.
+The script requires `backend/conf.yaml` before it stops any running process. After all builds and tests pass, it stops only the Yin-Panel listener, uses `sudo` to force-remove the old binary and `web/`, then starts the new binary from the target directory. It does not create backups and never touches database, upload, or configuration files.
 
 ## Versioning and Tags
 
