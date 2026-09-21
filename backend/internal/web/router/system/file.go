@@ -37,8 +37,8 @@ func (a *FileRouter) InitRouter(router *gin.RouterGroup) {
 	r.Use(interceptor.Auth)
 	{
 		r.POST("/file/uploadImg", a.UploadImg)
-		r.POST("/file/delete", a.Delete)
-		r.GET("/file/getList", a.GetList)
+		r.POST("/file/delete", interceptor.AdminInterceptor, a.Delete)
+		r.GET("/file/getList", interceptor.AdminInterceptor, a.GetList)
 	}
 }
 
@@ -131,13 +131,7 @@ func (a *FileRouter) UploadImg(c *gin.Context) {
 }
 
 func (a *FileRouter) GetList(c *gin.Context) {
-	userInfo, exist := base.GetCurrentUserInfo(c)
-	if !exist || userInfo.ID == 0 {
-		response.ErrorByCode(c, constant.CodeNotLogin)
-		return
-	}
-
-	list, count, err := global.FileRepo.GetList(userInfo.ID)
+	list, count, err := global.FileRepo.GetAll()
 	if err != nil {
 		response.ErrorDatabase(c, err.Error())
 		return
@@ -162,18 +156,12 @@ func (a *FileRouter) Delete(c *gin.Context) {
 	}
 
 	req := RequestDeleteId{}
-	userInfo, exist := base.GetCurrentUserInfo(c)
-	if !exist || userInfo.ID == 0 {
-		response.ErrorByCode(c, constant.CodeNotLogin)
-		return
-	}
-
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.ErrorParamFomat(c, err.Error())
 		return
 	}
 
-	file, err := global.FileRepo.Get(userInfo.ID, req.Id)
+	file, err := global.FileRepo.GetByID(req.Id)
 	if err != nil {
 		response.ErrorDatabase(c, err.Error())
 		return
@@ -185,7 +173,7 @@ func (a *FileRouter) Delete(c *gin.Context) {
 	}
 
 	// 从数据库中删除记录
-	if err := global.FileRepo.Delete(userInfo.ID, req.Id); err != nil {
+	if err := global.FileRepo.DeleteByID(req.Id); err != nil {
 		response.ErrorDatabase(c, err.Error())
 		return
 	}

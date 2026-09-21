@@ -46,11 +46,6 @@ const apps = ref<App[]>([
     componentName: 'SpaceManage',
     icon: 'ic-baseline-add-business',
   },
-  {
-    name: t('apps.uploadsFileManager.appName'),
-    componentName: 'UploadFileManager',
-    icon: 'tabler:file-upload',
-  },
 ])
 
 const authStore = useAuthStore()
@@ -98,8 +93,17 @@ onMounted(() => {
   }
   // 初始化
   const addAdminApp = () => {
-    if (Number(authStore.userInfo?.role) === 1 && !apps.value.some(item => item.componentName === 'Users'))
+    if (Number(authStore.userInfo?.role) !== 1)
+      return
+    if (!apps.value.some(item => item.componentName === 'Users'))
       apps.value.push(adminApp)
+    if (!apps.value.some(item => item.componentName === 'UploadFileManager'))
+      apps.value.push({
+        name: t('apps.uploadsFileManager.appName'),
+        componentName: 'UploadFileManager',
+        icon: 'tabler:file-upload',
+        auth: 1,
+      })
   }
   addAdminApp()
   apps.value.push(aboutApp)
