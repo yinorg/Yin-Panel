@@ -56,6 +56,9 @@ const currentAddItenIconGroupId = ref<number | undefined>()
 const settingModalShow = ref(false)
 const spaces = ref<Space[]>([])
 const activeSpace = ref<Space | null>(null)
+const spaceSelectorOptions = computed(() => spaces.value
+  .filter(space => space.id !== activeSpace.value?.id)
+  .map(space => ({ label: spaceDisplayName(space, spaces.value, authStore.userInfo?.id), key: space.id })))
 const createSpaceVisible = ref(false)
 const spaceName = ref('')
 const creatingSpace = ref(false)
@@ -742,7 +745,7 @@ function handleAddItem(itemIconGroupId?: number) {
     <div v-if="spaces.length && authStore.token" class="space-status-bar">
       <NDropdown
         trigger="hover"
-        :options="spaces.map(space => ({ label: spaceDisplayName(space, spaces, authStore.userInfo?.id), key: space.id }))"
+        :options="spaceSelectorOptions"
         :theme-overrides="{
           color: 'rgba(18, 22, 28, 0.72)',
           optionTextColor: 'rgba(255, 255, 255, 0.92)',
