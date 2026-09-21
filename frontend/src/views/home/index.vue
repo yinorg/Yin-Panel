@@ -376,7 +376,8 @@ function hasBlockingLayer() {
   if (settingModalShow.value || editItemInfoShow.value || createSpaceVisible.value || groupCreateVisible.value || windowShow.value || dropdownShow.value) return true
   return Array.from(document.querySelectorAll('.n-modal-container, .n-drawer-container')).some((element) => {
     const style = window.getComputedStyle(element)
-    return style.display !== 'none' && style.visibility !== 'hidden' && Number(style.opacity) !== 0
+    if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0) return false
+    return Array.from(element.querySelectorAll('.n-modal-body-wrapper, .n-drawer-body-content')).some(container => container.firstElementChild !== null)
   })
 }
 
