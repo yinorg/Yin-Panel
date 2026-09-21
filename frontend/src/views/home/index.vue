@@ -63,7 +63,6 @@ const monitorEnabled = ref(false)
 const sideSwitching = ref(false)
 let sideSwitchTimer: ReturnType<typeof setTimeout> | undefined
 const commandCenterVisible = ref(false)
-const commandCenterMode = ref<'search' | 'command'>('search')
 const commandCenterQuery = ref('')
 const commandCenterSelectedIndex = ref(-1)
 const commandCenterSearchEngine = ref<SearchEngine>(searchEngineList[0])
@@ -300,7 +299,7 @@ const allCommandItems = computed(() => items.value.flatMap(group => group.items 
 
 const commandCenterItems = computed(() => {
   const query = commandCenterQuery.value.trim().toLowerCase()
-  if (commandCenterMode.value === 'command' || !query) return []
+  if (commandCenterQuery.value.startsWith('/') || !query) return []
   const seen = new Set<number>()
   return allCommandItems.value.filter((item) => {
     if (item.id !== undefined && seen.has(Number(item.id))) return false
@@ -309,10 +308,9 @@ const commandCenterItems = computed(() => {
   })
 })
 
-function openCommandCenter(mode: 'search' | 'command', query: string) {
-  commandCenterMode.value = mode
+function openCommandCenter(query: string) {
   commandCenterQuery.value = query
-  commandCenterSelectedIndex.value = mode === 'command' ? 0 : -1
+  commandCenterSelectedIndex.value = query.startsWith('/') ? 0 : -1
   commandCenterVisible.value = true
 }
 
@@ -323,7 +321,7 @@ function closeCommandCenter() {
 }
 
 function moveCommandSelection(offset: number) {
-  const length = commandCenterMode.value === 'command' ? filteredCommandDefinitions.value.length : commandCenterItems.value.length
+  const length = commandCenterQuery.value.startsWith('/') ? filteredCommandDefinitions.value.length : commandCenterItems.value.length
   if (!length) return
   commandCenterSelectedIndex.value = (commandCenterSelectedIndex.value + offset + length) % length
 }
@@ -367,6 +365,14 @@ function executeCommandItem(item: Panel.ItemInfo) {
   closeCommandCenter()
 }
 
+function updateCommandCenterQuery(query: string) {
+  const wasCommandQuery = commandCenterQuery.value.startsWith('/')
+  const isCommandQuery = query.startsWith('/')
+  commandCenterQuery.value = query
+  if (wasCommandQuery !== isCommandQuery)
+    commandCenterSelectedIndex.value = isCommandQuery ? 0 : -1
+}
+
 function isEditableTarget(target: EventTarget | null) {
   const element = target as HTMLElement | null
   return !!element?.closest('input, textarea, select, [contenteditable="true"]')
@@ -386,7 +392,7 @@ function handleGlobalKeydown(event: KeyboardEvent) {
   if (event.isComposing || isEditableTarget(event.target) || hasBlockingLayer()) return
   if (event.ctrlKey || event.metaKey || event.altKey || event.key.length !== 1) return
   event.preventDefault()
-  openCommandCenter(event.key === '/' ? 'command' : 'search', event.key === '/' ? '/' : event.key)
+  openCommandCenter(event.key)
 }
 
 function submitCreateGroup() {
@@ -700,12 +706,12 @@ function handleAddItem(itemIconGroupId?: number) {
   <div class="w-full h-full sun-main" :class="{ 'side-switching': sideSwitching }">
     <CommandCenter
       :visible="commandCenterVisible"
-      :mode="commandCenterMode"
       :query="commandCenterQuery"
       :items="commandCenterItems"
-      :commands="commandCenterMode === 'command' ? filteredCommandDefinitions : []"
+      :commands="filteredCommandDefinitions"
       :selected-index="commandCenterSelectedIndex"
-      @update:query="commandCenterQuery = $event"
+      :search-engine="commandCenterSearchEngine"
+      @update:query="updateCommandCenterQuery"
       @move="moveCommandSelection"
       @select="selectCommandItem"
       @submit-search="submitCommandCenterSearch"

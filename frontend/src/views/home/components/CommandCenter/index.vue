@@ -1,5 +1,8 @@
 <script setup lang="ts">
-import { nextTick, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
+import { NAvatar } from 'naive-ui'
+import SvgIcon from '@/components/common/SvgIcon/index.vue'
+import type { SearchEngine } from '@/components/deskModule/SearchBox/engines'
 
 interface CommandDefinition {
   key: string
@@ -8,11 +11,11 @@ interface CommandDefinition {
 
 const props = defineProps<{
   visible: boolean
-  mode: 'search' | 'command'
   query: string
   items: Panel.ItemInfo[]
   commands: CommandDefinition[]
   selectedIndex: number
+  searchEngine: SearchEngine
 }>()
 
 const emit = defineEmits<{
@@ -26,6 +29,7 @@ const emit = defineEmits<{
 }>()
 
 const inputRef = ref<HTMLInputElement | null>(null)
+const isCommandQuery = computed(() => props.query.startsWith('/'))
 
 watch(() => props.visible, (visible) => {
   if (visible) nextTick(() => inputRef.value?.focus())
@@ -33,7 +37,7 @@ watch(() => props.visible, (visible) => {
 
 function handleInput(event: Event) {
   const value = (event.target as HTMLInputElement).value
-  emit('update:query', props.mode === 'command' ? `/${value.replace(/^\//, '')}` : value)
+  emit('update:query', value)
 }
 
 function handleKeydown(event: KeyboardEvent) {
@@ -47,7 +51,7 @@ function handleKeydown(event: KeyboardEvent) {
   }
   else if (event.key === 'Enter') {
     event.preventDefault()
-    if (props.mode === 'command') {
+    if (isCommandQuery.value) {
       const command = props.commands[props.selectedIndex]
       if (command) emit('execute-command', command.key)
     }
@@ -62,29 +66,45 @@ function handleKeydown(event: KeyboardEvent) {
     emit('close')
   }
 }
+
+function submitSearch() {
+  emit('submit-search', props.query)
+}
 </script>
 
 <template>
   <div v-if="visible" data-testid="command-center-backdrop" class="command-center-backdrop" @click.self="emit('close')">
     <section data-testid="command-center-panel" class="command-center-panel" role="dialog" aria-modal="true" @click.stop>
       <div class="command-center-input-wrap">
-        <span class="command-center-prefix">{{ mode === 'command' ? '/' : '⌕' }}</span>
+        <span data-testid="command-center-search-engine" class="command-center-engine" :title="searchEngine.title">
+          <NAvatar :src="searchEngine.iconSrc" style="background-color: transparent;" :size="20" />
+        </span>
         <input
           ref="inputRef"
           data-testid="command-center-input"
-          :value="mode === 'command' ? query.replace(/^\//, '') : query"
+          :value="query"
           :placeholder="$t('deskModule.searchBox.inputPlaceholder')"
           autocomplete="off"
           spellcheck="false"
           @input="handleInput"
           @keydown="handleKeydown"
         >
+        <button
+          v-if="!isCommandQuery"
+          data-testid="command-center-submit-search"
+          type="button"
+          class="command-center-submit-search"
+          :title="$t('deskModule.searchBox.inputPlaceholder')"
+          @click="submitSearch"
+        >
+          <SvgIcon style="width: 20px;height: 20px;" icon="iconamoon:search-fill" />
+        </button>
       </div>
 
       <div class="command-center-results">
         <button
           v-for="(item, index) in items"
-          v-show="mode === 'search'"
+          v-show="!isCommandQuery"
           :key="`item-${item.id || index}`"
           type="button"
           class="command-center-result"
@@ -98,7 +118,7 @@ function handleKeydown(event: KeyboardEvent) {
 
         <button
           v-for="(command, index) in commands"
-          v-show="mode === 'command'"
+          v-show="isCommandQuery"
           :key="command.key"
           type="button"
           class="command-center-result"
@@ -110,7 +130,7 @@ function handleKeydown(event: KeyboardEvent) {
           <span class="command-center-result-url">/{{ command.key }}</span>
         </button>
 
-        <div v-if="(mode === 'search' && !items.length) || (mode === 'command' && !commands.length)" class="command-center-empty">
+        <div v-if="(isCommandQuery && !commands.length) || (!isCommandQuery && query && !items.length)" class="command-center-empty">
           {{ $t('common.noData') }}
         </div>
       </div>
@@ -150,10 +170,8 @@ function handleKeydown(event: KeyboardEvent) {
   border-bottom: 1px solid rgba(255, 255, 255, 0.12);
 }
 
-.command-center-prefix {
+.command-center-engine {
   width: 22px;
-  color: rgba(255, 255, 255, 0.58);
-  font-size: 20px;
   text-align: center;
 }
 
@@ -168,6 +186,20 @@ function handleKeydown(event: KeyboardEvent) {
 }
 
 .command-center-input-wrap input::placeholder { color: rgba(255, 255, 255, 0.46); }
+
+.command-center-submit-search {
+  display: flex;
+  flex: 0 0 24px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.76);
+  cursor: pointer;
+}
+
+.command-center-submit-search:hover { color: white; }
 
 .command-center-results {
   max-height: min(520px, 58vh);
