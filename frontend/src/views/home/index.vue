@@ -265,7 +265,7 @@ function togglePanelSide() {
   sideSwitchTimer = setTimeout(() => {
     sideSwitching.value = false
     sideSwitchTimer = undefined
-  }, 650)
+  }, 1000)
 }
 
 async function refreshCurrentSpace() {
@@ -568,7 +568,7 @@ function handleAddItem(itemIconGroupId?: number) {
         <div class="taiji-bagua">
           <span v-for="index in 8" :key="index" />
         </div>
-        <div class="taiji-symbol">
+        <div class="taiji-symbol" :class="activeSpace?.side === 'yang' ? 'taiji-yang' : 'taiji-yin'">
           <span class="taiji-dot taiji-dot-dark" />
           <span class="taiji-dot taiji-dot-light" />
         </div>
@@ -922,7 +922,7 @@ html {
 }
 
 .sun-main.side-switching {
-  animation: panel-content-pulse 720ms ease-in-out;
+  animation: panel-content-pulse 1000ms ease-in-out;
 }
 
 @keyframes panel-content-pulse {
@@ -952,10 +952,12 @@ html {
   aspect-ratio: 1;
   display: grid;
   place-items: center;
-  animation: taiji-aura 720ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  animation: taiji-aura 1000ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
 }
 
 .taiji-symbol {
+  --taiji-top: #18212b;
+  --taiji-bottom: #f4efe2;
   position: relative;
   z-index: 1;
   width: 58%;
@@ -963,9 +965,14 @@ html {
   overflow: hidden;
   border: 3px solid rgba(255, 255, 255, 0.82);
   border-radius: 50%;
-  background: linear-gradient(90deg, #18212b 0 50%, #f4efe2 50%);
+  background: linear-gradient(to bottom, var(--taiji-top) 0 50%, var(--taiji-bottom) 50%);
   box-shadow: 0 0 34px rgba(255, 255, 255, 0.3), 0 0 80px rgba(13, 18, 24, 0.3);
-  animation: taiji-spin 720ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  animation: taiji-spin 1000ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+.taiji-symbol.taiji-yang {
+  --taiji-top: #f4efe2;
+  --taiji-bottom: #18212b;
 }
 
 .taiji-symbol::before,
@@ -980,12 +987,12 @@ html {
 
 .taiji-symbol::before {
   top: 0;
-  background: #f4efe2;
+  background: var(--taiji-bottom);
 }
 
 .taiji-symbol::after {
   bottom: 0;
-  background: #18212b;
+  background: var(--taiji-top);
 }
 
 .taiji-dot {
@@ -999,13 +1006,13 @@ html {
 .taiji-dot-dark {
   top: 25%;
   left: 44%;
-  background: #18212b;
+  background: var(--taiji-top);
 }
 
 .taiji-dot-light {
   bottom: 25%;
   left: 44%;
-  background: #f4efe2;
+  background: var(--taiji-bottom);
 }
 
 .taiji-bagua {
@@ -1013,7 +1020,7 @@ html {
   inset: 0;
   border: 1px solid rgba(255, 255, 255, 0.42);
   border-radius: 50%;
-  animation: taiji-spin 1440ms cubic-bezier(0.22, 0.61, 0.36, 1) reverse both;
+  animation: taiji-spin 1000ms cubic-bezier(0.22, 0.61, 0.36, 1) reverse both;
 }
 
 .taiji-bagua span {
@@ -1045,7 +1052,7 @@ html {
 
 @keyframes taiji-spin {
   from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  to { transform: rotate(180deg); }
 }
 
 @media (prefers-reduced-motion: reduce) {
