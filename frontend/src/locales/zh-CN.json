@@ -251,6 +251,7 @@
     "changeToLanModelSuccess": "已经切换到内网模式（模式状态仅保存在本地）",
     "changeToWanModel": "切换为公网模式",
     "changeToWanModelSuccess": "已经切换到公网模式（模式状态仅保存在本地）",
+    "refreshCacheSuccess": "缓存已刷新，即将重新加载页面",
     "goToLogin": "前往登录",
     "openLanUrl": "打开局域网地址",
     "openWanUrl": "打开公网地址"

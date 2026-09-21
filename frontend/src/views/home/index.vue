@@ -271,6 +271,8 @@ async function refreshCurrentSpace() {
     const cacheNames = await caches.keys()
     await Promise.all(cacheNames.map(cacheName => caches.delete(cacheName)))
   }
+  ms.success(t('panelHome.refreshCacheSuccess'))
+  await new Promise(resolve => setTimeout(resolve, 500))
   window.location.reload()
 }
 

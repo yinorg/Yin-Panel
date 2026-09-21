@@ -251,6 +251,7 @@
     "changeToLanModelSuccess": "Switched to LAN mode (mode status saved locally)",
     "changeToWanModel": "Switch to WAN mode",
     "changeToWanModelSuccess": "Switched to WAN mode (mode status saved locally)",
+    "refreshCacheSuccess": "캐시를 새로 고쳤습니다. 페이지를 다시 불러옵니다",
     "goToLogin": "Go to login",
     "openLanUrl": "Open LAN URL",
     "openWanUrl": "Open WAN URL"

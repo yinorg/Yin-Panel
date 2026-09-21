@@ -251,6 +251,7 @@
     "changeToLanModelSuccess": "Switched to LAN mode (mode status saved locally)",
     "changeToWanModel": "Switch to WAN mode",
     "changeToWanModelSuccess": "Switched to WAN mode (mode status saved locally)",
+    "refreshCacheSuccess": "Кэш обновлён, страница будет перезагружена",
     "goToLogin": "Go to login",
     "openLanUrl": "Open LAN URL",
     "openWanUrl": "Open WAN URL"

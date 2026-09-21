@@ -251,6 +251,7 @@
     "changeToLanModelSuccess": "LANモードに切り替えました（モード状態はローカルに保存されます）",
     "changeToWanModel": "WANモードに切り替え",
     "changeToWanModelSuccess": "WANモードに切り替えました（モード状態はローカルに保存されます）",
+    "refreshCacheSuccess": "キャッシュを更新しました。ページを再読み込みします",
     "goToLogin": "ログイン画面へ",
     "openLanUrl": "LAN URLを開く",
     "openWanUrl": "WAN URLを開く"
