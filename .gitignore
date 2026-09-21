@@ -105,6 +105,7 @@ docker-compose.*.local.yml
 
 # Application data and local build output
 backend/my_conf.yaml
+backend/conf.yaml
 backend/database/
 backend/web/
 backend/uploads/
