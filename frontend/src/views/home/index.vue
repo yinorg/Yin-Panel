@@ -255,7 +255,7 @@ function togglePanelSide() {
   const target = yin.side === 'yang'
     ? spaces.value.find(space => space.id === yin.pairId)
     : { ...yin, id: yin.pairedSpaceId, name: `${yin.name}-B`, side: 'yang' as const, pairId: yin.id, pairedSpaceId: yin.id }
-  if (target) { activeSpace.value = target; clearCachedSpace(target.id); getList() }
+  if (target) { activeSpace.value = target; getList() }
 }
 
 async function refreshCurrentSpace() {
@@ -607,7 +607,7 @@ function handleAddItem(itemIconGroupId?: number) {
           <div class="home-header-row flex mx-[auto] items-center justify-center text-white">
             <div class="logo cursor-pointer" data-lcp="brand" @click="togglePanelSide">
               <span class="text-2xl md:text-6xl font-bold text-shadow">
-                {{ activeSpace?.side === 'yang' ? 'Yang Panel' : 'Yin-Panel' }}
+                {{ activeSpace?.side === 'yang' ? 'Yang-Panel' : 'Yin-Panel' }}
               </span>
             </div>
             <div class="divider text-base lg:text-2xl mx-[10px]">
@@ -618,7 +618,7 @@ function handleAddItem(itemIconGroupId?: number) {
             </div>
           </div>
           <div v-if="panelState.panelConfig.searchBoxShow" class="flex mt-[20px] mx-auto sm:w-full lg:w-[80%]">
-            <SearchBox @itemSearch="itemFrontEndSearch" />
+            <SearchBox :space-id="activeSpace?.id" @itemSearch="itemFrontEndSearch" />
           </div>
         </div>
 

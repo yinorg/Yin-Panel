@@ -62,6 +62,11 @@
       "resetWarnText": "确定要重置这些样式吗？",
       "searchBar": "搜索栏组件",
       "searchBarSearchItem": "允许搜索栏搜索项目",
+      "searchEngine": "默认搜索引擎",
+      "selectSpace": "选择空间",
+      "saveSearchEngine": "保存默认搜索引擎",
+      "searchEngineSaved": "默认搜索引擎已保存",
+      "searchEngineSaveFailed": "默认搜索引擎保存失败",
       "searchBarShow": "配置已保存",
       "show": "显示",
       "showTitle": "显示标题",
@@ -193,8 +198,7 @@
       "wed": "星期三"
     },
     "searchBox": {
-      "inputPlaceholder": "请输入搜索内容",
-      "openWithNewOpen": "新窗口打开"
+      "inputPlaceholder": "请输入搜索内容"
     },
     "systemMonitor": {
       "cpuState": "CPU状态",

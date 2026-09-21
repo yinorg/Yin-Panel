@@ -62,6 +62,11 @@
       "resetWarnText": "確定要重置這些樣式嗎？",
       "searchBar": "搜索欄組件",
       "searchBarSearchItem": "允許搜索欄搜索項目",
+      "searchEngine": "預設搜尋引擎",
+      "selectSpace": "選擇空間",
+      "saveSearchEngine": "儲存預設搜尋引擎",
+      "searchEngineSaved": "預設搜尋引擎已儲存",
+      "searchEngineSaveFailed": "預設搜尋引擎儲存失敗",
       "searchBarShow": "配置已保存",
       "show": "顯示",
       "showTitle": "顯示標題",
@@ -193,8 +198,7 @@
       "wed": "星期三"
     },
     "searchBox": {
-      "inputPlaceholder": "請輸入搜索內容",
-      "openWithNewOpen": "新窗口打開"
+      "inputPlaceholder": "請輸入搜索內容"
     },
     "systemMonitor": {
       "cpuState": "CPU狀態",

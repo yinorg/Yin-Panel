@@ -34,6 +34,8 @@ func (r *SpaceRouter) InitRouter(router *gin.RouterGroup) {
 	g := router.Group("/spaces")
 	g.Use(interceptor.Auth)
 	g.GET("", r.List)
+	g.GET("/:spaceId/search-config", r.GetSearchConfig)
+	g.POST("/:spaceId/search-config", r.SetSearchConfig)
 	g.GET("/:spaceId/groups", r.Groups)
 	g.GET("/:spaceId/items", r.Items)
 	g.POST("/:spaceId/items", r.CreateItem)
@@ -1004,6 +1006,65 @@ func (r *SpaceRouter) List(c *gin.Context) {
 		}
 	}
 	response.SuccessData(c, spaces)
+}
+
+func (r *SpaceRouter) GetSearchConfig(c *gin.Context) {
+	user, ok := base.GetCurrentUserInfo(c)
+	if !ok {
+		response.Error(c, "not logged in")
+		return
+	}
+	id, err := spaceID(c)
+	if err != nil || !canAccessSpace(user.ID, id) {
+		response.ErrorNoAccess(c)
+		return
+	}
+
+	var space repository.Space
+	if err := repository.Db.First(&space, id).Error; err != nil {
+		response.ErrorDataNotFound(c)
+		return
+	}
+	if space.SearchConfigJSON == "" {
+		response.SuccessData(c, nil)
+		return
+	}
+
+	var config repository.SpaceSearchConfig
+	if err := json.Unmarshal([]byte(space.SearchConfigJSON), &config); err != nil {
+		response.ErrorDatabase(c, err.Error())
+		return
+	}
+	response.SuccessData(c, config)
+}
+
+func (r *SpaceRouter) SetSearchConfig(c *gin.Context) {
+	user, ok := base.GetCurrentUserInfo(c)
+	if !ok {
+		response.Error(c, "not logged in")
+		return
+	}
+	id, err := spaceID(c)
+	if err != nil || !canEditSpace(user.ID, id) {
+		response.ErrorNoAccess(c)
+		return
+	}
+
+	var config repository.SpaceSearchConfig
+	if err := c.ShouldBindJSON(&config); err != nil || config.CurrentSearchEngine.URL == "" {
+		response.ErrorParamFomat(c, "invalid search config")
+		return
+	}
+	data, err := json.Marshal(config)
+	if err != nil {
+		response.ErrorParamFomat(c, "invalid search config")
+		return
+	}
+	if err := repository.Db.Model(&repository.Space{}).Where("id = ?", id).Update("search_config_json", string(data)).Error; err != nil {
+		response.ErrorDatabase(c, err.Error())
+		return
+	}
+	response.Success(c)
 }
 
 func (r *SpaceRouter) Groups(c *gin.Context) {

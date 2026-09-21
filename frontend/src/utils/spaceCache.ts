@@ -3,6 +3,7 @@ import { ls } from './storage/local'
 export interface SpaceCache {
   groups?: any[]
   items: Record<string, any[]>
+  searchConfig?: any
 }
 
 const spacesKey = (userId?: number) => `yin-panel-spaces-cache:${userId || 'anonymous'}`

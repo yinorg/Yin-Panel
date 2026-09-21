@@ -1,171 +1,112 @@
 <script setup lang="ts">
-import { defineEmits, onMounted, ref } from 'vue'
-import { NAvatar, NCheckbox } from 'naive-ui'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { NAvatar } from 'naive-ui'
 import SvgIcon from '../../common/SvgIcon/index.vue'
+import { getSearchConfig, type SpaceSearchConfig } from '@/api/panel/space'
+import { useAuthStore } from '@/store'
+import { readSpaceCache, writeSpaceCache } from '@/utils/spaceCache'
+import { searchEngineList, type SearchEngine } from './engines'
 
-// 定义图标资源路径
-const SvgSrcBaidu = '/assets/search_engine_svg/baidu.svg'
-const SvgSrcBing = '/assets/search_engine_svg/bing.svg'
-const SvgSrcGoogle = '/assets/search_engine_svg/google.svg'
-const SvgSrcDuckDuckGo = '/assets/search_engine_svg/duckduckgo.svg'
-const SvgSrcYahoo = '/assets/search_engine_svg/yahoo.svg'
-const SvgSrcYandex = '/assets/search_engine_svg/yandex.png'
-const SvgSrcEcosia = '/assets/search_engine_svg/ecosia.svg'
-const SvgSrcBrave = '/assets/search_engine_svg/brave.svg'
-const SvgSrcStartpage = '/assets/search_engine_svg/startpage.svg'
-const SvgSrcSogou = '/assets/search_engine_svg/sogou.svg'
-const SvgSrc360 = '/assets/search_engine_svg/360.png'
-const SvgSrcAol = '/assets/search_engine_svg/aol.svg'
-import { useModuleConfig } from '@/store'
-
-withDefaults(defineProps<{
+const props = withDefaults(defineProps<{
   background?: string
   textColor?: string
+  spaceId?: number
 }>(), {
   background: '#2a2a2a6b',
   textColor: 'white',
 })
 
 const emits = defineEmits(['itemSearch'])
-
-interface State {
-  currentSearchEngine: DeskModule.SearchBox.SearchEngine
-  searchEngineList: DeskModule.SearchBox.SearchEngine[]
-  newWindowOpen: boolean
-}
-
-const moduleConfigName = 'deskModuleSearchBox'
-const moduleConfig = useModuleConfig()
+const authStore = useAuthStore()
 const searchTerm = ref('')
 const isFocused = ref(false)
 const searchSelectListShow = ref(false)
-const defaultSearchEngineList = ref<DeskModule.SearchBox.SearchEngine[]>([
-  {
-    iconSrc: SvgSrcBing,
-    title: 'Bing',
-    url: 'https://www.bing.com/search?q=%s',
-  },
-  {
-    iconSrc: SvgSrcGoogle,
-    title: 'Google',
-    url: 'https://www.google.com/search?q=%s',
-  },
-  {
-    iconSrc: SvgSrcBaidu,
-    title: 'Baidu',
-    url: 'https://www.baidu.com/s?wd=%s',
-  },
-  {
-    iconSrc: SvgSrcDuckDuckGo,
-    title: 'DuckDuckGo',
-    url: 'https://duckduckgo.com/?q=%s',
-  },
-  {
-    iconSrc: SvgSrcYahoo,
-    title: 'Yahoo',
-    url: 'https://search.yahoo.com/search?p=%s',
-  },
-  {
-    iconSrc: SvgSrcYandex,
-    title: 'Yandex',
-    url: 'https://yandex.com/search/?text=%s',
-  },
-  {
-    iconSrc: SvgSrcEcosia,
-    title: 'Ecosia',
-    url: 'https://www.ecosia.org/search?q=%s',
-  },
-  {
-    iconSrc: SvgSrcBrave,
-    title: 'Brave Search',
-    url: 'https://search.brave.com/search?q=%s',
-  },
-  {
-    iconSrc: SvgSrcStartpage,
-    title: 'Startpage',
-    url: 'https://www.startpage.com/sp/search?query=%s',
-  },
-  {
-    iconSrc: SvgSrcSogou,
-    title: 'Sogou',
-    url: 'https://www.sogou.com/web?query=%s',
-  },
-  {
-    iconSrc: SvgSrc360,
-    title: '360 Search',
-    url: 'https://www.so.com/s?q=%s',
-  },
-  {
-    iconSrc: SvgSrcAol,
-    title: 'AOL',
-    url: 'https://search.aol.com/aol/search?q=%s',
-  },
-])
 
-const defaultState: State = {
-  currentSearchEngine: defaultSearchEngineList.value[0],
-  searchEngineList: defaultSearchEngineList.value,
-    newWindowOpen: true,
+interface State {
+  currentSearchEngine: SearchEngine
 }
 
-const state = ref<State>({ ...defaultState })
+const defaultState = (): State => ({ currentSearchEngine: searchEngineList[0] })
+const state = ref<State>(defaultState())
+let loadGeneration = 0
 
-const onFocus = (): void => {
-  isFocused.value = true
+function applySearchConfig(config?: SpaceSearchConfig | null) {
+  const current = config?.currentSearchEngine
+  state.value = {
+    currentSearchEngine: current?.url ? current : defaultState().currentSearchEngine,
+  }
 }
 
-const onBlur = (): void => {
-  isFocused.value = false
+async function loadSearchConfig(spaceId?: number) {
+  const generation = ++loadGeneration
+  searchSelectListShow.value = false
+  applySearchConfig()
+  if (!spaceId)
+    return
+
+  const cache = readSpaceCache(spaceId, authStore.userInfo?.id)
+  if (cache.searchConfig?.currentSearchEngine?.url) {
+    applySearchConfig(cache.searchConfig)
+    return
+  }
+
+  try {
+    const { code, data } = await getSearchConfig<{ code: number; data?: SpaceSearchConfig | null }>(spaceId)
+    if (generation !== loadGeneration)
+      return
+    if (code === 0) {
+      applySearchConfig(data)
+      const nextCache = readSpaceCache(spaceId, authStore.userInfo?.id)
+      nextCache.searchConfig = data || { currentSearchEngine: defaultState().currentSearchEngine }
+      writeSpaceCache(spaceId, nextCache, authStore.userInfo?.id)
+    }
+  }
+  catch {
+    if (generation === loadGeneration)
+      applySearchConfig()
+  }
 }
 
-function handleEngineClick() {
-  searchSelectListShow.value = !searchSelectListShow.value
-}
-
-function handleEngineUpdate(engine: DeskModule.SearchBox.SearchEngine) {
+const onFocus = (): void => { isFocused.value = true }
+const onBlur = (): void => { isFocused.value = false }
+function handleEngineClick() { searchSelectListShow.value = !searchSelectListShow.value }
+function handleEngineUpdate(engine: SearchEngine) {
   state.value.currentSearchEngine = engine
-  moduleConfig.saveToCloud(moduleConfigName, state.value)
   searchSelectListShow.value = false
 }
 
 function handleSearchClick() {
-  const url = state.value.currentSearchEngine.url
-  const keyword = searchTerm
-  // 如果网址中存在 %s，则直接替换为关键字
-  const fullUrl = replaceOrAppendKeywordToUrl(url, keyword.value)
+  const fullUrl = replaceOrAppendKeywordToUrl(state.value.currentSearchEngine.url, searchTerm.value)
   handleClearSearchTerm()
-  if (state.value.newWindowOpen)
-    window.open(fullUrl)
-  else
-    window.location.href = fullUrl
+  window.open(fullUrl)
 }
 
 function replaceOrAppendKeywordToUrl(url: string, keyword: string) {
-  // 如果网址中存在 %s，则直接替换为关键字
   if (url.includes('%s'))
     return url.replace('%s', encodeURIComponent(keyword))
-
-  // 如果网址中不存在 %s，则将关键字追加到末尾
   return url + (keyword ? `${encodeURIComponent(keyword)}` : '')
 }
 
-const handleItemSearch = () => {
-  emits('itemSearch', searchTerm.value)
-}
-
+const handleItemSearch = () => { emits('itemSearch', searchTerm.value) }
 function handleClearSearchTerm() {
   searchTerm.value = ''
   emits('itemSearch', searchTerm.value)
 }
 
-onMounted(() => {
-  moduleConfig.getValueByNameFromCloud<State>('deskModuleSearchBox').then(({ code, data }) => {
-    if (code === 0)
-      state.value = data ? { ...defaultState, ...data } : defaultState
-    else
-      state.value = defaultState
-  })
-})
+watch(() => props.spaceId, spaceId => loadSearchConfig(spaceId), { immediate: true })
+
+function handleSavedSearchConfig(event: Event) {
+  const detail = (event as CustomEvent<{ spaceId: number; config: SpaceSearchConfig }>).detail
+  if (detail?.spaceId !== props.spaceId)
+    return
+  applySearchConfig(detail.config)
+  const cache = readSpaceCache(detail.spaceId, authStore.userInfo?.id)
+  cache.searchConfig = detail.config
+  writeSpaceCache(detail.spaceId, cache, authStore.userInfo?.id)
+}
+
+onMounted(() => window.addEventListener('yin-panel-search-config-saved', handleSavedSearchConfig))
+onUnmounted(() => window.removeEventListener('yin-panel-search-config-saved', handleSavedSearchConfig))
 </script>
 
 <template>
@@ -174,9 +115,7 @@ onMounted(() => {
       <div class="search-box-btn-engine w-[40px] flex justify-center cursor-pointer" @click="handleEngineClick">
         <NAvatar :src="state.currentSearchEngine.iconSrc" style="background-color: transparent;" :size="20" />
       </div>
-
       <input v-model="searchTerm" :placeholder="$t('deskModule.searchBox.inputPlaceholder')" @focus="onFocus" @blur="onBlur" @input="handleItemSearch">
-
       <div v-if="searchTerm !== ''" class="search-box-btn-clear w-[25px] mr-[10px] flex justify-center cursor-pointer" @click="handleClearSearchTerm">
         <SvgIcon style="width: 20px;height: 20px;" icon="line-md:close-small" />
       </div>
@@ -184,34 +123,13 @@ onMounted(() => {
         <SvgIcon style="width: 20px;height: 20px;" icon="iconamoon:search-fill" />
       </div>
     </div>
-
-    <!-- 搜索引擎选择 -->
     <div v-if="searchSelectListShow" class="w-full mt-[10px] rounded-xl p-[10px]" :style="{ background }">
-        <div class="flex items-center">
-          <div class="flex items-center flex-wrap">
-          <div
-            v-for="item, index in defaultSearchEngineList"
-            :key="index"
-            :title="item.title"
-            class="w-[40px] h-[40px] cursor-pointer bg-[#ffffff] flex items-center justify-center rounded-xl mr-[10px] mb-[10px]"
-            @click="handleEngineUpdate(item)"
-          >
+      <div class="flex items-center">
+        <div class="flex items-center flex-wrap">
+          <div v-for="item, index in searchEngineList" :key="index" :title="item.title" class="w-[40px] h-[40px] cursor-pointer bg-[#ffffff] flex items-center justify-center rounded-xl mr-[10px] mb-[10px]" @click="handleEngineUpdate(item)">
             <NAvatar :src="item.iconSrc" style="background-color: transparent;" :size="20" />
           </div>
-        <!-- <div class="w-[40px] h-[40px] ml-[10px] flex justify-center items-center cursor-pointer" @click="handleEngineClick">
-          <NAvatar style="background-color: transparent;" :size="30">
-            <SvgIcon icon="lets-icons:setting-alt-fill" style="font-size: 20px;" />
-          </NAvatar>
-        </div> -->
         </div>
-      </div>
-
-      <div class="mt-[10px]">
-        <NCheckbox v-model:checked="state.newWindowOpen" @update-checked="moduleConfig.saveToCloud(moduleConfigName, state)">
-          <span :style="{ color: textColor }">
-            {{ $t('deskModule.searchBox.openWithNewOpen') }}
-          </span>
-        </NCheckbox>
       </div>
     </div>
   </div>
@@ -224,30 +142,10 @@ onMounted(() => {
   padding: 2px 10px;
   backdrop-filter:blur(2px)
 }
-
 .focused, .search-container:hover {
   box-shadow: 0px 0px 30px -5px rgba(41, 41, 41, 0.45);
   -webkit-box-shadow: 0px 0px 30px -5px rgba(0, 0, 0, 0.45);
   -moz-box-shadow: 0px 0px 30px -5px rgba(0, 0, 0, 0.45);
   backdrop-filter:blur(5px)
-}
-
-.before {
-  left: 10px;
-}
-
-.after {
-  right: 10px;
-}
-
-input {
-  background-color: transparent;
-  box-sizing: border-box;
-  width: 100%;
-  height: 40px;
-  padding: 10px 5px;
-  border: none;
-  outline: none;
-  font-size: 17px;
 }
 </style>

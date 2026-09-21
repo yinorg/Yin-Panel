@@ -62,6 +62,11 @@
       "resetWarnText": "これらのスタイルをリセットしますか？",
       "searchBar": "検索バーコンポーネント",
       "searchBarSearchItem": "検索バーで項目を検索する",
+      "searchEngine": "デフォルト検索エンジン",
+      "selectSpace": "スペースを選択",
+      "saveSearchEngine": "デフォルト検索エンジンを保存",
+      "searchEngineSaved": "デフォルト検索エンジンを保存しました",
+      "searchEngineSaveFailed": "デフォルト検索エンジンの保存に失敗しました",
       "searchBarShow": "表示",
       "show": "表示",
       "showTitle": "タイトルを表示",
@@ -193,8 +198,7 @@
     "wed": "水曜日"
     },
     "searchBox": {
-    "inputPlaceholder": "検索内容を入力",
-    "openWithNewOpen": "新しいウィンドウで開く"
+      "inputPlaceholder": "検索内容を入力"
     },
     "systemMonitor": {
     "cpuState": "CPU使用率",

@@ -62,6 +62,11 @@
       "resetWarnText": "Are you sure you want to reset these styles?",
       "searchBar": "Search bar component",
       "searchBarSearchItem": "Allow search bar to search items",
+      "searchEngine": "Поисковая система по умолчанию",
+      "selectSpace": "Выберите пространство",
+      "saveSearchEngine": "Сохранить поисковую систему",
+      "searchEngineSaved": "Поисковая система сохранена",
+      "searchEngineSaveFailed": "Не удалось сохранить поисковую систему",
       "searchBarShow": "Konfiguration gespeichert",
       "show": "Показать",
       "showTitle": "Titel anzeigen",
@@ -193,8 +198,7 @@
       "wed": "Mittwoch"
     },
     "searchBox": {
-      "inputPlaceholder": "Suchbegriff eingeben",
-      "openWithNewOpen": "Открыть в новом окне"
+      "inputPlaceholder": "Suchbegriff eingeben"
     },
     "systemMonitor": {
       "cpuState": "CPU-Status",

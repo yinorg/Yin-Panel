@@ -2,6 +2,8 @@ import { get, post } from '../../utils/request'
 import { t } from '../../locales'
 
 export interface Space { id: number; type: 'personal' | 'team' | 'shared'; name: string; ownerUserId: number; pairId?: number; side?: 'yin' | 'yang'; pairedSpaceId?: number; publicEnabled?: boolean; publicId?: string; publicMode?: 'direct' | 'code' }
+export interface SearchEngine { iconSrc: string; title: string; url: string }
+export interface SpaceSearchConfig { currentSearchEngine: SearchEngine }
 export interface PublicConfig { enabled: boolean; publicId: string; mode: 'direct' | 'code'; accessCode?: string }
 export interface SpaceMember { id: number; userId: number; email?: string; role: 'admin' | 'editor' | 'viewer'; source?: string }
 export function spaceDisplayName(space: Space, spaces: Space[], currentUserId?: number, memberView = false) {
@@ -25,6 +27,8 @@ export function sortSpaces(spaces: Space[], currentUserId?: number) {
   })
 }
 export function getSpaces<T>() { return get<T>({ url: '/spaces' }) }
+export function getSearchConfig<T>(spaceId: number) { return get<T>({ url: `/spaces/${spaceId}/search-config` }) }
+export function setSearchConfig<T>(spaceId: number, data: SpaceSearchConfig) { return post<T>({ url: `/spaces/${spaceId}/search-config`, data }) }
 export function getPublicConfig<T>(spaceId: number) { return get<T>({ url: `/spaces/${spaceId}/public` }) }
 export function setPublicConfig<T>(spaceId: number, data: PublicConfig) { return post<T>({ url: `/spaces/${spaceId}/public`, data }) }
 export function importBookmarks<T>(spaceId: number, data: any) { return post<T>({ url: `/spaces/${spaceId}/bookmarks/import`, data }) }

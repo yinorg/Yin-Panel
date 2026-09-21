@@ -7,12 +7,86 @@ import { useAuthStore, usePanelState } from '@/store'
 import { PanelPanelConfigStyleEnum } from '@/enums'
 import { t } from '@/locales'
 import { getEnableStatus } from '@/api/system/systemMonitor'
+import { getSearchConfig, getSpaces, setSearchConfig, spaceDisplayName, type Space, type SpaceSearchConfig } from '@/api/panel/space'
+import { readSpaceCache, writeSpaceCache } from '@/utils/spaceCache'
+import { searchEngineList } from '@/components/deskModule/SearchBox/engines'
 
 const authStore = useAuthStore()
 const panelState = usePanelState()
 const ms = useMessage()
 const showWallpaperInput = ref(false)
 const monitorEnabled = ref(false)
+const spaces = ref<Space[]>([])
+const selectedSearchSpaceId = ref<number | null>(null)
+const selectedSearchEngineUrl = ref(searchEngineList[0].url)
+const searchConfigSaving = ref(false)
+
+const searchSpaceOptions = computed(() => spaces.value.flatMap((space) => {
+  const options = [{
+    label: `${spaceDisplayName(space, spaces.value, authStore.userInfo?.id)} (Yin)`,
+    value: space.id,
+  }]
+  if (space.pairedSpaceId) {
+    options.push({
+      label: `${spaceDisplayName(space, spaces.value, authStore.userInfo?.id)}-B (Yang)`,
+      value: space.pairedSpaceId,
+    })
+  }
+  return options
+}))
+
+const searchEngineOptions = searchEngineList.map(engine => ({
+  label: engine.title,
+  value: engine.url,
+}))
+
+function applySearchConfig(config?: SpaceSearchConfig | null) {
+  selectedSearchEngineUrl.value = config?.currentSearchEngine?.url || searchEngineList[0].url
+}
+
+async function loadSearchConfig(spaceId: number) {
+  const cached = readSpaceCache(spaceId, authStore.userInfo?.id)
+  if (cached.searchConfig?.currentSearchEngine?.url) {
+    applySearchConfig(cached.searchConfig)
+    return
+  }
+  const { code, data } = await getSearchConfig<{ code: number; data?: SpaceSearchConfig | null }>(spaceId)
+  if (code === 0) {
+    applySearchConfig(data)
+    const nextCache = readSpaceCache(spaceId, authStore.userInfo?.id)
+    nextCache.searchConfig = data || { currentSearchEngine: searchEngineList[0] }
+    writeSpaceCache(spaceId, nextCache, authStore.userInfo?.id)
+  }
+}
+
+function selectSearchSpace(spaceId: number) {
+  selectedSearchSpaceId.value = spaceId
+  loadSearchConfig(spaceId)
+}
+
+async function saveDefaultSearchEngine() {
+  if (!selectedSearchSpaceId.value || searchConfigSaving.value)
+    return
+  const engine = searchEngineList.find(item => item.url === selectedSearchEngineUrl.value) || searchEngineList[0]
+  const config = { currentSearchEngine: engine }
+  searchConfigSaving.value = true
+  try {
+    const { code, msg } = await setSearchConfig(selectedSearchSpaceId.value, config)
+    if (code === 0) {
+      const cache = readSpaceCache(selectedSearchSpaceId.value, authStore.userInfo?.id)
+      cache.searchConfig = config
+      writeSpaceCache(selectedSearchSpaceId.value, cache, authStore.userInfo?.id)
+      window.dispatchEvent(new CustomEvent('yin-panel-search-config-saved', { detail: { spaceId: selectedSearchSpaceId.value, config } }))
+      ms.success(t('apps.baseSettings.searchEngineSaved'))
+    }
+    else {
+      ms.error(`${t('apps.baseSettings.searchEngineSaveFailed')}: ${msg}`)
+    }
+  }
+  finally {
+    searchConfigSaving.value = false
+  }
+}
 
 // 获取后端 enableMonitor 配置
 onMounted(async () => {
@@ -27,6 +101,11 @@ onMounted(async () => {
   }
   catch (error) {
     console.error('Failed to get monitor enable status:', error)
+  }
+  const { code, data } = await getSpaces<{ code: number; data: Space[] }>()
+  if (code === 0 && data?.length) {
+    spaces.value = data
+    selectSearchSpace(data[0].id)
   }
 })
 
@@ -156,6 +235,24 @@ function resetPanelConfig() {
       <div class="flex items-center mt-[5px]">
         <span class="mr-[10px]">{{ $t('apps.baseSettings.clockSecondShow') }}</span>
         <NSwitch v-model:value="panelState.panelConfig.clockShowSecond" />
+      </div>
+    </NCard>
+
+    <NCard style="border-radius:10px" class="mt-[10px]" size="small">
+      <div class="text-slate-500 mb-[5px] font-bold">
+        {{ $t('apps.baseSettings.searchEngine') }}
+      </div>
+      <NSelect
+        :value="selectedSearchSpaceId"
+        :options="searchSpaceOptions"
+        :placeholder="$t('apps.baseSettings.selectSpace')"
+        @update:value="selectSearchSpace"
+      />
+      <div class="flex items-center mt-[10px]">
+        <NSelect v-model:value="selectedSearchEngineUrl" :options="searchEngineOptions" />
+        <NButton class="ml-[10px]" type="primary" :loading="searchConfigSaving" @click="saveDefaultSearchEngine">
+          {{ $t('apps.baseSettings.saveSearchEngine') }}
+        </NButton>
       </div>
     </NCard>
 

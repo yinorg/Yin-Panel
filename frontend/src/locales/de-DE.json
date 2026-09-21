@@ -62,6 +62,11 @@
       "resetWarnText": "Are you sure you want to reset these styles?",
       "searchBar": "Search bar component",
       "searchBarSearchItem": "Allow search bar to search items",
+      "searchEngine": "Standardsuchmaschine",
+      "selectSpace": "Bereich auswählen",
+      "saveSearchEngine": "Standardsuchmaschine speichern",
+      "searchEngineSaved": "Standardsuchmaschine gespeichert",
+      "searchEngineSaveFailed": "Standardsuchmaschine konnte nicht gespeichert werden",
       "searchBarShow": "Konfiguration gespeichert",
       "show": "Anzeigen",
       "showTitle": "Titel anzeigen",
@@ -193,8 +198,7 @@
       "wed": "Mittwoch"
     },
     "searchBox": {
-      "inputPlaceholder": "Suchbegriff eingeben",
-      "openWithNewOpen": "In neuem Fenster öffnen"
+      "inputPlaceholder": "Suchbegriff eingeben"
     },
     "systemMonitor": {
       "cpuState": "CPU-Status",
