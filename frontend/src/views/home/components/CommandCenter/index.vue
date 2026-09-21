@@ -171,25 +171,30 @@ function submitSearch() {
 }
 
 .command-center-engine {
-  width: 22px;
-  text-align: center;
+  display: flex;
+  flex: 0 0 40px;
+  align-items: center;
+  justify-content: center;
 }
 
 .command-center-input-wrap input {
   width: 100%;
   min-width: 0;
+  height: 40px;
+  box-sizing: border-box;
+  padding: 10px 5px;
   border: 0;
   outline: 0;
   background: transparent;
   color: white;
-  font-size: 20px;
+  font-size: 17px;
 }
 
 .command-center-input-wrap input::placeholder { color: rgba(255, 255, 255, 0.46); }
 
 .command-center-submit-search {
   display: flex;
-  flex: 0 0 24px;
+  flex: 0 0 25px;
   align-items: center;
   justify-content: center;
   padding: 0;
