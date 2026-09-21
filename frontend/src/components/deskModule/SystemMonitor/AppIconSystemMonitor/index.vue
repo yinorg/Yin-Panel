@@ -29,6 +29,8 @@ const iconText = computed(() => {
       return props.extendParam.path
     case MonitorType.memory:
       return 'RAM'
+    case MonitorType.network:
+      return 'NET'
   }
   return ''
 })
