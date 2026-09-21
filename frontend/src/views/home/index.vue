@@ -63,6 +63,7 @@ const createSpaceVisible = ref(false)
 const spaceName = ref('')
 const creatingSpace = ref(false)
 const monitorEnabled = ref(false)
+const homeReady = ref(false)
 const sideSwitching = ref(false)
 let sideSwitchTimer: ReturnType<typeof setTimeout> | undefined
 const commandCenterVisible = ref(false)
@@ -76,12 +77,8 @@ const creatingGroup = ref(false)
 const items = ref<ItemGroup[]>([])
 const filterItems = ref<ItemGroup[]>([])
 const loadedGroups = new Set<number>()
-const loadingGroups = ref<Set<number>>(new Set())
-const groupLoadQueue: number[] = []
-let activeGroupLoads = 0
 let groupLoadGeneration = 0
 const collapsedGroups = ref<Set<number>>(new Set())
-let groupObserver: IntersectionObserver | null = null
 const publicCode = parsePublicCodeFromPath()
 const publicAccessCode = ref('')
 const publicAccessReady = ref(!publicCode || !!sessionStorage.getItem(`yin-panel-public-access:${publicCode}`))
@@ -161,11 +158,7 @@ async function handleFloatingButtonClick(event: MouseEvent, action: () => unknow
 // 获取组数据
 async function getList(forceRefresh = false) {
   const generation = ++groupLoadGeneration
-  groupObserver?.disconnect()
-  groupObserver = null
   loadedGroups.clear()
-  loadingGroups.value = new Set()
-  groupLoadQueue.length = 0
   if (!activeSpace.value) {
     items.value = []
     filterItems.value = []
@@ -173,36 +166,67 @@ async function getList(forceRefresh = false) {
   }
 
   const spaceId = activeSpace.value.id
+  let groups: ItemGroup[] | undefined
+  let cache = getCachedSpace(spaceId)
   if (!forceRefresh) {
-    const cached = getCachedSpace(spaceId)
-    if (cached.groups) {
-      applyGroups(cached.groups)
-      return
+    groups = cache.groups
+  }
+  if (!groups) {
+    if (forceRefresh) {
+      clearCachedSpace(spaceId)
+      cache = getCachedSpace(spaceId)
+    }
+    const { data } = await getGroups<ItemGroup[]>(spaceId)
+    if (!data) return
+    groups = data
+    cache.groups = groups
+  }
+
+  const itemsByGroup = new Map<number, Panel.ItemInfo[]>()
+  const pendingGroups = groups.filter(group => !cache.items[String(group.id)])
+  groups.forEach((group) => {
+    const cachedItems = cache.items[String(group.id)]
+    if (cachedItems) itemsByGroup.set(Number(group.id), cachedItems)
+  })
+  let nextGroup = 0
+  const loadNextGroups = async () => {
+    while (nextGroup < pendingGroups.length) {
+      const group = pendingGroups[nextGroup++]
+      let groupItems: Panel.ItemInfo[] = []
+      try {
+        const { data } = await getItems<Panel.ItemInfo[]>(spaceId, Number(group.id), 1, 100)
+        groupItems = data || []
+      }
+      catch {
+        // Keep the group at a stable height when an item request fails.
+      }
+      cache.items[String(group.id)] = groupItems
+      itemsByGroup.set(Number(group.id), groupItems)
     }
   }
-  if (forceRefresh) clearCachedSpace(spaceId)
-  const { data } = await getGroups<ItemGroup[]>(spaceId)
-  if (!data) return
+  await Promise.all(Array.from({ length: Math.min(2, pendingGroups.length) }, loadNextGroups))
+
   if (generation === groupLoadGeneration && activeSpace.value?.id === spaceId) {
-    const cache = getCachedSpace(spaceId)
-    cache.groups = data
     saveCachedSpace(spaceId, cache)
-    applyGroups(data)
+    applyGroups(groups, itemsByGroup)
   }
 }
 
-function applyGroups(data: ItemGroup[]) {
+function applyGroups(data: ItemGroup[], itemsByGroup = new Map<number, Panel.ItemInfo[]>()) {
     const byParent = new Map<number, ItemGroup[]>()
-    data.forEach(group => { const key = group.parentId || 0; const list = byParent.get(key) || []; list.push({ ...group, items: [] }); byParent.set(key, list) })
+    data.forEach(group => { const key = group.parentId || 0; const list = byParent.get(key) || []; list.push({ ...group, items: itemsByGroup.get(Number(group.id)) || [] }); byParent.set(key, list) })
     const flattened: ItemGroup[] = []
     function append(parentId: number, depth: number) { (byParent.get(parentId) || []).forEach(group => { group.depth = depth; flattened.push(group); append(Number(group.id), depth + 1) }) }
     append(0, 0)
     items.value = flattened
     const initiallyCollapsed = new Set<number>()
-    flattened.forEach(group => { if ((byParent.get(Number(group.id)) || []).length) initiallyCollapsed.add(Number(group.id)) })
+    flattened.forEach(group => {
+      if ((byParent.get(Number(group.id)) || []).length || (group.items?.length || 0) > 40)
+        initiallyCollapsed.add(Number(group.id))
+    })
     collapsedGroups.value = initiallyCollapsed
+    flattened.forEach(group => loadedGroups.add(Number(group.id)))
     filterItems.value = items.value
-    nextTick(() => { document.querySelectorAll('[data-item-group]').forEach((el, index) => observeGroup(el, index)) })
 }
 
 function groupHidden(index: number) {
@@ -216,63 +240,10 @@ function groupHidden(index: number) {
   return false
 }
 
-function loadGroupItems(index: number) {
-  const group = items.value[index]
-  if (!group || !activeSpace.value || loadedGroups.has(Number(group.id)) || loadingGroups.value.has(Number(group.id))) return
-  loadingGroups.value = new Set(loadingGroups.value).add(Number(group.id))
-  groupLoadQueue.push(index)
-  processGroupLoadQueue()
-}
-function processGroupLoadQueue() {
-  if (activeGroupLoads >= 2 || groupLoadQueue.length === 0) return
-  const index = groupLoadQueue.shift()!
-  const group = items.value[index]
-  if (!group || !activeSpace.value) { processGroupLoadQueue(); return }
-  activeGroupLoads++
-  const spaceId = activeSpace.value.id
-  const generation = groupLoadGeneration
-  const groupId = Number(group.id)
-  const cached = getCachedSpace(spaceId).items[String(groupId)]
-  if (cached !== undefined) {
-    group.items = cached
-    loadedGroups.add(groupId)
-    const nextLoading = new Set(loadingGroups.value)
-    nextLoading.delete(groupId)
-    loadingGroups.value = nextLoading
-    activeGroupLoads--
-    processGroupLoadQueue()
-    return
-  }
-  getItems<Panel.ItemInfo[]>(spaceId, groupId, 1, 100).then(({ data }) => {
-    if (generation === groupLoadGeneration && activeSpace.value?.id === spaceId) {
-      group.items = data || []
-      const spaceCache = getCachedSpace(spaceId)
-      spaceCache.items[String(groupId)] = group.items
-      saveCachedSpace(spaceId, spaceCache)
-      if (group.items.length > 40) collapsedGroups.value = new Set([...collapsedGroups.value, groupId])
-    }
-  }).finally(() => {
-    if (generation === groupLoadGeneration) {
-      if (activeSpace.value?.id === spaceId) loadedGroups.add(groupId)
-      const nextLoading = new Set(loadingGroups.value)
-      nextLoading.delete(groupId)
-      loadingGroups.value = nextLoading
-    }
-    activeGroupLoads--
-    processGroupLoadQueue()
-  })
-}
 function toggleGroup(id: number) { const next = new Set(collapsedGroups.value); next.has(id) ? next.delete(id) : next.add(id); collapsedGroups.value = next }
-function observeGroup(el: Element, index: number) {
-  if (!groupObserver) groupObserver = new IntersectionObserver(entries => entries.forEach(entry => { if (entry.isIntersecting) loadGroupItems(Number((entry.target as HTMLElement).dataset.groupIndex)) }), { rootMargin: '100px' })
-  ;(el as HTMLElement).dataset.groupIndex = String(index)
-  groupObserver.observe(el)
-}
-
 function selectSpace(key: string | number) {
   groupLoadGeneration++
   loadedGroups.clear()
-  loadingGroups.value = new Set()
   const selected = spaces.value.find(space => space.id === Number(key))
   if (selected) { activeSpace.value = selected; getList() }
 }
@@ -615,38 +586,43 @@ function getDropdownMenuOptions() {
   return dropdownMenuOptions
 }
 
-function loadHomeData() {
-  getEnableStatus<{ enabled: boolean }>().then(({ code, data }) => {
-    if (code === 0) monitorEnabled.value = data.enabled
-  })
+async function loadHomeData() {
+  homeReady.value = false
+  const [monitorResult] = await Promise.all([
+    getEnableStatus<{ enabled: boolean }>().catch(() => ({ code: -1, data: { enabled: false } })),
+    panelState.updatePanelConfigByCloud(),
+  ])
+  if (monitorResult.code === 0) monitorEnabled.value = monitorResult.data.enabled
+
+  if (panelState.panelConfig.logoText)
+    setTitle(panelState.panelConfig.logoText)
+
   const useCachedSpaces = () => {
     const cached = readSpacesCache(authStore.userInfo?.id) as Space[]
     if (cached.length) {
       spaces.value = sortSpaces(cached, authStore.userInfo?.id)
       activeSpace.value = spaces.value[0]
-      getList()
     }
   }
   if (!navigator.onLine) {
     useCachedSpaces()
   }
   else {
-    getSpaces<Space[]>().then(({ data }) => {
+    try {
+      const { data } = await getSpaces<Space[]>()
       if (data?.length) {
         spaces.value = sortSpaces(data, authStore.userInfo?.id)
         writeSpacesCache(spaces.value, authStore.userInfo?.id)
         activeSpace.value = spaces.value[0]
-        getList()
       }
-    }).catch(useCachedSpaces)
+    }
+    catch {
+      useCachedSpaces()
+    }
   }
 
-  // 更新同步云端配置
-  panelState.updatePanelConfigByCloud()
-
-  // 设置标题
-  if (panelState.panelConfig.logoText)
-    setTitle(panelState.panelConfig.logoText)
+  if (activeSpace.value) await getList()
+  homeReady.value = true
 }
 
 onMounted(() => {
@@ -659,9 +635,6 @@ onUnmounted(() => {
   window.removeEventListener('keydown', handleGlobalKeydown)
   if (sideSwitchTimer) clearTimeout(sideSwitchTimer)
   groupLoadGeneration++
-  loadingGroups.value = new Set()
-  groupObserver?.disconnect()
-  groupObserver = null
 })
 
 // 前端搜索过滤
@@ -755,7 +728,7 @@ function handleAddItem(itemIconGroupId?: number) {
         </NSpace>
       </NCard>
     </NModal>
-    <div v-if="spaces.length && authStore.token" class="space-status-bar">
+    <div v-if="homeReady && spaces.length && authStore.token" class="space-status-bar">
       <NDropdown
         trigger="hover"
         :options="spaceSelectorOptions"
@@ -778,15 +751,15 @@ function handleAddItem(itemIconGroupId?: number) {
       </NDropdown>
     </div>
     <div
-      class="cover wallpaper" :style="{
+      v-if="homeReady" class="cover wallpaper" :style="{
         filter: `blur(${panelState.panelConfig.backgroundBlur}px)`,
         background: `url(${panelState.panelConfig.backgroundImageSrc}) no-repeat`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
       }"
     />
-    <div class="mask" :style="{ backgroundColor: `rgba(0,0,0,${panelState.panelConfig.backgroundMaskNumber})` }" />
-    <div ref="scrollContainerRef" class="absolute w-full h-full overflow-auto">
+    <div v-if="homeReady" class="mask" :style="{ backgroundColor: `rgba(0,0,0,${panelState.panelConfig.backgroundMaskNumber})` }" />
+    <div v-if="homeReady" ref="scrollContainerRef" class="absolute w-full h-full overflow-auto">
       <div
         class="p-2.5 mx-auto"
         :style="{
@@ -858,10 +831,7 @@ function handleAddItem(itemIconGroupId?: number) {
 
             <!-- 详情图标 -->
             <div v-if="panelState.panelConfig.iconStyle === PanelPanelConfigStyleEnum.info">
-              <div v-if="loadingGroups.has(Number(itemGroup.id))" class="flex min-h-[80px] items-center justify-center">
-                <NSpin size="medium" />
-              </div>
-              <div v-else-if="itemGroup.items && !collapsedGroups.has(Number(itemGroup.id))">
+              <div v-if="itemGroup.items && !collapsedGroups.has(Number(itemGroup.id))">
                 <VueDraggable
                   v-model="itemGroup.items" item-key="sort" :animation="300"
                   class="icon-info-box"
@@ -897,10 +867,7 @@ function handleAddItem(itemIconGroupId?: number) {
 
             <!-- APP图标宫型盒子 -->
             <div v-if="panelState.panelConfig.iconStyle === PanelPanelConfigStyleEnum.icon">
-              <div v-if="loadingGroups.has(Number(itemGroup.id))" class="flex min-h-[80px] items-center justify-center">
-                <NSpin size="medium" />
-              </div>
-              <div v-else-if="itemGroup.items && !collapsedGroups.has(Number(itemGroup.id))">
+              <div v-if="itemGroup.items && !collapsedGroups.has(Number(itemGroup.id))">
                 <VueDraggable
                   v-model="itemGroup.items" item-key="sort" :animation="300"
                   class="icon-small-box"
@@ -956,13 +923,13 @@ function handleAddItem(itemIconGroupId?: number) {
 
     <!-- 右键菜单 -->
     <NDropdown
-      v-if="parsePublicCodeFromPath() === '' && authStore.token"
+      v-if="homeReady && parsePublicCodeFromPath() === '' && authStore.token"
       placement="bottom-start" trigger="manual" :x="dropdownMenuX" :y="dropdownMenuY"
       :options="getDropdownMenuOptions()" :show="dropdownShow" :on-clickoutside="onClickoutside" @select="handleRightMenuSelect"
     />
 
     <!-- 悬浮按钮 -->
-    <div v-if="parsePublicCodeFromPath() === '' && authStore.token" class="fixed-element shadow-[0_0_10px_2px_rgba(0,0,0,0.2)]">
+    <div v-if="homeReady && parsePublicCodeFromPath() === '' && authStore.token" class="fixed-element shadow-[0_0_10px_2px_rgba(0,0,0,0.2)]">
       <NButtonGroup vertical>
         <NButton data-testid="floating-refresh-button" color="#2a2a2a6b" :title="$t('common.refresh')" @mousedown="handleFloatingButtonMouseDown" @click="handleFloatingButtonClick($event, refreshCurrentSpace)">
           <template #icon>
@@ -1004,6 +971,7 @@ function handleAddItem(itemIconGroupId?: number) {
     </div>
 
     <NBackTop
+      v-if="homeReady"
       :listen-to="scrollContainerRef"
       :right="10"
       :bottom="10"
