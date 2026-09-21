@@ -192,11 +192,11 @@ function getGroupListOptions() {
     itemIconGroupOptions.value = []
     return
   }
-  getGroups<{ code: number; data: Panel.ItemIconGroup[] }>(props.spaceId).then(({ data, code, msg }) => {
-    if (code === 0) {
+  getGroups<Panel.ItemIconGroup[]>(props.spaceId).then(({ data }) => {
+    if (data) {
       itemIconGroupOptions.value = []
 
-      const list = data as Panel.ItemIconGroup[]
+      const list = data
       for (let i = 0; i < list.length; i++) {
         const element = list[i]
         if (i === 0 && !model.value.itemIconGroupId) {
@@ -210,16 +210,14 @@ function getGroupListOptions() {
         })
       }
     }
-    else {
-      ms.error(`${t('iconItem.getGroupFail')}:${msg}`)
-    }
+    else ms.error(t('iconItem.getGroupFail'))
   })
 }
 </script>
 
 <template>
   <NModal v-model:show="show" preset="card" size="small" style="width: 600px;max-width:calc(100vw - 24px);max-height:90vh;border-radius:1rem;overflow:auto;" :title="itemInfo ? t('iconItem.edit') : t('iconItem.add')">
-    <div class="h-[600px] overflow-auto p-[5px]">
+    <div data-testid="edit-item-modal" class="h-[600px] overflow-auto p-[5px]">
       <NForm ref="formRef" :model="model" :rules="rules">
         <NGrid cols="2" :x-gap="10" item-responsive>
           <NGridItem span="2 500:1">

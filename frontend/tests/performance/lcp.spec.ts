@@ -44,18 +44,16 @@ for (const path of ['/', '/login']) {
         if (entry) {
           target.__lcpMetric = {
             time: entry.startTime,
-            marker: entry.element?.getAttribute('data-lcp'),
-            text: entry.element?.textContent?.trim(),
+            marker: entry.element?.getAttribute('data-lcp') ?? undefined,
+            text: entry.element?.textContent?.trim() ?? undefined,
           }
         }
       }).observe({ type: 'largest-contentful-paint', buffered: true })
     })
     await page.goto(path, { waitUntil: 'domcontentloaded' })
     await expect(page.locator('[data-lcp="brand"]').last()).toBeVisible()
-    await page.waitForTimeout(500)
-
+    await expect.poll(() => readLcp(page), { timeout: 5000 }).toBeTruthy()
     const lcp = await readLcp(page)
-    expect(lcp).not.toBeNull()
     expect(lcp?.time).toBeLessThan(2500)
     expect(lcp?.marker).toBe('brand')
     expect(lcp?.text).toContain('Yin-Panel')

@@ -8,7 +8,6 @@ import { languageOptions } from '@/utils/defaultData'
 import type { Language, Theme } from '@/store/modules/app/helper'
 import { logout } from '@/api'
 import { updateInfo, updatePassword } from '@/api/system/user'
-import { enablePublicVisit, disablePublicVisit } from '@/api/panel/publicVisit'
 import { updateLocalUserInfo } from '@/utils/cmn'
 import { t } from '@/locales'
 
@@ -19,9 +18,6 @@ const appStore = useAppStore()
 const panelState = usePanelState()
 const ms = useMessage()
 const dialog = useDialog()
-const publicVisitEnabled = ref(false)
-const publicVisitUrl = ref('')
-const publicVisitLoading = ref(false)
 
 const languageValue = ref(appStore.language)
 const localizedLanguageOptions = computed(() => languageOptions.map(option => ({ ...option, label: option.key === 'auto' ? t('common.followBrowser') : option.label })))
@@ -140,63 +136,6 @@ function handleChangeTheme(value: Theme) {
   // location.reload()
 }
 
-// 从用户认证信息中获取公开访问代码状态
-const fetchPublicVisitCode = () => {
-  try {
-    // 直接从 authStore 中获取公开访问代码
-    const publiccode = authStore.userInfo?.publiccode
-    if (publiccode) {
-      // 使用类型断言确保类型安全
-      const codeStr = String(publiccode)
-      publicVisitEnabled.value = true
-      // 构建公开访问URL
-      const baseUrl = window.location.origin
-      publicVisitUrl.value = `${baseUrl}/${codeStr}`
-    } else {
-      publicVisitEnabled.value = false
-      publicVisitUrl.value = ''
-    }
-  } catch (error) {
-    console.error('获取公开访问代码失败:', error)
-    ms.error('获取公开访问代码状态失败')
-  }
-}
-
-// 处理公开访问开关切换
-const handleTogglePublicVisit = async (value: boolean) => {
-  publicVisitLoading.value = true
-  try {
-    if (value) {
-      // 开启公开访问
-      const res = await enablePublicVisit()
-      if (res.code === 0 && res.data && res.data.code) {
-        // 使用类型断言确保类型安全
-        const codeStr = String(res.data.code)
-        publicVisitEnabled.value = true
-        // 构建公开访问URL
-        const baseUrl = window.location.origin
-        publicVisitUrl.value = `${baseUrl}/${codeStr}`
-        ms.success('公开访问已开启')
-        // 更新用户信息
-        updateLocalUserInfo()
-      }
-    } else {
-      // 关闭公开访问
-      await disablePublicVisit()
-      publicVisitEnabled.value = false
-      publicVisitUrl.value = ''
-      ms.success('公开访问已关闭')
-      // 更新用户信息
-      updateLocalUserInfo()
-    }
-  } catch (error) {
-    console.error('切换公开访问状态失败:', error)
-    ms.error('切换公开访问状态失败')
-    publicVisitEnabled.value = !value // 恢复开关状态
-  } finally {
-    publicVisitLoading.value = false
-  }
-}
 </script>
 
 <template>

@@ -51,10 +51,10 @@ async function loadSearchConfig(spaceId?: number) {
   }
 
   try {
-    const { code, data } = await getSearchConfig<{ code: number; data?: SpaceSearchConfig | null }>(spaceId)
+    const { data } = await getSearchConfig<SpaceSearchConfig>(spaceId)
     if (generation !== loadGeneration)
       return
-    if (code === 0) {
+    if (data) {
       applySearchConfig(data)
       const nextCache = readSpaceCache(spaceId, authStore.userInfo?.id)
       nextCache.searchConfig = data || { currentSearchEngine: defaultState().currentSearchEngine }
@@ -115,7 +115,7 @@ onUnmounted(() => window.removeEventListener('yin-panel-search-config-saved', ha
       <div class="search-box-btn-engine w-[40px] flex justify-center cursor-pointer" @click="handleEngineClick">
         <NAvatar :src="state.currentSearchEngine.iconSrc" style="background-color: transparent;" :size="20" />
       </div>
-      <input v-model="searchTerm" :placeholder="$t('deskModule.searchBox.inputPlaceholder')" @focus="onFocus" @blur="onBlur" @input="handleItemSearch">
+      <input data-testid="home-search-input" v-model="searchTerm" :placeholder="$t('deskModule.searchBox.inputPlaceholder')" @focus="onFocus" @blur="onBlur" @input="handleItemSearch">
       <div v-if="searchTerm !== ''" class="search-box-btn-clear w-[25px] mr-[10px] flex justify-center cursor-pointer" @click="handleClearSearchTerm">
         <SvgIcon style="width: 20px;height: 20px;" icon="line-md:close-small" />
       </div>

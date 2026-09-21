@@ -62,12 +62,13 @@ function handleKeydown(event: KeyboardEvent) {
 </script>
 
 <template>
-  <div v-if="visible" class="command-center-backdrop" @click.self="emit('close')">
-    <section class="command-center-panel" role="dialog" aria-modal="true" @click.stop>
+  <div v-if="visible" data-testid="command-center-backdrop" class="command-center-backdrop" @click.self="emit('close')">
+    <section data-testid="command-center-panel" class="command-center-panel" role="dialog" aria-modal="true" @click.stop>
       <div class="command-center-input-wrap">
         <span class="command-center-prefix">{{ mode === 'command' ? '/' : '⌕' }}</span>
         <input
           ref="inputRef"
+          data-testid="command-center-input"
           :value="mode === 'command' ? query.replace(/^\//, '') : query"
           :placeholder="$t('deskModule.searchBox.inputPlaceholder')"
           autocomplete="off"

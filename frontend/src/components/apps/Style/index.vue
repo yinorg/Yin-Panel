@@ -50,8 +50,8 @@ async function loadSearchConfig(spaceId: number) {
     applySearchConfig(cached.searchConfig)
     return
   }
-  const { code, data } = await getSearchConfig<{ code: number; data?: SpaceSearchConfig | null }>(spaceId)
-  if (code === 0) {
+  const { data } = await getSearchConfig<SpaceSearchConfig>(spaceId)
+  if (data) {
     applySearchConfig(data)
     const nextCache = readSpaceCache(spaceId, authStore.userInfo?.id)
     nextCache.searchConfig = data || { currentSearchEngine: searchEngineList[0] }
@@ -102,8 +102,8 @@ onMounted(async () => {
   catch (error) {
     console.error('Failed to get monitor enable status:', error)
   }
-  const { code, data } = await getSpaces<{ code: number; data: Space[] }>()
-  if (code === 0 && data?.length) {
+  const { data } = await getSpaces<Space[]>()
+  if (data?.length) {
     spaces.value = data
     selectSearchSpace(data[0].id)
   }

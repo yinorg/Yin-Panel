@@ -164,8 +164,8 @@ async function getList(forceRefresh = false) {
     }
   }
   if (forceRefresh) clearCachedSpace(spaceId)
-  const { code, data } = await getGroups<{ code: number; data: ItemGroup[] }>(spaceId)
-  if (code !== 0 || !data) return
+  const { data } = await getGroups<ItemGroup[]>(spaceId)
+  if (!data) return
   if (generation === groupLoadGeneration && activeSpace.value?.id === spaceId) {
     const cache = getCachedSpace(spaceId)
     cache.groups = data
@@ -226,9 +226,9 @@ function processGroupLoadQueue() {
     processGroupLoadQueue()
     return
   }
-  getItems<{ code: number; data: Panel.ItemInfo[] }>(spaceId, groupId, 1, 100).then(res => {
-    if (generation === groupLoadGeneration && activeSpace.value?.id === spaceId && res.code === 0) {
-      group.items = res.data || []
+  getItems<Panel.ItemInfo[]>(spaceId, groupId, 1, 100).then(({ data }) => {
+    if (generation === groupLoadGeneration && activeSpace.value?.id === spaceId) {
+      group.items = data || []
       const spaceCache = getCachedSpace(spaceId)
       spaceCache.items[String(groupId)] = group.items
       saveCachedSpace(spaceId, spaceCache)
@@ -264,7 +264,7 @@ function togglePanelSide() {
   const yin = activeSpace.value
   const target = yin.side === 'yang'
     ? spaces.value.find(space => space.id === yin.pairId)
-    : { ...yin, id: yin.pairedSpaceId, name: `${yin.name}-B`, side: 'yang' as const, pairId: yin.id, pairedSpaceId: yin.id }
+    : { ...yin, id: yin.pairedSpaceId!, name: `${yin.name}-B`, side: 'yang' as const, pairId: yin.id, pairedSpaceId: yin.id }
   if (!target) return
   activeSpace.value = target
   getList()
@@ -410,8 +410,7 @@ async function refreshCurrentSpace() {
 }
 
 function reloadSpaces(selectLatest = false) {
-  getSpaces<{ code: number; data: Space[] }>().then(({ code, data }) => {
-    if (code !== 0) return
+  getSpaces<Space[]>().then(({ data }) => {
     const nextSpaces = sortSpaces(data || [], authStore.userInfo?.id)
     const targetSpaceId = selectLatest ? data?.[data.length - 1]?.id : activeSpace.value?.id
     spaces.value = nextSpaces
@@ -434,9 +433,8 @@ function submitCreateSpace() {
 
 // 从后端获取组下面的图标
 function updateItemIconGroupByNet(itemIconGroupIndex: number, itemIconGroupId: number) {
-  getItems<{ code: number; data: Panel.ItemInfo[] }>(activeSpace.value!.id, itemIconGroupId).then((res) => {
-    if (res.code === 0)
-      items.value[itemIconGroupIndex].items = res.data
+  getItems<Panel.ItemInfo[]>(activeSpace.value!.id, itemIconGroupId).then(({ data }) => {
+    items.value[itemIconGroupIndex].items = data
   })
 }
 
@@ -599,8 +597,8 @@ function loadHomeData() {
     useCachedSpaces()
   }
   else {
-    getSpaces<{ code: number; data: Space[] }>().then(({ code, data }) => {
-      if (code === 0 && data?.length) {
+    getSpaces<Space[]>().then(({ data }) => {
+      if (data?.length) {
         spaces.value = sortSpaces(data, authStore.userInfo?.id)
         writeSpacesCache(spaces.value, authStore.userInfo?.id)
         activeSpace.value = spaces.value[0]
@@ -733,7 +731,6 @@ function handleAddItem(itemIconGroupId?: number) {
           optionColorActive: 'rgba(125, 211, 252, 0.18)',
           dividerColor: 'rgba(255, 255, 255, 0.18)',
           borderRadius: '10px',
-          boxShadow: '0 12px 32px rgba(0, 0, 0, 0.28)',
         }"
         @select="selectSpace"
       >
@@ -795,7 +792,7 @@ function handleAddItem(itemIconGroupId?: number) {
           <div
             v-for="(itemGroup, itemGroupIndex) in filterItems" :key="itemGroupIndex"
             v-show="!groupHidden(itemGroupIndex)"
-            data-item-group
+            data-item-group data-testid="item-group"
             class="item-list mt-[50px] min-h-[110px]"
             :class="itemGroup.sortStatus ? 'shadow-2xl border shadow-[0_0_30px_10px_rgba(0,0,0,0.3)]  p-[10px] rounded-2xl' : ''"
             @mouseenter="handleSetHoverStatus(itemGroupIndex, true)"
@@ -960,7 +957,7 @@ function handleAddItem(itemIconGroupId?: number) {
           </template>
         </NButton>
 
-        <NButton color="#2a2a2a6b" @click="settingModalShow = !settingModalShow">
+        <NButton data-testid="system-settings-button" color="#2a2a2a6b" @click="settingModalShow = !settingModalShow">
           <template #icon>
             <SvgIcon class="text-white font-xl" icon="majesticons-applications" />
           </template>
@@ -1016,10 +1013,10 @@ function handleAddItem(itemIconGroupId?: number) {
     </NModal>
   </div>
   <NModal v-model:show="createSpaceVisible" preset="dialog" :title="$t('spaceManage.createSpace')" :positive-text="$t('common.confirm')" :negative-text="$t('common.cancel')" :loading="creatingSpace" @positive-click="submitCreateSpace">
-    <NInput v-model:value="spaceName" :placeholder="$t('spaceManage.newSpaceName')" maxlength="100" show-count @keyup.enter="submitCreateSpace" />
+    <div data-testid="create-space-modal"><NInput v-model:value="spaceName" :placeholder="$t('spaceManage.newSpaceName')" maxlength="100" show-count @keyup.enter="submitCreateSpace" /></div>
   </NModal>
   <NModal v-model:show="groupCreateVisible" preset="dialog" :title="$t('spaceManage.addGroup')" :positive-text="$t('common.confirm')" :negative-text="$t('common.cancel')" :loading="creatingGroup" @positive-click="submitCreateGroup">
-    <NInput v-model:value="groupName" :placeholder="$t('spaceManage.groupName')" maxlength="100" @keyup.enter="submitCreateGroup" />
+    <div data-testid="create-group-modal"><NInput v-model:value="groupName" :placeholder="$t('spaceManage.groupName')" maxlength="100" @keyup.enter="submitCreateGroup" /></div>
   </NModal>
 </template>
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { defineAsyncComponent, onMounted, shallowRef, watch } from 'vue'
+import { defineAsyncComponent, onMounted, shallowRef, watch, type Component } from 'vue'
 import { NSpin } from 'naive-ui'
 
 const props = defineProps<{
@@ -9,9 +9,9 @@ const emit = defineEmits<{
   (e: 'spaces-changed'): void
 }>()
 const loading = shallowRef(false)
-const dynamicComponent = shallowRef('')
+const dynamicComponent = shallowRef<Component | null>(null)
 
-const componentLoaders: Record<string, () => Promise<unknown>> = {
+const componentLoaders: Record<string, () => Promise<Component>> = {
   UserInfo: () => import('../../apps/UserInfo/index.vue'),
   Style: () => import('../../apps/Style/index.vue'),
   SpaceManage: () => import('../../apps/SpaceManage/index.vue'),
@@ -24,18 +24,18 @@ function updateComponent() {
   loading.value = true
   const loader = componentLoaders[props.componentName || '']
   if (!loader) {
-    dynamicComponent.value = ''
+    dynamicComponent.value = null
     loading.value = false
     return
   }
-  dynamicComponent.value = defineAsyncComponent(() =>
+  dynamicComponent.value = defineAsyncComponent<Component>(() =>
     loader()
       .finally(() => {
         loading.value = false
       }).catch(() => {
       // 组件不存在
-        dynamicComponent.value = ''
-        return null
+        dynamicComponent.value = null
+        return { render: () => null }
       }),
   )
 }
