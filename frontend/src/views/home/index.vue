@@ -1013,7 +1013,7 @@ html {
   inset: 0;
   border: 1px solid rgba(255, 255, 255, 0.42);
   border-radius: 50%;
-  animation: taiji-spin 720ms cubic-bezier(0.22, 0.61, 0.36, 1) reverse both;
+  animation: taiji-spin 1440ms cubic-bezier(0.22, 0.61, 0.36, 1) reverse both;
 }
 
 .taiji-bagua span {
