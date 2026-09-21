@@ -563,6 +563,17 @@ function handleAddItem(itemIconGroupId?: number) {
 
 <template>
   <div class="w-full h-full sun-main" :class="{ 'side-switching': sideSwitching }">
+    <div v-if="sideSwitching" class="taiji-transition" aria-hidden="true">
+      <div class="taiji-aura">
+        <div class="taiji-bagua">
+          <span v-for="index in 8" :key="index" />
+        </div>
+        <div class="taiji-symbol">
+          <span class="taiji-dot taiji-dot-dark" />
+          <span class="taiji-dot taiji-dot-light" />
+        </div>
+      </div>
+    </div>
     <NModal :show="!!publicCode && !publicAccessReady" :mask-closable="false" :closable="false">
       <NCard :title="$t('spaceManage.accessVerification')" style="width: min(92vw, 380px)">
         <NSpace vertical>
@@ -908,29 +919,133 @@ html {
 
 .sun-main {
   user-select: none;
-  transform-origin: center;
-  backface-visibility: hidden;
-  will-change: transform;
 }
 
 .sun-main.side-switching {
-  perspective: 1200px;
-  animation: panel-side-switch 650ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  animation: panel-content-pulse 720ms ease-in-out;
 }
 
-@keyframes panel-side-switch {
+@keyframes panel-content-pulse {
   0% {
-    transform: perspective(1200px) rotateY(0deg) scale(1);
     filter: brightness(1);
   }
-  50% {
-    transform: perspective(1200px) rotateY(180deg) scale(0.97);
-    filter: brightness(0.72);
+  45% {
+    filter: brightness(0.84);
   }
   100% {
-    transform: perspective(1200px) rotateY(180deg) scale(1);
     filter: brightness(1);
   }
+}
+
+.taiji-transition {
+  position: fixed;
+  z-index: 30;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+.taiji-aura {
+  position: relative;
+  width: clamp(120px, 22vw, 190px);
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  animation: taiji-aura 720ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+.taiji-symbol {
+  position: relative;
+  z-index: 1;
+  width: 58%;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: 3px solid rgba(255, 255, 255, 0.82);
+  border-radius: 50%;
+  background: linear-gradient(90deg, #18212b 0 50%, #f4efe2 50%);
+  box-shadow: 0 0 34px rgba(255, 255, 255, 0.3), 0 0 80px rgba(13, 18, 24, 0.3);
+  animation: taiji-spin 720ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+.taiji-symbol::before,
+.taiji-symbol::after {
+  position: absolute;
+  left: 25%;
+  width: 50%;
+  height: 50%;
+  content: '';
+  border-radius: 50%;
+}
+
+.taiji-symbol::before {
+  top: 0;
+  background: #f4efe2;
+}
+
+.taiji-symbol::after {
+  bottom: 0;
+  background: #18212b;
+}
+
+.taiji-dot {
+  position: absolute;
+  z-index: 2;
+  width: 12%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+}
+
+.taiji-dot-dark {
+  top: 25%;
+  left: 44%;
+  background: #18212b;
+}
+
+.taiji-dot-light {
+  bottom: 25%;
+  left: 44%;
+  background: #f4efe2;
+}
+
+.taiji-bagua {
+  position: absolute;
+  inset: 0;
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  border-radius: 50%;
+  animation: taiji-spin 720ms cubic-bezier(0.22, 0.61, 0.36, 1) reverse both;
+}
+
+.taiji-bagua span {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 16%;
+  height: 3px;
+  transform: rotate(calc(var(--index, 0) * 45deg)) translateX(255%);
+  transform-origin: left center;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: 6px 0 0 rgba(255, 255, 255, 0.72);
+}
+
+.taiji-bagua span:nth-child(1) { --index: 0; }
+.taiji-bagua span:nth-child(2) { --index: 1; }
+.taiji-bagua span:nth-child(3) { --index: 2; }
+.taiji-bagua span:nth-child(4) { --index: 3; }
+.taiji-bagua span:nth-child(5) { --index: 4; }
+.taiji-bagua span:nth-child(6) { --index: 5; }
+.taiji-bagua span:nth-child(7) { --index: 6; }
+.taiji-bagua span:nth-child(8) { --index: 7; }
+
+@keyframes taiji-aura {
+  0% { opacity: 0; transform: scale(0.72); }
+  18%, 72% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.72); }
+}
+
+@keyframes taiji-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 @media (prefers-reduced-motion: reduce) {
