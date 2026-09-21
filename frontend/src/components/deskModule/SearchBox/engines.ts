@@ -18,3 +18,9 @@ export const searchEngineList: SearchEngine[] = [
   { iconSrc: '/assets/search_engine_svg/360.png', title: '360 Search', url: 'https://www.so.com/s?q=%s' },
   { iconSrc: '/assets/search_engine_svg/aol.svg', title: 'AOL', url: 'https://search.aol.com/aol/search?q=%s' },
 ]
+
+export function replaceOrAppendKeywordToUrl(url: string, keyword: string) {
+  const encodedKeyword = encodeURIComponent(keyword)
+  if (url.includes('%s')) return url.replace('%s', encodedKeyword)
+  return url + encodedKeyword
+}

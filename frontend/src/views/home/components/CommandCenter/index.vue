@@ -18,6 +18,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'update:query', value: string): void
   (e: 'move', offset: number): void
+  (e: 'select', index: number): void
+  (e: 'submit-search', query: string): void
   (e: 'execute-item', item: Panel.ItemInfo): void
   (e: 'execute-command', command: string): void
   (e: 'close'): void
@@ -52,6 +54,7 @@ function handleKeydown(event: KeyboardEvent) {
     else {
       const item = props.items[props.selectedIndex]
       if (item) emit('execute-item', item)
+      else emit('submit-search', props.query)
     }
   }
   else if (event.key === 'Escape') {
@@ -86,7 +89,7 @@ function handleKeydown(event: KeyboardEvent) {
           type="button"
           class="command-center-result"
           :class="{ selected: index === selectedIndex }"
-          @mouseenter="emit('move', index - selectedIndex)"
+          @mouseenter="emit('select', index)"
           @click="emit('execute-item', item)"
         >
           <span class="command-center-result-title">{{ item.title }}</span>
@@ -100,7 +103,7 @@ function handleKeydown(event: KeyboardEvent) {
           type="button"
           class="command-center-result"
           :class="{ selected: index === selectedIndex }"
-          @mouseenter="emit('move', index - selectedIndex)"
+          @mouseenter="emit('select', index)"
           @click="emit('execute-command', command.key)"
         >
           <span class="command-center-result-title">{{ command.label }}</span>

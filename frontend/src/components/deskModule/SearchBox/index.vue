@@ -5,7 +5,7 @@ import SvgIcon from '../../common/SvgIcon/index.vue'
 import { getSearchConfig, type SpaceSearchConfig } from '@/api/panel/space'
 import { useAuthStore } from '@/store'
 import { readSpaceCache, writeSpaceCache } from '@/utils/spaceCache'
-import { searchEngineList, type SearchEngine } from './engines'
+import { replaceOrAppendKeywordToUrl, searchEngineList, type SearchEngine } from './engines'
 
 const props = withDefaults(defineProps<{
   background?: string
@@ -16,7 +16,10 @@ const props = withDefaults(defineProps<{
   textColor: 'white',
 })
 
-const emits = defineEmits(['itemSearch'])
+const emits = defineEmits<{
+  (e: 'itemSearch', value: string): void
+  (e: 'searchEngineChange', value: SearchEngine): void
+}>()
 const authStore = useAuthStore()
 const searchTerm = ref('')
 const isFocused = ref(false)
@@ -35,6 +38,7 @@ function applySearchConfig(config?: SpaceSearchConfig | null) {
   state.value = {
     currentSearchEngine: current?.url ? current : defaultState().currentSearchEngine,
   }
+  emits('searchEngineChange', state.value.currentSearchEngine)
 }
 
 async function loadSearchConfig(spaceId?: number) {
@@ -72,6 +76,7 @@ const onBlur = (): void => { isFocused.value = false }
 function handleEngineClick() { searchSelectListShow.value = !searchSelectListShow.value }
 function handleEngineUpdate(engine: SearchEngine) {
   state.value.currentSearchEngine = engine
+  emits('searchEngineChange', engine)
   searchSelectListShow.value = false
 }
 
@@ -79,12 +84,6 @@ function handleSearchClick() {
   const fullUrl = replaceOrAppendKeywordToUrl(state.value.currentSearchEngine.url, searchTerm.value)
   handleClearSearchTerm()
   window.open(fullUrl)
-}
-
-function replaceOrAppendKeywordToUrl(url: string, keyword: string) {
-  if (url.includes('%s'))
-    return url.replace('%s', encodeURIComponent(keyword))
-  return url + (keyword ? `${encodeURIComponent(keyword)}` : '')
 }
 
 const handleItemSearch = () => { emits('itemSearch', searchTerm.value) }

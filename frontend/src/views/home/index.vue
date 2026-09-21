@@ -5,6 +5,7 @@ import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref }
 import { createGroup, createSpace, getGroups, getItems, getSpaces, sortSpaces, spaceDisplayName, type Space } from '../../api/panel/space'
 import Clock from '../../components/deskModule/Clock/index.vue'
 import SearchBox from '../../components/deskModule/SearchBox/index.vue'
+import { replaceOrAppendKeywordToUrl, searchEngineList, type SearchEngine } from '../../components/deskModule/SearchBox/engines'
 import SvgIcon from '../../components/common/SvgIcon/index.vue'
 import SvgIconOnline from '../../components/common/SvgIconOnline/index.vue'
 import AppIcon from './components/AppIcon/index.vue'
@@ -64,7 +65,8 @@ let sideSwitchTimer: ReturnType<typeof setTimeout> | undefined
 const commandCenterVisible = ref(false)
 const commandCenterMode = ref<'search' | 'command'>('search')
 const commandCenterQuery = ref('')
-const commandCenterSelectedIndex = ref(0)
+const commandCenterSelectedIndex = ref(-1)
+const commandCenterSearchEngine = ref<SearchEngine>(searchEngineList[0])
 const groupCreateVisible = ref(false)
 const groupName = ref('')
 const creatingGroup = ref(false)
@@ -310,7 +312,7 @@ const commandCenterItems = computed(() => {
 function openCommandCenter(mode: 'search' | 'command', query: string) {
   commandCenterMode.value = mode
   commandCenterQuery.value = query
-  commandCenterSelectedIndex.value = 0
+  commandCenterSelectedIndex.value = mode === 'command' ? 0 : -1
   commandCenterVisible.value = true
 }
 
@@ -324,6 +326,15 @@ function moveCommandSelection(offset: number) {
   const length = commandCenterMode.value === 'command' ? filteredCommandDefinitions.value.length : commandCenterItems.value.length
   if (!length) return
   commandCenterSelectedIndex.value = (commandCenterSelectedIndex.value + offset + length) % length
+}
+
+function selectCommandItem(index: number) {
+  commandCenterSelectedIndex.value = index
+}
+
+function submitCommandCenterSearch(keyword: string) {
+  window.open(replaceOrAppendKeywordToUrl(commandCenterSearchEngine.value.url, keyword))
+  closeCommandCenter()
 }
 
 function findCommandItem(query: string) {
@@ -695,6 +706,8 @@ function handleAddItem(itemIconGroupId?: number) {
       :selected-index="commandCenterSelectedIndex"
       @update:query="commandCenterQuery = $event"
       @move="moveCommandSelection"
+      @select="selectCommandItem"
+      @submit-search="submitCommandCenterSearch"
       @execute-item="executeCommandItem"
       @execute-command="executeCommand"
       @close="closeCommandCenter"
@@ -775,7 +788,7 @@ function handleAddItem(itemIconGroupId?: number) {
             </div>
           </div>
           <div v-if="panelState.panelConfig.searchBoxShow" class="flex mt-[20px] mx-auto sm:w-full lg:w-[80%]">
-            <SearchBox :space-id="activeSpace?.id" @itemSearch="itemFrontEndSearch" />
+            <SearchBox :space-id="activeSpace?.id" @itemSearch="itemFrontEndSearch" @search-engine-change="commandCenterSearchEngine = $event" />
           </div>
         </div>
 
