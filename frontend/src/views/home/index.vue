@@ -956,7 +956,7 @@ html {
 }
 
 .taiji-symbol {
-  --taiji-start-angle: 90deg;
+  --taiji-start-angle: 0deg;
   position: relative;
   z-index: 1;
   width: 58%;
@@ -970,7 +970,7 @@ html {
 }
 
 .taiji-symbol.taiji-yang {
-  --taiji-start-angle: 270deg;
+  --taiji-start-angle: 180deg;
 }
 
 .taiji-symbol::before,
