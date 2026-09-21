@@ -145,6 +145,15 @@ function scrollToTop() {
   scrollContainerRef.value?.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
+async function handleFloatingButtonClick(event: MouseEvent, action: () => unknown | Promise<unknown>) {
+  const button = event.currentTarget as HTMLElement | null
+  try {
+    await action()
+  } finally {
+    button?.blur()
+  }
+}
+
 // 获取组数据
 async function getList(forceRefresh = false) {
   const generation = ++groupLoadGeneration
@@ -951,12 +960,12 @@ function handleAddItem(itemIconGroupId?: number) {
     <!-- 悬浮按钮 -->
     <div v-if="parsePublicCodeFromPath() === '' && authStore.token" class="fixed-element shadow-[0_0_10px_2px_rgba(0,0,0,0.2)]">
       <NButtonGroup vertical>
-        <NButton color="#2a2a2a6b" :title="$t('common.refresh')" @click="refreshCurrentSpace">
+        <NButton data-testid="floating-refresh-button" color="#2a2a2a6b" :title="$t('common.refresh')" @click="handleFloatingButtonClick($event, refreshCurrentSpace)">
           <template #icon>
             <SvgIcon class="text-white font-xl" icon="material-symbols:refresh-rounded" />
           </template>
         </NButton>
-        <NButton color="#2a2a2a6b" :title="$t('spaceManage.backToTop')" @click="scrollToTop">
+        <NButton data-testid="floating-top-button" color="#2a2a2a6b" :title="$t('spaceManage.backToTop')" @click="handleFloatingButtonClick($event, scrollToTop)">
           <template #icon>
             <SvgIcon class="text-white font-xl" icon="icon-park-outline:to-top" />
           </template>
@@ -964,7 +973,7 @@ function handleAddItem(itemIconGroupId?: number) {
         <!-- 网络模式切换按钮组 -->
         <NButton
           v-if="panelState.networkMode === PanelStateNetworkModeEnum.lan && panelState.panelConfig.netModeChangeButtonShow" color="#2a2a2a6b"
-          :title="t('panelHome.changeToWanModel')" @click="handleChangeNetwork(PanelStateNetworkModeEnum.wan)"
+          data-testid="floating-wan-button" :title="t('panelHome.changeToWanModel')" @click="handleFloatingButtonClick($event, () => handleChangeNetwork(PanelStateNetworkModeEnum.wan))"
         >
           <template #icon>
             <SvgIcon class="text-white font-xl" icon="material-symbols:lan-outline-rounded" />
@@ -973,14 +982,14 @@ function handleAddItem(itemIconGroupId?: number) {
 
         <NButton
           v-if="panelState.networkMode === PanelStateNetworkModeEnum.wan && panelState.panelConfig.netModeChangeButtonShow" color="#2a2a2a6b"
-          :title="t('panelHome.changeToLanModel')" @click="handleChangeNetwork(PanelStateNetworkModeEnum.lan)"
+          data-testid="floating-lan-button" :title="t('panelHome.changeToLanModel')" @click="handleFloatingButtonClick($event, () => handleChangeNetwork(PanelStateNetworkModeEnum.lan))"
         >
           <template #icon>
             <SvgIcon class="text-white font-xl" icon="mdi:wan" />
           </template>
         </NButton>
 
-        <NButton data-testid="system-settings-button" color="#2a2a2a6b" @click="settingModalShow = !settingModalShow">
+        <NButton data-testid="system-settings-button" color="#2a2a2a6b" @click="handleFloatingButtonClick($event, () => { settingModalShow = !settingModalShow })">
           <template #icon>
             <SvgIcon class="text-white font-xl" icon="majesticons-applications" />
           </template>
