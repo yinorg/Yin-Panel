@@ -71,6 +71,7 @@ const refreshInterval = 5000
           />
           <Network
             v-else-if="monitorType === MonitorType.network"
+            :compact="false"
             :refresh-interval="refreshInterval"
             :text-color="extendParam?.color"
             :progress-color="extendParam?.progressColor"
@@ -121,7 +122,7 @@ const refreshInterval = 5000
           :path="extendParam?.path"
           :refresh-interval="refreshInterval"
         />
-        <Network v-else-if="monitorType === MonitorType.network" :refresh-interval="refreshInterval" :text-color="extendParam?.color" :progress-color="extendParam?.progressColor" :progress-rail-color="extendParam?.progressRailColor" />
+        <Network v-else-if="monitorType === MonitorType.network" :compact="true" :refresh-interval="refreshInterval" :text-color="extendParam?.color" :progress-color="extendParam?.progressColor" :progress-rail-color="extendParam?.progressRailColor" />
       </template>
     </GenericMonitorCard>
   </div>
