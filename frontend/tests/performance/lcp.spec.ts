@@ -135,3 +135,54 @@ test('home keeps layout stable while delayed space data loads', async ({ page })
   await expect(page.locator('[data-testid="item-group"]')).toHaveCount(groups.length)
   await expect.poll(() => page.evaluate(() => (window as typeof window & { __clsMetric?: number }).__clsMetric || 0), { timeout: 2000 }).toBeLessThan(0.1)
 })
+
+test('home keeps ordinary groups stable while system monitor data loads', async ({ page }) => {
+  const groups = [{ id: 1, title: 'Group 1', sort: 1, parentId: null }]
+  const items = [{
+    id: 1,
+    title: 'Item 1',
+    url: 'https://example.com/1',
+    description: '',
+    openMethod: 2,
+    itemIconGroupId: 1,
+    icon: { itemType: 1, text: 'I', backgroundColor: '#18212b' },
+  }]
+
+  await page.addInitScript(() => {
+    sessionStorage.setItem('yin-panel-public-access:abcdef', 'test-access')
+    const target = window as typeof window & { __clsMetric?: number }
+    target.__clsMetric = 0
+    new PerformanceObserver((list) => {
+      for (const entry of list.getEntries() as (PerformanceEntry & { hadRecentInput?: boolean; value?: number })[]) {
+        if (!entry.hadRecentInput) target.__clsMetric = (target.__clsMetric || 0) + (entry.value || 0)
+      }
+    }).observe({ type: 'layout-shift', buffered: true })
+  })
+  await page.route('**/api/**', async (route) => {
+    const path = new URL(route.request().url()).pathname
+    const delay = path.endsWith('/getEnableStatus') || path.endsWith('/snapshot') ? 220 : 40
+    let data: unknown = {}
+    if (path.endsWith('/getConfig')) data = { panel: { clockShowSecond: false, searchBoxShow: true, systemMonitorShow: true, systemMonitorShowTitle: true } }
+    else if (path.endsWith('/getEnableStatus')) data = { enabled: true, refresh_interval: 10 }
+    else if (path.endsWith('/spaces')) data = [{ id: 1, name: 'Test Space', type: 'personal', ownerUserId: 1 }]
+    else if (path.endsWith('/groups')) data = groups
+    else if (path.endsWith('/items')) data = items
+    else if (path.endsWith('/search-config')) data = { currentSearchEngine: { iconSrc: '/assets/search_engine_svg/bing.svg', title: 'Bing', url: 'https://www.bing.com/search?q=%s' } }
+    else if (path.endsWith('/snapshot')) data = { cpu: 10, memory: 20, network: { upload: 1, download: 2 } }
+    if (delay) await new Promise(resolve => setTimeout(resolve, delay))
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ code: 0, data }) })
+  })
+
+  await page.goto('/abcdef', { waitUntil: 'domcontentloaded' })
+  const firstGroup = page.locator('[data-testid="item-group"]').first()
+  await expect(firstGroup).toBeVisible()
+  await expect(page.locator('.system-monitor-layer')).toBeVisible()
+  const initialTop = await firstGroup.boundingBox()
+  expect(initialTop).not.toBeNull()
+  await page.waitForTimeout(700)
+  const finalTop = await firstGroup.boundingBox()
+  const monitorBox = await page.locator('.system-monitor-layer').boundingBox()
+  expect(finalTop?.y).toBe(initialTop?.y)
+  expect(monitorBox?.y! + monitorBox?.height!).toBeLessThanOrEqual(finalTop?.y!)
+  await expect.poll(() => page.evaluate(() => (window as typeof window & { __clsMetric?: number }).__clsMetric || 0), { timeout: 2000 }).toBeLessThan(0.1)
+})

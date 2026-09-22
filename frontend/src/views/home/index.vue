@@ -789,9 +789,13 @@ function handleAddItem(itemIconGroupId?: number) {
         </div>
 
         <!-- 应用盒子 -->
-        <div :style="{ marginLeft: `${panelState.panelConfig.marginX}px`, marginRight: `${panelState.panelConfig.marginX}px` }">
+        <div
+          class="home-content"
+          :class="{ 'home-content--with-monitor': monitorEnabled && panelState.panelConfig.systemMonitorShow }"
+          :style="{ marginLeft: `${panelState.panelConfig.marginX}px`, marginRight: `${panelState.panelConfig.marginX}px` }"
+        >
           <!-- 系统监控状态 -->
-          <div v-if="monitorEnabled && panelState.panelConfig.systemMonitorShow" class="flex mx-auto">
+          <div v-if="monitorEnabled && panelState.panelConfig.systemMonitorShow" class="system-monitor-layer">
             <SystemMonitor
               :show-title="panelState.panelConfig.systemMonitorShowTitle"
             />
@@ -1209,6 +1213,27 @@ html {
   transform: scale(1.05);
 }
 
+.home-content {
+  position: relative;
+}
+
+.home-content--with-monitor {
+  padding-top: 280px;
+}
+
+.system-monitor-layer {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  left: 0;
+  right: 0;
+  max-width: 1200px;
+  max-height: 260px;
+  margin: 0 auto;
+  overflow: auto;
+  contain: layout;
+}
+
 .text-shadow {
   text-shadow: 2px 2px 50px rgb(0, 0, 0);
 }
@@ -1268,5 +1293,7 @@ html {
   .icon-info-box { gap: 10px; grid-template-columns: 1fr; }
   .icon-small-box { gap: 12px 8px; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); }
   .system-monitor { overflow: hidden; }
+  .home-content--with-monitor { padding-top: 430px; }
+  .system-monitor-layer { max-height: 410px; }
 }
 </style>
