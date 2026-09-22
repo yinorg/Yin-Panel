@@ -14,16 +14,24 @@ function setupPlugins(env: ImportMetaEnv): PluginOption[] {
       workbox: {
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api(?:\/|$)/],
-        // Keep the application shell and chunks in the precache. Public images
-        // are listed explicitly below so they are not discovered twice.
-        globPatterns: ['**/*.{js,css,html}'],
+        // Precache the shell and compiled entry chunks. Other same-origin
+        // assets are cached as they are used, keeping installation bounded.
+        globPatterns: ['index.html', 'assets/js/index.*.js', 'assets/js/vue-vendor.*.js', 'assets/*.css'],
+        runtimeCaching: [{
+          urlPattern: /\/assets\//,
+          handler: 'CacheFirst',
+          options: {
+            cacheName: 'yin-panel-runtime-assets',
+            cacheableResponse: { statuses: [0, 200] },
+            expiration: { maxEntries: 200, maxAgeSeconds: 7 * 24 * 60 * 60 },
+          },
+        }],
       },
       includeAssets: [
         'assets/favicon.svg',
         'assets/apple-touch-icon.png',
         'assets/bg-forest.webp',
         'assets/search_engine_svg/*.{png,svg}',
-        'assets/svg-icons/*.svg',
       ],
       manifest: {
         name: 'Yin-Panel',
