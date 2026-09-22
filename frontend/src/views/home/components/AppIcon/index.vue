@@ -93,7 +93,7 @@ const cardStyle = computed(() => {
 </script>
 
 <template>
-  <div class="app-icon w-full">
+  <div class="app-icon w-full" data-testid="home-item" :data-item-title="itemInfo?.title || ''">
     <!-- 详情图标 -->
     <div
       v-if="style === PanelPanelConfigStyleEnum.info"

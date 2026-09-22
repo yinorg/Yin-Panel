@@ -14,7 +14,9 @@ function setupPlugins(env: ImportMetaEnv): PluginOption[] {
       workbox: {
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api(?:\/|$)/],
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,jpg,jpeg,webp}'],
+        // Keep the application shell and chunks in the precache. Public images
+        // are listed explicitly below so they are not discovered twice.
+        globPatterns: ['**/*.{js,css,html}'],
       },
       includeAssets: [
         'assets/favicon.svg',
