@@ -177,6 +177,8 @@ test('home keeps ordinary groups stable while system monitor data loads', async 
   const firstGroup = page.locator('[data-testid="item-group"]').first()
   await expect(firstGroup).toBeVisible()
   await expect(page.locator('.system-monitor-layer')).toBeVisible()
+  for (const label of ['CPU', 'RAM', 'NET'])
+    await expect(page.getByText(label, { exact: true }).first()).toBeVisible()
   const initialTop = await firstGroup.boundingBox()
   expect(initialTop).not.toBeNull()
   await page.waitForTimeout(700)

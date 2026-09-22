@@ -791,11 +791,18 @@ function handleAddItem(itemIconGroupId?: number) {
         <!-- 应用盒子 -->
         <div
           class="home-content"
-          :class="{ 'home-content--with-monitor': monitorEnabled && panelState.panelConfig.systemMonitorShow }"
+          :class="{
+            'home-content--with-monitor': monitorEnabled && panelState.panelConfig.systemMonitorShow,
+            'home-content--monitor-info': monitorEnabled && panelState.panelConfig.systemMonitorShow && panelState.panelConfig.iconStyle === PanelPanelConfigStyleEnum.info,
+          }"
           :style="{ marginLeft: `${panelState.panelConfig.marginX}px`, marginRight: `${panelState.panelConfig.marginX}px` }"
         >
           <!-- 系统监控状态 -->
-          <div v-if="monitorEnabled && panelState.panelConfig.systemMonitorShow" class="system-monitor-layer">
+          <div
+            v-if="monitorEnabled && panelState.panelConfig.systemMonitorShow"
+            class="system-monitor-layer"
+            :class="{ 'system-monitor-layer--info': panelState.panelConfig.iconStyle === PanelPanelConfigStyleEnum.info }"
+          >
             <SystemMonitor
               :show-title="panelState.panelConfig.systemMonitorShowTitle"
             />
@@ -1218,7 +1225,11 @@ html {
 }
 
 .home-content--with-monitor {
-  padding-top: 200px;
+  padding-top: 190px;
+}
+
+.home-content--monitor-info {
+  padding-top: 230px;
 }
 
 .system-monitor-layer {
@@ -1228,10 +1239,15 @@ html {
   left: 0;
   right: 0;
   max-width: 1200px;
-  max-height: 180px;
+  max-height: 210px;
+  box-sizing: border-box;
   margin: 0 auto;
   overflow: auto;
   contain: layout;
+}
+
+.system-monitor-layer--info {
+  max-height: 220px;
 }
 
 .text-shadow {
@@ -1293,7 +1309,9 @@ html {
   .icon-info-box { gap: 10px; grid-template-columns: 1fr; }
   .icon-small-box { gap: 12px 8px; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); }
   .system-monitor { overflow: hidden; }
-  .home-content--with-monitor { padding-top: 320px; }
-  .system-monitor-layer { max-height: 300px; }
+  .home-content--with-monitor { padding-top: 300px; }
+  .home-content--monitor-info { padding-top: 380px; }
+  .system-monitor-layer { max-height: 320px; }
+  .system-monitor-layer--info { max-height: 370px; }
 }
 </style>
