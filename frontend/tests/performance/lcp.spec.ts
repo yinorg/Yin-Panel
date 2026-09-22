@@ -188,3 +188,33 @@ test('home keeps ordinary groups stable while system monitor data loads', async 
   expect(monitorBox?.y! + monitorBox?.height!).toBeLessThanOrEqual(finalTop?.y!)
   await expect.poll(() => page.evaluate(() => (window as typeof window & { __clsMetric?: number }).__clsMetric || 0), { timeout: 2000 }).toBeLessThan(0.1)
 })
+
+test('home renders cached content without API requests while offline', async ({ page }) => {
+  const requests: string[] = []
+  await page.addInitScript(() => {
+    sessionStorage.setItem('yin-panel-public-access:abcdef', 'test-access')
+    if (localStorage.getItem('__offline_test__') === '1')
+      Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false })
+  })
+  await page.route('**/api/**', async (route) => {
+    requests.push(new URL(route.request().url()).pathname)
+    const path = new URL(route.request().url()).pathname
+    let data: unknown = {}
+    if (path.endsWith('/getConfig')) data = { panel: { systemMonitorShow: false } }
+    else if (path.endsWith('/getEnableStatus')) data = { enabled: false }
+    else if (path.endsWith('/spaces')) data = [{ id: 1, name: 'Cached Space', type: 'personal', ownerUserId: 1 }]
+    else if (path.endsWith('/groups')) data = [{ id: 1, title: 'Cached Group', sort: 1, parentId: null }]
+    else if (path.endsWith('/items')) data = [{ id: 1, title: 'Cached Item', url: 'https://example.com', description: '', openMethod: 2, itemIconGroupId: 1, icon: { itemType: 1, text: 'I', backgroundColor: '#18212b' } }]
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ code: 0, data }) })
+  })
+
+  await page.goto('/abcdef', { waitUntil: 'domcontentloaded' })
+  await expect(page.getByText('Cached Item', { exact: true })).toBeVisible()
+  const onlineRequestCount = requests.length
+  await page.evaluate(() => localStorage.setItem('__offline_test__', '1'))
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await expect(page.getByText('Cached Item', { exact: true })).toBeVisible()
+  expect(requests.slice(onlineRequestCount)).not.toContain('/api/spaces')
+  expect(requests.slice(onlineRequestCount)).not.toContain('/api/panel/userConfig/getConfig')
+  expect(requests.slice(onlineRequestCount)).not.toContain('/api/system/monitor/getEnableStatus')
+})

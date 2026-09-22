@@ -30,15 +30,13 @@ export const usePanelState = defineStore('panel', {
     async updatePanelConfigByCloud() {
       try {
         const res = await getUserConfig<Panel.userConfig>()
-        if (res.code === 0)
-          this.panelConfig = { ...defaultStatePanelConfig(), ...res.data.panel }
-        else
-          this.resetPanelConfig()
+        if (res.code !== 0) return false
+        this.panelConfig = { ...defaultStatePanelConfig(), ...res.data.panel }
         this.recordState()
+        return true
       }
       catch {
-        this.resetPanelConfig()
-        this.recordState()
+        return false
       }
     },
 

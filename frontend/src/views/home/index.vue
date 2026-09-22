@@ -7,7 +7,6 @@ import Clock from '../../components/deskModule/Clock/index.vue'
 import SearchBox from '../../components/deskModule/SearchBox/index.vue'
 import { replaceOrAppendKeywordToUrl, searchEngineList, type SearchEngine } from '../../components/deskModule/SearchBox/engines'
 import SvgIcon from '../../components/common/SvgIcon/index.vue'
-import SvgIconOnline from '../../components/common/SvgIconOnline/index.vue'
 import AppIcon from './components/AppIcon/index.vue'
 import CommandCenter from './components/CommandCenter/index.vue'
 import { deleteItem, sortItems } from '@/api/panel/space'
@@ -63,6 +62,8 @@ const createSpaceVisible = ref(false)
 const spaceName = ref('')
 const creatingSpace = ref(false)
 const monitorEnabled = ref(false)
+const monitorResultRefreshInterval = ref<number | undefined>()
+const isOnline = ref(typeof navigator === 'undefined' ? true : navigator.onLine)
 const homeReady = ref(false)
 const sideSwitching = ref(false)
 let sideSwitchTimer: ReturnType<typeof setTimeout> | undefined
@@ -78,10 +79,16 @@ const items = ref<ItemGroup[]>([])
 const filterItems = ref<ItemGroup[]>([])
 const loadedGroups = new Set<number>()
 let groupLoadGeneration = 0
+const HOME_REQUEST_TIMEOUT = 3000
 const collapsedGroups = ref<Set<number>>(new Set())
 const publicCode = parsePublicCodeFromPath()
 const publicAccessCode = ref('')
 const publicAccessReady = ref(!publicCode || !!sessionStorage.getItem(`yin-panel-public-access:${publicCode}`))
+
+function getBackgroundImageSrc() {
+  const source = panelState.panelConfig.backgroundImageSrc
+  return source === '/assets/bg-forest.jpg' ? '/assets/bg-forest.webp' : source
+}
 
 function getCachedSpace(spaceId: number) { return readSpaceCache(spaceId, authStore.userInfo?.id) }
 function saveCachedSpace(spaceId: number, cache: any) { writeSpaceCache(spaceId, cache, authStore.userInfo?.id) }
@@ -156,7 +163,15 @@ async function handleFloatingButtonClick(event: MouseEvent, action: () => unknow
 }
 
 // 获取组数据
+function withHomeTimeout<T>(request: Promise<T>): Promise<T> {
+  return Promise.race([
+    request,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error('Home request timed out')), HOME_REQUEST_TIMEOUT)),
+  ])
+}
+
 async function getList(forceRefresh = false) {
+  if (forceRefresh && !isOnline.value) return
   const generation = ++groupLoadGeneration
   loadedGroups.clear()
   if (!activeSpace.value) {
@@ -176,7 +191,8 @@ async function getList(forceRefresh = false) {
       clearCachedSpace(spaceId)
       cache = getCachedSpace(spaceId)
     }
-    const { data } = await getGroups<ItemGroup[]>(spaceId)
+    if (!isOnline.value) return
+    const { data } = await withHomeTimeout(getGroups<ItemGroup[]>(spaceId)).catch(() => ({ data: undefined }))
     if (!data) return
     groups = data
     cache.groups = groups
@@ -188,27 +204,35 @@ async function getList(forceRefresh = false) {
     const cachedItems = cache.items[String(group.id)]
     if (cachedItems) itemsByGroup.set(Number(group.id), cachedItems)
   })
+  if (!groups) return
+  const resolvedGroups = groups
   let nextGroup = 0
   const loadNextGroups = async () => {
     while (nextGroup < pendingGroups.length) {
       const group = pendingGroups[nextGroup++]
       let groupItems: Panel.ItemInfo[] = []
       try {
-        const { data } = await getItems<Panel.ItemInfo[]>(spaceId, Number(group.id), 1, 100)
-        groupItems = data || []
+        const { data } = await withHomeTimeout(getItems<Panel.ItemInfo[]>(spaceId, Number(group.id), 1, 100))
+        if (data) {
+          groupItems = data
+          cache.items[String(group.id)] = groupItems
+          itemsByGroup.set(Number(group.id), groupItems)
+        }
       }
       catch {
         // Keep the group at a stable height when an item request fails.
       }
-      cache.items[String(group.id)] = groupItems
-      itemsByGroup.set(Number(group.id), groupItems)
+      if (generation === groupLoadGeneration && activeSpace.value?.id === spaceId)
+        applyGroups(resolvedGroups, itemsByGroup)
     }
   }
+  applyGroups(resolvedGroups, itemsByGroup)
+  if (!isOnline.value) return
   await Promise.all(Array.from({ length: Math.min(2, pendingGroups.length) }, loadNextGroups))
 
   if (generation === groupLoadGeneration && activeSpace.value?.id === spaceId) {
     saveCachedSpace(spaceId, cache)
-    applyGroups(groups, itemsByGroup)
+    applyGroups(resolvedGroups, itemsByGroup)
   }
 }
 
@@ -397,6 +421,7 @@ function submitCreateGroup() {
 }
 
 async function refreshCurrentSpace() {
+  if (!isOnline.value) return
   const authStorage = localStorage.getItem('authStorage')
   localStorage.clear()
   if (authStorage !== null) localStorage.setItem('authStorage', authStorage)
@@ -415,6 +440,7 @@ async function refreshCurrentSpace() {
 }
 
 function reloadSpaces(selectLatest = false) {
+  if (!isOnline.value) return
   getSpaces<Space[]>().then(({ data }) => {
     const nextSpaces = sortSpaces(data || [], authStore.userInfo?.id)
     const targetSpaceId = selectLatest ? data?.[data.length - 1]?.id : activeSpace.value?.id
@@ -428,12 +454,13 @@ function handleSpacesChanged() {
   reloadSpaces()
 }
 function submitCreateSpace() {
-	const name = spaceName.value.trim()
-	if (!name || creatingSpace.value) return
-	creatingSpace.value = true
-	createSpace<{ code: number }>(name).then(({ code }) => {
-		if (code === 0) { createSpaceVisible.value = false; spaceName.value = ''; reloadSpaces(true) }
-	}).finally(() => { creatingSpace.value = false })
+  if (!isOnline.value) return
+  const name = spaceName.value.trim()
+  if (!name || creatingSpace.value) return
+  creatingSpace.value = true
+  createSpace<{ code: number }>(name).then(({ code }) => {
+    if (code === 0) { createSpaceVisible.value = false; spaceName.value = ''; reloadSpaces(true) }
+  }).finally(() => { creatingSpace.value = false })
 }
 
 // 从后端获取组下面的图标
@@ -445,6 +472,7 @@ function updateItemIconGroupByNet(itemIconGroupIndex: number, itemIconGroupId: n
 
 function handleRightMenuSelect(key: string | number) {
   dropdownShow.value = false
+  if (!isOnline.value && ['edit', 'delete'].includes(String(key))) return
   // console.log(currentRightSelectItem, key)
   const jumpUrl = currentRightSelectItem.value ? getItemOpenUrl(currentRightSelectItem.value) : ''
   switch (key) {
@@ -509,6 +537,7 @@ function onClickoutside() {
 }
 
 function handleEditSuccess(item: Panel.ItemInfo) {
+  if (!isOnline.value) return
   if (activeSpace.value) clearCachedSpace(activeSpace.value.id)
   getList(true)
 }
@@ -529,6 +558,7 @@ function handleChangeNetwork(mode: PanelStateNetworkModeEnum) {
 // }
 
 function handleSaveSort(itemGroup: ItemGroup) {
+  if (!isOnline.value) return
   const saveItems: Common.SortItemRequest[] = []
   if (itemGroup.items) {
     for (let i = 0; i < itemGroup.items.length; i++) {
@@ -586,14 +616,8 @@ function getDropdownMenuOptions() {
   return dropdownMenuOptions
 }
 
-async function loadHomeData() {
-  homeReady.value = false
-  const [monitorResult] = await Promise.all([
-    getEnableStatus<{ enabled: boolean }>().catch(() => ({ code: -1, data: { enabled: false } })),
-    panelState.updatePanelConfigByCloud(),
-  ])
-  if (monitorResult.code === 0) monitorEnabled.value = monitorResult.data.enabled
-
+async function loadHomeData(refresh = false) {
+  if (!refresh) homeReady.value = false
   if (panelState.panelConfig.logoText)
     setTitle(panelState.panelConfig.logoText)
 
@@ -604,38 +628,53 @@ async function loadHomeData() {
       activeSpace.value = spaces.value[0]
     }
   }
-  if (!navigator.onLine) {
-    useCachedSpaces()
-  }
-  else {
-    try {
-      const { data } = await getSpaces<Space[]>()
-      if (data?.length) {
-        spaces.value = sortSpaces(data, authStore.userInfo?.id)
-        writeSpacesCache(spaces.value, authStore.userInfo?.id)
-        activeSpace.value = spaces.value[0]
-      }
-    }
-    catch {
-      useCachedSpaces()
-    }
-  }
-
-  if (activeSpace.value) await getList()
+  useCachedSpaces()
+  if (activeSpace.value) void getList()
   homeReady.value = true
+  performance.mark('home-ready')
+
+  if (!isOnline.value) return
+  const monitorRequest = withHomeTimeout(getEnableStatus<{ enabled: boolean; refresh_interval?: number }>()).catch((): { code: number; data: { enabled: boolean; refresh_interval?: number } } => ({ code: -1, data: { enabled: false } }))
+  const configRequest = panelState.updatePanelConfigByCloud()
+  const spacesRequest = withHomeTimeout(getSpaces<Space[]>()).catch(() => ({ data: undefined }))
+  const [monitorResult, , spacesResult] = await Promise.all([monitorRequest, configRequest, spacesRequest])
+  if (monitorResult.code === 0) {
+    monitorEnabled.value = monitorResult.data.enabled
+    monitorResultRefreshInterval.value = monitorResult.data.refresh_interval
+  }
+  if (spacesResult.data?.length) {
+    const previousSpaceId = activeSpace.value?.id
+    spaces.value = sortSpaces(spacesResult.data, authStore.userInfo?.id)
+    writeSpacesCache(spaces.value, authStore.userInfo?.id)
+    activeSpace.value = spaces.value.find(space => space.id === previousSpaceId) || spaces.value[0]
+    void getList()
+  }
 }
 
 onMounted(() => {
   window.addEventListener('keydown', handleGlobalKeydown)
+  window.addEventListener('online', handleOnline)
+  window.addEventListener('offline', handleOffline)
   if (publicCode && !publicAccessReady.value) return
   loadHomeData()
 })
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleGlobalKeydown)
+  window.removeEventListener('online', handleOnline)
+  window.removeEventListener('offline', handleOffline)
   if (sideSwitchTimer) clearTimeout(sideSwitchTimer)
   groupLoadGeneration++
 })
+
+function handleOnline() {
+  isOnline.value = true
+  void loadHomeData(true)
+}
+
+function handleOffline() {
+  isOnline.value = false
+}
 
 // 前端搜索过滤
 function itemFrontEndSearch(keyword?: string) {
@@ -666,6 +705,7 @@ function handleSetHoverStatus(groupIndex: number, hoverStatus: boolean) {
 }
 
 function handleSetSortStatus(groupIndex: number, sortStatus: boolean) {
+  if (!isOnline.value) return
   if (items.value[groupIndex])
     items.value[groupIndex].sortStatus = sortStatus
 
@@ -678,12 +718,14 @@ function handleSetSortStatus(groupIndex: number, sortStatus: boolean) {
 }
 
 function handleEditItem(item: Panel.ItemInfo) {
+  if (!isOnline.value) return
   editItemInfoData.value = item
   editItemInfoShow.value = true
   currentAddItenIconGroupId.value = undefined
 }
 
 function handleAddItem(itemIconGroupId?: number) {
+  if (!isOnline.value) return
   editItemInfoData.value = null
   editItemInfoShow.value = true
   if (itemIconGroupId)
@@ -752,8 +794,8 @@ function handleAddItem(itemIconGroupId?: number) {
     </div>
     <div
       v-if="homeReady" class="cover wallpaper" :style="{
-        filter: `blur(${panelState.panelConfig.backgroundBlur}px)`,
-        background: `url(${panelState.panelConfig.backgroundImageSrc}) no-repeat`,
+        filter: panelState.panelConfig.backgroundBlur ? `blur(${panelState.panelConfig.backgroundBlur}px)` : 'none',
+        background: `url(${getBackgroundImageSrc()}) no-repeat`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
       }"
@@ -805,6 +847,7 @@ function handleAddItem(itemIconGroupId?: number) {
           >
             <SystemMonitor
               :show-title="panelState.panelConfig.systemMonitorShowTitle"
+              :refresh-interval="monitorResultRefreshInterval"
             />
           </div>
 
@@ -824,10 +867,10 @@ function handleAddItem(itemIconGroupId?: number) {
                 {{ itemGroup.title }}
               </span>
               <span class="ml-2 cursor-pointer" :title="collapsedGroups.has(Number(itemGroup.id)) ? $t('spaceManage.expandGroup') : $t('spaceManage.collapseGroup')" @click="toggleGroup(Number(itemGroup.id))">
-                <SvgIconOnline :icon="collapsedGroups.has(Number(itemGroup.id)) ? 'mdi:chevron-down' : 'mdi:chevron-up'" />
+                <SvgIcon :icon="collapsedGroups.has(Number(itemGroup.id)) ? 'mdi-chevron-down' : 'mdi-chevron-up'" />
               </span>
               <div
-                v-if="parsePublicCodeFromPath() === '' && authStore.token"
+                v-if="parsePublicCodeFromPath() === '' && authStore.token && isOnline"
                 class="group-buttons ml-2 delay-100 transition-opacity flex"
                 :class="itemGroup.hoverStatus ? 'opacity-100' : 'opacity-0'"
               >

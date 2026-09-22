@@ -51,7 +51,7 @@ async function loadSearchConfig(spaceId?: number) {
   const cache = readSpaceCache(spaceId, authStore.userInfo?.id)
   if (cache.searchConfig?.currentSearchEngine?.url) {
     applySearchConfig(cache.searchConfig)
-    return
+    if (!navigator.onLine) return
   }
 
   try {

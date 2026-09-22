@@ -22,6 +22,7 @@ interface MonitorGroup extends Panel.ItemIconGroup {
 const props = defineProps<{
   allowEdit?: boolean
   showTitle?: boolean
+  refreshInterval?: number
 }>()
 const panelState = usePanelState()
 
@@ -148,6 +149,8 @@ async function getData() {
 }
 
 async function getSnapshotInterval() {
+  if (props.refreshInterval && props.refreshInterval > 0)
+    return props.refreshInterval * 1000
   try {
     const res = await getEnableStatus<{ refresh_interval?: number }>()
     if (res.code !== 0) return defaultSnapshotInterval
