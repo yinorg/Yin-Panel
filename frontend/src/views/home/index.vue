@@ -1218,7 +1218,7 @@ html {
 }
 
 .home-content--with-monitor {
-  padding-top: 280px;
+  padding-top: 200px;
 }
 
 .system-monitor-layer {
@@ -1228,7 +1228,7 @@ html {
   left: 0;
   right: 0;
   max-width: 1200px;
-  max-height: 260px;
+  max-height: 180px;
   margin: 0 auto;
   overflow: auto;
   contain: layout;
@@ -1293,7 +1293,7 @@ html {
   .icon-info-box { gap: 10px; grid-template-columns: 1fr; }
   .icon-small-box { gap: 12px 8px; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); }
   .system-monitor { overflow: hidden; }
-  .home-content--with-monitor { padding-top: 430px; }
-  .system-monitor-layer { max-height: 410px; }
+  .home-content--with-monitor { padding-top: 320px; }
+  .system-monitor-layer { max-height: 300px; }
 }
 </style>
