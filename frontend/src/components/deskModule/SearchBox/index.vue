@@ -11,6 +11,7 @@ const props = withDefaults(defineProps<{
   background?: string
   textColor?: string
   spaceId?: number
+  sessionOnly?: boolean
 }>(), {
   background: '#2a2a2a6b',
   textColor: 'white',
@@ -48,8 +49,8 @@ async function loadSearchConfig(spaceId?: number) {
   if (!spaceId)
     return
 
-  const cache = readSpaceCache(spaceId, authStore.userInfo?.id)
-  if (cache.searchConfig?.currentSearchEngine?.url) {
+  const cache = readSpaceCache(spaceId, authStore.userInfo?.id, props.sessionOnly)
+  if (cache?.searchConfig?.currentSearchEngine?.url) {
     applySearchConfig(cache.searchConfig)
     if (!navigator.onLine) return
   }
@@ -60,9 +61,11 @@ async function loadSearchConfig(spaceId?: number) {
       return
     if (data) {
       applySearchConfig(data)
-      const nextCache = readSpaceCache(spaceId, authStore.userInfo?.id)
-      nextCache.searchConfig = data || { currentSearchEngine: defaultState().currentSearchEngine }
-      writeSpaceCache(spaceId, nextCache, authStore.userInfo?.id)
+      const nextCache = readSpaceCache(spaceId, authStore.userInfo?.id, props.sessionOnly)
+      if (nextCache) {
+        nextCache.searchConfig = data || { currentSearchEngine: defaultState().currentSearchEngine }
+        writeSpaceCache(spaceId, nextCache, authStore.userInfo?.id, props.sessionOnly)
+      }
     }
   }
   catch {
@@ -99,9 +102,11 @@ function handleSavedSearchConfig(event: Event) {
   if (detail?.spaceId !== props.spaceId)
     return
   applySearchConfig(detail.config)
-  const cache = readSpaceCache(detail.spaceId, authStore.userInfo?.id)
-  cache.searchConfig = detail.config
-  writeSpaceCache(detail.spaceId, cache, authStore.userInfo?.id)
+  const cache = readSpaceCache(detail.spaceId, authStore.userInfo?.id, props.sessionOnly)
+  if (cache) {
+    cache.searchConfig = detail.config
+    writeSpaceCache(detail.spaceId, cache, authStore.userInfo?.id, props.sessionOnly)
+  }
 }
 
 onMounted(() => window.addEventListener('yin-panel-search-config-saved', handleSavedSearchConfig))

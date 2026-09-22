@@ -259,7 +259,13 @@
     "refreshCacheSuccess": "快取已重新整理，即將重新載入頁面",
     "goToLogin": "前往登錄",
     "openLanUrl": "打開局域網地址",
-    "openWanUrl": "打開公網地址"
+    "openWanUrl": "打開公網地址",
+    "pwaReady": "離線已就緒",
+    "offlineReadonly": "離線唯讀",
+    "cacheUpdatedAt": "快取於 {time}",
+    "offlineUnavailable": "離線內容無法使用",
+    "offlineUnavailableDetail": "請連線後重新整理頁面以載入首頁資料。",
+    "retryWhenOnline": "連線後重新整理"
   },
   "spaceManage": {
     "mySpace": "我的空間",

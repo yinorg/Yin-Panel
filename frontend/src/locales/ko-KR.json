@@ -259,7 +259,13 @@
     "refreshCacheSuccess": "캐시를 새로 고쳤습니다. 페이지를 다시 불러옵니다",
     "goToLogin": "Go to login",
     "openLanUrl": "Open LAN URL",
-    "openWanUrl": "Open WAN URL"
+    "openWanUrl": "Open WAN URL",
+    "pwaReady": "오프라인 준비 완료",
+    "offlineReadonly": "오프라인 읽기 전용",
+    "cacheUpdatedAt": "캐시: {time}",
+    "offlineUnavailable": "오프라인 콘텐츠를 사용할 수 없습니다",
+    "offlineUnavailableDetail": "네트워크에 연결한 뒤 페이지를 새로 고치세요.",
+    "retryWhenOnline": "온라인에서 새로 고침"
   },
   "spaceManage": {
     "mySpace": "내 공간",

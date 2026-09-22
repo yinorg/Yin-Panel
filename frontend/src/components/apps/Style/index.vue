@@ -46,7 +46,7 @@ function applySearchConfig(config?: SpaceSearchConfig | null) {
 
 async function loadSearchConfig(spaceId: number) {
   const cached = readSpaceCache(spaceId, authStore.userInfo?.id)
-  if (cached.searchConfig?.currentSearchEngine?.url) {
+  if (cached?.searchConfig?.currentSearchEngine?.url) {
     applySearchConfig(cached.searchConfig)
     return
   }
@@ -54,8 +54,10 @@ async function loadSearchConfig(spaceId: number) {
   if (data) {
     applySearchConfig(data)
     const nextCache = readSpaceCache(spaceId, authStore.userInfo?.id)
-    nextCache.searchConfig = data || { currentSearchEngine: searchEngineList[0] }
-    writeSpaceCache(spaceId, nextCache, authStore.userInfo?.id)
+    if (nextCache) {
+      nextCache.searchConfig = data || { currentSearchEngine: searchEngineList[0] }
+      writeSpaceCache(spaceId, nextCache, authStore.userInfo?.id)
+    }
   }
 }
 
@@ -74,8 +76,10 @@ async function saveDefaultSearchEngine() {
     const { code, msg } = await setSearchConfig(selectedSearchSpaceId.value, config)
     if (code === 0) {
       const cache = readSpaceCache(selectedSearchSpaceId.value, authStore.userInfo?.id)
-      cache.searchConfig = config
-      writeSpaceCache(selectedSearchSpaceId.value, cache, authStore.userInfo?.id)
+      if (cache) {
+        cache.searchConfig = config
+        writeSpaceCache(selectedSearchSpaceId.value, cache, authStore.userInfo?.id)
+      }
       window.dispatchEvent(new CustomEvent('yin-panel-search-config-saved', { detail: { spaceId: selectedSearchSpaceId.value, config } }))
       ms.success(t('apps.baseSettings.searchEngineSaved'))
     }

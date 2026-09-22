@@ -14,7 +14,15 @@ function setupPlugins(env: ImportMetaEnv): PluginOption[] {
       workbox: {
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api(?:\/|$)/],
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,jpg,jpeg,webp}'],
       },
+      includeAssets: [
+        'assets/favicon.svg',
+        'assets/apple-touch-icon.png',
+        'assets/bg-forest.webp',
+        'assets/search_engine_svg/*.{png,svg}',
+        'assets/svg-icons/*.svg',
+      ],
       manifest: {
         name: 'Yin-Panel',
         short_name: 'Yin-Panel',

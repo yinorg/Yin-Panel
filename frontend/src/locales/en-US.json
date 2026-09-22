@@ -259,7 +259,13 @@
     "refreshCacheSuccess": "Cache refreshed, reloading the page",
     "goToLogin": "Go to login",
     "openLanUrl": "Open LAN URL",
-    "openWanUrl": "Open WAN URL"
+    "openWanUrl": "Open WAN URL",
+    "pwaReady": "Offline ready",
+    "offlineReadonly": "Offline read-only",
+    "cacheUpdatedAt": "Cached {time}",
+    "offlineUnavailable": "Offline content unavailable",
+    "offlineUnavailableDetail": "Connect to the network and refresh this page to load your home data.",
+    "retryWhenOnline": "Refresh when online"
   },
   "spaceManage": { "mySpace": "My space", "chooseFile": "Import", "oidcTitle": "OIDC group authorization", "addRule": "Add rule", "shared": "Shared", "personal": "Personal", "emailMissing": "Email unavailable", "admin": "Administrator",
     "title": "Space Management", "newSpaceName": "New space name", "createSpace": "Create new space", "spaceName": "Space name", "rename": "Rename", "copy": "Copy space", "publicAccess": "Public access", "enablePublicAccess": "Enable public access", "publicIdPlaceholder": "FN ID, e.g. my-panel", "directAccess": "Direct link access", "codeAccess": "Access code required", "accessCodePlaceholder": "Access code (4-12 characters)", "savePublic": "Save public access settings", "bookmarkTransfer": "Bookmarks (Chrome compatible) - Import/Export", "exportBookmarks": "Export", "clearSpace": "Clear current space", "groups": "Groups", "groupName": "Group name", "parentGroupOptional": "Parent group (optional)", "addGroup": "Add group", "members": "Members", "userEmail": "User email", "editor": "Editor", "viewer": "Viewer", "addMember": "Add member", "accessVerification": "Access verification", "enterAccessCode": "Enter the access code to continue", "accessCodeShortPlaceholder": "Access code (4-12 characters)", "confirmAccess": "Confirm access", "expandGroup": "Expand group", "collapseGroup": "Collapse group", "backToTop": "Back to top", "createTeamSpace": "Create team space", "teamName": "Team name",

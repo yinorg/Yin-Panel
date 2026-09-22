@@ -17,7 +17,7 @@ import { usePanelState, useAuthStore } from '@/store'
 import { PanelPanelConfigStyleEnum, PanelStateNetworkModeEnum } from '@/enums'
 import { t } from '@/locales'
 import { getEnableStatus } from '@/api/system/systemMonitor'
-import { clearSpaceCache, readSpaceCache, readSpacesCache, writeSpaceCache, writeSpacesCache } from '@/utils/spaceCache'
+import { clearSpaceCache, createSpaceCache, readSpaceCache, readSpacesCache, writeSpaceCache, writeSpacesCache } from '@/utils/spaceCache'
 
 const SystemMonitor = defineAsyncComponent(() => import('../../components/deskModule/SystemMonitor/index.vue'))
 const AppStarter = defineAsyncComponent(() => import('./components/AppStarter/index.vue'))
@@ -64,6 +64,9 @@ const creatingSpace = ref(false)
 const monitorEnabled = ref(false)
 const monitorResultRefreshInterval = ref<number | undefined>()
 const isOnline = ref(typeof navigator === 'undefined' ? true : navigator.onLine)
+const pwaReady = ref(false)
+const cacheUpdatedAt = ref<number | null>(null)
+const hasValidCachedHome = ref(false)
 const homeReady = ref(false)
 const sideSwitching = ref(false)
 let sideSwitchTimer: ReturnType<typeof setTimeout> | undefined
@@ -87,12 +90,17 @@ const publicAccessReady = ref(!publicCode || !!sessionStorage.getItem(`yin-panel
 
 function getBackgroundImageSrc() {
   const source = panelState.panelConfig.backgroundImageSrc
+  if (!isOnline.value && source !== '/assets/bg-forest.jpg' && source !== '/assets/bg-forest.webp')
+    return '/assets/bg-forest.webp'
   return source === '/assets/bg-forest.jpg' ? '/assets/bg-forest.webp' : source
 }
 
-function getCachedSpace(spaceId: number) { return readSpaceCache(spaceId, authStore.userInfo?.id) }
-function saveCachedSpace(spaceId: number, cache: any) { writeSpaceCache(spaceId, cache, authStore.userInfo?.id) }
-function clearCachedSpace(spaceId: number) { clearSpaceCache(spaceId, authStore.userInfo?.id) }
+const sessionOnlyCache = !!publicCode
+function getCachedSpace(spaceId: number) { return readSpaceCache(spaceId, authStore.userInfo?.id, sessionOnlyCache) }
+function saveCachedSpace(spaceId: number, cache: any) { writeSpaceCache(spaceId, cache, authStore.userInfo?.id, sessionOnlyCache) }
+function clearCachedSpace(spaceId: number) { clearSpaceCache(spaceId, authStore.userInfo?.id, sessionOnlyCache) }
+const offlineUnavailable = computed(() => homeReady.value && !isOnline.value && !hasValidCachedHome.value)
+const canWrite = computed(() => isOnline.value && !offlineUnavailable.value)
 
 function unlockPublicAccess() {
   if (publicAccessCode.value.length < 4 || publicAccessCode.value.length > 12) return
@@ -171,7 +179,7 @@ function withHomeTimeout<T>(request: Promise<T>): Promise<T> {
 }
 
 async function getList(forceRefresh = false) {
-  if (forceRefresh && !isOnline.value) return
+  if (forceRefresh && !canWrite.value) return
   const generation = ++groupLoadGeneration
   loadedGroups.clear()
   if (!activeSpace.value) {
@@ -182,24 +190,27 @@ async function getList(forceRefresh = false) {
 
   const spaceId = activeSpace.value.id
   let groups: ItemGroup[] | undefined
-  let cache = getCachedSpace(spaceId)
-  if (!forceRefresh) {
+  const cachedSpace = getCachedSpace(spaceId)
+  const cache = cachedSpace || createSpaceCache()
+  if (!forceRefresh && cachedSpace) {
     groups = cache.groups
   }
-  if (!groups) {
-    if (forceRefresh) {
-      clearCachedSpace(spaceId)
-      cache = getCachedSpace(spaceId)
-    }
+  if (!groups || forceRefresh) {
     if (!isOnline.value) return
     const { data } = await withHomeTimeout(getGroups<ItemGroup[]>(spaceId)).catch(() => ({ data: undefined }))
-    if (!data) return
-    groups = data
-    cache.groups = groups
+    if (data) {
+      groups = data
+      cache.groups = groups
+    }
+    else if (cache.groups.length) {
+      groups = cache.groups
+      isOnline.value = false
+    }
+    else return
   }
 
   const itemsByGroup = new Map<number, Panel.ItemInfo[]>()
-  const pendingGroups = groups.filter(group => !cache.items[String(group.id)])
+  const pendingGroups = groups.filter(group => forceRefresh || !cache.items[String(group.id)])
   groups.forEach((group) => {
     const cachedItems = cache.items[String(group.id)]
     if (cachedItems) itemsByGroup.set(Number(group.id), cachedItems)
@@ -232,6 +243,8 @@ async function getList(forceRefresh = false) {
 
   if (generation === groupLoadGeneration && activeSpace.value?.id === spaceId) {
     saveCachedSpace(spaceId, cache)
+    cacheUpdatedAt.value = cache.updatedAt || Date.now()
+    hasValidCachedHome.value = !!getCachedSpace(spaceId)
     applyGroups(resolvedGroups, itemsByGroup)
   }
 }
@@ -352,6 +365,7 @@ function findCommandItem(query: string) {
 }
 
 function executeCommand(command: string) {
+  if (!canWrite.value && ['add', 'group', 'space', 'settings', 'edit'].includes(command)) return
   const parts = commandCenterQuery.value.trim().replace(/^\//, '').split(/\s+/)
   const keyword = parts.slice(1).join(' ')
   if (command === 'add') handleAddItem()
@@ -407,6 +421,7 @@ function handleGlobalKeydown(event: KeyboardEvent) {
 }
 
 function submitCreateGroup() {
+  if (!canWrite.value) return
   const title = groupName.value.trim()
   if (!title || !activeSpace.value || creatingGroup.value) return
   creatingGroup.value = true
@@ -421,7 +436,7 @@ function submitCreateGroup() {
 }
 
 async function refreshCurrentSpace() {
-  if (!isOnline.value) return
+  if (!canWrite.value) return
   const authStorage = localStorage.getItem('authStorage')
   localStorage.clear()
   if (authStorage !== null) localStorage.setItem('authStorage', authStorage)
@@ -440,13 +455,13 @@ async function refreshCurrentSpace() {
 }
 
 function reloadSpaces(selectLatest = false) {
-  if (!isOnline.value) return
+  if (!canWrite.value) return
   getSpaces<Space[]>().then(({ data }) => {
     const nextSpaces = sortSpaces(data || [], authStore.userInfo?.id)
     const targetSpaceId = selectLatest ? data?.[data.length - 1]?.id : activeSpace.value?.id
     spaces.value = nextSpaces
     activeSpace.value = nextSpaces.find(space => space.id === targetSpaceId) || nextSpaces[0] || null
-    writeSpacesCache(spaces.value, authStore.userInfo?.id)
+    writeSpacesCache(spaces.value, authStore.userInfo?.id, sessionOnlyCache)
     getList()
   })
 }
@@ -454,7 +469,7 @@ function handleSpacesChanged() {
   reloadSpaces()
 }
 function submitCreateSpace() {
-  if (!isOnline.value) return
+  if (!canWrite.value) return
   const name = spaceName.value.trim()
   if (!name || creatingSpace.value) return
   creatingSpace.value = true
@@ -472,7 +487,7 @@ function updateItemIconGroupByNet(itemIconGroupIndex: number, itemIconGroupId: n
 
 function handleRightMenuSelect(key: string | number) {
   dropdownShow.value = false
-  if (!isOnline.value && ['edit', 'delete'].includes(String(key))) return
+  if (!canWrite.value && ['edit', 'delete'].includes(String(key))) return
   // console.log(currentRightSelectItem, key)
   const jumpUrl = currentRightSelectItem.value ? getItemOpenUrl(currentRightSelectItem.value) : ''
   switch (key) {
@@ -537,7 +552,7 @@ function onClickoutside() {
 }
 
 function handleEditSuccess(item: Panel.ItemInfo) {
-  if (!isOnline.value) return
+  if (!canWrite.value) return
   if (activeSpace.value) clearCachedSpace(activeSpace.value.id)
   getList(true)
 }
@@ -558,7 +573,7 @@ function handleChangeNetwork(mode: PanelStateNetworkModeEnum) {
 // }
 
 function handleSaveSort(itemGroup: ItemGroup) {
-  if (!isOnline.value) return
+  if (!canWrite.value) return
   const saveItems: Common.SortItemRequest[] = []
   if (itemGroup.items) {
     for (let i = 0; i < itemGroup.items.length; i++) {
@@ -606,13 +621,9 @@ function getDropdownMenuOptions() {
     })
   }
 
-  dropdownMenuOptions.push({
-    label: t('common.edit'),
-    key: 'edit',
-  }, {
-    label: t('common.delete'),
-    key: 'delete',
-  })
+  if (canWrite.value) {
+    dropdownMenuOptions.push({ label: t('common.edit'), key: 'edit' }, { label: t('common.delete'), key: 'delete' })
+  }
   return dropdownMenuOptions
 }
 
@@ -622,10 +633,13 @@ async function loadHomeData(refresh = false) {
     setTitle(panelState.panelConfig.logoText)
 
   const useCachedSpaces = () => {
-    const cached = readSpacesCache(authStore.userInfo?.id) as Space[]
-    if (cached.length) {
+    const cached = readSpacesCache(authStore.userInfo?.id, sessionOnlyCache) as Space[] | null
+    if (cached?.length) {
       spaces.value = sortSpaces(cached, authStore.userInfo?.id)
       activeSpace.value = spaces.value[0]
+      const cache = getCachedSpace(activeSpace.value.id)
+      hasValidCachedHome.value = !!cache
+      cacheUpdatedAt.value = cache?.updatedAt || null
     }
   }
   useCachedSpaces()
@@ -636,7 +650,7 @@ async function loadHomeData(refresh = false) {
   if (!isOnline.value) return
   const monitorRequest = withHomeTimeout(getEnableStatus<{ enabled: boolean; refresh_interval?: number }>()).catch((): { code: number; data: { enabled: boolean; refresh_interval?: number } } => ({ code: -1, data: { enabled: false } }))
   const configRequest = panelState.updatePanelConfigByCloud()
-  const spacesRequest = withHomeTimeout(getSpaces<Space[]>()).catch(() => ({ data: undefined }))
+  const spacesRequest = withHomeTimeout(getSpaces<Space[]>()).catch(() => ({ data: undefined, failed: true }))
   const [monitorResult, , spacesResult] = await Promise.all([monitorRequest, configRequest, spacesRequest])
   if (monitorResult.code === 0) {
     monitorEnabled.value = monitorResult.data.enabled
@@ -645,9 +659,12 @@ async function loadHomeData(refresh = false) {
   if (spacesResult.data?.length) {
     const previousSpaceId = activeSpace.value?.id
     spaces.value = sortSpaces(spacesResult.data, authStore.userInfo?.id)
-    writeSpacesCache(spaces.value, authStore.userInfo?.id)
+    writeSpacesCache(spaces.value, authStore.userInfo?.id, sessionOnlyCache)
     activeSpace.value = spaces.value.find(space => space.id === previousSpaceId) || spaces.value[0]
     void getList()
+  }
+  else if ('failed' in spacesResult && spacesResult.failed) {
+    isOnline.value = false
   }
 }
 
@@ -655,6 +672,8 @@ onMounted(() => {
   window.addEventListener('keydown', handleGlobalKeydown)
   window.addEventListener('online', handleOnline)
   window.addEventListener('offline', handleOffline)
+  void updatePwaReady()
+  navigator.serviceWorker?.addEventListener('controllerchange', updatePwaReady)
   if (publicCode && !publicAccessReady.value) return
   loadHomeData()
 })
@@ -663,6 +682,7 @@ onUnmounted(() => {
   window.removeEventListener('keydown', handleGlobalKeydown)
   window.removeEventListener('online', handleOnline)
   window.removeEventListener('offline', handleOffline)
+  navigator.serviceWorker?.removeEventListener('controllerchange', updatePwaReady)
   if (sideSwitchTimer) clearTimeout(sideSwitchTimer)
   groupLoadGeneration++
 })
@@ -674,6 +694,16 @@ function handleOnline() {
 
 function handleOffline() {
   isOnline.value = false
+}
+
+function retryWhenOnline() {
+  window.location.reload()
+}
+
+async function updatePwaReady() {
+  if (!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) return
+  const registration = await navigator.serviceWorker.ready
+  pwaReady.value = registration.active?.state === 'activated' && !!navigator.serviceWorker.controller
 }
 
 // 前端搜索过滤
@@ -705,7 +735,7 @@ function handleSetHoverStatus(groupIndex: number, hoverStatus: boolean) {
 }
 
 function handleSetSortStatus(groupIndex: number, sortStatus: boolean) {
-  if (!isOnline.value) return
+  if (!canWrite.value) return
   if (items.value[groupIndex])
     items.value[groupIndex].sortStatus = sortStatus
 
@@ -718,14 +748,14 @@ function handleSetSortStatus(groupIndex: number, sortStatus: boolean) {
 }
 
 function handleEditItem(item: Panel.ItemInfo) {
-  if (!isOnline.value) return
+  if (!canWrite.value) return
   editItemInfoData.value = item
   editItemInfoShow.value = true
   currentAddItenIconGroupId.value = undefined
 }
 
 function handleAddItem(itemIconGroupId?: number) {
-  if (!isOnline.value) return
+  if (!canWrite.value) return
   editItemInfoData.value = null
   editItemInfoShow.value = true
   if (itemIconGroupId)
@@ -792,6 +822,13 @@ function handleAddItem(itemIconGroupId?: number) {
         </NButton>
       </NDropdown>
     </div>
+    <div v-if="homeReady" class="offline-status" data-testid="offline-status">
+      <span v-if="pwaReady" data-testid="pwa-ready">{{ $t('panelHome.pwaReady') }}</span>
+      <template v-if="!isOnline && hasValidCachedHome">
+        <span data-testid="offline-readonly">{{ $t('panelHome.offlineReadonly') }}</span>
+        <span v-if="cacheUpdatedAt" data-testid="offline-cache-updated">{{ $t('panelHome.cacheUpdatedAt', { time: new Date(cacheUpdatedAt).toLocaleString() }) }}</span>
+      </template>
+    </div>
     <div
       v-if="homeReady" class="cover wallpaper" :style="{
         filter: panelState.panelConfig.backgroundBlur ? `blur(${panelState.panelConfig.backgroundBlur}px)` : 'none',
@@ -801,6 +838,14 @@ function handleAddItem(itemIconGroupId?: number) {
       }"
     />
     <div v-if="homeReady" class="mask" :style="{ backgroundColor: `rgba(0,0,0,${panelState.panelConfig.backgroundMaskNumber})` }" />
+    <div v-if="offlineUnavailable" class="offline-unavailable" data-testid="offline-unavailable">
+      <NCard :title="$t('panelHome.offlineUnavailable')" size="small">
+        <NSpace vertical>
+          <span>{{ $t('panelHome.offlineUnavailableDetail') }}</span>
+          <NButton type="primary" data-testid="offline-retry-button" @click="retryWhenOnline">{{ $t('panelHome.retryWhenOnline') }}</NButton>
+        </NSpace>
+      </NCard>
+    </div>
     <div v-if="homeReady" ref="scrollContainerRef" class="absolute w-full h-full overflow-auto">
       <div
         class="p-2.5 mx-auto"
@@ -826,7 +871,7 @@ function handleAddItem(itemIconGroupId?: number) {
             </div>
           </div>
           <div v-if="panelState.panelConfig.searchBoxShow" class="flex mt-[20px] mx-auto sm:w-full lg:w-[80%]">
-            <SearchBox :space-id="activeSpace?.id" @itemSearch="itemFrontEndSearch" @search-engine-change="commandCenterSearchEngine = $event" />
+            <SearchBox :space-id="activeSpace?.id" :session-only="sessionOnlyCache" @itemSearch="itemFrontEndSearch" @search-engine-change="commandCenterSearchEngine = $event" />
           </div>
         </div>
 
@@ -870,7 +915,7 @@ function handleAddItem(itemIconGroupId?: number) {
                 <SvgIcon :icon="collapsedGroups.has(Number(itemGroup.id)) ? 'mdi-chevron-down' : 'mdi-chevron-up'" />
               </span>
               <div
-                v-if="parsePublicCodeFromPath() === '' && authStore.token && isOnline"
+                v-if="parsePublicCodeFromPath() === '' && authStore.token && canWrite"
                 class="group-buttons ml-2 delay-100 transition-opacity flex"
                 :class="itemGroup.hoverStatus ? 'opacity-100' : 'opacity-0'"
               >
@@ -904,7 +949,7 @@ function handleAddItem(itemIconGroupId?: number) {
                     />
                   </div>
 
-                  <div v-if="itemGroup.items.length === 0 && loadedGroups.has(Number(itemGroup.id))" class="not-drag">
+                  <div v-if="itemGroup.items.length === 0 && loadedGroups.has(Number(itemGroup.id)) && canWrite" class="not-drag">
                     <AppIcon
                       :class="itemGroup.sortStatus ? 'cursor-move' : 'cursor-pointer'"
                       :item-info="{ icon: { itemType: 3, text: 'subway:add' }, title: t('common.add'), url: '', openMethod: 0 }"
@@ -941,7 +986,7 @@ function handleAddItem(itemIconGroupId?: number) {
                     />
                   </div>
 
-                  <div v-if="itemGroup.items.length === 0 && loadedGroups.has(Number(itemGroup.id))" class="not-drag">
+                  <div v-if="itemGroup.items.length === 0 && loadedGroups.has(Number(itemGroup.id)) && canWrite" class="not-drag">
                     <AppIcon
                       class="cursor-pointer"
                       :item-info="{ icon: { itemType: 3, text: 'subway:add' }, title: $t('common.add'), url: '', openMethod: 0 }"
@@ -983,7 +1028,7 @@ function handleAddItem(itemIconGroupId?: number) {
     />
 
     <!-- 悬浮按钮 -->
-    <div v-if="homeReady && parsePublicCodeFromPath() === '' && authStore.token" class="fixed-element shadow-[0_0_10px_2px_rgba(0,0,0,0.2)]">
+    <div v-if="homeReady && parsePublicCodeFromPath() === '' && authStore.token && canWrite" class="fixed-element shadow-[0_0_10px_2px_rgba(0,0,0,0.2)]">
       <NButtonGroup vertical>
         <NButton data-testid="floating-refresh-button" color="#2a2a2a6b" :title="$t('common.refresh')" @mousedown="handleFloatingButtonMouseDown" @click="handleFloatingButtonClick($event, refreshCurrentSpace)">
           <template #icon>
@@ -1094,6 +1139,8 @@ function handleAddItem(itemIconGroupId?: number) {
 }
 .space-status-button { color: white; min-width: 140px; }
 .space-status-dot { width: 7px; height: 7px; margin-right: 8px; border-radius: 50%; background: #7dd3fc; box-shadow: 0 0 10px #7dd3fc; }
+.offline-status { position: fixed; z-index: 21; top: 14px; right: 18px; display: flex; gap: 8px; color: white; font-size: 12px; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7); }
+.offline-unavailable { position: fixed; z-index: 31; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(0, 0, 0, 0.48); }
 </style>
 
 <style>

@@ -259,7 +259,13 @@
     "refreshCacheSuccess": "Cache atualizado, recarregando a página",
     "goToLogin": "Go to login",
     "openLanUrl": "Open LAN URL",
-    "openWanUrl": "Open WAN URL"
+    "openWanUrl": "Open WAN URL",
+    "pwaReady": "Offline pronto",
+    "offlineReadonly": "Offline, somente leitura",
+    "cacheUpdatedAt": "Em cache: {time}",
+    "offlineUnavailable": "Conteúdo offline indisponível",
+    "offlineUnavailableDetail": "Conecte-se à rede e atualize a página.",
+    "retryWhenOnline": "Atualizar quando online"
   },
   "spaceManage": {
     "mySpace": "Mein Bereich",

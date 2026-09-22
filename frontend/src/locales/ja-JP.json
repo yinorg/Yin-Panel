@@ -259,7 +259,13 @@
     "refreshCacheSuccess": "キャッシュを更新しました。ページを再読み込みします",
     "goToLogin": "ログイン画面へ",
     "openLanUrl": "LAN URLを開く",
-    "openWanUrl": "WAN URLを開く"
+    "openWanUrl": "WAN URLを開く",
+    "pwaReady": "オフラインの準備完了",
+    "offlineReadonly": "オフライン読み取り専用",
+    "cacheUpdatedAt": "キャッシュ: {time}",
+    "offlineUnavailable": "オフラインのコンテンツを利用できません",
+    "offlineUnavailableDetail": "ネットワークに接続してからページを更新してください。",
+    "retryWhenOnline": "オンラインで更新"
   },
   "spaceManage": { "mySpace": "マイスペース", "chooseFile": "インポート", "oidcTitle": "OIDCグループ認証", "addRule": "ルールを追加", "shared": "共有", "personal": "個人", "emailMissing": "メール未設定", "admin": "管理者",
     "title": "スペース管理", "newSpaceName": "新しいスペース名", "createSpace": "新しいスペースを作成", "spaceName": "スペース名", "rename": "名前を変更", "copy": "スペースをコピー", "publicAccess": "公開アクセス", "enablePublicAccess": "公開アクセスを有効化", "publicIdPlaceholder": "FN ID（例: my-panel）", "directAccess": "リンクで直接アクセス", "codeAccess": "アクセスコードが必要", "accessCodePlaceholder": "アクセスコード（4～12文字）", "savePublic": "公開アクセス設定を保存", "bookmarkTransfer": "ブックマーク（Chrome対応）- インポート/エクスポート", "exportBookmarks": "エクスポート", "clearSpace": "現在のスペースをクリア", "groups": "グループ", "groupName": "グループ名", "parentGroupOptional": "親グループ（任意）", "addGroup": "グループを追加", "members": "メンバー", "userEmail": "ユーザーメール", "editor": "編集者", "viewer": "閲覧者", "addMember": "メンバーを追加", "accessVerification": "アクセス認証", "enterAccessCode": "アクセスコードを入力して続行してください", "accessCodeShortPlaceholder": "アクセスコード（4～12文字）", "confirmAccess": "アクセスを確認", "expandGroup": "グループを展開", "collapseGroup": "グループを折りたたむ", "backToTop": "トップへ戻る", "createTeamSpace": "チームスペースを作成", "teamName": "チーム名",
