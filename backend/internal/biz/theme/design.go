@@ -92,8 +92,8 @@ func validateDesignSlot(name string, value any) error {
 		}
 	case "homeColumns":
 		n, ok := number(value)
-		if !ok || n < 1 || n > 6 || math.Trunc(n) != n {
-			return fmt.Errorf("binding %s must be an integer from 1 to 6", name)
+		if !ok || n < 1 || n > 12 || math.Trunc(n) != n {
+			return fmt.Errorf("binding %s must be an integer from 1 to 12", name)
 		}
 	case "layoutTemplate":
 		if value != "centered" && value != "split" {
@@ -202,6 +202,6 @@ func builtinDesignValues(dark bool) map[string]any {
 		"controlHeight": px(36), "iconSize": px(24), "sidebarWidth": px(280),
 		"contentMaxWidth": px(1200), "pageGutter": px(16),
 		"breakpointMobile": px(640), "breakpointTablet": px(1024),
-		"layoutTemplate": "centered", "homeColumns": 4,
+		"layoutTemplate": "centered", "homeColumns": 12,
 	}
 }

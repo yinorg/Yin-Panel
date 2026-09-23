@@ -99,8 +99,8 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.wallpaper-layer { position: absolute; inset: 0; overflow: hidden; }
-.wallpaper-media { position: absolute; inset: -3%; width: 106%; height: 106%; object-fit: cover; filter: blur(var(--wallpaper-blur)); }
+.wallpaper-layer { position: fixed; inset: 0; width: 100vw; height: 100dvh; overflow: hidden; background: var(--yin-canvas); }
+.wallpaper-media { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scale(1.03); filter: blur(var(--wallpaper-blur)); }
 .wallpaper-frame { border: 0; pointer-events: none; }
 .wallpaper-frame--interactive { z-index: 35; pointer-events: auto; filter: none; }
 .wallpaper-mask { position: absolute; inset: 0; pointer-events: none; }
