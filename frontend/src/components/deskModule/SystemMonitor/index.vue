@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, onMounted, onUnmounted, provide, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, provide, ref } from 'vue'
 import { VueDraggable } from 'vue-draggable-plus'
 import { NButton, NDropdown, useDialog, useMessage } from 'naive-ui'
 import AppIconSystemMonitor from './AppIconSystemMonitor/index.vue'
@@ -12,6 +12,7 @@ import { SvgIcon } from '../../common'
 import { t } from '../../../locales'
 import { getEnableStatus, getSnapshot } from '../../../api/system/systemMonitor'
 import { monitorSnapshotKey, type MonitorSnapshot } from './snapshot'
+import { resolvePanelValue } from '../../../utils/theme'
 
 interface MonitorGroup extends Panel.ItemIconGroup {
   sortStatus?: boolean
@@ -23,8 +24,10 @@ const props = defineProps<{
   allowEdit?: boolean
   showTitle?: boolean
   refreshInterval?: number
+  iconTextColor?: string
 }>()
 const panelState = usePanelState()
+const iconTextColor = computed(() => props.iconTextColor || resolvePanelValue('var(--yin-text)', panelState.panelConfig.iconTextColor, !!panelState.panelConfig.useThemeDefaults))
 
 const dialog = useDialog()
 const ms = useMessage()
@@ -290,7 +293,7 @@ function handleRightMenuSelect(key: string | number) {
               :card-type-style="panelState.panelConfig.iconStyle"
               :monitor-type="item.monitorType"
               :card-style="cardStyle"
-              :icon-text-color="panelState.panelConfig.iconTextColor"
+              :icon-text-color="iconTextColor"
             />
           </div>
         </VueDraggable>
@@ -316,7 +319,7 @@ function handleRightMenuSelect(key: string | number) {
               :card-type-style="panelState.panelConfig.iconStyle"
               :monitor-type="item.monitorType"
               :card-style="cardStyle"
-              :icon-text-color="panelState.panelConfig.iconTextColor"
+              :icon-text-color="iconTextColor"
             />
           </div>
         </vuedraggable>

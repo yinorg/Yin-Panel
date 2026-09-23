@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { FormInst, FormRules } from 'naive-ui'
 import { NButton, NCard, NDivider, NForm, NFormItem, NInput, NSelect, useDialog, useMessage } from 'naive-ui'
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { RoundCardModal, SvgIcon } from '../../common'
 import { useAppStore, useAuthStore, usePanelState } from '@/store'
 import { languageOptions } from '@/utils/defaultData'
@@ -10,6 +10,8 @@ import { logout } from '@/api'
 import { updateInfo, updatePassword } from '@/api/system/user'
 import { updateLocalUserInfo } from '@/utils/cmn'
 import { t } from '@/locales'
+import { getInstalledThemes, getMyTheme, saveThemePreference } from '@/api/theme'
+import { refreshMyTheme } from '@/hooks/useTheme'
 
 // 使用导入的 ApiResponse 类型
 
@@ -22,6 +24,8 @@ const dialog = useDialog()
 const languageValue = ref(appStore.language)
 const localizedLanguageOptions = computed(() => languageOptions.map(option => ({ ...option, label: option.key === 'auto' ? t('common.followBrowser') : option.label })))
 const themeValue = ref(appStore.theme)
+const selectedThemePackage = ref('')
+const themePackageOptions = ref<{ label: string; value: string }[]>([])
 const nickName = ref(authStore.userInfo?.name || '')
 const isEditNickNameStatus = ref(false)
 const formRef = ref<FormInst | null>(null)
@@ -133,13 +137,46 @@ function handleChangeLanuage(value: Language) {
 function handleChangeTheme(value: Theme) {
   themeValue.value = value
   appStore.setTheme(value)
-  // location.reload()
+  saveThemePreference({ packageId: selectedThemePackage.value, mode: value })
 }
+
+async function loadThemeSettings() {
+  try {
+    const [installed, mine] = await Promise.all([getInstalledThemes(), getMyTheme()])
+    if (installed.code === 0) {
+      themePackageOptions.value = [
+        { label: t('themePackage.instanceDefault'), value: '' },
+        ...installed.data.map(item => ({ label: item.name, value: item.id })),
+      ]
+    }
+    if (mine.code === 0) {
+      selectedThemePackage.value = mine.data.preference.packageId || ''
+      themeValue.value = mine.data.preference.mode
+    }
+  }
+  catch {
+    // Theme selection remains on the server's current default when unavailable.
+  }
+}
+
+async function handleChangeThemePackage(packageId: string) {
+  selectedThemePackage.value = packageId
+  const result = await saveThemePreference({ packageId, mode: themeValue.value })
+  if (result.code === 0) {
+    await refreshMyTheme(appStore)
+    ms.success(t('themePackage.saved'))
+  }
+  else {
+    ms.error(result.msg)
+  }
+}
+
+onMounted(loadThemeSettings)
 
 </script>
 
 <template>
-  <div class="bg-slate-200 dark:bg-zinc-900 p-2 h-full">
+  <div class="theme-page p-2 h-full">
     <NCard style="border-radius:10px" size="small">
       <div>
         <div class="text-slate-500 font-bold">
@@ -197,7 +234,11 @@ function handleChangeTheme(value: Theme) {
           {{ $t('apps.userInfo.theme') }}
         </div>
         <div class="max-w-[200px]">
-          <NSelect v-model:value="themeValue" :options="themeOptions" @update-value="handleChangeTheme" />
+        <NSelect v-model:value="themeValue" :options="themeOptions" @update-value="handleChangeTheme" />
+        <div class="mt-3">
+          <div class="mb-1">{{ $t('themePackage.label') }}</div>
+          <NSelect v-model:value="selectedThemePackage" :options="themePackageOptions" @update-value="handleChangeThemePackage" />
+        </div>
         </div>
       </div>
 

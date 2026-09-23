@@ -122,6 +122,7 @@
     "enablePublicVisit": "公開アクセスを有効化"
     }
   },
+  "themePackage": { "title": "テーマライブラリ", "label": "テーマパッケージ", "instanceDefault": "インスタンスの既定を使用", "install": "パッケージをインストール", "setDefault": "インスタンスの既定に設定", "verified": "公式署名", "unverified": "未検証", "confirmUnverified": "このパッケージには Yin の署名がありません。信頼できる場合のみインストールしてください。", "installed": "テーマをインストールしました", "removed": "テーマを削除しました", "saved": "テーマ設定を保存しました", "adoptDefaults": "テーマの色を使用", "removeConfirm": "このテーマを削除しますか？選択中のユーザーとインスタンスの既定は Yin Default に戻ります。" },
   "common": {
     "action": "操作",
     "add": "追加",

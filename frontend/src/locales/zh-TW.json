@@ -122,6 +122,7 @@
       "enablePublicVisit": "開啟公開訪問"
     }
   },
+  "themePackage": { "title": "主題庫", "label": "主題套件", "instanceDefault": "使用執行個體預設主題", "install": "安裝主題套件", "setDefault": "設為執行個體預設", "verified": "官方簽章", "unverified": "未驗證", "confirmUnverified": "此主題套件沒有 Yin 簽章。請只在信任來源時安裝。", "installed": "主題已安裝", "removed": "主題已移除", "saved": "主題偏好已儲存", "adoptDefaults": "使用主題色彩", "removeConfirm": "移除此主題？選用此主題的使用者和執行個體預設將改為 Yin 預設主題。" },
   "common": {
     "action": "操作",
     "add": "添加",

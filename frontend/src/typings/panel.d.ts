@@ -45,6 +45,7 @@ declare namespace Panel {
         backgroundMaskNumber?:number
         iconStyle?:PanelPanelConfigStyleEnum
         iconTextColor?:string
+        useThemeDefaults?:boolean
         iconTextInfoHideDescription?:boolean
         iconTextIconHideTitle?:boolean
         logoText?:string

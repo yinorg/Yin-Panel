@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/yinorg/Yin-Panel/backend/internal/biz/repository"
+	"github.com/yinorg/Yin-Panel/backend/internal/biz/theme"
 	"github.com/yinorg/Yin-Panel/backend/internal/constant"
 	"github.com/yinorg/Yin-Panel/backend/internal/global"
 	"github.com/yinorg/Yin-Panel/backend/internal/util"
@@ -72,6 +73,12 @@ func initDatabase(db *gorm.DB) (err error) {
 	)
 
 	if err != nil {
+		return err
+	}
+	if err := theme.Migrate(db); err != nil {
+		return err
+	}
+	if err := theme.EnsureBuiltin(db); err != nil {
 		return err
 	}
 	// Backfill email accounts from the legacy username column before the

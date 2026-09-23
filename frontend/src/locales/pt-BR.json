@@ -122,6 +122,7 @@
       "enablePublicVisit": "Enable public visit"
     }
   },
+  "themePackage": { "title": "Biblioteca de temas", "label": "Pacote de tema", "instanceDefault": "Usar o padrão da instância", "install": "Instalar pacote", "setDefault": "Definir como padrão", "verified": "Assinatura oficial", "unverified": "Não verificado", "confirmUnverified": "Este pacote não é assinado pela Yin. Instale somente se confiar na origem.", "installed": "Tema instalado", "removed": "Tema removido", "saved": "Preferência salva", "adoptDefaults": "Usar cores do tema", "removeConfirm": "Remover este tema? Os usuários que o selecionaram e o padrão da instância voltarão ao Yin Default." },
   "common": {
     "action": "Aktion",
     "add": "Adicionar",

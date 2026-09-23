@@ -18,6 +18,7 @@ import { PanelPanelConfigStyleEnum, PanelStateNetworkModeEnum } from '@/enums'
 import { t } from '@/locales'
 import { getEnableStatus } from '@/api/system/systemMonitor'
 import { clearSpaceCache, createSpaceCache, readSpaceCache, readSpacesCache, writeSpaceCache, writeSpacesCache } from '@/utils/spaceCache'
+import { resolvePanelValue } from '@/utils/theme'
 
 const SystemMonitor = defineAsyncComponent(() => import('../../components/deskModule/SystemMonitor/index.vue'))
 const AppStarter = defineAsyncComponent(() => import('./components/AppStarter/index.vue'))
@@ -34,6 +35,7 @@ const ms = useMessage()
 const dialog = useDialog()
 const panelState = usePanelState()
 const authStore = useAuthStore()
+const panelIconTextColor = computed(() => resolvePanelValue('var(--yin-text)', panelState.panelConfig.iconTextColor, !!panelState.panelConfig.useThemeDefaults))
 
 const scrollContainerRef = ref<HTMLElement | undefined>(undefined)
 
@@ -764,7 +766,7 @@ function handleAddItem(itemIconGroupId?: number) {
 </script>
 
 <template>
-  <div class="w-full h-full sun-main" :class="{ 'side-switching': sideSwitching }">
+  <div class="w-full h-full sun-main" :class="{ 'side-switching': sideSwitching, 'theme-defaults': panelState.panelConfig.useThemeDefaults }">
     <CommandCenter
       :visible="commandCenterVisible"
       :query="commandCenterQuery"
@@ -830,14 +832,14 @@ function handleAddItem(itemIconGroupId?: number) {
       </template>
     </div>
     <div
-      v-if="homeReady" class="cover wallpaper" :style="{
+      v-if="homeReady && !panelState.panelConfig.useThemeDefaults" class="cover wallpaper" :style="{
         filter: panelState.panelConfig.backgroundBlur ? `blur(${panelState.panelConfig.backgroundBlur}px)` : 'none',
         background: `url(${getBackgroundImageSrc()}) no-repeat`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
       }"
     />
-    <div v-if="homeReady" class="mask" :style="{ backgroundColor: `rgba(0,0,0,${panelState.panelConfig.backgroundMaskNumber})` }" />
+    <div v-if="homeReady && !panelState.panelConfig.useThemeDefaults" class="mask" :style="{ backgroundColor: `rgba(0,0,0,${panelState.panelConfig.backgroundMaskNumber})` }" />
     <div v-if="offlineUnavailable" class="offline-unavailable" data-testid="offline-unavailable">
       <NCard :title="$t('panelHome.offlineUnavailable')" size="small">
         <NSpace vertical>
@@ -893,6 +895,7 @@ function handleAddItem(itemIconGroupId?: number) {
             <SystemMonitor
               :show-title="panelState.panelConfig.systemMonitorShowTitle"
               :refresh-interval="monitorResultRefreshInterval"
+              :icon-text-color="panelIconTextColor"
             />
           </div>
 
@@ -941,7 +944,7 @@ function handleAddItem(itemIconGroupId?: number) {
                     <AppIcon
                       :class="itemGroup.sortStatus ? 'cursor-move' : 'cursor-pointer'"
                       :item-info="item"
-                      :icon-text-color="panelState.panelConfig.iconTextColor"
+                      :icon-text-color="panelIconTextColor"
                       :icon-text-info-hide-description="panelState.panelConfig.iconTextInfoHideDescription || false"
                       :icon-text-icon-hide-title="panelState.panelConfig.iconTextIconHideTitle || false"
                       :style="0"
@@ -953,7 +956,7 @@ function handleAddItem(itemIconGroupId?: number) {
                     <AppIcon
                       :class="itemGroup.sortStatus ? 'cursor-move' : 'cursor-pointer'"
                       :item-info="{ icon: { itemType: 3, text: 'subway:add' }, title: t('common.add'), url: '', openMethod: 0 }"
-                      :icon-text-color="panelState.panelConfig.iconTextColor"
+                      :icon-text-color="panelIconTextColor"
                       :icon-text-info-hide-description="panelState.panelConfig.iconTextInfoHideDescription || false"
                       :icon-text-icon-hide-title="panelState.panelConfig.iconTextIconHideTitle || false"
                       :style="0"
@@ -978,7 +981,7 @@ function handleAddItem(itemIconGroupId?: number) {
                     <AppIcon
                       :class="itemGroup.sortStatus ? 'cursor-move' : 'cursor-pointer'"
                       :item-info="item"
-                      :icon-text-color="panelState.panelConfig.iconTextColor"
+                      :icon-text-color="panelIconTextColor"
                       :icon-text-info-hide-description="!panelState.panelConfig.iconTextInfoHideDescription"
                       :icon-text-icon-hide-title="panelState.panelConfig.iconTextIconHideTitle || false"
                       :style="1"
@@ -990,7 +993,7 @@ function handleAddItem(itemIconGroupId?: number) {
                     <AppIcon
                       class="cursor-pointer"
                       :item-info="{ icon: { itemType: 3, text: 'subway:add' }, title: $t('common.add'), url: '', openMethod: 0 }"
-                      :icon-text-color="panelState.panelConfig.iconTextColor"
+                      :icon-text-color="panelIconTextColor"
                       :icon-text-info-hide-description="!panelState.panelConfig.iconTextInfoHideDescription"
                       :icon-text-icon-hide-title="panelState.panelConfig.iconTextIconHideTitle || false"
                       :style="1"
@@ -1147,7 +1150,7 @@ function handleAddItem(itemIconGroupId?: number) {
 body,
 html {
   overflow: hidden;
-  background-color: rgb(54, 54, 54);
+  background-color: var(--yin-canvas);
 }
 </style>
 
@@ -1162,6 +1165,32 @@ html {
 
 .sun-main {
   user-select: none;
+}
+
+.sun-main.theme-defaults {
+  background-color: var(--yin-canvas);
+  color: var(--yin-text);
+}
+
+.sun-main.theme-defaults .home-header-row,
+.sun-main.theme-defaults .item-list > div:first-child {
+  color: var(--yin-text) !important;
+}
+
+.sun-main.theme-defaults .text-shadow,
+.sun-main.theme-defaults .app-icon-text-shadow {
+  text-shadow: none;
+}
+
+.sun-main.theme-defaults .space-status-bar {
+  border-color: var(--yin-border);
+  background-color: var(--yin-surfaceElevated);
+}
+
+.sun-main.theme-defaults .space-status-button,
+.sun-main.theme-defaults .offline-status {
+  color: var(--yin-text);
+  text-shadow: none;
 }
 
 .sun-main.side-switching {

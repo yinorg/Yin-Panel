@@ -122,6 +122,7 @@
       "enablePublicVisit": "Enable public visit"
     }
   },
+  "themePackage": { "title": "Theme library", "label": "Theme package", "instanceDefault": "Use instance default", "install": "Install package", "setDefault": "Set instance default", "verified": "Official signature", "unverified": "Unverified", "confirmUnverified": "This package is not signed by Yin. Install it only if you trust its source.", "installed": "Theme installed", "removed": "Theme removed", "saved": "Theme preference saved", "adoptDefaults": "Use theme colors", "removeConfirm": "Remove this theme? Users selecting it and the instance default will return to Yin Default." },
   "common": {
     "action": "Action",
     "add": "Add",

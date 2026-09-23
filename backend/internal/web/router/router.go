@@ -49,6 +49,7 @@ func RouterArray() []IRouter {
 		system.NewModuleConfigRouter(),
 		system.NewMonitorRouter(),
 		system.NewOAuthRouter(),
+		system.NewThemeRouter(),
 		panel.NewItemIconRouter(),
 		panel.NewUserConfigRouter(),
 		panel.NewUsersRouter(),

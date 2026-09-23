@@ -122,6 +122,7 @@
       "enablePublicVisit": "Enable public visit"
     }
   },
+  "themePackage": { "title": "테마 라이브러리", "label": "테마 패키지", "instanceDefault": "인스턴스 기본값 사용", "install": "패키지 설치", "setDefault": "인스턴스 기본값 설정", "verified": "공식 서명", "unverified": "미검증", "confirmUnverified": "이 패키지는 Yin 서명이 없습니다. 출처를 신뢰하는 경우에만 설치하세요.", "installed": "테마를 설치했습니다", "removed": "테마를 삭제했습니다", "saved": "테마 설정을 저장했습니다", "adoptDefaults": "테마 색상 사용", "removeConfirm": "이 테마를 삭제할까요? 선택한 사용자와 인스턴스 기본값은 Yin 기본 테마로 돌아갑니다." },
   "common": {
     "action": "작업",
     "add": "추가",

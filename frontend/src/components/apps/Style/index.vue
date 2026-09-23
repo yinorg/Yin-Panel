@@ -10,6 +10,8 @@ import { getEnableStatus } from '@/api/system/systemMonitor'
 import { getSearchConfig, getSpaces, setSearchConfig, spaceDisplayName, type Space, type SpaceSearchConfig } from '@/api/panel/space'
 import { readSpaceCache, writeSpaceCache } from '@/utils/spaceCache'
 import { searchEngineList } from '@/components/deskModule/SearchBox/engines'
+import { getThemePackages, installThemePackage, removeThemePackage, setInstanceDefaultTheme } from '@/api/theme'
+import { activeThemePackageId } from '@/hooks/useTheme'
 
 const authStore = useAuthStore()
 const panelState = usePanelState()
@@ -20,6 +22,67 @@ const spaces = ref<Space[]>([])
 const selectedSearchSpaceId = ref<number | null>(null)
 const selectedSearchEngineUrl = ref(searchEngineList[0].url)
 const searchConfigSaving = ref(false)
+const themeFileInput = ref<HTMLInputElement | null>(null)
+const themePackages = ref<Array<{ id: string; name: string; version: string; verified: boolean }>>([])
+const defaultThemeId = ref('')
+const themeSaving = ref(false)
+const isAdmin = computed(() => authStore.userInfo?.role === 1)
+const themeOptions = computed(() => themePackages.value.map(item => ({ label: `${item.name} (${item.version})`, value: item.id })))
+
+async function loadThemePackages() {
+  if (!isAdmin.value) return
+  const { code, data } = await getThemePackages()
+  if (code === 0) {
+    themePackages.value = data.packages
+    defaultThemeId.value = data.defaultPackage
+  }
+}
+
+async function uploadThemePackage(file?: File, confirmed = false): Promise<void> {
+  if (!file) return
+  const result = await installThemePackage(file, confirmed)
+  if (result.code !== 0 && !confirmed && /unverified/i.test(result.msg)) {
+    if (window.confirm(t('themePackage.confirmUnverified')))
+      return uploadThemePackage(file, true)
+  }
+  else if (result.code === 0) {
+    ms.success(t('themePackage.installed'))
+    await loadThemePackages()
+    if (activeThemePackageId.value === result.data?.id)
+      window.location.reload()
+  }
+  else {
+    ms.error(result.msg)
+  }
+}
+
+async function saveDefaultTheme() {
+  themeSaving.value = true
+  try {
+    const { code, msg } = await setInstanceDefaultTheme(defaultThemeId.value)
+    if (code === 0) {
+      ms.success(t('themePackage.saved'))
+      window.location.reload()
+    }
+    else ms.error(msg)
+  }
+  finally {
+    themeSaving.value = false
+  }
+}
+
+async function deleteTheme(id: string) {
+  if (!window.confirm(t('themePackage.removeConfirm')))
+    return
+  const { code, msg } = await removeThemePackage(id)
+  if (code === 0) {
+    ms.success(t('themePackage.removed'))
+    await loadThemePackages()
+    if (activeThemePackageId.value === id)
+      window.location.reload()
+  }
+  else ms.error(msg)
+}
 
 const searchSpaceOptions = computed(() => spaces.value.flatMap((space) => {
   const options = [{
@@ -111,6 +174,7 @@ onMounted(async () => {
     spaces.value = data
     selectSearchSpace(data[0].id)
   }
+  await loadThemePackages()
 })
 
 const iconTypeOptions = [
@@ -177,10 +241,30 @@ function resetPanelConfig() {
   panelState.resetPanelConfig()
   uploadCloud()
 }
+
+function adoptThemeDefaults() {
+  panelState.panelConfig.useThemeDefaults = true
+  uploadCloud()
+}
 </script>
 
 <template>
-  <div class="bg-slate-200 dark:bg-zinc-900 rounded-[10px] p-[8px] overflow-auto">
+  <div class="theme-page rounded-[10px] p-[8px] overflow-auto">
+    <NCard v-if="isAdmin" size="small">
+      <div class="text-slate-500 mb-2 font-bold">{{ $t('themePackage.title') }}</div>
+      <div class="flex flex-wrap items-center gap-2">
+        <input ref="themeFileInput" type="file" accept=".yin-theme,.zip" class="hidden" @change="uploadThemePackage(($event.target as HTMLInputElement).files?.[0]); ($event.target as HTMLInputElement).value = ''">
+        <NButton size="small" @click="themeFileInput?.click()">{{ $t('themePackage.install') }}</NButton>
+        <NSelect v-model:value="defaultThemeId" :options="themeOptions" class="min-w-[220px] flex-1" />
+        <NButton size="small" type="primary" :loading="themeSaving" @click="saveDefaultTheme">{{ $t('themePackage.setDefault') }}</NButton>
+      </div>
+      <div class="mt-3 divide-y">
+        <div v-for="item in themePackages" :key="item.id" class="flex items-center justify-between gap-3 py-2">
+          <span class="min-w-0 truncate">{{ item.name }} <span class="text-gray-500">{{ item.id }} · {{ item.version }} · {{ item.verified ? $t('themePackage.verified') : $t('themePackage.unverified') }}</span></span>
+          <NButton v-if="item.id !== 'org.yin.default'" size="tiny" tertiary type="error" @click="deleteTheme(item.id)">{{ $t('common.delete') }}</NButton>
+        </div>
+      </div>
+    </NCard>
     <NCard style="border-radius:10px" size="small">
       <div class="text-slate-500 mb-[5px] font-bold">
         LOGO
@@ -323,6 +407,7 @@ function resetPanelConfig() {
         <div>
           {{ $t('common.textColor') }}
         </div>
+        <NButton class="mt-2" size="tiny" tertiary @click="adoptThemeDefaults">{{ $t('themePackage.adoptDefaults') }}</NButton>
         <div class="flex items-center mt-[5px]">
           <NColorPicker
             v-model:value="panelState.panelConfig.iconTextColor"

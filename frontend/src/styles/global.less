@@ -5,6 +5,33 @@ body,
 }
 
 body {
+	color: var(--yin-text);
+	background-color: var(--yin-canvas);
 	padding-bottom: constant(safe-area-inset-bottom);
 	padding-bottom: env(safe-area-inset-bottom);
 }
+
+:root {
+	--yin-canvas: #ffffff;
+	--yin-surface: #f3f6f8;
+	--yin-surfaceElevated: #ffffff;
+	--yin-text: #172126;
+	--yin-textMuted: #53636a;
+	--yin-border: #d5dfe2;
+	--yin-primary: #075b68;
+	--yin-onPrimary: #ffffff;
+	--yin-secondary: #8b4412;
+	--yin-success: #176b45;
+	--yin-warning: #805200;
+	--yin-danger: #a12627;
+	--yin-focusRing: #075b68;
+}
+
+:focus-visible {
+	outline: 2px solid var(--yin-focusRing);
+	outline-offset: 2px;
+}
+
+.theme-page { background-color: var(--yin-surface); }
+.markdown-body { color: var(--yin-text); background-color: transparent; }
+.markdown-body pre, .markdown-body code { background-color: var(--yin-surface); border-color: var(--yin-border); }

@@ -122,6 +122,7 @@
       "enablePublicVisit": "Enable public visit"
     }
   },
+  "themePackage": { "title": "Библиотека тем", "label": "Пакет темы", "instanceDefault": "Использовать тему экземпляра", "install": "Установить пакет", "setDefault": "Установить по умолчанию", "verified": "Официальная подпись", "unverified": "Не проверено", "confirmUnverified": "Этот пакет не подписан Yin. Устанавливайте его только из доверенного источника.", "installed": "Тема установлена", "removed": "Тема удалена", "saved": "Настройки темы сохранены", "adoptDefaults": "Использовать цвета темы", "removeConfirm": "Удалить эту тему? Пользователи, выбравшие её, и настройка экземпляра вернутся к Yin Default." },
   "common": {
     "action": "Aktion",
     "add": "Добавить",

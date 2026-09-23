@@ -122,6 +122,7 @@
       "enablePublicVisit": "开启公开访问"
     }
   },
+  "themePackage": { "title": "主题库", "label": "主题包", "instanceDefault": "跟随实例默认主题", "install": "安装主题包", "setDefault": "设为实例默认", "verified": "官方签名", "unverified": "未验证", "confirmUnverified": "此主题包没有 Yin 签名。请仅在信任来源时安装。", "installed": "主题已安装", "removed": "主题已移除", "saved": "主题偏好已保存", "adoptDefaults": "使用主题颜色", "removeConfirm": "移除此主题？选择该主题的用户和实例默认值将改为 Yin 默认主题。" },
   "common": {
     "action": "操作",
     "add": "添加",

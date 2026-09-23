@@ -16,6 +16,7 @@ export function defaultStatePanelConfig(): Panel.panelConfig {
     backgroundMaskNumber: 0,
     iconStyle: PanelPanelConfigStyleEnum.icon,
     iconTextColor: '#ffffff',
+    useThemeDefaults: false,
     iconTextInfoHideDescription: false,
     iconTextIconHideTitle: false,
     logoText: 'Yin-Panel',

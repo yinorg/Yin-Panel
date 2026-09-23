@@ -174,12 +174,11 @@ function getProviderLabel(provider: string) {
         justify-content: center;
         align-items: center;
         height: 100vh;
-        background-color: #f2f6ff;
+        background-color: var(--yin-canvas);
     }
 
-    /* 夜间模式 */
-    .dark .login-container{
-      background-color: rgb(43, 43, 43);
+    .login-card {
+      color: var(--yin-text);
     }
 
     @media (min-width: 600px) {
