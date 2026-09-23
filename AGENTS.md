@@ -77,19 +77,46 @@ Every command must run in the directory stated by its `cd` or tool working-direc
 
 All paths outside this repository are machine-specific. Use `git rev-parse --show-toplevel`, `YIN_PANEL_RUNTIME_DIR`, `YIN_PANEL_EXTENSION_DIR`, and `YIN_PANEL_E2E_DIR`; never commit a developer home directory or machine-specific absolute path.
 
-Load local-only values for a shell session with:
+## Local Environment
+
+At the start of every task, load `.env.local` before running shell commands. Each tool call starts a new shell session, so repeat this setup in every command that uses local paths, credentials, proxies, E2E, installation, deployment, or privileged operations. Do not decide a local variable is unset by checking only the inherited process environment.
+
+Use this setup from the repository root:
 
 ```bash
 repo_root="$(git rev-parse --show-toplevel)"
 env_file="${YIN_PANEL_ENV_FILE:-$repo_root/.env.local}"
-if [ -f "$env_file" ]; then
-    set -a
-    . "$env_file"
-    set +a
+if [ ! -f "$env_file" ]; then
+    printf 'Local environment file not found: %s\n' "$env_file" >&2
+    exit 1
 fi
+set +x
+set -a
+. "$env_file"
+set +a
+# Keep sudo credentials in this shell only; do not pass them to child processes.
+export -n SUDO_PASSWORD SUDO_PASSWD 2>/dev/null || true
 ```
 
-`.env.example` documents supported variables. `.env.local` may contain test credentials and must remain untracked. Never print `SUDO_PASSWORD`, put it in command arguments, or write it to logs; prefer `sudo -v` or an OS credential helper when possible.
+`.env.example` documents supported variables. `.env.local` may contain credentials and proxy URLs and must remain untracked. Never print or log these values.
+
+- For E2E work, load the environment first, then require `YIN_PANEL_E2E_DIR` to be non-empty and resolve relative paths from `repo_root`. Confirm the resolved directory exists before reporting E2E as unavailable or running its tests.
+- Network commands must inherit the configured `http_proxy`, `https_proxy`, and `all_proxy` values from the loaded environment. If a network operation fails, verify the command inherited the proxy configuration and retry with it before reporting a network blocker. Do not print proxy values.
+- For sudo, accept `SUDO_PASSWORD` or the existing local alias `SUDO_PASSWD`. Keep the credential unexported and authenticate through standard input; never put it in command arguments or logs. Use this in the shell session that needs privilege:
+
+  ```bash
+  sudo_password="${SUDO_PASSWORD:-${SUDO_PASSWD:-}}"
+  if [ -n "$sudo_password" ]; then
+      sudo -S -v <<< "$sudo_password"
+      sudo_status=$?
+      unset sudo_password SUDO_PASSWORD SUDO_PASSWD
+      [ "$sudo_status" -eq 0 ] || exit "$sudo_status"
+  else
+      sudo -v
+  fi
+  ```
+
+  The cached sudo credential can then be used for privileged commands. If no password is configured, use an OS credential helper or the normal interactive `sudo -v` flow.
 
 ## Before Changes
 
