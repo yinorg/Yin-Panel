@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { NButton, NCard, NInput, NList, NListItem, NModal, NProgress, NSelect, NSpace, useMessage } from 'naive-ui'
-import { addMember, addOIDCGroup, clearSpace, copySpace, createGroup, createSpace, deleteOIDCGroup, getGroups, getMembers, getOIDCGroups, getPublicConfig, getSpaces, renameSpace, setPublicConfig, spaceDisplayName, updateGroup, updateMember, type Space, type SpaceMember } from '../../../api/panel/space'
+import { addMember, addOIDCGroup, clearSpace, copySpace, createGroup, createSpace, deleteOIDCGroup, getGroups, getMembers, getOIDCGroups, getPublicConfig, getSpaces, renameSpace, resolveSpace, setPublicConfig, spaceOptions, updateGroup, updateMember, type Space, type SpaceMember } from '../../../api/panel/space'
 import { useAuthStore } from '../../../store'
 import { t } from '../../../locales'
 import { clearSpaceCache } from '@/utils/spaceCache'
@@ -91,7 +91,7 @@ async function confirmImport() {
   }
 }
 function clearCurrentSpace() { if (!selectedSpaceId.value || !window.confirm(t('spaceManage.clearConfirm'))) return; clearSpace(selectedSpaceId.value).then(({ code }) => { if (code === 0) { invalidateSpaceCache(selectedSpaceId.value!); message.success(t('spaceManage.clearSuccess')); loadGroups(selectedSpaceId.value!) } }) }
-function load() { getSpaces<Space[]>().then(({ data }) => { spaces.value = data || []; if (spaces.value.length && !selectedSpaceId.value) selectedSpaceId.value = spaces.value[0].id; spaces.value.forEach(space => loadGroups(space.id)); if (selectedSpaceId.value) loadDetails(selectedSpaceId.value) }) }
+function load() { getSpaces<Space[]>().then(({ data }) => { spaces.value = data || []; if (spaces.value.length && !selectedSpaceId.value) selectedSpaceId.value = spaces.value[0].id; spaces.value.forEach(space => loadGroups(space.id)); if (selectedSpaceId.value) { loadGroups(selectedSpaceId.value); loadDetails(selectedSpaceId.value) } }) }
 function loadGroups(spaceId: number) { getGroups<{ id: number; title: string; parentId?: number | null }[]>(spaceId).then(({ data }) => { groups.value[spaceId] = data || [] }) }
 function loadDetails(spaceId: number) { getMembers<SpaceMember[]>(spaceId).then(({ data }) => { members.value = data || [] }); getOIDCGroups<any[]>(spaceId).then(({ data }) => { oidcRules.value = data || [] }); getPublicConfig<any>(spaceId).then(({ data }) => { publicEnabled.value = !!data?.enabled; publicId.value = data?.publicId || ''; publicMode.value = data?.mode === 'code' ? 'code' : 'direct'; publicAccessCode.value = '' }) }
 function savePublic() { if (!selectedSpaceId.value || (publicEnabled.value && !/^[a-z][a-z0-9-]{4,28}[a-z0-9]$/.test(publicId.value))) { message.error(t('spaceManage.publicIdInvalid')); return }; if (publicMode.value === 'code' && publicEnabled.value && publicAccessCode.value && (publicAccessCode.value.length < 4 || publicAccessCode.value.length > 12)) { message.error(t('spaceManage.accessCodeInvalid')); return }; publicSaving.value = true; setPublicConfig(selectedSpaceId.value, { enabled: publicEnabled.value, publicId: publicId.value, mode: publicMode.value, accessCode: publicAccessCode.value }).then(({ code }) => { if (code === 0) message.success(t('spaceManage.publicSaved')) }).finally(() => { publicSaving.value = false }) }
@@ -132,15 +132,20 @@ async function create() {
     loading.value = false
   }
 }
-function selected() { return spaces.value.find(space => space.id === selectedSpaceId.value) }
+function selected() { return selectedSpaceId.value ? resolveSpace(spaces.value, selectedSpaceId.value) : undefined }
+function selectSpace(spaceId: number) { selectedSpaceId.value = spaceId; loadGroups(spaceId); loadDetails(spaceId) }
 function openRenameDialog() {
-  rename.value = selected()?.name || ''
+  const space = selected()
+  const baseSpace = space?.side === 'yang' ? spaces.value.find(item => item.pairedSpaceId === space.id) : space
+  rename.value = baseSpace?.name || space?.name || ''
   renameDialogVisible.value = true
 }
 async function renameCurrent() {
   const value = rename.value.trim()
   if (!value || !selectedSpaceId.value) return false
-  const { code } = await renameSpace(selectedSpaceId.value, value)
+  const space = selected()
+  const baseSpace = space?.side === 'yang' ? spaces.value.find(item => item.pairedSpaceId === space.id) : space
+  const { code } = await renameSpace(baseSpace?.id || selectedSpaceId.value, value)
   if (code !== 0) return false
   message.success('空间名称已更新')
   renameDialogVisible.value = false
@@ -188,7 +193,7 @@ onMounted(load)
         <NModal v-model:show="createDialogVisible" preset="dialog" :title="$t('spaceManage.createSpace')" :positive-text="$t('common.confirm')" :negative-text="$t('common.cancel')" :loading="loading" @positive-click="create">
           <NInput v-model:value="name" :placeholder="$t('spaceManage.newSpaceName')" maxlength="100" @keyup.enter="create" />
         </NModal>
-        <NSelect v-model:value="selectedSpaceId" :options="spaces.map(space => ({ label: `${spaceDisplayName(space, spaces, authStore.userInfo?.id, true)} (${space.type === 'shared' || space.type === 'team' ? $t('spaceManage.shared') : $t('spaceManage.personal')})`, value: space.id }))" @update:value="(id) => loadDetails(Number(id))" />
+        <NSelect v-model:value="selectedSpaceId" :options="spaceOptions(spaces, authStore.userInfo?.id)" @update:value="(id) => selectSpace(Number(id))" />
         <NSpace v-if="selectedSpaceId"><NButton @click="openRenameDialog">{{ $t('spaceManage.rename') }}</NButton><NButton @click="copyCurrent">{{ $t('spaceManage.copy') }}</NButton></NSpace>
         <NModal v-model:show="renameDialogVisible" preset="dialog" :title="$t('spaceManage.rename')" :positive-text="$t('common.confirm')" :negative-text="$t('common.cancel')" @positive-click="renameCurrent">
           <NInput v-model:value="rename" :placeholder="$t('spaceManage.spaceName')" maxlength="100" @keyup.enter="renameCurrent" />

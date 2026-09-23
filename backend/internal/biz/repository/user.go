@@ -89,7 +89,19 @@ func (r *UserRepo) GetList(pagedParam PagedParam) ([]User, uint, error) {
 }
 
 func (r *UserRepo) Update(id uint, user *User) error {
-	return Db.Where("id=?", id).Updates(user).Error
+	return Db.Transaction(func(tx *gorm.DB) error {
+		var existing User
+		if err := tx.First(&existing, id).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&User{}).Where("id = ?", id).Updates(user).Error; err != nil {
+			return err
+		}
+		if user.Name != existing.Name {
+			return updatePersonalSpaceNames(tx, id, user.Name)
+		}
+		return nil
+	})
 }
 
 func (r *UserRepo) UpdateUserInfo(userId uint, updateInfo map[string]any) error {
@@ -122,9 +134,32 @@ func (r *UserRepo) UpdateUserInfo(userId uint, updateInfo map[string]any) error 
 		data["password"] = v
 	}
 
-	mUser := User{}
-	err := Db.Model(&mUser).Where("id=?", userId).Updates(data).Error
-	return err
+	return Db.Transaction(func(tx *gorm.DB) error {
+		var existing User
+		if _, hasName := data["name"]; hasName {
+			if err := tx.First(&existing, userId).Error; err != nil {
+				return err
+			}
+		}
+		if err := tx.Model(&User{}).Where("id = ?", userId).Updates(data).Error; err != nil {
+			return err
+		}
+		if newName, ok := data["name"].(string); ok && newName != existing.Name {
+			return updatePersonalSpaceNames(tx, userId, newName)
+		}
+		return nil
+	})
+}
+
+func updatePersonalSpaceNames(tx *gorm.DB, userId uint, name string) error {
+	if err := tx.Model(&Space{}).
+		Where("type = ? AND owner_user_id = ? AND (side = ? OR side = '' OR side IS NULL)", SpaceTypePersonal, userId, "yin").
+		Update("name", name).Error; err != nil {
+		return err
+	}
+	return tx.Model(&Space{}).
+		Where("type = ? AND owner_user_id = ? AND side = ?", SpaceTypePersonal, userId, "yang").
+		Update("name", name+"-B").Error
 }
 
 func (r *UserRepo) Create(user *User) error {

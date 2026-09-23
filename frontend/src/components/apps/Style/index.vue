@@ -7,7 +7,7 @@ import { useAuthStore, usePanelState } from '@/store'
 import { PanelPanelConfigStyleEnum } from '@/enums'
 import { t } from '@/locales'
 import { getEnableStatus } from '@/api/system/systemMonitor'
-import { getSearchConfig, getSpaces, setSearchConfig, spaceDisplayName, type Space, type SpaceSearchConfig } from '@/api/panel/space'
+import { getSearchConfig, getSpaces, setSearchConfig, spaceOptions, type Space, type SpaceSearchConfig } from '@/api/panel/space'
 import { readSpaceCache, writeSpaceCache } from '@/utils/spaceCache'
 import { searchEngineList } from '@/components/deskModule/SearchBox/engines'
 import { getThemePackage, getThemePackages, installThemePackage, previewThemePackage, removeThemePackage, setInstanceDefaultTheme, uploadWebWallpaper } from '@/api/theme'
@@ -135,19 +135,7 @@ async function deleteTheme(id: string) {
   else ms.error(msg)
 }
 
-const searchSpaceOptions = computed(() => spaces.value.flatMap((space) => {
-  const options = [{
-    label: `${spaceDisplayName(space, spaces.value, authStore.userInfo?.id)} (Yin)`,
-    value: space.id,
-  }]
-  if (space.pairedSpaceId) {
-    options.push({
-      label: `${spaceDisplayName(space, spaces.value, authStore.userInfo?.id)}-B (Yang)`,
-      value: space.pairedSpaceId,
-    })
-  }
-  return options
-}))
+const searchSpaceOptions = computed(() => spaceOptions(spaces.value, authStore.userInfo?.id))
 
 const searchEngineOptions = searchEngineList.map(engine => ({
   label: engine.title,

@@ -2,15 +2,32 @@ import { get, post } from '../../utils/request'
 import { t } from '../../locales'
 
 export interface Space { id: number; type: 'personal' | 'team' | 'shared'; name: string; ownerUserId: number; pairId?: number; side?: 'yin' | 'yang'; pairedSpaceId?: number; publicEnabled?: boolean; publicId?: string; publicMode?: 'direct' | 'code' }
+export interface SpaceOption { label: string; value: number }
 export interface SearchEngine { iconSrc: string; title: string; url: string }
 export interface SpaceSearchConfig { currentSearchEngine: SearchEngine }
 export interface PublicConfig { enabled: boolean; publicId: string; mode: 'direct' | 'code'; accessCode?: string }
 export interface SpaceMember { id: number; userId: number; email?: string; role: 'admin' | 'editor' | 'viewer'; source?: string }
-export function spaceDisplayName(space: Space, spaces: Space[], currentUserId?: number, memberView = false) {
-  if (space.type === 'personal' && !memberView && space.ownerUserId === currentUserId)
+export function spaceDisplayName(space: Space, spaces: Space[], currentUserId?: number) {
+  if (space.type === 'personal' && space.ownerUserId === currentUserId)
     return t('spaceManage.mySpace')
   const sameName = spaces.filter(item => item.name === space.name)
   return sameName.length > 1 ? `${space.name} ${space.id}` : space.name
+}
+export function resolveSpace(spaces: Space[], spaceId: number) {
+  const space = spaces.find(item => item.id === spaceId)
+  if (space) return space
+  const yin = spaces.find(item => item.pairedSpaceId === spaceId)
+  return yin ? { ...yin, id: spaceId, name: `${yin.name}-B`, side: 'yang' as const, pairId: yin.id, pairedSpaceId: yin.id } : undefined
+}
+export function spaceOptions(spaces: Space[], currentUserId?: number) {
+  return spaces.flatMap((space): SpaceOption[] => {
+    const name = spaceDisplayName(space, spaces, currentUserId)
+    const category = space.type === 'shared' || space.type === 'team' ? t('spaceManage.shared') : t('spaceManage.personal')
+    const options: SpaceOption[] = [{ label: `${name} (Yin) (${category})`, value: space.id }]
+    if (space.pairedSpaceId)
+      options.push({ label: `${name}-B (Yang) (${category})`, value: space.pairedSpaceId })
+    return options
+  })
 }
 export function sortSpaces(spaces: Space[], currentUserId?: number) {
   const seenPersonal = new Set<number>()
