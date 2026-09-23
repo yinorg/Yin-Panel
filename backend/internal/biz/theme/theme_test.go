@@ -23,6 +23,75 @@ func TestBuiltinPackageValidates(t *testing.T) {
 	}
 }
 
+func TestBuiltinHomeColumnsAndUpgrade(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open("file:builtin-home-columns?mode=memory&cache=shared"), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := Migrate(db); err != nil {
+		t.Fatal(err)
+	}
+
+	old := Builtin()
+	old.Manifest.PackageVersion = "2.0.0"
+	for _, scheme := range old.Manifest.Schemes {
+		var document map[string]any
+		if err := json.Unmarshal(old.Documents[scheme], &document); err != nil {
+			t.Fatal(err)
+		}
+		document["design"].(map[string]any)["homeColumns"].(map[string]any)["$value"] = 4
+		old.Documents[scheme], err = json.Marshal(document)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	manifest, err := json.Marshal(old.Manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	documents, err := json.Marshal(old.Documents)
+	if err != nil {
+		t.Fatal(err)
+	}
+	record := PackageRecord{
+		ID: old.Manifest.ID, Name: old.Manifest.Name, Version: old.Manifest.PackageVersion,
+		AssetVersion: packageRevision(old), ManifestJSON: string(manifest), DocumentsJSON: string(documents), Verified: true,
+	}
+	if err := db.Create(&record).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	if err := EnsureBuiltin(db); err != nil {
+		t.Fatal(err)
+	}
+	stored, err := Get(db, "org.yin.default")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stored.Manifest.PackageVersion != "2.0.1" {
+		t.Fatalf("built-in package version = %q, want 2.0.1", stored.Manifest.PackageVersion)
+	}
+	for _, scheme := range stored.Manifest.Schemes {
+		var document map[string]any
+		if err := json.Unmarshal(stored.Documents[scheme], &document); err != nil {
+			t.Fatal(err)
+		}
+		columns := document["design"].(map[string]any)["homeColumns"].(map[string]any)["$value"]
+		if columns != float64(12) {
+			t.Errorf("%s homeColumns = %v, want 12", scheme, columns)
+		}
+	}
+}
+
+func TestHomeColumnsRange(t *testing.T) {
+	if err := validateDesignSlot("homeColumns", json.Number("12")); err != nil {
+		t.Fatalf("12 columns rejected: %v", err)
+	}
+	if err := validateDesignSlot("homeColumns", json.Number("13")); err == nil {
+		t.Fatal("13 columns accepted")
+	}
+}
+
 func TestValidationRejectsContrastAndReferenceCycles(t *testing.T) {
 	pkg := Builtin()
 	setTokenValue(t, pkg, "light", "text", map[string]any{"colorSpace": "srgb", "components": []float64{.996, .996, .996}, "alpha": 1})

@@ -779,7 +779,7 @@ func Builtin() *Package {
 	for name := range v2Slots {
 		bindings[name] = "/design/" + name
 	}
-	manifest := Manifest{Format: "yin-theme", FormatVersion: FormatVersion, ID: "org.yin.default", Name: "Yin Default", PackageVersion: "2.0.0", APIVersion: APIVersion, DTCGVersion: DTCGVersion, Schemes: []string{"light", "dark"}, Documents: map[string]string{"light": "tokens/light.json", "dark": "tokens/dark.json"}, Bindings: bindings}
+	manifest := Manifest{Format: "yin-theme", FormatVersion: FormatVersion, ID: "org.yin.default", Name: "Yin Default", PackageVersion: "2.0.1", APIVersion: APIVersion, DTCGVersion: DTCGVersion, Schemes: []string{"light", "dark"}, Documents: map[string]string{"light": "tokens/light.json", "dark": "tokens/dark.json"}, Bindings: bindings}
 	light := map[string]string{"canvas": "#ffffff", "surface": "#f3f6f8", "surfaceElevated": "#ffffff", "text": "#172126", "textMuted": "#53636a", "border": "#d5dfe2", "primary": "#075b68", "onPrimary": "#ffffff", "secondary": "#8b4412", "success": "#176b45", "warning": "#805200", "danger": "#a12627", "focusRing": "#075b68"}
 	dark := map[string]string{"canvas": "#171d20", "surface": "#222a2e", "surfaceElevated": "#2b353a", "text": "#f1f5f6", "textMuted": "#b0bec3", "border": "#536168", "primary": "#72d6df", "onPrimary": "#102326", "secondary": "#f0a66d", "success": "#71d8a0", "warning": "#f2c46c", "danger": "#ff9792", "focusRing": "#72d6df"}
 	return &Package{Manifest: manifest, Documents: map[string]json.RawMessage{"light": makeDocument(light, false), "dark": makeDocument(dark, true)}, Resources: map[string]ResourceData{}, Verified: true}
