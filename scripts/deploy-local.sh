@@ -35,18 +35,21 @@ command -v setsid >/dev/null 2>&1 || die "setsid is required"
 
 sudo -v
 
+build_dir="$(mktemp -d /tmp/yin-panel-build.XXXXXX)"
+trap 'rm -rf "$build_dir"' EXIT
+
 printf 'Building frontend...\n'
-npm run build-only --prefix "$repo_root/frontend"
+(cd "$repo_root/frontend" && npm run build-only)
+
+[[ -f "$repo_root/backend/web/index.html" ]] || die "frontend build did not produce backend/web/index.html"
+cp -a "$repo_root/backend/web" "$build_dir/web"
 
 printf 'Testing backend...\n'
 (cd "$repo_root/backend" && go test ./...)
 
-build_dir="$(mktemp -d /tmp/yin-panel-build.XXXXXX)"
-trap 'rm -rf "$build_dir"' EXIT
 printf 'Building backend...\n'
 (cd "$repo_root/backend" && go build -o "$build_dir/yin-panel" .)
 
-[[ -f "$repo_root/backend/web/index.html" ]] || die "frontend build did not produce backend/web/index.html"
 [[ -x "$build_dir/yin-panel" ]] || die "backend build did not produce an executable"
 
 pid="$(ss -ltnp | awk '/:'"$port"' / {match($0,/pid=[0-9]+/); if (RSTART) {print substr($0,RSTART+4,RLENGTH-4); exit}}')"
@@ -68,7 +71,7 @@ printf 'Replacing runtime binary and frontend files...\n'
 sudo rm -f "$run_dir/yin-panel"
 sudo rm -rf "$run_dir/web"
 sudo cp -a "$build_dir/yin-panel" "$run_dir/yin-panel"
-sudo cp -a "$repo_root/backend/web" "$run_dir/web"
+sudo cp -a "$build_dir/web" "$run_dir/web"
 
 printf 'Starting Yin-Panel from %s...\n' "$run_dir"
 (cd "$run_dir" && setsid ./yin-panel > yin-panel.log 2>&1 < /dev/null &)
