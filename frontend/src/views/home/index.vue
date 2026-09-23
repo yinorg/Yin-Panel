@@ -1385,7 +1385,7 @@ html {
 .icon-small-box {
   width: 100%;
   display: grid;
-  grid-template-columns: repeat(var(--yin-activeColumns), minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(75px, 1fr));
   gap: var(--yin-spaceLg);
 
 }
