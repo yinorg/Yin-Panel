@@ -21,11 +21,13 @@ import (
 )
 
 const (
-	FormatVersion = 1
-	APIVersion    = "2"
-	DTCGVersion   = "2025.10"
-	MaxArchive    = 32 << 20
-	MaxExpanded   = 48 << 20
+	FormatVersion    = 1
+	APIVersion       = "2"
+	DTCGVersion      = "2025.10"
+	MaxArchive       = 32 << 20
+	MaxExpanded      = 48 << 20
+	builtinDefaultID = "org.yin.default"
+	builtinMistID    = "org.yin.mist"
 )
 
 var requiredSlots = map[string]string{
@@ -275,7 +277,7 @@ func validateManifest(m Manifest) error {
 	if m.Format != "yin-theme" || m.FormatVersion != FormatVersion || (m.APIVersion != "1" && m.APIVersion != APIVersion) || m.DTCGVersion != DTCGVersion {
 		return errors.New("unsupported theme format, package API, or DTCG version")
 	}
-	if !idPattern.MatchString(m.ID) || m.ID == "org.yin.default" || strings.TrimSpace(m.Name) == "" || len(m.Name) > 100 || !versionPattern.MatchString(m.PackageVersion) {
+	if !idPattern.MatchString(m.ID) || isBuiltinThemeID(m.ID) || strings.TrimSpace(m.Name) == "" || len(m.Name) > 100 || !versionPattern.MatchString(m.PackageVersion) {
 		return errors.New("invalid theme identity or reserved package ID")
 	}
 	if len(m.Schemes) == 0 || len(m.Schemes) > 2 || len(m.Documents) != len(m.Schemes) {
@@ -771,6 +773,26 @@ func ratio(a, b color) float64 {
 }
 
 func Builtin() *Package {
+	light := map[string]string{"canvas": "#ffffff", "surface": "#f3f6f8", "surfaceElevated": "#ffffff", "text": "#172126", "textMuted": "#53636a", "border": "#d5dfe2", "primary": "#075b68", "onPrimary": "#ffffff", "secondary": "#8b4412", "success": "#176b45", "warning": "#805200", "danger": "#a12627", "focusRing": "#075b68"}
+	dark := map[string]string{"canvas": "#171d20", "surface": "#222a2e", "surfaceElevated": "#2b353a", "text": "#f1f5f6", "textMuted": "#b0bec3", "border": "#536168", "primary": "#72d6df", "onPrimary": "#102326", "secondary": "#f0a66d", "success": "#71d8a0", "warning": "#f2c46c", "danger": "#ff9792", "focusRing": "#72d6df"}
+	return builtinPackage(builtinDefaultID, "Yin Default", "2.0.1", light, dark)
+}
+
+func BuiltinMist() *Package {
+	light := map[string]string{"canvas": "#f4f7f6", "surface": "#ffffff", "surfaceElevated": "#ffffff", "text": "#172826", "textMuted": "#586966", "border": "#d6e2df", "primary": "#b43743", "onPrimary": "#ffffff", "secondary": "#08796a", "success": "#197349", "warning": "#785300", "danger": "#a52d34", "focusRing": "#b43743"}
+	dark := map[string]string{"canvas": "#151d1c", "surface": "#202a29", "surfaceElevated": "#2a3634", "text": "#f0f6f3", "textMuted": "#b4c3be", "border": "#4b605a", "primary": "#f28b80", "onPrimary": "#311717", "secondary": "#74d4bd", "success": "#76d39b", "warning": "#f0c66f", "danger": "#ff9b95", "focusRing": "#f28b80"}
+	return builtinPackage(builtinMistID, "Yin Mist", "1.0.0", light, dark)
+}
+
+func Builtins() []*Package {
+	return []*Package{Builtin(), BuiltinMist()}
+}
+
+func isBuiltinThemeID(id string) bool {
+	return id == builtinDefaultID || id == builtinMistID
+}
+
+func builtinPackage(id, name, version string, light, dark map[string]string) *Package {
 	bindings := map[string]string{}
 	names := []string{"canvas", "surface", "surfaceElevated", "text", "textMuted", "border", "primary", "onPrimary", "secondary", "success", "warning", "danger", "focusRing"}
 	for _, name := range names {
@@ -779,9 +801,7 @@ func Builtin() *Package {
 	for name := range v2Slots {
 		bindings[name] = "/design/" + name
 	}
-	manifest := Manifest{Format: "yin-theme", FormatVersion: FormatVersion, ID: "org.yin.default", Name: "Yin Default", PackageVersion: "2.0.1", APIVersion: APIVersion, DTCGVersion: DTCGVersion, Schemes: []string{"light", "dark"}, Documents: map[string]string{"light": "tokens/light.json", "dark": "tokens/dark.json"}, Bindings: bindings}
-	light := map[string]string{"canvas": "#ffffff", "surface": "#f3f6f8", "surfaceElevated": "#ffffff", "text": "#172126", "textMuted": "#53636a", "border": "#d5dfe2", "primary": "#075b68", "onPrimary": "#ffffff", "secondary": "#8b4412", "success": "#176b45", "warning": "#805200", "danger": "#a12627", "focusRing": "#075b68"}
-	dark := map[string]string{"canvas": "#171d20", "surface": "#222a2e", "surfaceElevated": "#2b353a", "text": "#f1f5f6", "textMuted": "#b0bec3", "border": "#536168", "primary": "#72d6df", "onPrimary": "#102326", "secondary": "#f0a66d", "success": "#71d8a0", "warning": "#f2c46c", "danger": "#ff9792", "focusRing": "#72d6df"}
+	manifest := Manifest{Format: "yin-theme", FormatVersion: FormatVersion, ID: id, Name: name, PackageVersion: version, APIVersion: APIVersion, DTCGVersion: DTCGVersion, Schemes: []string{"light", "dark"}, Documents: map[string]string{"light": "tokens/light.json", "dark": "tokens/dark.json"}, Bindings: bindings}
 	return &Package{Manifest: manifest, Documents: map[string]json.RawMessage{"light": makeDocument(light, false), "dark": makeDocument(dark, true)}, Resources: map[string]ResourceData{}, Verified: true}
 }
 

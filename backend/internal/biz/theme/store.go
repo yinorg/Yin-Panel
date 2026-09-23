@@ -17,6 +17,7 @@ type PackageRecord struct {
 	ID            string    `gorm:"primaryKey;size:128" json:"id"`
 	Name          string    `gorm:"size:100" json:"name"`
 	Version       string    `gorm:"size:80" json:"version"`
+	Removed       bool      `gorm:"not null;default:false" json:"-"`
 	AssetVersion  string    `gorm:"size:64" json:"-"`
 	ManifestJSON  string    `gorm:"type:text" json:"-"`
 	DocumentsJSON string    `gorm:"type:text" json:"-"`
@@ -63,28 +64,42 @@ func Migrate(db *gorm.DB) error {
 }
 
 func EnsureBuiltin(db *gorm.DB) error {
-	builtin := Builtin()
-	manifest, _ := json.Marshal(builtin.Manifest)
-	documents, _ := json.Marshal(builtin.Documents)
 	return db.Transaction(func(tx *gorm.DB) error {
-		var existing PackageRecord
-		if err := tx.First(&existing, "id = ?", builtin.Manifest.ID).Error; errors.Is(err, gorm.ErrRecordNotFound) {
-			record := PackageRecord{ID: builtin.Manifest.ID, Name: builtin.Manifest.Name, Version: builtin.Manifest.PackageVersion, AssetVersion: packageRevision(builtin), ManifestJSON: string(manifest), DocumentsJSON: string(documents), Verified: true}
-			if err := tx.Create(&record).Error; err != nil {
+		for _, builtin := range Builtins() {
+			manifest, err := json.Marshal(builtin.Manifest)
+			if err != nil {
 				return err
 			}
-		} else if err != nil {
-			return err
-		} else if existing.Version != builtin.Manifest.PackageVersion || existing.ManifestJSON != string(manifest) || existing.DocumentsJSON != string(documents) {
-			if err := tx.Model(&existing).Updates(map[string]any{
-				"name": builtin.Manifest.Name, "version": builtin.Manifest.PackageVersion,
-				"asset_version": packageRevision(builtin), "manifest_json": string(manifest),
-				"documents_json": string(documents), "verified": true,
-			}).Error; err != nil {
+			documents, err := json.Marshal(builtin.Documents)
+			if err != nil {
 				return err
+			}
+			var existing PackageRecord
+			err = tx.First(&existing, "id = ?", builtin.Manifest.ID).Error
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				record := PackageRecord{ID: builtin.Manifest.ID, Name: builtin.Manifest.Name, Version: builtin.Manifest.PackageVersion, AssetVersion: packageRevision(builtin), ManifestJSON: string(manifest), DocumentsJSON: string(documents), Verified: true}
+				if err := tx.Create(&record).Error; err != nil {
+					return err
+				}
+				continue
+			}
+			if err != nil {
+				return err
+			}
+			if existing.Removed && builtin.Manifest.ID != builtinDefaultID && existing.Version == builtin.Manifest.PackageVersion {
+				continue
+			}
+			if existing.Version != builtin.Manifest.PackageVersion || existing.ManifestJSON != string(manifest) || existing.DocumentsJSON != string(documents) || existing.Removed {
+				if err := tx.Model(&existing).Updates(map[string]any{
+					"name": builtin.Manifest.Name, "version": builtin.Manifest.PackageVersion,
+					"asset_version": packageRevision(builtin), "manifest_json": string(manifest),
+					"documents_json": string(documents), "verified": true, "removed": false,
+				}).Error; err != nil {
+					return err
+				}
 			}
 		}
-		settings := InstanceSettings{ID: 1, DefaultPackage: builtin.Manifest.ID}
+		settings := InstanceSettings{ID: 1, DefaultPackage: builtinDefaultID}
 		if err := tx.FirstOrCreate(&settings, InstanceSettings{ID: 1}).Error; err != nil {
 			return err
 		}
@@ -94,13 +109,13 @@ func EnsureBuiltin(db *gorm.DB) error {
 
 func List(db *gorm.DB) ([]PackageRecord, error) {
 	var records []PackageRecord
-	err := db.Select("id", "name", "version", "verified", "created_at", "updated_at").Order("id").Find(&records).Error
+	err := db.Select("id", "name", "version", "verified", "created_at", "updated_at").Where("removed = ?", false).Order("id").Find(&records).Error
 	return records, err
 }
 
 func Get(db *gorm.DB, id string) (PublicPackage, error) {
 	var record PackageRecord
-	if err := db.First(&record, "id = ?", id).Error; err != nil {
+	if err := db.First(&record, "id = ? AND removed = ?", id, false).Error; err != nil {
 		return PublicPackage{}, err
 	}
 	var result PublicPackage
@@ -167,7 +182,7 @@ func SetPreference(db *gorm.DB, userID uint, packageID, mode string) error {
 	}
 	if packageID != "" {
 		var count int64
-		if err := db.Model(&PackageRecord{}).Where("id = ?", packageID).Count(&count).Error; err != nil {
+		if err := db.Model(&PackageRecord{}).Where("id = ? AND removed = ?", packageID, false).Count(&count).Error; err != nil {
 			return err
 		}
 		if count == 0 {
@@ -184,6 +199,9 @@ func SetPreference(db *gorm.DB, userID uint, packageID, mode string) error {
 }
 
 func Install(db *gorm.DB, actorID uint, pkg *Package) error {
+	if isBuiltinThemeID(pkg.Manifest.ID) {
+		return errors.New("built-in theme ID is reserved")
+	}
 	manifest, err := json.Marshal(pkg.Manifest)
 	if err != nil {
 		return err
@@ -229,7 +247,7 @@ func SetDefault(db *gorm.DB, actorID uint, packageID string) error {
 func SetDefaultConfirmed(db *gorm.DB, actorID uint, packageID string, confirmExternal bool) error {
 	return db.Transaction(func(tx *gorm.DB) error {
 		var record PackageRecord
-		if err := tx.First(&record, "id = ?", packageID).Error; err != nil {
+		if err := tx.First(&record, "id = ? AND removed = ?", packageID, false).Error; err != nil {
 			return err
 		}
 		var manifest Manifest
@@ -253,27 +271,31 @@ func SetDefaultConfirmed(db *gorm.DB, actorID uint, packageID string, confirmExt
 }
 
 func Remove(db *gorm.DB, actorID uint, packageID string) error {
-	if packageID == "org.yin.default" {
+	if packageID == builtinDefaultID {
 		return errors.New("built-in theme cannot be removed")
 	}
 	return db.Transaction(func(tx *gorm.DB) error {
 		var record PackageRecord
-		if err := tx.First(&record, "id = ?", packageID).Error; err != nil {
+		if err := tx.First(&record, "id = ? AND removed = ?", packageID, false).Error; err != nil {
 			return err
 		}
-		if _, err := Get(tx, "org.yin.default"); err != nil {
+		if _, err := Get(tx, builtinDefaultID); err != nil {
 			return err
 		}
-		if err := tx.Model(&InstanceSettings{}).Where("id = ? AND default_package = ?", 1, packageID).Update("default_package", "org.yin.default").Error; err != nil {
+		if err := tx.Model(&InstanceSettings{}).Where("id = ? AND default_package = ?", 1, packageID).Update("default_package", builtinDefaultID).Error; err != nil {
 			return err
 		}
-		if err := tx.Model(&Preference{}).Where("package_id = ?", packageID).Update("package_id", "org.yin.default").Error; err != nil {
+		if err := tx.Model(&Preference{}).Where("package_id = ?", packageID).Update("package_id", builtinDefaultID).Error; err != nil {
 			return err
 		}
 		if err := tx.Where("package_id = ?", packageID).Delete(&AssetRecord{}).Error; err != nil {
 			return err
 		}
-		if err := tx.Delete(&record).Error; err != nil {
+		if packageID == builtinMistID {
+			if err := tx.Model(&record).Update("removed", true).Error; err != nil {
+				return err
+			}
+		} else if err := tx.Delete(&record).Error; err != nil {
 			return err
 		}
 		return tx.Create(&AuditRecord{ActorID: actorID, Action: "remove", PackageID: packageID}).Error
@@ -282,7 +304,7 @@ func Remove(db *gorm.DB, actorID uint, packageID string) error {
 
 func Asset(db *gorm.DB, packageID, version, name string) (AssetRecord, error) {
 	var record PackageRecord
-	if err := db.First(&record, "id = ? AND asset_version = ?", packageID, version).Error; err != nil {
+	if err := db.First(&record, "id = ? AND asset_version = ? AND removed = ?", packageID, version, false).Error; err != nil {
 		return AssetRecord{}, err
 	}
 	var asset AssetRecord

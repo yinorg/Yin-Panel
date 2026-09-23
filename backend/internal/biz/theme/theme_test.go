@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -18,9 +19,103 @@ import (
 )
 
 func TestBuiltinPackageValidates(t *testing.T) {
-	if err := Validate(Builtin()); err != nil {
-		t.Fatalf("built-in package rejected: %v", err)
+	for _, pkg := range Builtins() {
+		if err := Validate(pkg); err != nil {
+			t.Errorf("built-in theme %q rejected: %v", pkg.Manifest.ID, err)
+		}
 	}
+}
+
+func TestBuiltinMistRemovalPersistsUntilUpgrade(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open("file:builtin-mist-removal?mode=memory&cache=shared"), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := Migrate(db); err != nil {
+		t.Fatal(err)
+	}
+	if err := EnsureBuiltin(db); err != nil {
+		t.Fatal(err)
+	}
+	if defaultID, err := DefaultID(db); err != nil || defaultID != builtinDefaultID {
+		t.Fatalf("initial default = %q, err=%v", defaultID, err)
+	}
+	if err := SetDefault(db, 1, builtinMistID); err != nil {
+		t.Fatal(err)
+	}
+	if err := SetPreference(db, 9, builtinMistID, "dark"); err != nil {
+		t.Fatal(err)
+	}
+	if err := Remove(db, 1, builtinMistID); err != nil {
+		t.Fatalf("built-in alternate theme could not be removed: %v", err)
+	}
+	if defaultID, err := DefaultID(db); err != nil || defaultID != builtinDefaultID {
+		t.Fatalf("removed theme default fallback = %q, err=%v", defaultID, err)
+	}
+	preference, err := PreferenceFor(db, 9)
+	if err != nil || preference.PackageID != builtinDefaultID || preference.Mode != "dark" {
+		t.Fatalf("removed theme preference fallback = %#v, err=%v", preference, err)
+	}
+	if _, err := Get(db, builtinMistID); !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Fatalf("removed built-in theme remained readable: %v", err)
+	}
+	if err := SetPreference(db, 10, builtinMistID, "light"); !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Fatalf("removed built-in theme remained selectable: %v", err)
+	}
+	if err := EnsureBuiltin(db); err != nil {
+		t.Fatal(err)
+	}
+	if packages, err := List(db); err != nil || containsPackage(packages, builtinMistID) {
+		t.Fatalf("removed theme was reseeded at the same version: packages=%v err=%v", packageIDs(packages), err)
+	}
+
+	if err := db.Model(&PackageRecord{}).Where("id = ?", builtinMistID).Update("version", "0.9.0").Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := EnsureBuiltin(db); err != nil {
+		t.Fatal(err)
+	}
+	if packages, err := List(db); err != nil || !containsPackage(packages, builtinMistID) {
+		t.Fatalf("new built-in version was not restored: packages=%v err=%v", packageIDs(packages), err)
+	}
+	if defaultID, err := DefaultID(db); err != nil || defaultID != builtinDefaultID {
+		t.Fatalf("restoring theme changed default = %q, err=%v", defaultID, err)
+	}
+}
+
+func TestBuiltinThemeIDsCannotBeInstalledAsArchives(t *testing.T) {
+	pkg := Builtin()
+	pkg.Manifest.ID = builtinMistID
+	if err := validateManifest(pkg.Manifest); err == nil || !strings.Contains(err.Error(), "reserved package ID") {
+		t.Fatalf("built-in theme ID was not reserved: %v", err)
+	}
+	db, err := gorm.Open(sqlite.Open("file:builtin-mist-reserved?mode=memory&cache=shared"), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := Migrate(db); err != nil {
+		t.Fatal(err)
+	}
+	if err := Install(db, 1, pkg); err == nil {
+		t.Fatal("built-in theme ID was accepted by direct package installation")
+	}
+}
+
+func containsPackage(packages []PackageRecord, id string) bool {
+	for _, pkg := range packages {
+		if pkg.ID == id {
+			return true
+		}
+	}
+	return false
+}
+
+func packageIDs(packages []PackageRecord) []string {
+	ids := make([]string, len(packages))
+	for i, pkg := range packages {
+		ids[i] = pkg.ID
+	}
+	return ids
 }
 
 func TestBuiltinHomeColumnsAndUpgrade(t *testing.T) {
