@@ -31,6 +31,7 @@ type PanelConfig struct {
 	SystemMonitorShow           *bool    `json:"systemMonitorShow,omitempty"`
 	SystemMonitorShowTitle      *bool    `json:"systemMonitorShowTitle,omitempty"`
 	NetModeChangeButtonShow     *bool    `json:"netModeChangeButtonShow,omitempty"`
+	UseThemeDefaults            bool     `json:"useThemeDefaults,omitempty"`
 }
 
 type UserConfig struct {

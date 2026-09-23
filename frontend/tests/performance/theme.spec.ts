@@ -62,6 +62,32 @@ test('rejects missing token references and cycles', () => {
   expect(() => resolveThemeSlots(pkg, 'light')).toThrow(/cycle/i)
 })
 
+test('inherits DTCG types and rejects references that change token type', () => {
+  const pkg = makePackage(['light'])
+  expect(resolveThemeSlots(pkg, 'light').canvas).toBe('#ffffff')
+
+  pkg.documents.light.typography = {
+    $type: 'fontFamily',
+    body: { $value: 'Inter' },
+  }
+  pkg.documents.light.color.focusRing.$value = '{typography.body}'
+  expect(() => resolveThemeSlots(pkg, 'light')).toThrow(/type/i)
+})
+
+test('rejects missing schemes, non-color bindings, and unsupported color values', () => {
+  const missing = makePackage(['light'])
+  delete missing.documents.light
+  expect(() => resolveThemeSlots(missing, 'light')).toThrow(/missing/i)
+
+  const wrongType = makePackage(['light'])
+  wrongType.documents.light.color.primary.$type = 'string'
+  expect(() => resolveThemeSlots(wrongType, 'light')).toThrow(/not a color/i)
+
+  const invalidColor = makePackage(['light'])
+  invalidColor.documents.light.color.primary.$value = 'rgb(1, 2, 3)'
+  expect(() => resolveThemeSlots(invalidColor, 'light')).toThrow(/unsupported color/i)
+})
+
 test('stored panel values remain overrides until theme defaults are adopted', () => {
   expect(resolvePanelValue('#ffffff', '#fa00aa', false)).toBe('#fa00aa')
   expect(resolvePanelValue('var(--yin-text)', '#fa00aa', true)).toBe('var(--yin-text)')

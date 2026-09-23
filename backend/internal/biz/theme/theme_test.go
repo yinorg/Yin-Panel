@@ -5,8 +5,11 @@ import (
 	"bytes"
 	"crypto/ed25519"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -49,6 +52,23 @@ func TestValidationRejectsWrongBoundType(t *testing.T) {
 	pkg.Documents["light"] = content
 	if err := Validate(pkg); err == nil {
 		t.Fatal("expected bound type failure")
+	}
+}
+
+func TestValidationRejectsReferenceTypeMismatch(t *testing.T) {
+	pkg := Builtin()
+	var doc map[string]any
+	if err := json.Unmarshal(pkg.Documents["light"], &doc); err != nil {
+		t.Fatal(err)
+	}
+	doc["invalid"] = map[string]any{"$type": "string", "reference": map[string]any{"$value": "{color.primary}"}}
+	content, err := json.Marshal(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pkg.Documents["light"] = content
+	if err := Validate(pkg); err == nil || !strings.Contains(err.Error(), "changes token type") {
+		t.Fatalf("expected reference type mismatch rejection, got %v", err)
 	}
 }
 
@@ -142,6 +162,69 @@ func TestArchiveRejectsIncompatibleMetadata(t *testing.T) {
 	}
 }
 
+func TestArchiveRejectsInvalidManifestBindingsAndSchemes(t *testing.T) {
+	tests := []struct {
+		name   string
+		mutate func(*Package)
+	}{
+		{name: "api version", mutate: func(pkg *Package) { pkg.Manifest.APIVersion = "2" }},
+		{name: "missing slot", mutate: func(pkg *Package) { delete(pkg.Manifest.Bindings, "focusRing") }},
+		{name: "unknown pointer", mutate: func(pkg *Package) { pkg.Manifest.Bindings["focusRing"] = "/color/missing" }},
+		{name: "unsupported scheme", mutate: func(pkg *Package) { pkg.Manifest.Schemes = []string{"contrast"} }},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pkg := Builtin()
+			pkg.Manifest.ID = "test.invalid"
+			pkg.Manifest.Name = "Invalid Theme"
+			tt.mutate(pkg)
+			if _, err := ParseArchive(archivePackage(t, pkg, nil), true); err == nil {
+				t.Fatal("invalid manifest was accepted")
+			}
+		})
+	}
+}
+
+func TestArchiveRejectsFileCountAndExpandedSizeLimits(t *testing.T) {
+	t.Run("file count", func(t *testing.T) {
+		var buf bytes.Buffer
+		w := zip.NewWriter(&buf)
+		for i := 0; i < 65; i++ {
+			entry, err := w.Create(fmt.Sprintf("extra/%d", i))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := entry.Write([]byte("x")); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := w.Close(); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := ParseArchive(buf.Bytes(), true); err == nil || !strings.Contains(err.Error(), "too many files") {
+			t.Fatalf("expected file count rejection, got %v", err)
+		}
+	})
+
+	t.Run("expanded size", func(t *testing.T) {
+		var buf bytes.Buffer
+		w := zip.NewWriter(&buf)
+		entry, err := w.Create("large")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := entry.Write(make([]byte, MaxExpanded+1)); err != nil {
+			t.Fatal(err)
+		}
+		if err := w.Close(); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := ParseArchive(buf.Bytes(), true); err == nil || !strings.Contains(err.Error(), "expanded theme archive") {
+			t.Fatalf("expected expanded size rejection, got %v", err)
+		}
+	})
+}
+
 func TestArchiveRejectsResourceDigestMismatch(t *testing.T) {
 	pkg := Builtin()
 	pkg.Manifest.ID = "test.digest"
@@ -200,6 +283,85 @@ func TestThemeSchemaMigrationAndRemovalFallback(t *testing.T) {
 	if err != nil || preference.PackageID != "org.yin.default" || preference.Mode != "dark" {
 		t.Fatalf("user fallback = %#v, err=%v", preference, err)
 	}
+}
+
+func TestThemeMigrationPreservesExistingDatabaseRows(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open("file:themes-existing?mode=memory&cache=shared"), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Exec("CREATE TABLE legacy_user_data (id INTEGER PRIMARY KEY, value TEXT NOT NULL)").Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Exec("INSERT INTO legacy_user_data (id, value) VALUES (1, 'preserve-me')").Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := Migrate(db); err != nil {
+		t.Fatal(err)
+	}
+	if err := EnsureBuiltin(db); err != nil {
+		t.Fatal(err)
+	}
+	var value string
+	if err := db.Raw("SELECT value FROM legacy_user_data WHERE id = 1").Scan(&value).Error; err != nil {
+		t.Fatal(err)
+	}
+	if value != "preserve-me" {
+		t.Fatalf("existing row changed during theme migration: %q", value)
+	}
+}
+
+func TestUpgradeRollsBackPackageAndAssetsWhenAuditFails(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open("file:themes-atomic?mode=memory&cache=shared"), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := Migrate(db); err != nil {
+		t.Fatal(err)
+	}
+	if err := EnsureBuiltin(db); err != nil {
+		t.Fatal(err)
+	}
+	oldAsset := []byte("old asset")
+	newAsset := []byte("new asset")
+	old := packageWithAsset("test.atomic", "1.0.0", oldAsset)
+	if err := Install(db, 1, old); err != nil {
+		t.Fatal(err)
+	}
+	var oldRecord PackageRecord
+	if err := db.First(&oldRecord, "id = ?", old.Manifest.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Exec("CREATE TRIGGER fail_theme_audit BEFORE INSERT ON audit_records BEGIN SELECT RAISE(ABORT, 'audit unavailable'); END").Error; err != nil {
+		t.Fatal(err)
+	}
+	next := packageWithAsset("test.atomic", "1.0.1", newAsset)
+	setTokenValue(t, next, "light", "primary", "#006064")
+	if err := Install(db, 1, next); err == nil {
+		t.Fatal("upgrade succeeded despite an audit failure")
+	}
+	var stored PackageRecord
+	if err := db.First(&stored, "id = ?", old.Manifest.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if stored.Version != "1.0.0" || stored.AssetVersion != oldRecord.AssetVersion {
+		t.Fatalf("failed upgrade changed package record: before=%#v after=%#v", oldRecord, stored)
+	}
+	asset, err := Asset(db, old.Manifest.ID, oldRecord.AssetVersion, "assets/logo.png")
+	if err != nil || string(asset.Content) != string(oldAsset) {
+		t.Fatalf("failed upgrade changed package asset: content=%q err=%v", asset.Content, err)
+	}
+}
+
+func packageWithAsset(id, version string, content []byte) *Package {
+	pkg := Builtin()
+	pkg.Manifest.ID = id
+	pkg.Manifest.Name = "Atomic Theme"
+	pkg.Manifest.PackageVersion = version
+	sum := sha256.Sum256(content)
+	pkg.Manifest.Resources = []Resource{{Path: "assets/logo.png", SHA256: hex.EncodeToString(sum[:]), MediaType: "image/png"}}
+	pkg.Resources = map[string]ResourceData{"assets/logo.png": {MediaType: "image/png", Content: content}}
+	return pkg
 }
 
 func archiveFor(t *testing.T, private ed25519.PrivateKey) []byte {

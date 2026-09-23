@@ -54,7 +54,10 @@ export const t = i18n.global.t
 // 后面有时间调整
 export function setLocale(locale: string) {
   const resolvedLocale = locale === 'auto' ? resolveBrowserLocale() : locale
-  i18n.global.locale = (supportedLocales as readonly string[]).includes(resolvedLocale) ? resolvedLocale as SupportedLocale : defaultLocale
+  const activeLocale = (supportedLocales as readonly string[]).includes(resolvedLocale) ? resolvedLocale as SupportedLocale : defaultLocale
+  i18n.global.locale = activeLocale
+  if (typeof document !== 'undefined')
+    document.documentElement.lang = activeLocale
 }
 
 export function setupI18n(app: App) {
