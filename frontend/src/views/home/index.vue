@@ -9,6 +9,7 @@ import { replaceOrAppendKeywordToUrl, searchEngineList, type SearchEngine } from
 import SvgIcon from '../../components/common/SvgIcon/index.vue'
 import AppIcon from './components/AppIcon/index.vue'
 import CommandCenter from './components/CommandCenter/index.vue'
+import WallpaperLayer from './components/WallpaperLayer.vue'
 import { deleteItem, sortItems } from '@/api/panel/space'
 
 import { setTitle } from '@/utils/cmn'
@@ -35,7 +36,10 @@ const ms = useMessage()
 const dialog = useDialog()
 const panelState = usePanelState()
 const authStore = useAuthStore()
-const panelIconTextColor = computed(() => resolvePanelValue('var(--yin-text)', panelState.panelConfig.iconTextColor, !!panelState.panelConfig.useThemeDefaults))
+const previewThemeDefaults = new URLSearchParams(window.location.search).has('themePreview')
+const useThemeDefaults = computed(() => previewThemeDefaults || !!panelState.panelConfig.useThemeDefaults)
+const useThemeColors = computed(() => useThemeDefaults.value || panelState.panelConfig.wallpaperMode === 'theme')
+const panelIconTextColor = computed(() => resolvePanelValue('var(--yin-text)', panelState.panelConfig.iconTextColor, useThemeDefaults.value))
 
 const scrollContainerRef = ref<HTMLElement | undefined>(undefined)
 
@@ -89,13 +93,6 @@ const collapsedGroups = ref<Set<number>>(new Set())
 const publicCode = parsePublicCodeFromPath()
 const publicAccessCode = ref('')
 const publicAccessReady = ref(!publicCode || !!sessionStorage.getItem(`yin-panel-public-access:${publicCode}`))
-
-function getBackgroundImageSrc() {
-  const source = panelState.panelConfig.backgroundImageSrc
-  if (!isOnline.value && source !== '/assets/bg-forest.jpg' && source !== '/assets/bg-forest.webp')
-    return '/assets/bg-forest.webp'
-  return source === '/assets/bg-forest.jpg' ? '/assets/bg-forest.webp' : source
-}
 
 const sessionOnlyCache = !!publicCode
 function getCachedSpace(spaceId: number) { return readSpaceCache(spaceId, authStore.userInfo?.id, sessionOnlyCache) }
@@ -766,7 +763,7 @@ function handleAddItem(itemIconGroupId?: number) {
 </script>
 
 <template>
-  <div class="w-full h-full sun-main" :class="{ 'side-switching': sideSwitching, 'theme-defaults': panelState.panelConfig.useThemeDefaults }">
+  <div class="w-full h-full sun-main" :class="{ 'side-switching': sideSwitching, 'theme-defaults': useThemeColors }">
     <CommandCenter
       :visible="commandCenterVisible"
       :query="commandCenterQuery"
@@ -831,15 +828,7 @@ function handleAddItem(itemIconGroupId?: number) {
         <span v-if="cacheUpdatedAt" data-testid="offline-cache-updated">{{ $t('panelHome.cacheUpdatedAt', { time: new Date(cacheUpdatedAt).toLocaleString() }) }}</span>
       </template>
     </div>
-    <div
-      v-if="homeReady && !panelState.panelConfig.useThemeDefaults" class="cover wallpaper" :style="{
-        filter: panelState.panelConfig.backgroundBlur ? `blur(${panelState.panelConfig.backgroundBlur}px)` : 'none',
-        background: `url(${getBackgroundImageSrc()}) no-repeat`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-      }"
-    />
-    <div v-if="homeReady && !panelState.panelConfig.useThemeDefaults" class="mask" :style="{ backgroundColor: `rgba(0,0,0,${panelState.panelConfig.backgroundMaskNumber})` }" />
+    <WallpaperLayer v-if="homeReady" />
     <div v-if="offlineUnavailable" class="offline-unavailable" data-testid="offline-unavailable">
       <NCard :title="$t('panelHome.offlineUnavailable')" size="small">
         <NSpace vertical>
@@ -852,9 +841,9 @@ function handleAddItem(itemIconGroupId?: number) {
       <div
         class="p-2.5 mx-auto"
         :style="{
-          marginTop: `${panelState.panelConfig.marginTop}%`,
-          marginBottom: `${panelState.panelConfig.marginBottom}%`,
-          maxWidth: (panelState.panelConfig.maxWidth ?? '1200') + panelState.panelConfig.maxWidthUnit,
+          marginTop: resolvePanelValue('var(--yin-spaceLg)', `${panelState.panelConfig.marginTop}%`, useThemeDefaults),
+          marginBottom: resolvePanelValue('var(--yin-spaceLg)', `${panelState.panelConfig.marginBottom}%`, useThemeDefaults),
+          maxWidth: resolvePanelValue('var(--yin-contentMaxWidth)', `${panelState.panelConfig.maxWidth ?? 1200}${panelState.panelConfig.maxWidthUnit}`, useThemeDefaults),
         }"
       >
         <!-- 头 -->
@@ -884,7 +873,7 @@ function handleAddItem(itemIconGroupId?: number) {
             'home-content--with-monitor': monitorEnabled && panelState.panelConfig.systemMonitorShow,
             'home-content--monitor-info': monitorEnabled && panelState.panelConfig.systemMonitorShow && panelState.panelConfig.iconStyle === PanelPanelConfigStyleEnum.info,
           }"
-          :style="{ marginLeft: `${panelState.panelConfig.marginX}px`, marginRight: `${panelState.panelConfig.marginX}px` }"
+          :style="{ marginLeft: resolvePanelValue('var(--yin-pageGutter)', `${panelState.panelConfig.marginX}px`, useThemeDefaults), marginRight: resolvePanelValue('var(--yin-pageGutter)', `${panelState.panelConfig.marginX}px`, useThemeDefaults) }"
         >
           <!-- 系统监控状态 -->
           <div
@@ -1339,9 +1328,8 @@ html {
   transform: scale(1.05);
 }
 
-.home-content {
-  position: relative;
-}
+.home-content { position: relative; }
+:global(:root[data-yin-layout='split']) .home-content { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: var(--yin-spaceLg); }
 
 .home-content--with-monitor {
   padding-top: 190px;
@@ -1357,7 +1345,7 @@ html {
   top: 0;
   left: 0;
   right: 0;
-  max-width: 1200px;
+  max-width: var(--yin-contentMaxWidth);
   max-height: 210px;
   box-sizing: border-box;
   margin: 0 auto;
@@ -1389,16 +1377,16 @@ html {
 .icon-info-box {
   width: 100%;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 18px;
+  grid-template-columns: repeat(var(--yin-activeColumns), minmax(0, 1fr));
+  gap: var(--yin-spaceLg);
 
 }
 
 .icon-small-box {
   width: 100%;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(75px, 1fr));
-  gap: 18px;
+  grid-template-columns: repeat(var(--yin-activeColumns), minmax(0, 1fr));
+  gap: var(--yin-spaceLg);
 
 }
 

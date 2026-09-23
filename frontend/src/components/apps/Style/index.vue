@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import type { UploadFileInfo } from 'naive-ui'
-import { NButton, NCard, NColorPicker, NGrid, NGridItem, NInput, NInputGroup, NPopconfirm, NSelect, NSlider, NSwitch, NUpload, NUploadDragger, useMessage } from 'naive-ui'
+import { NButton, NCard, NColorPicker, NGrid, NGridItem, NInput, NInputGroup, NModal, NPopconfirm, NSelect, NSlider, NSwitch, NUpload, NUploadDragger, useMessage } from 'naive-ui'
 import { set as setUserConfig } from '../../../api/panel/userConfig'
 import { useAuthStore, usePanelState } from '@/store'
 import { PanelPanelConfigStyleEnum } from '@/enums'
@@ -10,13 +10,13 @@ import { getEnableStatus } from '@/api/system/systemMonitor'
 import { getSearchConfig, getSpaces, setSearchConfig, spaceDisplayName, type Space, type SpaceSearchConfig } from '@/api/panel/space'
 import { readSpaceCache, writeSpaceCache } from '@/utils/spaceCache'
 import { searchEngineList } from '@/components/deskModule/SearchBox/engines'
-import { getThemePackages, installThemePackage, removeThemePackage, setInstanceDefaultTheme } from '@/api/theme'
+import { getThemePackage, getThemePackages, installThemePackage, previewThemePackage, removeThemePackage, setInstanceDefaultTheme, uploadWebWallpaper } from '@/api/theme'
+import type { ThemePackage } from '@/utils/theme'
 import { activeThemePackageId } from '@/hooks/useTheme'
 
 const authStore = useAuthStore()
 const panelState = usePanelState()
 const ms = useMessage()
-const showWallpaperInput = ref(false)
 const monitorEnabled = ref(false)
 const spaces = ref<Space[]>([])
 const selectedSearchSpaceId = ref<number | null>(null)
@@ -26,6 +26,33 @@ const themeFileInput = ref<HTMLInputElement | null>(null)
 const themePackages = ref<Array<{ id: string; name: string; version: string; verified: boolean }>>([])
 const defaultThemeId = ref('')
 const themeSaving = ref(false)
+const previewFile = ref<File | null>(null)
+const previewToken = ref('')
+const previewPackage = ref<ThemePackage | null>(null)
+const previewVisible = ref(false)
+const previewPage = ref<'home' | 'login'>('home')
+const previewDevice = ref<'desktop' | 'mobile'>('desktop')
+const previewMode = ref<'light' | 'dark'>('light')
+const webWallpaperInput = ref<HTMLInputElement | null>(null)
+const previewURL = computed(() => `${previewPage.value === 'login' ? '/login' : '/'}?themePreview=${encodeURIComponent(previewToken.value)}&themePreviewMode=${previewMode.value}`)
+const previewRemoteDomains = computed(() => Object.values(previewPackage.value?.manifest.wallpapers || {})
+  .filter(item => item.kind === 'externalUrl')
+  .map(item => new URL(item.source).hostname))
+const wallpaperModeOptions = computed(() => [
+  { label: t('themeWallpaper.follow'), value: 'theme' },
+  { label: t('themeWallpaper.custom'), value: 'custom' },
+  { label: t('themeWallpaper.none'), value: 'none' },
+])
+const wallpaperKindOptions = computed(() => [
+  { label: t('themeWallpaper.image'), value: 'image' },
+  { label: t('themeWallpaper.video'), value: 'video' },
+  { label: t('themeWallpaper.web'), value: 'webBundle' },
+  { label: t('themeWallpaper.external'), value: 'externalUrl' },
+])
+watch(() => panelState.panelConfig.wallpaperMode, (mode) => {
+  if (mode === 'custom' && !panelState.panelConfig.wallpaperKind)
+    panelState.panelConfig.wallpaperKind = 'image'
+}, { immediate: true })
 const isAdmin = computed(() => authStore.userInfo?.role === 1)
 const themeOptions = computed(() => themePackages.value.map(item => ({ label: `${item.name} (${item.version})`, value: item.id })))
 
@@ -46,6 +73,7 @@ async function uploadThemePackage(file?: File, confirmed = false): Promise<void>
       return uploadThemePackage(file, true)
   }
   else if (result.code === 0) {
+    previewVisible.value = false
     ms.success(t('themePackage.installed'))
     await loadThemePackages()
     if (activeThemePackageId.value === result.data?.id)
@@ -56,10 +84,33 @@ async function uploadThemePackage(file?: File, confirmed = false): Promise<void>
   }
 }
 
+async function prepareThemePackage(file?: File) {
+  if (!file) return
+  const result = await previewThemePackage(file)
+  if (result.code !== 0 || !result.data) {
+    ms.error(result.msg)
+    return
+  }
+  previewFile.value = file
+  previewToken.value = result.data.token
+  previewPackage.value = result.data.package
+  previewVisible.value = true
+}
+
 async function saveDefaultTheme() {
   themeSaving.value = true
   try {
-    const { code, msg } = await setInstanceDefaultTheme(defaultThemeId.value)
+    const detail = await getThemePackage(defaultThemeId.value)
+    if (detail.code !== 0) {
+      ms.error(t('themeWallpaper.loadFailed'))
+      return
+    }
+    const hosts = Object.values(detail.data.manifest.wallpapers || {})
+      .filter(item => item.kind === 'externalUrl')
+      .map(item => new URL(item.source).hostname)
+    if (hosts.length && !window.confirm(t('themeWallpaper.confirmExternal', { hosts: [...new Set(hosts)].join(', ') })))
+      return
+    const { code, msg } = await setInstanceDefaultTheme(defaultThemeId.value, hosts.length > 0)
     if (code === 0) {
       ms.success(t('themePackage.saved'))
       window.location.reload()
@@ -213,7 +264,25 @@ function handleUploadBackgroundFinish({
 }) {
   const res = JSON.parse((event?.target as XMLHttpRequest).response)
   panelState.panelConfig.backgroundImageSrc = res.data.imageUrl
+  panelState.panelConfig.wallpaperMode = 'custom'
+  panelState.panelConfig.wallpaperKind = /\.(mp4|webm)$/i.test(file.name) ? 'video' : 'image'
+  panelState.panelConfig.wallpaperSource = res.data.imageUrl
+  panelState.panelConfig.wallpaperPoster = panelState.panelConfig.wallpaperKind === 'video' ? '/assets/bg-forest.webp' : res.data.imageUrl
   return file
+}
+
+async function handleWebWallpaper(file?: File) {
+  if (!file) return
+  const result = await uploadWebWallpaper(file)
+  if (result.code !== 0 || !result.data) {
+    ms.error(result.msg)
+    return
+  }
+  panelState.panelConfig.wallpaperMode = 'custom'
+  panelState.panelConfig.wallpaperKind = 'webBundle'
+  panelState.panelConfig.wallpaperSource = result.data.source
+  panelState.panelConfig.wallpaperPoster = result.data.poster
+  uploadCloud()
 }
 
 function uploadCloud() {
@@ -253,7 +322,7 @@ function adoptThemeDefaults() {
     <NCard v-if="isAdmin" size="small">
       <div class="text-slate-500 mb-2 font-bold">{{ $t('themePackage.title') }}</div>
       <div class="flex flex-wrap items-center gap-2">
-        <input ref="themeFileInput" type="file" accept=".yin-theme,.zip" class="hidden" @change="uploadThemePackage(($event.target as HTMLInputElement).files?.[0]); ($event.target as HTMLInputElement).value = ''">
+        <input ref="themeFileInput" type="file" accept=".yin-theme,.zip" class="hidden" @change="prepareThemePackage(($event.target as HTMLInputElement).files?.[0]); ($event.target as HTMLInputElement).value = ''">
         <NButton size="small" @click="themeFileInput?.click()">{{ $t('themePackage.install') }}</NButton>
         <NSelect v-model:value="defaultThemeId" :options="themeOptions" class="min-w-[220px] flex-1" />
         <NButton size="small" type="primary" :loading="themeSaving" @click="saveDefaultTheme">{{ $t('themePackage.setDefault') }}</NButton>
@@ -265,6 +334,21 @@ function adoptThemeDefaults() {
         </div>
       </div>
     </NCard>
+    <NModal v-model:show="previewVisible" preset="card" :title="$t('themeWallpaper.preview')" style="width: min(96vw, 1280px)">
+      <div class="flex flex-wrap items-center gap-2 mb-3">
+        <span>{{ previewPackage?.manifest.name }} · {{ previewPackage?.manifest.packageVersion }} · {{ previewPackage?.verified ? $t('themePackage.verified') : $t('themePackage.unverified') }}</span>
+        <NSelect v-model:value="previewPage" :options="[{ label: $t('themeWallpaper.home'), value: 'home' }, { label: $t('themeWallpaper.login'), value: 'login' }]" style="width: 130px" />
+        <NSelect v-model:value="previewDevice" :options="[{ label: $t('themeWallpaper.desktop'), value: 'desktop' }, { label: $t('themeWallpaper.mobile'), value: 'mobile' }]" style="width: 130px" />
+        <NSelect v-model:value="previewMode" :options="[{ label: $t('themeWallpaper.light'), value: 'light' }, { label: $t('themeWallpaper.dark'), value: 'dark' }]" style="width: 110px" />
+        <NButton type="primary" @click="uploadThemePackage(previewFile || undefined)">{{ $t('themePackage.install') }}</NButton>
+      </div>
+      <div v-if="previewRemoteDomains.length" class="mb-2 text-sm">
+        {{ $t('themeWallpaper.remoteDomain') }}: {{ previewRemoteDomains.join(', ') }}
+      </div>
+      <div class="flex justify-center overflow-auto bg-neutral-800 p-2">
+        <iframe :key="previewURL + previewDevice" :src="previewURL" :title="$t('themeWallpaper.preview')" :style="{ width: previewDevice === 'mobile' ? '390px' : '100%', height: 'min(70vh, 700px)', border: '0', background: '#fff', flexShrink: 0 }" />
+      </div>
+    </NModal>
     <NCard style="border-radius:10px" size="small">
       <div class="text-slate-500 mb-[5px] font-bold">
         LOGO
@@ -429,7 +513,10 @@ function adoptThemeDefaults() {
       <div class="text-slate-500 mb-[5px] font-bold">
         {{ $t('apps.baseSettings.wallpaper') }}
       </div>
+      <NSelect v-model:value="panelState.panelConfig.wallpaperMode" :options="wallpaperModeOptions" class="mb-2" />
+      <NSelect v-if="panelState.panelConfig.wallpaperMode === 'custom'" v-model:value="panelState.panelConfig.wallpaperKind" :options="wallpaperKindOptions" class="mb-2" />
       <NUpload
+        v-if="panelState.panelConfig.wallpaperMode === 'custom' && (panelState.panelConfig.wallpaperKind === 'image' || panelState.panelConfig.wallpaperKind === 'video')"
         action="/api/file/uploadImg"
         :show-file-list="false"
         name="imgfile"
@@ -437,12 +524,13 @@ function adoptThemeDefaults() {
           Authorization: `Bearer ${authStore.token}`,
         }"
         :directory-dnd="true"
+        :accept="panelState.panelConfig.wallpaperKind === 'video' ? '.mp4,.webm' : '.png,.jpg,.jpeg,.gif,.webp'"
         @finish="handleUploadBackgroundFinish"
       >
         <NUploadDragger style="width: 100%;">
           <div
             class="h-[200px] w-full border bg-slate-100 flex justify-center items-center cursor-pointer rounded-[10px]"
-            :style="{ background: `url(${panelState.panelConfig.backgroundImageSrc}) no-repeat`, backgroundSize: 'cover' }"
+            :style="{ background: `url(${panelState.panelConfig.wallpaperPoster || panelState.panelConfig.backgroundImageSrc}) no-repeat`, backgroundSize: 'cover' }"
           >
             <div class="text-shadow text-white">
               {{ $t('apps.baseSettings.uploadOrDragText') }}
@@ -450,14 +538,20 @@ function adoptThemeDefaults() {
           </div>
         </NUploadDragger>
       </NUpload>
-
-      <div class="flex items-center mt-[5px]">
-        <span class="mr-[10px]">{{ $t('apps.baseSettings.customImageAddress') }}</span>
-        <NSwitch v-model:value="showWallpaperInput" />
-      </div>
-      <div v-if="showWallpaperInput" class="mt-1">
-        <NInput v-model:value="panelState.panelConfig.backgroundImageSrc" type="text" size="small" clearable />
-      </div>
+      <template v-if="panelState.panelConfig.wallpaperMode === 'custom'">
+        <div v-if="panelState.panelConfig.wallpaperKind === 'webBundle'" class="mt-2">
+          <input ref="webWallpaperInput" type="file" accept=".yin-wallpaper,.zip" class="hidden" @change="handleWebWallpaper(($event.target as HTMLInputElement).files?.[0]); ($event.target as HTMLInputElement).value = ''">
+          <NButton size="small" @click="webWallpaperInput?.click()">{{ $t('themeWallpaper.uploadWeb') }}</NButton>
+        </div>
+        <div v-else class="mt-2">
+          <div class="mb-1">{{ $t('themeWallpaper.source') }}</div>
+          <NInput v-model:value="panelState.panelConfig.wallpaperSource" type="text" size="small" clearable />
+        </div>
+        <div v-if="panelState.panelConfig.wallpaperKind === 'video' || panelState.panelConfig.wallpaperKind === 'externalUrl'" class="mt-2">
+          <div class="mb-1">{{ $t('themeWallpaper.poster') }}</div>
+          <NInput v-model:value="panelState.panelConfig.wallpaperPoster" type="text" size="small" clearable />
+        </div>
+      </template>
 
       <div class="flex items-center mt-[10px]">
         <span class="mr-[10px]">{{ $t('apps.baseSettings.vague') }}</span>

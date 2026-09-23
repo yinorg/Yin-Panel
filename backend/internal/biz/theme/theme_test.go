@@ -167,7 +167,7 @@ func TestArchiveRejectsInvalidManifestBindingsAndSchemes(t *testing.T) {
 		name   string
 		mutate func(*Package)
 	}{
-		{name: "api version", mutate: func(pkg *Package) { pkg.Manifest.APIVersion = "2" }},
+		{name: "api version", mutate: func(pkg *Package) { pkg.Manifest.APIVersion = "3" }},
 		{name: "missing slot", mutate: func(pkg *Package) { delete(pkg.Manifest.Bindings, "focusRing") }},
 		{name: "unknown pointer", mutate: func(pkg *Package) { pkg.Manifest.Bindings["focusRing"] = "/color/missing" }},
 		{name: "unsupported scheme", mutate: func(pkg *Package) { pkg.Manifest.Schemes = []string{"contrast"} }},
@@ -407,4 +407,108 @@ func archivePackage(t *testing.T, pkg *Package, private ed25519.PrivateKey) []by
 		t.Fatal(err)
 	}
 	return buf.Bytes()
+}
+
+func TestV1PackageStillInstalls(t *testing.T) {
+	pkg := Builtin()
+	pkg.Manifest.ID = "test.legacy-theme"
+	pkg.Manifest.APIVersion = "1"
+	pkg.Manifest.PackageVersion = "1.0.0"
+	for slot := range v2Slots {
+		delete(pkg.Manifest.Bindings, slot)
+	}
+	installed, err := ParseArchive(archivePackage(t, pkg, nil), true)
+	if err != nil || installed.Manifest.APIVersion != "1" {
+		t.Fatalf("v1 package rejected: %v", err)
+	}
+}
+
+func TestV2DesignBindingsRejectBadValues(t *testing.T) {
+	pkg := Builtin()
+	var doc map[string]any
+	if err := json.Unmarshal(pkg.Documents["light"], &doc); err != nil {
+		t.Fatal(err)
+	}
+	doc["design"].(map[string]any)["controlHeight"].(map[string]any)["$value"] = map[string]any{"value": 10, "unit": "px"}
+	pkg.Documents["light"], _ = json.Marshal(doc)
+	if err := Validate(pkg); err == nil || !strings.Contains(err.Error(), "controlHeight") {
+		t.Fatalf("invalid component height accepted: %v", err)
+	}
+}
+
+func TestExternalWallpaperNeedsPosterAndAdminConfirmation(t *testing.T) {
+	pkg := Builtin()
+	pkg.Manifest.ID = "test.remote-wallpaper"
+	pkg.Manifest.Name = "Remote Wallpaper"
+	poster := []byte("\x89PNG\r\n\x1a\nposter")
+	sum := sha256.Sum256(poster)
+	pkg.Manifest.Resources = []Resource{{Path: "wallpaper/poster.png", SHA256: hex.EncodeToString(sum[:]), MediaType: "image/png"}}
+	pkg.Resources = map[string]ResourceData{"wallpaper/poster.png": {MediaType: "image/png", Content: poster}}
+	pkg.Manifest.Wallpapers = map[string]Wallpaper{
+		"light": {Kind: "externalUrl", Source: "https://example.test/wallpaper", Poster: "wallpaper/poster.png"},
+		"dark":  {Kind: "externalUrl", Source: "https://example.test/wallpaper", Poster: "wallpaper/poster.png"},
+	}
+	if _, err := ParseArchive(archivePackage(t, pkg, nil), true); err != nil {
+		t.Fatalf("valid external wallpaper rejected: %v", err)
+	}
+	db, err := gorm.Open(sqlite.Open("file:remote-wallpaper?mode=memory&cache=shared"), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := Migrate(db); err != nil {
+		t.Fatal(err)
+	}
+	if err := EnsureBuiltin(db); err != nil {
+		t.Fatal(err)
+	}
+	if err := Install(db, 1, pkg); err != nil {
+		t.Fatal(err)
+	}
+	if err := SetDefault(db, 1, pkg.Manifest.ID); err == nil || !strings.Contains(err.Error(), "confirmation") {
+		t.Fatalf("unconfirmed remote default accepted: %v", err)
+	}
+	if err := SetDefaultConfirmed(db, 1, pkg.Manifest.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	id, err := DefaultID(db)
+	if err != nil || id != pkg.Manifest.ID {
+		t.Fatalf("remote default was not stored: %q %v", id, err)
+	}
+	pkg.Manifest.Wallpapers["dark"] = Wallpaper{Kind: "externalUrl", Source: "javascript:alert(1)", Poster: "wallpaper/poster.png"}
+	if _, err := ParseArchive(archivePackage(t, pkg, nil), true); err == nil {
+		t.Fatal("unsafe external URL accepted")
+	}
+}
+
+func TestWebWallpaperPackage(t *testing.T) {
+	var buffer bytes.Buffer
+	writer := zip.NewWriter(&buffer)
+	for name, content := range map[string][]byte{
+		"index.html": []byte("<!doctype html><canvas></canvas><script>document.querySelector('canvas').width=2</script>"),
+		"poster.png": []byte("\x89PNG\r\n\x1a\nposter"),
+	} {
+		entry, err := writer.Create(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, _ = entry.Write(content)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	db, err := gorm.Open(sqlite.Open("file:web-wallpaper?mode=memory&cache=shared"), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := Migrate(db); err != nil {
+		t.Fatal(err)
+	}
+	record, err := SaveWebWallpaper(db, 7, buffer.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+	mediaType, content, err := WebWallpaperAsset(db, record.ID, "index.html")
+	if err != nil || mediaType != "text/html" || !bytes.Contains(content, []byte("<canvas>")) {
+		t.Fatalf("stored web wallpaper cannot be served: %s %v", mediaType, err)
+	}
 }

@@ -10,12 +10,20 @@ export function getCurrentTheme() {
   return request.get<{ code: number; data: ThemePackage }>('/theme/current').then(res => res.data)
 }
 
+export function getPreviewTheme(token: string) {
+  return request.get<{ code: number; data: ThemePackage }>(`/theme/preview/${encodeURIComponent(token)}`).then(res => res.data)
+}
+
 export function getMyTheme() {
   return request.get<{ code: number; data: { package: ThemePackage; preference: ThemePreference } }>('/theme/mine').then(res => res.data)
 }
 
 export function getInstalledThemes() {
   return request.get<{ code: number; data: Array<{ id: string; name: string; version: string; verified: boolean }> }>('/theme/packages').then(res => res.data)
+}
+
+export function getThemePackage(id: string) {
+  return request.get<{ code: number; data: ThemePackage }>(`/theme/packages/${encodeURIComponent(id)}`).then(res => res.data)
 }
 
 export function saveThemePreference(preference: ThemePreference) {
@@ -33,8 +41,20 @@ export function installThemePackage(file: File, confirmUnverified: boolean) {
   return request.post<{ code: number; msg: string; data?: { id: string; verified: boolean } }>('/theme/admin/install', data).then(res => res.data)
 }
 
-export function setInstanceDefaultTheme(packageId: string) {
-  return request.post<{ code: number; msg: string }>('/theme/admin/default', { packageId }).then(res => res.data)
+export function previewThemePackage(file: File) {
+  const data = new FormData()
+  data.append('package', file)
+  return request.post<{ code: number; msg: string; data?: { token: string; package: ThemePackage } }>('/theme/admin/preview', data).then(res => res.data)
+}
+
+export function setInstanceDefaultTheme(packageId: string, confirmExternalWallpaper = false) {
+  return request.post<{ code: number; msg: string }>('/theme/admin/default', { packageId, confirmExternalWallpaper }).then(res => res.data)
+}
+
+export function uploadWebWallpaper(file: File) {
+  const data = new FormData()
+  data.append('package', file)
+  return request.post<{ code: number; msg: string; data?: { source: string; poster: string } }>('/theme/wallpaper/web', data).then(res => res.data)
 }
 
 export function removeThemePackage(packageId: string) {

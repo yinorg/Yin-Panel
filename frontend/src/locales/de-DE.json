@@ -123,6 +123,7 @@
     }
   },
   "themePackage": { "title": "Themenbibliothek", "label": "Themenpaket", "instanceDefault": "Instanzstandard verwenden", "install": "Paket installieren", "setDefault": "Als Instanzstandard festlegen", "verified": "Offizielle Signatur", "unverified": "Nicht verifiziert", "confirmUnverified": "Dieses Paket ist nicht von Yin signiert. Installieren Sie es nur aus einer vertrauenswürdigen Quelle.", "installed": "Theme installiert", "removed": "Theme entfernt", "saved": "Einstellung gespeichert", "adoptDefaults": "Theme-Farben verwenden", "removeConfirm": "Dieses Theme entfernen? Nutzer mit diesem Theme und der Instanzstandard wechseln zu Yin Default." },
+  "themeWallpaper": { "follow": "Theme folgen", "custom": "Benutzerdefiniert", "none": "Kein Hintergrund", "image": "Bild", "video": "Video", "web": "Lokaler Webhintergrund", "external": "Externe Website", "source": "Hintergrund-URL", "poster": "Standbild-URL", "uploadWeb": "Webhintergrund hochladen", "preview": "Theme-Vorschau", "home": "Startseite", "login": "Anmeldung", "desktop": "Desktop", "mobile": "Mobil", "light": "Hell", "dark": "Dunkel", "remoteDomain": "Externe Domain", "confirmExternal": "Dieses Theme lädt {hosts} auf der Startseite aller Nutzer. Als Standard festlegen?", "loadFailed": "Theme konnte nicht geladen werden", "wallpaperPlay": "Hintergrund abspielen", "wallpaperPause": "Hintergrund pausieren", "wallpaperInteract": "Hintergrund bedienen", "wallpaperExit": "Interaktion beenden" },
   "common": {
     "action": "Aktion",
     "add": "Hinzufügen",

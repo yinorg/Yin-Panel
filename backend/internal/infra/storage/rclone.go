@@ -3,6 +3,7 @@ package storage
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"github.com/yinorg/Yin-Panel/backend/internal/infra/zaplog"
 	"io"
@@ -25,6 +26,9 @@ type RcloneStorage struct {
 
 func (r *RcloneStorage) Exists(ctx context.Context, fileName string) (bool, error) {
 	_, err := r.fs.NewObject(ctx, fileName)
+	if errors.Is(err, fs.ErrorObjectNotFound) {
+		return false, nil
+	}
 	return err == nil, err
 }
 

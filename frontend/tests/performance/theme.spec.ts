@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { resolvePanelValue, resolveThemeSlots, selectThemeScheme, semanticSlots, type ThemePackage } from '../../src/utils/theme'
+import { designSlotTypes, resolvePanelValue, resolveThemeSlots, resolveWallpaper, selectThemeScheme, semanticSlots, type ThemePackage } from '../../src/utils/theme'
 
 const palettes: Record<string, Record<string, string>> = {
   light: { canvas: '#ffffff', surface: '#f3f6f8', surfaceElevated: '#ffffff', text: '#172126', textMuted: '#53636a', border: '#d5dfe2', primary: '#075b68', onPrimary: '#ffffff', secondary: '#8b4412', success: '#176b45', warning: '#805200', danger: '#a12627', focusRing: '#075b68' },
@@ -92,4 +92,40 @@ test('stored panel values remain overrides until theme defaults are adopted', ()
   expect(resolvePanelValue('#ffffff', '#fa00aa', false)).toBe('#fa00aa')
   expect(resolvePanelValue('var(--yin-text)', '#fa00aa', true)).toBe('var(--yin-text)')
   expect(resolvePanelValue('#ffffff', undefined, false)).toBe('#ffffff')
+})
+
+test('v2 converts typography, dimensions, shadows, and layout slots', () => {
+  const pkg = makePackage(['light'])
+  pkg.manifest.apiVersion = '2'
+  pkg.documents.light.design = {}
+  for (const [slot, type] of Object.entries(designSlotTypes)) {
+    let value: any = { value: 12, unit: 'px' }
+    if (type === 'fontFamily') value = ['Inter', 'system-ui']
+    if (type === 'fontWeight') value = 600
+    if (type === 'number') value = slot === 'homeColumns' ? 4 : 1.5
+    if (type === 'string') value = 'split'
+    if (type === 'shadow') value = { color: '#172126', offsetX: { value: 0, unit: 'px' }, offsetY: { value: 2, unit: 'px' }, blur: { value: 12, unit: 'px' }, spread: { value: 0, unit: 'px' } }
+    if (slot === 'breakpointMobile') value = { value: 640, unit: 'px' }
+    if (slot === 'breakpointTablet') value = { value: 1024, unit: 'px' }
+    pkg.documents.light.design[slot] = { $type: type, $value: value }
+    pkg.manifest.bindings[slot] = `/design/${slot}`
+  }
+  const slots = resolveThemeSlots(pkg, 'light')
+  expect(slots).toMatchObject({ fontBody: 'Inter, system-ui', controlHeight: '12px', layoutTemplate: 'split', shadowCard: '0px 2px 12px 0px #172126' })
+  pkg.documents.light.design.controlHeight.$value = { value: -1, unit: 'px' }
+  expect(() => resolveThemeSlots(pkg, 'light')).toThrow(/dimension/i)
+})
+
+test('wallpaper uses the selected scheme and versioned assets', () => {
+  const pkg = makePackage()
+  pkg.manifest.wallpapers = {
+    light: { kind: 'image', source: 'wallpaper/light.webp' },
+    dark: { kind: 'externalUrl', source: 'https://example.test/live', poster: 'wallpaper/poster.png' },
+  }
+  pkg.manifest.resources = [
+    { path: 'wallpaper/light.webp', sha256: '', mediaType: 'image/webp', url: '/assets/light-v1.webp' },
+    { path: 'wallpaper/poster.png', sha256: '', mediaType: 'image/png', url: '/assets/poster-v2.png' },
+  ]
+  expect(resolveWallpaper(pkg, 'light')).toMatchObject({ kind: 'image', source: '/assets/light-v1.webp' })
+  expect(resolveWallpaper(pkg, 'dark')).toEqual({ kind: 'externalUrl', source: 'https://example.test/live', poster: '/assets/poster-v2.png' })
 })

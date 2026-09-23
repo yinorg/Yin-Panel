@@ -31,7 +31,10 @@ export const usePanelState = defineStore('panel', {
       try {
         const res = await getUserConfig<Panel.userConfig>()
         if (res.code !== 0) return false
-        this.panelConfig = { ...defaultStatePanelConfig(), ...res.data.panel }
+        const saved = res.data.panel
+        this.panelConfig = { ...defaultStatePanelConfig(), ...saved }
+        if (!saved.wallpaperMode && saved.backgroundImageSrc)
+          this.panelConfig.wallpaperMode = 'custom'
         this.recordState()
         return true
       }

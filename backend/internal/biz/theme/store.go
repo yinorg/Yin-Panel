@@ -59,7 +59,7 @@ type PublicPackage struct {
 }
 
 func Migrate(db *gorm.DB) error {
-	return db.AutoMigrate(&PackageRecord{}, &AssetRecord{}, &Preference{}, &InstanceSettings{}, &AuditRecord{})
+	return db.AutoMigrate(&PackageRecord{}, &AssetRecord{}, &Preference{}, &InstanceSettings{}, &AuditRecord{}, &WebWallpaperRecord{})
 }
 
 func EnsureBuiltin(db *gorm.DB) error {
@@ -69,12 +69,20 @@ func EnsureBuiltin(db *gorm.DB) error {
 	return db.Transaction(func(tx *gorm.DB) error {
 		var existing PackageRecord
 		if err := tx.First(&existing, "id = ?", builtin.Manifest.ID).Error; errors.Is(err, gorm.ErrRecordNotFound) {
-			record := PackageRecord{ID: builtin.Manifest.ID, Name: builtin.Manifest.Name, Version: builtin.Manifest.PackageVersion, ManifestJSON: string(manifest), DocumentsJSON: string(documents), Verified: true}
+			record := PackageRecord{ID: builtin.Manifest.ID, Name: builtin.Manifest.Name, Version: builtin.Manifest.PackageVersion, AssetVersion: packageRevision(builtin), ManifestJSON: string(manifest), DocumentsJSON: string(documents), Verified: true}
 			if err := tx.Create(&record).Error; err != nil {
 				return err
 			}
 		} else if err != nil {
 			return err
+		} else if existing.Version != builtin.Manifest.PackageVersion || existing.ManifestJSON != string(manifest) || existing.DocumentsJSON != string(documents) {
+			if err := tx.Model(&existing).Updates(map[string]any{
+				"name": builtin.Manifest.Name, "version": builtin.Manifest.PackageVersion,
+				"asset_version": packageRevision(builtin), "manifest_json": string(manifest),
+				"documents_json": string(documents), "verified": true,
+			}).Error; err != nil {
+				return err
+			}
 		}
 		settings := InstanceSettings{ID: 1, DefaultPackage: builtin.Manifest.ID}
 		if err := tx.FirstOrCreate(&settings, InstanceSettings{ID: 1}).Error; err != nil {
@@ -215,18 +223,32 @@ func Install(db *gorm.DB, actorID uint, pkg *Package) error {
 }
 
 func SetDefault(db *gorm.DB, actorID uint, packageID string) error {
+	return SetDefaultConfirmed(db, actorID, packageID, false)
+}
+
+func SetDefaultConfirmed(db *gorm.DB, actorID uint, packageID string, confirmExternal bool) error {
 	return db.Transaction(func(tx *gorm.DB) error {
-		var count int64
-		if err := tx.Model(&PackageRecord{}).Where("id = ?", packageID).Count(&count).Error; err != nil {
+		var record PackageRecord
+		if err := tx.First(&record, "id = ?", packageID).Error; err != nil {
 			return err
 		}
-		if count == 0 {
-			return gorm.ErrRecordNotFound
+		var manifest Manifest
+		if err := json.Unmarshal([]byte(record.ManifestJSON), &manifest); err != nil {
+			return err
+		}
+		for _, wallpaper := range manifest.Wallpapers {
+			if wallpaper.Kind == "externalUrl" && !confirmExternal {
+				return errors.New("external wallpaper requires administrator confirmation")
+			}
 		}
 		if err := tx.Model(&InstanceSettings{}).Where("id = ?", 1).Update("default_package", packageID).Error; err != nil {
 			return err
 		}
-		return tx.Create(&AuditRecord{ActorID: actorID, Action: "default", PackageID: packageID}).Error
+		action := "default"
+		if confirmExternal {
+			action = "default-external"
+		}
+		return tx.Create(&AuditRecord{ActorID: actorID, Action: action, PackageID: packageID}).Error
 	})
 }
 

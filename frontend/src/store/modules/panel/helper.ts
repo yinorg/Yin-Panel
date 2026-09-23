@@ -12,6 +12,7 @@ const defaultFooterHtml = '<div class="flex justify-center text-slate-300" style
 export function defaultStatePanelConfig(): Panel.panelConfig {
   return {
     backgroundImageSrc: defaultBackground,
+    wallpaperMode: 'theme',
     backgroundBlur: 0,
     backgroundMaskNumber: 0,
     iconStyle: PanelPanelConfigStyleEnum.icon,
@@ -47,7 +48,11 @@ export function defaultState(): Panel.State {
 
 export function getLocalState(): Panel.State {
   const localState = ss.get(LOCAL_NAME)
-  return { ...defaultState(), ...localState }
+  const state = { ...defaultState(), ...localState }
+  state.panelConfig = { ...defaultStatePanelConfig(), ...localState?.panelConfig }
+  if (!localState?.panelConfig?.wallpaperMode && localState?.panelConfig?.backgroundImageSrc)
+    state.panelConfig.wallpaperMode = 'custom'
+  return state
 }
 
 export function setLocalState(state: Panel.State) {

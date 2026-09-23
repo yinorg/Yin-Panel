@@ -123,6 +123,7 @@
     }
   },
   "themePackage": { "title": "Biblioteca de temas", "label": "Paquete de tema", "instanceDefault": "Usar el tema predeterminado de la instancia", "install": "Instalar paquete", "setDefault": "Establecer predeterminado", "verified": "Firma oficial", "unverified": "Sin verificar", "confirmUnverified": "Yin no ha firmado este paquete. Instálalo solo si confías en su origen.", "installed": "Tema instalado", "removed": "Tema eliminado", "saved": "Preferencia guardada", "adoptDefaults": "Usar colores del tema", "removeConfirm": "¿Eliminar este tema? Los usuarios que lo seleccionaron y el predeterminado de la instancia volverán a Yin Default." },
+  "themeWallpaper": { "follow": "Seguir tema", "custom": "Personalizado", "none": "Sin fondo", "image": "Imagen", "video": "Vídeo", "web": "Fondo web local", "external": "Sitio externo", "source": "URL del fondo", "poster": "URL de imagen fija", "uploadWeb": "Subir paquete de fondo web", "preview": "Vista previa del tema", "home": "Inicio", "login": "Acceso", "desktop": "Escritorio", "mobile": "Móvil", "light": "Claro", "dark": "Oscuro", "remoteDomain": "Dominio externo", "confirmExternal": "Este tema cargará {hosts} en el inicio de todos los usuarios. ¿Establecerlo como predeterminado?", "loadFailed": "No se pudo cargar el tema", "wallpaperPlay": "Reproducir fondo", "wallpaperPause": "Pausar fondo", "wallpaperInteract": "Interactuar con el fondo", "wallpaperExit": "Salir de la interacción" },
   "common": {
     "action": "Aktion",
     "add": "Añadir",

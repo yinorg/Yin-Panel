@@ -7,6 +7,9 @@ body,
 body {
 	color: var(--yin-text);
 	background-color: var(--yin-canvas);
+	font-family: var(--yin-fontBody);
+	font-size: var(--yin-fontBodySize);
+	line-height: var(--yin-lineHeightBody);
 	padding-bottom: constant(safe-area-inset-bottom);
 	padding-bottom: env(safe-area-inset-bottom);
 }
@@ -25,6 +28,40 @@ body {
 	--yin-warning: #805200;
 	--yin-danger: #a12627;
 	--yin-focusRing: #075b68;
+	--yin-fontBody: Inter, system-ui, sans-serif;
+	--yin-fontDisplay: Inter, system-ui, sans-serif;
+	--yin-fontBodySize: 14px;
+	--yin-fontSmallSize: 12px;
+	--yin-fontHeadingSize: 24px;
+	--yin-fontBodyWeight: 400;
+	--yin-fontHeadingWeight: 600;
+	--yin-lineHeightBody: 1.5;
+	--yin-lineHeightHeading: 1.25;
+	--yin-spaceXs: 4px;
+	--yin-spaceSm: 8px;
+	--yin-spaceMd: 12px;
+	--yin-spaceLg: 20px;
+	--yin-spaceXl: 32px;
+	--yin-radiusControl: 4px;
+	--yin-radiusCard: 6px;
+	--yin-radiusDialog: 8px;
+	--yin-borderWidth: 1px;
+	--yin-shadowCard: 0 2px 12px #d5dfe2;
+	--yin-shadowPopup: 0 6px 24px #53636a;
+	--yin-controlHeight: 36px;
+	--yin-iconSize: 24px;
+	--yin-sidebarWidth: 280px;
+	--yin-contentMaxWidth: 1200px;
+	--yin-pageGutter: 16px;
+	--yin-homeColumns: 4;
+	--yin-activeColumns: 4;
+	--yin-activeSidebarWidth: 280px;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-family: var(--yin-fontDisplay);
+	font-weight: var(--yin-fontHeadingWeight);
+	line-height: var(--yin-lineHeightHeading);
 }
 
 :focus-visible {

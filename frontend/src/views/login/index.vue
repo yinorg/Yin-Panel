@@ -104,7 +104,7 @@ function getProviderLabel(provider: string) {
 
 <template>
   <div class="login-container">
-    <NCard class="login-card" style="border-radius: 20px;">
+    <NCard class="login-card" :style="{ borderRadius: 'var(--yin-radiusDialog)' }">
       <div class="mb-5 flex items-center justify-end">
         <div class="mr-2">
           <SvgIcon icon="ion-language" style="width: 20;height: 20;" />
@@ -172,9 +172,16 @@ function getProviderLabel(provider: string) {
         padding: 20px;
         display: flex;
         justify-content: center;
-        align-items: center;
-        height: 100vh;
+        align-items: flex-start;
+        min-height: 100vh;
+        padding-top: max(40px, 6vh);
         background-color: var(--yin-canvas);
+    }
+
+    @media (max-width: 639px) {
+      .login-container {
+        padding-top: max(8vh, 40px);
+      }
     }
 
     .login-card {

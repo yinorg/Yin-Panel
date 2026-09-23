@@ -1,6 +1,7 @@
 package system
 
 import (
+	"bytes"
 	"crypto/md5"
 	"encoding/hex"
 	"github.com/yinorg/Yin-Panel/backend/internal/constant"
@@ -15,6 +16,7 @@ import (
 	"net/http"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -47,6 +49,7 @@ func (a *FileRouter) InitPublicRouter(router *gin.RouterGroup) {
 }
 
 func (a *FileRouter) UploadImg(c *gin.Context) {
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 21<<20)
 	userInfo, exist := base.GetCurrentUserInfo(c)
 	if !exist || userInfo.ID == 0 {
 		response.ErrorByCode(c, constant.CodeNotLogin)
@@ -68,6 +71,8 @@ func (a *FileRouter) UploadImg(c *gin.Context) {
 		".webp",
 		".svg",
 		".ico",
+		".mp4",
+		".webm",
 	}
 
 	if !util.InArray(agreeExts, fileExt) {
@@ -88,6 +93,21 @@ func (a *FileRouter) UploadImg(c *gin.Context) {
 			zaplog.Logger.Errorf("Failed to close file. error : %v", err)
 		}
 	}()
+	if fileExt == ".mp4" || fileExt == ".webm" {
+		if f.Size > 20<<20 {
+			response.ErrorByCode(c, constant.CodeUploadFailed)
+			return
+		}
+		header := make([]byte, 12)
+		if _, err := io.ReadFull(src, header); err != nil || (fileExt == ".mp4" && string(header[4:8]) != "ftyp") || (fileExt == ".webm" && !bytes.Equal(header[:4], []byte("\x1a\x45\xdf\xa3"))) {
+			response.ErrorByCode(c, constant.CodeUnsupportFileFormat)
+			return
+		}
+		if _, err := src.Seek(0, io.SeekStart); err != nil {
+			response.ErrorByCode(c, constant.CodeUploadFailed)
+			return
+		}
+	}
 	hash := md5.New()
 	if _, err = io.Copy(hash, src); err != nil {
 		response.ErrorByCode(c, constant.CodeUploadFailed)
@@ -208,6 +228,12 @@ func (a *FileRouter) GetS3File(c *gin.Context) {
 		contentType = "image/gif"
 	case ".svg":
 		contentType = "image/svg+xml"
+	case ".webp":
+		contentType = "image/webp"
+	case ".mp4":
+		contentType = "video/mp4"
+	case ".webm":
+		contentType = "video/webm"
 	}
 
 	// 设置响应头
@@ -218,5 +244,9 @@ func (a *FileRouter) GetS3File(c *gin.Context) {
 
 	zaplog.Logger.Infof("Successfully serving file: %s with content type: %s", filepath, contentType)
 	// 返回文件内容
+	if contentType == "video/mp4" || contentType == "video/webm" {
+		http.ServeContent(c.Writer, c.Request, path.Base(filepath), time.Time{}, bytes.NewReader(fileData))
+		return
+	}
 	c.Data(http.StatusOK, contentType, fileData)
 }

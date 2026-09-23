@@ -41,6 +41,10 @@ declare namespace Panel {
 
     interface panelConfig{
         backgroundImageSrc?:string
+        wallpaperMode?:'theme' | 'custom' | 'none'
+        wallpaperKind?:'image' | 'video' | 'webBundle' | 'externalUrl'
+        wallpaperSource?:string
+        wallpaperPoster?:string
         backgroundBlur?:number
         backgroundMaskNumber?:number
         iconStyle?:PanelPanelConfigStyleEnum

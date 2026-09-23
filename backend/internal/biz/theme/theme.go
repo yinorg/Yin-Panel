@@ -12,18 +12,20 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"net/url"
 	"path"
 	"regexp"
 	"sort"
 	"strings"
+	"unicode/utf8"
 )
 
 const (
 	FormatVersion = 1
-	APIVersion    = "1"
+	APIVersion    = "2"
 	DTCGVersion   = "2025.10"
-	MaxArchive    = 10 << 20
-	MaxExpanded   = 20 << 20
+	MaxArchive    = 32 << 20
+	MaxExpanded   = 48 << 20
 )
 
 var requiredSlots = map[string]string{
@@ -48,18 +50,33 @@ type Resource struct {
 	URL       string `json:"url,omitempty"`
 }
 
+type Wallpaper struct {
+	Kind   string `json:"kind"`
+	Source string `json:"source"`
+	Poster string `json:"poster,omitempty"`
+}
+
+type FontResource struct {
+	Family string `json:"family"`
+	Path   string `json:"path"`
+	Weight int    `json:"weight"`
+	Style  string `json:"style"`
+}
+
 type Manifest struct {
-	Format         string            `json:"format"`
-	FormatVersion  int               `json:"formatVersion"`
-	ID             string            `json:"id"`
-	Name           string            `json:"name"`
-	PackageVersion string            `json:"packageVersion"`
-	APIVersion     string            `json:"apiVersion"`
-	DTCGVersion    string            `json:"dtcgVersion"`
-	Schemes        []string          `json:"schemes"`
-	Documents      map[string]string `json:"documents"`
-	Bindings       map[string]string `json:"bindings"`
-	Resources      []Resource        `json:"resources"`
+	Format         string               `json:"format"`
+	FormatVersion  int                  `json:"formatVersion"`
+	ID             string               `json:"id"`
+	Name           string               `json:"name"`
+	PackageVersion string               `json:"packageVersion"`
+	APIVersion     string               `json:"apiVersion"`
+	DTCGVersion    string               `json:"dtcgVersion"`
+	Schemes        []string             `json:"schemes"`
+	Documents      map[string]string    `json:"documents"`
+	Bindings       map[string]string    `json:"bindings"`
+	Resources      []Resource           `json:"resources"`
+	Wallpapers     map[string]Wallpaper `json:"wallpapers,omitempty"`
+	Fonts          []FontResource       `json:"fonts,omitempty"`
 }
 
 type Package struct {
@@ -85,7 +102,7 @@ func ParseArchive(data []byte, confirmUnverified bool) (*Package, error) {
 
 func parseArchive(data []byte, confirmUnverified bool, trustedKey ed25519.PublicKey) (*Package, error) {
 	if len(data) == 0 || len(data) > MaxArchive {
-		return nil, errors.New("theme archive must be between 1 byte and 10 MiB")
+		return nil, errors.New("theme archive must be between 1 byte and 32 MiB")
 	}
 	zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
 	if err != nil {
@@ -109,7 +126,7 @@ func parseArchive(data []byte, confirmUnverified bool, trustedKey ed25519.Public
 		}
 		expanded += int64(file.UncompressedSize64)
 		if expanded > MaxExpanded {
-			return nil, errors.New("expanded theme archive exceeds 20 MiB")
+			return nil, errors.New("expanded theme archive exceeds 48 MiB")
 		}
 		r, err := file.Open()
 		if err != nil {
@@ -124,7 +141,7 @@ func parseArchive(data []byte, confirmUnverified bool, trustedKey ed25519.Public
 			return nil, closeErr
 		}
 		if int64(len(content)) > MaxExpanded {
-			return nil, errors.New("expanded theme archive exceeds 20 MiB")
+			return nil, errors.New("expanded theme archive exceeds 48 MiB")
 		}
 		files[name] = content
 	}
@@ -176,6 +193,9 @@ func parseArchive(data []byte, confirmUnverified bool, trustedKey ed25519.Public
 	if err := Validate(pkg); err != nil {
 		return nil, err
 	}
+	if err := validateWallpaperAssets(pkg); err != nil {
+		return nil, err
+	}
 	signed := false
 	if signature, exists := files["signature.ed25519"]; exists {
 		decoded, err := base64.StdEncoding.DecodeString(strings.TrimSpace(string(signature)))
@@ -198,6 +218,46 @@ func parseArchive(data []byte, confirmUnverified bool, trustedKey ed25519.Public
 	return pkg, nil
 }
 
+func validateWallpaperAssets(pkg *Package) error {
+	for _, font := range pkg.Manifest.Fonts {
+		content := pkg.Resources[font.Path].Content
+		if len(content) < 4 || string(content[:4]) != "wOF2" {
+			return fmt.Errorf("font %q is not WOFF2", font.Path)
+		}
+	}
+	for _, wallpaper := range pkg.Manifest.Wallpapers {
+		if wallpaper.Kind != "externalUrl" && !validWallpaperBytes(pkg.Resources[wallpaper.Source]) {
+			return fmt.Errorf("wallpaper source %q has invalid content", wallpaper.Source)
+		}
+		if wallpaper.Poster != "" && !validWallpaperBytes(pkg.Resources[wallpaper.Poster]) {
+			return fmt.Errorf("wallpaper poster %q has invalid content", wallpaper.Poster)
+		}
+	}
+	return nil
+}
+
+func validWallpaperBytes(asset ResourceData) bool {
+	data := asset.Content
+	switch asset.MediaType {
+	case "image/png":
+		return len(data) >= 8 && bytes.Equal(data[:8], []byte("\x89PNG\r\n\x1a\n"))
+	case "image/jpeg":
+		return len(data) >= 3 && bytes.Equal(data[:3], []byte("\xff\xd8\xff"))
+	case "image/gif":
+		return len(data) >= 6 && (string(data[:6]) == "GIF87a" || string(data[:6]) == "GIF89a")
+	case "image/webp":
+		return len(data) >= 12 && string(data[:4]) == "RIFF" && string(data[8:12]) == "WEBP"
+	case "video/mp4":
+		return len(data) >= 12 && len(data) <= 20<<20 && string(data[4:8]) == "ftyp"
+	case "video/webm":
+		return len(data) >= 4 && len(data) <= 20<<20 && bytes.Equal(data[:4], []byte("\x1a\x45\xdf\xa3"))
+	case "text/html":
+		return len(data) > 0 && len(data) <= 5<<20 && utf8.Valid(data)
+	default:
+		return false
+	}
+}
+
 func strictJSON(data []byte, out any) error {
 	d := json.NewDecoder(bytes.NewReader(data))
 	d.DisallowUnknownFields()
@@ -212,7 +272,7 @@ func strictJSON(data []byte, out any) error {
 }
 
 func validateManifest(m Manifest) error {
-	if m.Format != "yin-theme" || m.FormatVersion != FormatVersion || m.APIVersion != APIVersion || m.DTCGVersion != DTCGVersion {
+	if m.Format != "yin-theme" || m.FormatVersion != FormatVersion || (m.APIVersion != "1" && m.APIVersion != APIVersion) || m.DTCGVersion != DTCGVersion {
 		return errors.New("unsupported theme format, package API, or DTCG version")
 	}
 	if !idPattern.MatchString(m.ID) || m.ID == "org.yin.default" || strings.TrimSpace(m.Name) == "" || len(m.Name) > 100 || !versionPattern.MatchString(m.PackageVersion) {
@@ -228,11 +288,12 @@ func validateManifest(m Manifest) error {
 		}
 		seen[scheme] = true
 	}
-	if len(m.Bindings) != len(requiredSlots) {
+	expectedSlots := slotTypes(m.APIVersion)
+	if len(m.Bindings) != len(expectedSlots) {
 		return errors.New("theme must bind every required Yin semantic slot exactly once")
 	}
 	for slot, pointer := range m.Bindings {
-		if _, ok := requiredSlots[slot]; !ok || !strings.HasPrefix(pointer, "/") {
+		if _, ok := expectedSlots[slot]; !ok || !strings.HasPrefix(pointer, "/") {
 			return fmt.Errorf("invalid semantic binding %q", slot)
 		}
 	}
@@ -243,11 +304,73 @@ func validateManifest(m Manifest) error {
 		}
 		paths[name] = true
 	}
+	resourceTypes := map[string]string{}
 	for _, resource := range m.Resources {
 		if !safePackagePath(resource.Path) || resource.URL != "" || paths[resource.Path] || len(resource.SHA256) != 64 || !regexp.MustCompile(`^[0-9a-fA-F]{64}$`).MatchString(resource.SHA256) {
 			return fmt.Errorf("invalid or duplicate resource metadata for %q", resource.Path)
 		}
 		paths[resource.Path] = true
+		resourceTypes[resource.Path] = resource.MediaType
+	}
+	if m.APIVersion == "1" && len(m.Wallpapers) != 0 {
+		return errors.New("wallpapers require theme package API v2")
+	}
+	if len(m.Fonts) > 8 {
+		return errors.New("theme contains too many font faces")
+	}
+	for _, font := range m.Fonts {
+		if !safeFontName.MatchString(font.Family) || resourceTypes[font.Path] != "font/woff2" || font.Weight < 100 || font.Weight > 900 || font.Weight%100 != 0 || (font.Style != "normal" && font.Style != "italic") {
+			return fmt.Errorf("invalid font resource %q", font.Path)
+		}
+	}
+	if len(m.Wallpapers) != 0 && len(m.Wallpapers) != len(m.Schemes) {
+		return errors.New("wallpaper defaults must cover every declared scheme")
+	}
+	for _, scheme := range m.Schemes {
+		wallpaper, exists := m.Wallpapers[scheme]
+		if !exists && len(m.Wallpapers) != 0 {
+			return fmt.Errorf("wallpaper default for %s is missing", scheme)
+		}
+		if !exists {
+			continue
+		}
+		if err := validateWallpaper(wallpaper, resourceTypes); err != nil {
+			return fmt.Errorf("wallpaper %s: %w", scheme, err)
+		}
+	}
+	return nil
+}
+
+func validateWallpaper(w Wallpaper, resources map[string]string) error {
+	if w.Source == "" {
+		return errors.New("source is required")
+	}
+	switch w.Kind {
+	case "image":
+		if !strings.HasPrefix(resources[w.Source], "image/") {
+			return errors.New("image source must be a declared image")
+		}
+	case "video":
+		if resources[w.Source] != "video/mp4" && resources[w.Source] != "video/webm" {
+			return errors.New("video source must be a declared video")
+		}
+	case "webBundle":
+		if resources[w.Source] != "text/html" {
+			return errors.New("web wallpaper source must be declared HTML")
+		}
+	case "externalUrl":
+		u, err := url.Parse(w.Source)
+		if err != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil || u.Fragment != "" || len(w.Source) > 2048 {
+			return errors.New("external wallpaper must use a plain HTTPS URL")
+		}
+	default:
+		return errors.New("unknown wallpaper kind")
+	}
+	if w.Poster == "" && w.Kind != "image" {
+		return errors.New("dynamic wallpaper requires a poster")
+	}
+	if w.Poster != "" && !strings.HasPrefix(resources[w.Poster], "image/") {
+		return errors.New("poster must be a declared image")
 	}
 	return nil
 }
@@ -257,8 +380,8 @@ func safePackagePath(name string) bool {
 }
 
 func allowedResource(mediaType, name string) bool {
-	allowed := map[string]string{"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp", "font/woff2": ".woff2"}
-	return allowed[mediaType] != "" && strings.EqualFold(path.Ext(name), allowed[mediaType])
+	allowed := map[string]string{"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp", "image/gif": ".gif", "font/woff2": ".woff2", "video/mp4": ".mp4", "video/webm": ".webm", "text/html": ".html"}
+	return allowed[mediaType] != "" && strings.EqualFold(path.Ext(name), allowed[mediaType]) && ((mediaType != "text/html" && !strings.HasPrefix(mediaType, "video/")) || strings.HasPrefix(name, "wallpaper/"))
 }
 
 func signaturePayload(files map[string][]byte) ([]byte, error) {
@@ -280,6 +403,7 @@ func signaturePayload(files map[string][]byte) ([]byte, error) {
 }
 
 func Validate(pkg *Package) error {
+	expectedSlots := slotTypes(pkg.Manifest.APIVersion)
 	for _, scheme := range pkg.Manifest.Schemes {
 		var doc any
 		decoder := json.NewDecoder(bytes.NewReader(pkg.Documents[scheme]))
@@ -298,6 +422,7 @@ func Validate(pkg *Package) error {
 				return fmt.Errorf("scheme %s: %w", scheme, err)
 			}
 		}
+		resolvedSlots := map[string]any{}
 		for slot, pointer := range pkg.Manifest.Bindings {
 			name, err := pointerTokenName(doc, pointer)
 			if err != nil {
@@ -307,11 +432,23 @@ func Validate(pkg *Package) error {
 			if err != nil {
 				return fmt.Errorf("binding %s: %w", slot, err)
 			}
-			if t.typ != requiredSlots[slot] {
-				return fmt.Errorf("binding %s must reference a %s token", slot, requiredSlots[slot])
+			if t.typ != expectedSlots[slot] {
+				return fmt.Errorf("binding %s must reference a %s token", slot, expectedSlots[slot])
 			}
-			if _, err := parseColor(t.value); err != nil {
-				return fmt.Errorf("binding %s: %w", slot, err)
+			if t.typ == "color" {
+				if _, err := parseColor(t.value); err != nil {
+					return fmt.Errorf("binding %s: %w", slot, err)
+				}
+			} else if err := validateDesignSlot(slot, t.value); err != nil {
+				return err
+			}
+			resolvedSlots[slot] = t.value
+		}
+		if pkg.Manifest.APIVersion == APIVersion {
+			mobile, _, _ := dimension(resolvedSlots["breakpointMobile"])
+			tablet, _, _ := dimension(resolvedSlots["breakpointTablet"])
+			if mobile >= tablet {
+				return fmt.Errorf("scheme %s has unordered breakpoints", scheme)
 			}
 		}
 		if err := validateContrast(doc, flat, pkg.Manifest.Bindings); err != nil {
@@ -639,19 +776,26 @@ func Builtin() *Package {
 	for _, name := range names {
 		bindings[name] = "/color/" + name
 	}
-	manifest := Manifest{Format: "yin-theme", FormatVersion: FormatVersion, ID: "org.yin.default", Name: "Yin Default", PackageVersion: "1.0.0", APIVersion: APIVersion, DTCGVersion: DTCGVersion, Schemes: []string{"light", "dark"}, Documents: map[string]string{"light": "tokens/light.json", "dark": "tokens/dark.json"}, Bindings: bindings}
+	for name := range v2Slots {
+		bindings[name] = "/design/" + name
+	}
+	manifest := Manifest{Format: "yin-theme", FormatVersion: FormatVersion, ID: "org.yin.default", Name: "Yin Default", PackageVersion: "2.0.0", APIVersion: APIVersion, DTCGVersion: DTCGVersion, Schemes: []string{"light", "dark"}, Documents: map[string]string{"light": "tokens/light.json", "dark": "tokens/dark.json"}, Bindings: bindings}
 	light := map[string]string{"canvas": "#ffffff", "surface": "#f3f6f8", "surfaceElevated": "#ffffff", "text": "#172126", "textMuted": "#53636a", "border": "#d5dfe2", "primary": "#075b68", "onPrimary": "#ffffff", "secondary": "#8b4412", "success": "#176b45", "warning": "#805200", "danger": "#a12627", "focusRing": "#075b68"}
 	dark := map[string]string{"canvas": "#171d20", "surface": "#222a2e", "surfaceElevated": "#2b353a", "text": "#f1f5f6", "textMuted": "#b0bec3", "border": "#536168", "primary": "#72d6df", "onPrimary": "#102326", "secondary": "#f0a66d", "success": "#71d8a0", "warning": "#f2c46c", "danger": "#ff9792", "focusRing": "#72d6df"}
-	return &Package{Manifest: manifest, Documents: map[string]json.RawMessage{"light": makeDocument(light), "dark": makeDocument(dark)}, Resources: map[string]ResourceData{}, Verified: true}
+	return &Package{Manifest: manifest, Documents: map[string]json.RawMessage{"light": makeDocument(light, false), "dark": makeDocument(dark, true)}, Resources: map[string]ResourceData{}, Verified: true}
 }
 
-func makeDocument(palette map[string]string) json.RawMessage {
+func makeDocument(palette map[string]string, dark bool) json.RawMessage {
 	colors := map[string]any{"$type": "color"}
 	for name, hexColor := range palette {
 		parsed, _ := parseColor(hexColor)
 		colors[name] = map[string]any{"$value": map[string]any{"colorSpace": "srgb", "components": []float64{parsed.r, parsed.g, parsed.b}, "alpha": 1}}
 	}
-	document := map[string]any{"$schema": "https://design-tokens.github.io/community-group/format/2025.10/schema.json", "color": colors}
+	design := map[string]any{}
+	for name, value := range builtinDesignValues(dark) {
+		design[name] = map[string]any{"$type": v2Slots[name], "$value": value}
+	}
+	document := map[string]any{"$schema": "https://design-tokens.github.io/community-group/format/2025.10/schema.json", "color": colors, "design": design}
 	raw, _ := json.Marshal(document)
 	return raw
 }
