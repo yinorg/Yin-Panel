@@ -60,11 +60,14 @@ type PublicPackage struct {
 }
 
 func Migrate(db *gorm.DB) error {
-	return db.AutoMigrate(&PackageRecord{}, &AssetRecord{}, &Preference{}, &InstanceSettings{}, &AuditRecord{}, &WebWallpaperRecord{})
+	if err := db.AutoMigrate(&PackageRecord{}, &AssetRecord{}, &Preference{}, &InstanceSettings{}, &AuditRecord{}, &WebWallpaperRecord{}); err != nil {
+		return err
+	}
+	return migrateRevisionV2(db)
 }
 
 func EnsureBuiltin(db *gorm.DB) error {
-	return db.Transaction(func(tx *gorm.DB) error {
+	if err := db.Transaction(func(tx *gorm.DB) error {
 		for _, builtin := range Builtins() {
 			manifest, err := json.Marshal(builtin.Manifest)
 			if err != nil {
@@ -104,7 +107,10 @@ func EnsureBuiltin(db *gorm.DB) error {
 			return err
 		}
 		return nil
-	})
+	}); err != nil {
+		return err
+	}
+	return EnsureBuiltinV2(db)
 }
 
 func List(db *gorm.DB) ([]PackageRecord, error) {

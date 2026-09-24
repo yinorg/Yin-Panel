@@ -2,6 +2,8 @@ package system
 
 import (
 	"bytes"
+	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"path"
@@ -24,24 +26,37 @@ func NewThemeRouter() *ThemeRouter { return &ThemeRouter{} }
 
 func (a *ThemeRouter) InitRouter(router *gin.RouterGroup) {
 	router.GET("/theme/current", a.Current)
-	router.GET("/theme/packages", a.PublicList)
-	router.GET("/theme/packages/:id", a.PublicPackage)
-	router.GET("/theme/assets/:id/:version/*name", a.Asset)
-	router.GET("/theme/preview/assets/:token/*name", a.PreviewAsset)
-	router.GET("/theme/preview/:token", a.PreviewPackage)
+	router.GET("/theme/packages", a.PublicListV2)
+	router.GET("/theme/packages/:id", a.PackageByIDV2)
+	router.GET("/theme/preview/:token", a.PreviewPackageV2)
+	router.GET("/theme/preview/:token/assets/*name", a.PreviewAssetV2)
+	router.GET("/theme/v2/current", a.CurrentV2)
+	router.GET("/theme/v2/packages/:revision", a.PackageV2)
+	router.GET("/theme/v2/assets/:revision/*name", a.AssetV2)
 	router.GET("/theme/wallpaper/web/:id/:name", a.WebWallpaperAsset)
 	user := router.Group("")
 	user.Use(interceptor.Auth, themeJWTOnly)
 	user.GET("/theme/mine", a.Mine)
 	user.POST("/theme/preference", a.SetPreference)
 	user.POST("/theme/wallpaper/web", a.UploadWebWallpaper)
+	user.GET("/theme/v2/grants/:revision", a.ThemeGrantV2)
+	user.POST("/theme/v2/grants/:revision", a.SetThemeGrantV2)
+	user.DELETE("/theme/v2/grants/:revision", a.RevokeThemeGrantV2)
 	admin := router.Group("")
 	admin.Use(interceptor.Auth, themeJWTOnly, interceptor.AdminInterceptor)
-	admin.GET("/theme/admin/packages", a.List)
+	admin.GET("/theme/admin/packages", a.RevisionsV2)
 	admin.POST("/theme/admin/install", a.Install)
 	admin.POST("/theme/admin/preview", a.Preview)
-	admin.POST("/theme/admin/default", a.SetDefault)
-	admin.DELETE("/theme/admin/packages/:id", a.Remove)
+	admin.POST("/theme/v2/admin/install", a.InstallV2)
+	admin.POST("/theme/v2/admin/preview", a.PreviewV2)
+	admin.GET("/theme/v2/admin/revisions", a.RevisionsV2)
+	admin.POST("/theme/v2/admin/default", a.SetDefaultV2)
+	admin.POST("/theme/v2/admin/trial", a.BeginTrialV2)
+	admin.POST("/theme/v2/admin/confirm", a.ConfirmTrialV2)
+	admin.POST("/theme/v2/admin/rollback", a.RollbackV2)
+	admin.DELETE("/theme/v2/admin/packages/:id", a.RemoveV2)
+	admin.POST("/theme/admin/default", a.SetDefaultV2)
+	admin.DELETE("/theme/admin/packages/:id", a.RemoveV2)
 	admin.GET("/theme/admin/audit", a.Audit)
 }
 
@@ -53,8 +68,36 @@ func themeJWTOnly(c *gin.Context) {
 }
 
 func (a *ThemeRouter) Current(c *gin.Context) {
+	a.CurrentV2(c)
+}
+
+func (a *ThemeRouter) CurrentV2(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
-	pkg, err := theme.Current(repository.Db)
+	yin, err := theme.InstanceDefaultRevisionV2(repository.Db)
+	if err != nil {
+		response.ErrorDatabase(c, err.Error())
+		return
+	}
+	instanceRevision, err := theme.ActivePackageRevisionV2(repository.Db, theme.InstanceThemeScopeV2, yin.ID)
+	if err != nil {
+		response.ErrorDatabase(c, err.Error())
+		return
+	}
+	revision := instanceRevision
+	if c.GetString("authMethod") == "jwt" {
+		user, ok := base.GetCurrentUserInfo(c)
+		if !ok || user.ID == 0 {
+			response.ErrorByCode(c, constant.CodeNotLogin)
+			return
+		}
+		if userRevision, userErr := theme.ActivePackageRevisionV2(repository.Db, theme.ActivationScopeForUserV2(user.ID), instanceRevision.ID); userErr == nil {
+			revision = userRevision
+		} else if !errors.Is(userErr, gorm.ErrRecordNotFound) {
+			response.ErrorDatabase(c, userErr.Error())
+			return
+		}
+	}
+	pkg, err := theme.PackageRevisionPublicV2(repository.Db, revision.ID)
 	if err != nil {
 		response.ErrorDatabase(c, err.Error())
 		return
@@ -69,6 +112,15 @@ func (a *ThemeRouter) PublicList(c *gin.Context) {
 		return
 	}
 	response.SuccessData(c, list)
+}
+
+func (a *ThemeRouter) PublicListV2(c *gin.Context) {
+	packages, err := theme.ListPackagesV2(repository.Db)
+	if err != nil {
+		response.ErrorDatabase(c, err.Error())
+		return
+	}
+	response.SuccessData(c, packages)
 }
 
 func (a *ThemeRouter) PublicPackage(c *gin.Context) {
@@ -88,12 +140,41 @@ func (a *ThemeRouter) Mine(c *gin.Context) {
 		response.ErrorByCode(c, constant.CodeNotLogin)
 		return
 	}
-	pkg, preference, err := theme.UserPackage(repository.Db, user.ID)
+	yin, err := theme.InstanceDefaultRevisionV2(repository.Db)
 	if err != nil {
 		response.ErrorDatabase(c, err.Error())
 		return
 	}
-	response.SuccessData(c, gin.H{"package": pkg, "preference": preference})
+	instanceRevision, err := theme.ActivePackageRevisionV2(repository.Db, theme.InstanceThemeScopeV2, yin.ID)
+	if err != nil {
+		response.ErrorDatabase(c, err.Error())
+		return
+	}
+	userScope := theme.ActivationScopeForUserV2(user.ID)
+	activation, activationErr := theme.GetActivationV2(repository.Db, userScope)
+	selectedPackageID := ""
+	if activationErr == nil {
+		selectedPackageID = activation.PackageID
+	} else if !errors.Is(activationErr, gorm.ErrRecordNotFound) {
+		response.ErrorDatabase(c, activationErr.Error())
+		return
+	}
+	revision, err := theme.ActivePackageRevisionV2(repository.Db, userScope, instanceRevision.ID)
+	if err != nil {
+		response.ErrorDatabase(c, err.Error())
+		return
+	}
+	pkg, err := theme.PackageRevisionPublicV2(repository.Db, revision.ID)
+	if err != nil {
+		response.ErrorDatabase(c, err.Error())
+		return
+	}
+	pref, err := theme.PreferenceFor(repository.Db, user.ID)
+	if err != nil {
+		response.ErrorDatabase(c, err.Error())
+		return
+	}
+	response.SuccessData(c, gin.H{"package": pkg, "preference": gin.H{"revision": revision.ID, "packageId": selectedPackageID, "mode": pref.Mode}})
 }
 
 func (a *ThemeRouter) SetPreference(c *gin.Context) {
@@ -103,6 +184,7 @@ func (a *ThemeRouter) SetPreference(c *gin.Context) {
 		return
 	}
 	var req struct {
+		Revision  string `json:"revision"`
 		PackageID string `json:"packageId"`
 		Mode      string `json:"mode"`
 	}
@@ -110,8 +192,122 @@ func (a *ThemeRouter) SetPreference(c *gin.Context) {
 		response.ErrorParamFomat(c, err.Error())
 		return
 	}
-	if err := theme.SetPreference(repository.Db, user.ID, req.PackageID, req.Mode); err != nil {
+	if req.Mode == "" {
+		req.Mode = "auto"
+	}
+	if req.Mode != "light" && req.Mode != "dark" && req.Mode != "auto" {
+		response.ErrorParamFomat(c, "mode must be light, dark, or auto")
+		return
+	}
+	revisionID := req.Revision
+	if revisionID == "" && req.PackageID != "" {
+		latest, latestErr := theme.LatestPackageRevisionV2(repository.Db, req.PackageID)
+		if latestErr != nil {
+			response.ErrorDataNotFound(c)
+			return
+		}
+		revisionID = latest.ID
+	}
+	if revisionID == "" {
+		yin, yinErr := theme.InstanceDefaultRevisionV2(repository.Db)
+		if yinErr != nil {
+			response.ErrorDatabase(c, yinErr.Error())
+			return
+		}
+		instanceRevision, instanceErr := theme.ActivePackageRevisionV2(repository.Db, theme.InstanceThemeScopeV2, yin.ID)
+		if instanceErr != nil {
+			response.ErrorDatabase(c, instanceErr.Error())
+			return
+		}
+		revisionID = instanceRevision.ID
+	}
+	revision, err := theme.GetPackageRevisionV2(repository.Db, revisionID)
+	if err != nil {
+		response.ErrorDataNotFound(c)
+		return
+	}
+	if err := theme.ActivatePackageV2(repository.Db, theme.ActivationScopeForUserV2(user.ID), revision.PackageID, revision.ID); err != nil {
 		response.ErrorParamFomat(c, err.Error())
+		return
+	}
+	if err := theme.SetPreference(repository.Db, user.ID, "", req.Mode); err != nil {
+		response.ErrorParamFomat(c, err.Error())
+		return
+	}
+	response.Success(c)
+}
+
+func (a *ThemeRouter) ThemeGrantV2(c *gin.Context) {
+	user, ok := base.GetCurrentUserInfo(c)
+	if !ok || user.ID == 0 {
+		response.ErrorByCode(c, constant.CodeNotLogin)
+		return
+	}
+	grant, err := theme.GetGrantV2(repository.Db, user.ID, c.Param("revision"), "sandbox")
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		response.SuccessData(c, gin.H{"revision": c.Param("revision"), "executionMode": "sandbox", "granted": false, "permissions": []string{}})
+		return
+	}
+	if err != nil {
+		response.ErrorDatabase(c, err.Error())
+		return
+	}
+	var permissions []string
+	if err := json.Unmarshal([]byte(grant.PermissionsJSON), &permissions); err != nil {
+		response.ErrorDatabase(c, "stored theme grant is invalid")
+		return
+	}
+	response.SuccessData(c, gin.H{"revision": grant.RevisionID, "executionMode": grant.ExecutionMode, "granted": true, "permissions": permissions})
+}
+
+func (a *ThemeRouter) SetThemeGrantV2(c *gin.Context) {
+	user, ok := base.GetCurrentUserInfo(c)
+	if !ok || user.ID == 0 {
+		response.ErrorByCode(c, constant.CodeNotLogin)
+		return
+	}
+	var request struct {
+		Permissions []string `json:"permissions"`
+	}
+	if err := c.ShouldBindJSON(&request); err != nil {
+		response.ErrorParamFomat(c, err.Error())
+		return
+	}
+	revision, err := theme.GetPackageRevisionV2(repository.Db, c.Param("revision"))
+	if err != nil {
+		response.ErrorDataNotFound(c)
+		return
+	}
+	var manifest theme.PackageManifestV2
+	if err := json.Unmarshal([]byte(revision.ManifestJSON), &manifest); err != nil {
+		response.ErrorDatabase(c, "stored theme manifest is invalid")
+		return
+	}
+	if err := theme.ValidateThemeGrantV2(manifest, "sandbox", request.Permissions); err != nil {
+		response.ErrorParamFomat(c, err.Error())
+		return
+	}
+	permissions, err := json.Marshal(request.Permissions)
+	if err != nil {
+		response.ErrorParamFomat(c, err.Error())
+		return
+	}
+	grant := theme.GrantRecordV2{UserID: user.ID, RevisionID: revision.ID, ExecutionMode: "sandbox", PermissionsJSON: string(permissions)}
+	if err := theme.SaveGrantV2(repository.Db, grant); err != nil {
+		response.ErrorDatabase(c, err.Error())
+		return
+	}
+	response.Success(c)
+}
+
+func (a *ThemeRouter) RevokeThemeGrantV2(c *gin.Context) {
+	user, ok := base.GetCurrentUserInfo(c)
+	if !ok || user.ID == 0 {
+		response.ErrorByCode(c, constant.CodeNotLogin)
+		return
+	}
+	if err := theme.RevokeGrantV2(repository.Db, user.ID, c.Param("revision"), "sandbox"); err != nil {
+		response.ErrorDatabase(c, err.Error())
 		return
 	}
 	response.Success(c)
@@ -132,6 +328,14 @@ func (a *ThemeRouter) List(c *gin.Context) {
 }
 
 func (a *ThemeRouter) Install(c *gin.Context) {
+	a.installPackageV2(c, false)
+}
+
+func (a *ThemeRouter) InstallV2(c *gin.Context) {
+	a.installPackageV2(c, false)
+}
+
+func (a *ThemeRouter) installPackageV2(c *gin.Context, preview bool) {
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, theme.MaxArchive+(1<<20))
 	if err := c.Request.ParseMultipartForm(theme.MaxArchive + (1 << 20)); err != nil {
 		response.ErrorParamFomat(c, "invalid multipart theme upload")
@@ -149,20 +353,28 @@ func (a *ThemeRouter) Install(c *gin.Context) {
 		return
 	}
 	confirm := strings.EqualFold(c.PostForm("confirmUnverified"), "true")
-	pkg, err := theme.ParseArchive(data, confirm)
+	pkg, err := theme.ParsePackageArchiveV2(data, confirm)
 	if err != nil {
 		response.ErrorParamFomat(c, err.Error())
 		return
 	}
 	user, _ := base.GetCurrentUserInfo(c)
-	if err := theme.Install(repository.Db, user.ID, pkg); err != nil {
+	if err := theme.InstallPackageV2(repository.Db, user.ID, pkg); err != nil {
 		response.ErrorDatabase(c, err.Error())
 		return
 	}
-	response.SuccessData(c, gin.H{"id": pkg.Manifest.ID, "verified": pkg.Verified})
+	response.SuccessData(c, gin.H{"id": pkg.Manifest.ID, "revision": pkg.Revision, "verified": pkg.Verified, "preview": preview})
 }
 
 func (a *ThemeRouter) Preview(c *gin.Context) {
+	a.previewPackageV2(c)
+}
+
+func (a *ThemeRouter) PreviewV2(c *gin.Context) {
+	a.previewPackageV2(c)
+}
+
+func (a *ThemeRouter) previewPackageV2(c *gin.Context) {
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, theme.MaxArchive+(1<<20))
 	file, _, err := c.Request.FormFile("package")
 	if err != nil {
@@ -175,31 +387,79 @@ func (a *ThemeRouter) Preview(c *gin.Context) {
 		response.ErrorParamFomat(c, "theme package exceeds 32 MiB")
 		return
 	}
-	pkg, err := theme.ParseArchive(data, true)
+	pkg, err := theme.ParsePackageArchiveV2(data, true)
 	if err != nil {
 		response.ErrorParamFomat(c, err.Error())
 		return
 	}
-	token, preview, err := theme.SavePreview(pkg)
+	c.Header("Cache-Control", "no-store")
+	token, err := theme.SavePackagePreviewV2(pkg)
 	if err != nil {
 		response.ErrorDatabase(c, err.Error())
 		return
 	}
+	response.SuccessData(c, gin.H{"token": token, "package": theme.PackagePreviewPublicV2(pkg, token)})
+}
+
+func (a *ThemeRouter) PreviewPackageV2(c *gin.Context) {
+	pkg, err := theme.GetPackagePreviewV2(c.Param("token"))
+	if err != nil {
+		c.Status(http.StatusNotFound)
+		return
+	}
 	c.Header("Cache-Control", "no-store")
-	response.SuccessData(c, gin.H{"token": token, "package": preview})
+	response.SuccessData(c, theme.PackagePreviewPublicV2(pkg, c.Param("token")))
+}
+
+func (a *ThemeRouter) PreviewAssetV2(c *gin.Context) {
+	pkg, err := theme.GetPackagePreviewV2(c.Param("token"))
+	if err != nil {
+		c.Status(http.StatusNotFound)
+		return
+	}
+	name := strings.TrimPrefix(c.Param("name"), "/")
+	if name == "" || strings.Contains(name, "\\") || path.Clean(name) != name || name == "." || strings.HasPrefix(name, "../") {
+		c.Status(http.StatusNotFound)
+		return
+	}
+	asset, exists := pkg.Files[name]
+	if !exists {
+		c.Status(http.StatusNotFound)
+		return
+	}
+	c.Header("Cache-Control", "no-store")
+	c.Header("X-Content-Type-Options", "nosniff")
+	c.Data(http.StatusOK, asset.MediaType, asset.Content)
 }
 
 func (a *ThemeRouter) SetDefault(c *gin.Context) {
+	a.SetDefaultV2(c)
+}
+
+func (a *ThemeRouter) SetDefaultV2(c *gin.Context) {
 	var req struct {
-		PackageID       string `json:"packageId"`
-		ConfirmExternal bool   `json:"confirmExternalWallpaper"`
+		Revision  string `json:"revision"`
+		PackageID string `json:"packageId"`
 	}
-	if err := c.ShouldBindJSON(&req); err != nil || req.PackageID == "" {
-		response.ErrorParamFomat(c, "packageId is required")
+	if err := c.ShouldBindJSON(&req); err != nil || (req.Revision == "" && req.PackageID == "") {
+		response.ErrorParamFomat(c, "revision or packageId is required")
 		return
 	}
-	user, _ := base.GetCurrentUserInfo(c)
-	if err := theme.SetDefaultConfirmed(repository.Db, user.ID, req.PackageID, req.ConfirmExternal); err != nil {
+	revisionID := req.Revision
+	if revisionID == "" {
+		latest, latestErr := theme.LatestPackageRevisionV2(repository.Db, req.PackageID)
+		if latestErr != nil {
+			response.ErrorDataNotFound(c)
+			return
+		}
+		revisionID = latest.ID
+	}
+	revision, err := theme.GetPackageRevisionV2(repository.Db, revisionID)
+	if err != nil {
+		response.ErrorDataNotFound(c)
+		return
+	}
+	if err := theme.ActivatePackageV2(repository.Db, theme.InstanceThemeScopeV2, revision.PackageID, revision.ID); err != nil {
 		response.ErrorParamFomat(c, err.Error())
 		return
 	}
@@ -207,8 +467,12 @@ func (a *ThemeRouter) SetDefault(c *gin.Context) {
 }
 
 func (a *ThemeRouter) Remove(c *gin.Context) {
+	a.RemoveV2(c)
+}
+
+func (a *ThemeRouter) RemoveV2(c *gin.Context) {
 	user, _ := base.GetCurrentUserInfo(c)
-	if err := theme.Remove(repository.Db, user.ID, c.Param("id")); err != nil {
+	if err := theme.RemovePackageV2(repository.Db, user.ID, c.Param("id")); err != nil {
 		if err == gorm.ErrRecordNotFound {
 			response.ErrorDataNotFound(c)
 		} else {
@@ -229,17 +493,113 @@ func (a *ThemeRouter) Audit(c *gin.Context) {
 }
 
 func (a *ThemeRouter) Asset(c *gin.Context) {
+	a.AssetV2(c)
+}
+
+func (a *ThemeRouter) AssetV2(c *gin.Context) {
 	name := strings.TrimPrefix(c.Param("name"), "/")
 	if name == "" || path.Clean(name) != name || strings.HasPrefix(name, "../") || strings.Contains(name, "\\") {
 		c.Status(http.StatusNotFound)
 		return
 	}
-	asset, err := theme.Asset(repository.Db, c.Param("id"), c.Param("version"), name)
+	asset, err := theme.GetPackageAssetV2(repository.Db, c.Param("revision"), name)
 	if err != nil {
 		c.Status(http.StatusNotFound)
 		return
 	}
 	serveThemeAsset(c, asset.MediaType, asset.Content, name, true)
+}
+
+func (a *ThemeRouter) PackageV2(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	pkg, err := theme.PackageRevisionPublicV2(repository.Db, c.Param("revision"))
+	if err != nil {
+		c.Status(http.StatusNotFound)
+		return
+	}
+	response.SuccessData(c, pkg)
+}
+
+func (a *ThemeRouter) RevisionsV2(c *gin.Context) {
+	packages, err := theme.ListPackagesV2(repository.Db)
+	if err != nil {
+		response.ErrorDatabase(c, err.Error())
+		return
+	}
+	defaultRevision, defaultErr := theme.ActivePackageRevisionV2(repository.Db, theme.InstanceThemeScopeV2, "")
+	if defaultErr != nil {
+		defaultRevision, defaultErr = theme.InstanceDefaultRevisionV2(repository.Db)
+	}
+	if defaultErr != nil {
+		response.ErrorDatabase(c, defaultErr.Error())
+		return
+	}
+	response.SuccessData(c, gin.H{"packages": packages, "defaultPackage": defaultRevision.PackageID})
+}
+
+func (a *ThemeRouter) PackageByIDV2(c *gin.Context) {
+	revision, err := theme.LatestPackageRevisionV2(repository.Db, c.Param("id"))
+	if err != nil {
+		c.Status(http.StatusNotFound)
+		return
+	}
+	pkg, err := theme.PackageRevisionPublicV2(repository.Db, revision.ID)
+	if err != nil {
+		c.Status(http.StatusNotFound)
+		return
+	}
+	response.SuccessData(c, pkg)
+}
+
+func (a *ThemeRouter) BeginTrialV2(c *gin.Context) {
+	var req struct {
+		Revision string `json:"revision"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil || req.Revision == "" {
+		response.ErrorParamFomat(c, "revision is required")
+		return
+	}
+	revision, err := theme.GetPackageRevisionV2(repository.Db, req.Revision)
+	if err != nil {
+		response.ErrorDataNotFound(c)
+		return
+	}
+	if err := theme.SetPendingActivationV2(repository.Db, theme.InstanceThemeScopeV2, revision.PackageID, revision.ID, time.Now()); err != nil {
+		response.ErrorParamFomat(c, err.Error())
+		return
+	}
+	response.SuccessData(c, gin.H{"revision": revision.ID, "expiresInSeconds": 120})
+}
+
+func (a *ThemeRouter) ConfirmTrialV2(c *gin.Context) {
+	var req struct {
+		Revision string `json:"revision"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil || req.Revision == "" {
+		response.ErrorParamFomat(c, "revision is required")
+		return
+	}
+	if err := theme.ConfirmActivationV2(repository.Db, theme.InstanceThemeScopeV2, req.Revision); err != nil {
+		response.ErrorParamFomat(c, err.Error())
+		return
+	}
+	if err := theme.MarkActivationHealthyV2(repository.Db, theme.InstanceThemeScopeV2, req.Revision); err != nil {
+		response.ErrorDatabase(c, err.Error())
+		return
+	}
+	response.Success(c)
+}
+
+func (a *ThemeRouter) RollbackV2(c *gin.Context) {
+	fallback, err := theme.InstanceDefaultRevisionV2(repository.Db)
+	if err == nil {
+		err = theme.RollbackActivationV2(repository.Db, theme.InstanceThemeScopeV2, fallback.ID)
+	}
+	if err != nil {
+		response.ErrorDatabase(c, err.Error())
+		return
+	}
+	response.Success(c)
 }
 
 func (a *ThemeRouter) PreviewAsset(c *gin.Context) {

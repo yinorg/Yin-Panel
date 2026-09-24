@@ -20,6 +20,12 @@ import { t } from '@/locales'
 import { getEnableStatus } from '@/api/system/systemMonitor'
 import { clearSpaceCache, createSpaceCache, readSpaceCache, readSpacesCache, writeSpaceCache, writeSpacesCache } from '@/utils/spaceCache'
 import { resolvePanelValue } from '@/utils/theme'
+import { activeThemePackage, activeThemeSlots } from '@/hooks/useTheme'
+import { getThemeRuntimeGrant, setThemeRuntimeGrant } from '@/api/theme'
+import { createHomeThemeHandlers } from '@/core/home/themeHandlers'
+import { createThemeHomeSnapshot } from '@/theme/api/homeSnapshot'
+import type { ThemeCollectionStatus, ThemeCommand, ThemePermission } from '@/theme/api/v1'
+import ThemeHost from '@/theme/runtime/ThemeHost.vue'
 
 const SystemMonitor = defineAsyncComponent(() => import('../../components/deskModule/SystemMonitor/index.vue'))
 const AppStarter = defineAsyncComponent(() => import('./components/AppStarter/index.vue'))
@@ -36,6 +42,7 @@ const ms = useMessage()
 const dialog = useDialog()
 const panelState = usePanelState()
 const authStore = useAuthStore()
+const publicCode = parsePublicCodeFromPath()
 const previewThemeDefaults = new URLSearchParams(window.location.search).has('themePreview')
 const useThemeDefaults = computed(() => previewThemeDefaults || !!panelState.panelConfig.useThemeDefaults)
 const useThemeColors = computed(() => useThemeDefaults.value || panelState.panelConfig.wallpaperMode === 'theme')
@@ -43,9 +50,6 @@ const panelIconTextColor = computed(() => resolvePanelValue('var(--yin-text)', p
 const directoryLayout = computed(() => panelState.panelConfig.homeLayout === 'directory')
 const directoryRoots = computed(() => items.value.filter(group => !group.parentId))
 const activeDirectoryId = ref<number | null>(null)
-watch(directoryLayout, (enabled) => {
-  document.documentElement.dataset.yinLayout = enabled ? 'directory' : 'standard'
-}, { immediate: true })
 const directoryItems = computed(() => {
   if (!directoryLayout.value) return filterItems.value
   if (filterItems.value.length !== items.value.length) return filterItems.value
@@ -97,6 +101,9 @@ const pwaReady = ref(false)
 const cacheUpdatedAt = ref<number | null>(null)
 const hasValidCachedHome = ref(false)
 const homeReady = ref(false)
+const homeCollectionStatus = ref<ThemeCollectionStatus>('idle')
+const homeCollectionError = ref<{ code: string; message: string }>()
+const themeSnapshotVersion = ref(0)
 const sideSwitching = ref(false)
 let sideSwitchTimer: ReturnType<typeof setTimeout> | undefined
 const commandCenterVisible = ref(false)
@@ -113,7 +120,75 @@ const loadedGroups = new Set<number>()
 let groupLoadGeneration = 0
 const HOME_REQUEST_TIMEOUT = 3000
 const collapsedGroups = ref<Set<number>>(new Set())
-const publicCode = parsePublicCodeFromPath()
+const themeRuntimeGrant = ref<{ revision: string; granted: boolean; permissions: ThemePermission[] }>({ revision: '', granted: false, permissions: [] })
+const themeRuntimeGrantLoading = ref(false)
+const themeRuntimeGrantSaving = ref(false)
+const themeRuntimeFailed = ref(false)
+const themeRuntimeFailureMessage = ref('')
+let themeGrantRequestGeneration = 0
+const themeRuntimePackage = computed(() => activeThemePackage.value)
+const themeHomeContribution = computed(() => {
+  const manifest = themeRuntimePackage.value?.manifest
+  return !!manifest?.entrypoints?.script && !!manifest.contributes?.views?.includes('home') && !!manifest.runtime?.supportedModes?.includes('sandbox')
+})
+const themeRequiredPermissions = computed(() => (themeRuntimePackage.value?.manifest.permissions?.required || []).map(permission => permission.name as ThemePermission))
+const themeGrantMatches = computed(() => {
+  const revision = themeRuntimePackage.value?.revision || ''
+  return !!revision && themeRuntimeGrant.value.revision === revision && themeRuntimeGrant.value.granted && themeRequiredPermissions.value.every(permission => themeRuntimeGrant.value.permissions.includes(permission))
+})
+const themeRuntimeActive = computed(() => homeReady.value && themeHomeContribution.value && themeGrantMatches.value && !themeRuntimeFailed.value && !publicCode)
+const themeRuntimeNeedsConsent = computed(() => homeReady.value && themeHomeContribution.value && !!authStore.token && !publicCode && !themeRuntimeGrantLoading.value && !themeGrantMatches.value)
+const themeRuntimeSnapshot = computed(() => createThemeHomeSnapshot({
+  version: themeSnapshotVersion.value,
+  status: homeCollectionStatus.value,
+  error: homeCollectionError.value,
+  spaces: spaces.value.map(space => ({ ...space, name: spaceDisplayName(space, spaces.value, authStore.userInfo?.id) })),
+  activeSpaceId: activeSpace.value?.id,
+  groups: items.value.filter(group => Number.isSafeInteger(Number(group.id))).map(group => ({
+    ...group,
+    id: Number(group.id),
+    items: (group.items || []).filter(item => Number.isSafeInteger(Number(item.id))).map(item => ({ ...item, id: Number(item.id) })),
+  })),
+  canWrite: canWrite.value && themeRuntimePermissions.value.includes('items.write'),
+}))
+const themeRuntimeEnvironment = computed(() => ({
+  coreVersion: import.meta.env.VITE_APP_VERSION || '0.0.0',
+  language: document.documentElement.lang || navigator.language,
+  colorScheme: document.documentElement.classList.contains('dark') ? 'dark' as const : 'light' as const,
+  reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+  online: isOnline.value,
+  viewport: { width: window.innerWidth, height: window.innerHeight },
+}))
+const themeRuntimePermissions = computed(() => themeGrantMatches.value ? themeRuntimeGrant.value.permissions : [])
+const themeRuntimeSlots = computed(() => activeThemeSlots.value)
+
+watch([() => themeRuntimePackage.value?.revision, () => authStore.token], async ([revision, token]) => {
+  const requestGeneration = ++themeGrantRequestGeneration
+  themeRuntimeFailed.value = false
+  themeRuntimeFailureMessage.value = ''
+  themeRuntimeGrant.value = { revision: revision || '', granted: false, permissions: [] }
+  themeRuntimeGrantLoading.value = false
+  if (!revision || !token || !themeHomeContribution.value || publicCode) return
+  themeRuntimeGrantLoading.value = true
+  try {
+    const result = await getThemeRuntimeGrant(revision)
+    if (requestGeneration === themeGrantRequestGeneration && result.code === 0 && result.data.revision === revision)
+      themeRuntimeGrant.value = { revision, granted: result.data.granted, permissions: result.data.permissions as ThemePermission[] }
+  }
+  catch {
+    if (requestGeneration === themeGrantRequestGeneration)
+      themeRuntimeGrant.value = { revision, granted: false, permissions: [] }
+  }
+  finally {
+    if (requestGeneration === themeGrantRequestGeneration)
+      themeRuntimeGrantLoading.value = false
+  }
+}, { immediate: true })
+watch(directoryLayout, (enabled) => {
+  document.documentElement.dataset.yinLayout = enabled ? 'directory' : 'standard'
+  if (enabled)
+    collapsedGroups.value = new Set()
+}, { immediate: true })
 const publicAccessCode = ref('')
 const publicAccessReady = ref(!publicCode || !!sessionStorage.getItem(`yin-panel-public-access:${publicCode}`))
 
@@ -203,10 +278,14 @@ function withHomeTimeout<T>(request: Promise<T>): Promise<T> {
 async function getList(forceRefresh = false) {
   if (forceRefresh && !canWrite.value) return
   const generation = ++groupLoadGeneration
+  themeSnapshotVersion.value++
+  homeCollectionStatus.value = 'loading'
+  homeCollectionError.value = undefined
   loadedGroups.clear()
   if (!activeSpace.value) {
     items.value = []
     filterItems.value = []
+    homeCollectionStatus.value = 'empty'
     return
   }
 
@@ -218,7 +297,11 @@ async function getList(forceRefresh = false) {
     groups = cache.groups
   }
   if (!groups || forceRefresh) {
-    if (!isOnline.value) return
+    if (!isOnline.value) {
+      homeCollectionStatus.value = cachedSpace ? 'stale' : 'error'
+      if (!cachedSpace) homeCollectionError.value = { code: 'OFFLINE', message: 'Home data is unavailable offline' }
+      return
+    }
     const { data } = await withHomeTimeout(getGroups<ItemGroup[]>(spaceId)).catch(() => ({ data: undefined }))
     if (data) {
       groups = data
@@ -228,7 +311,11 @@ async function getList(forceRefresh = false) {
       groups = cache.groups
       isOnline.value = false
     }
-    else return
+    else {
+      homeCollectionStatus.value = 'error'
+      homeCollectionError.value = { code: 'LOAD_FAILED', message: 'Could not load bookmark groups' }
+      return
+    }
   }
 
   const itemsByGroup = new Map<number, Panel.ItemInfo[]>()
@@ -240,6 +327,7 @@ async function getList(forceRefresh = false) {
   if (!groups) return
   const resolvedGroups = groups
   let nextGroup = 0
+  let failedGroups = 0
   const loadNextGroups = async () => {
     while (nextGroup < pendingGroups.length) {
       const group = pendingGroups[nextGroup++]
@@ -253,14 +341,17 @@ async function getList(forceRefresh = false) {
         }
       }
       catch {
-        // Keep the group at a stable height when an item request fails.
+        failedGroups++
       }
       if (generation === groupLoadGeneration && activeSpace.value?.id === spaceId)
         applyGroups(resolvedGroups, itemsByGroup)
     }
   }
   applyGroups(resolvedGroups, itemsByGroup)
-  if (!isOnline.value) return
+  if (!isOnline.value) {
+    homeCollectionStatus.value = 'stale'
+    return
+  }
   await Promise.all(Array.from({ length: Math.min(2, pendingGroups.length) }, loadNextGroups))
 
   if (generation === groupLoadGeneration && activeSpace.value?.id === spaceId) {
@@ -268,6 +359,9 @@ async function getList(forceRefresh = false) {
     cacheUpdatedAt.value = cache.updatedAt || Date.now()
     hasValidCachedHome.value = !!getCachedSpace(spaceId)
     applyGroups(resolvedGroups, itemsByGroup)
+    const itemCount = Array.from(itemsByGroup.values()).reduce((count, groupItems) => count + groupItems.length, 0)
+    homeCollectionStatus.value = failedGroups ? (itemCount ? 'stale' : 'error') : itemCount ? 'ready' : 'empty'
+    if (failedGroups) homeCollectionError.value = { code: 'PARTIAL_LOAD', message: 'Some bookmark items could not be loaded' }
   }
 }
 
@@ -278,9 +372,10 @@ function applyGroups(data: ItemGroup[], itemsByGroup = new Map<number, Panel.Ite
     function append(parentId: number, depth: number) { (byParent.get(parentId) || []).forEach(group => { group.depth = depth; flattened.push(group); append(Number(group.id), depth + 1) }) }
     append(0, 0)
     items.value = flattened
+    themeSnapshotVersion.value++
     const initiallyCollapsed = new Set<number>()
     flattened.forEach(group => {
-      if ((byParent.get(Number(group.id)) || []).length || (group.items?.length || 0) > 40)
+      if (!directoryLayout.value && ((byParent.get(Number(group.id)) || []).length || (group.items?.length || 0) > 40))
         initiallyCollapsed.add(Number(group.id))
     })
     collapsedGroups.value = initiallyCollapsed
@@ -786,6 +881,88 @@ function handleAddItem(itemIconGroupId?: number) {
   if (itemIconGroupId)
     currentAddItenIconGroupId.value = itemIconGroupId
 }
+
+function createThemeRuntimeError(code: string, message: string) {
+  return Object.assign(new Error(message), { code })
+}
+
+const homeThemeHandlers = createHomeThemeHandlers({
+  getSpaces: () => spaces.value,
+  getGroups: () => items.value.filter(group => Number.isSafeInteger(Number(group.id))).map(group => ({ id: Number(group.id), items: group.items || [] })),
+  selectSpace: spaceId => selectSpace(spaceId),
+  openItem: (item) => { openPage(item.openMethod, getItemOpenUrl(item), item.title) },
+  openEditor: ({ item, groupId }) => item ? handleEditItem(item) : handleAddItem(groupId),
+  openCommandCenter: () => { commandCenterVisible.value = true },
+  toggleSide: togglePanelSide,
+  refresh: refreshCurrentSpace,
+  submitSearch: query => itemFrontEndSearch(query),
+  navigate: (destination) => {
+    if (destination.view !== 'home') throw createThemeRuntimeError('UNSUPPORTED_CAPABILITY', 'Core navigation destination is unavailable')
+  },
+  getSettings: () => ({}),
+  patchSettings: () => { throw createThemeRuntimeError('UNSUPPORTED_CAPABILITY', 'Theme settings are not available yet') },
+  getStorage: (key) => {
+    const packageId = activeThemePackage.value?.manifest.id || 'unknown'
+    const userId = authStore.userInfo?.id || 'anonymous'
+    const value = localStorage.getItem(`yin-theme-storage:${userId}:${packageId}:${key}`)
+    return value === null ? undefined : JSON.parse(value)
+  },
+  setStorage: (key, value) => {
+    const encoded = JSON.stringify(value)
+    if (encoded === undefined || encoded.length > 65_536) throw createThemeRuntimeError('INVALID_ARGUMENT', 'Theme storage values are limited to 64 KiB')
+    const packageId = activeThemePackage.value?.manifest.id || 'unknown'
+    const userId = authStore.userInfo?.id || 'anonymous'
+    localStorage.setItem(`yin-theme-storage:${userId}:${packageId}:${key}`, encoded)
+  },
+  removeStorage: (key) => {
+    const packageId = activeThemePackage.value?.manifest.id || 'unknown'
+    const userId = authStore.userInfo?.id || 'anonymous'
+    localStorage.removeItem(`yin-theme-storage:${userId}:${packageId}:${key}`)
+  },
+})
+
+async function executeThemeRequest(value: unknown) {
+  if (!value || typeof value !== 'object') throw createThemeRuntimeError('INVALID_ARGUMENT', 'Invalid Theme API request')
+  const request = value as Record<string, any>
+  if (request.method === 'commands.execute' && typeof request.command === 'string')
+    return homeThemeHandlers.executeCommand(request.command as ThemeCommand, request.payload || {})
+  if (request.method === 'navigation.navigate' && request.destination)
+    return homeThemeHandlers.navigate(request.destination)
+  if (request.method === 'settings.get') return homeThemeHandlers.getSettings()
+  if (request.method === 'settings.patch') return homeThemeHandlers.patchSettings(request.value || {})
+  if (request.method === 'storage.get' && typeof request.key === 'string') return homeThemeHandlers.getStorage(request.key)
+  if (request.method === 'storage.set' && typeof request.key === 'string') return homeThemeHandlers.setStorage(request.key, request.value)
+  if (request.method === 'storage.remove' && typeof request.key === 'string') return homeThemeHandlers.removeStorage(request.key)
+  throw createThemeRuntimeError('UNSUPPORTED_CAPABILITY', 'Theme API operation is unavailable')
+}
+
+async function grantThemeRuntimePermissions() {
+  const revision = themeRuntimePackage.value?.revision
+  if (!revision || themeRuntimeGrantSaving.value) return
+  const permissions = themeRequiredPermissions.value
+  const summary = permissions.length ? permissions.join(', ') : t('themePackage.noRuntimePermissions')
+  if (!window.confirm(t('themePackage.runtimeConfirm', { permissions: summary }))) return
+  themeRuntimeGrantSaving.value = true
+  try {
+    const result = await setThemeRuntimeGrant(revision, permissions)
+    if (result.code === 0) {
+      themeRuntimeGrant.value = { revision, granted: true, permissions }
+      themeRuntimeFailed.value = false
+      themeRuntimeFailureMessage.value = ''
+    }
+  }
+  catch {
+    themeRuntimeFailureMessage.value = t('themePackage.runtimeGrantFailed')
+  }
+  finally {
+    themeRuntimeGrantSaving.value = false
+  }
+}
+
+function handleThemeRuntimeFailure(error: Error) {
+  themeRuntimeFailed.value = true
+  themeRuntimeFailureMessage.value = error.message || t('themePackage.runtimeLoadFailed')
+}
 </script>
 
 <template>
@@ -855,6 +1032,19 @@ function handleAddItem(itemIconGroupId?: number) {
       </template>
     </div>
     <WallpaperLayer v-if="homeReady" />
+    <ThemeHost
+      v-if="themeRuntimeActive && themeRuntimePackage"
+      :key="`${themeRuntimePackage.revision}:${themeRuntimeGrant.permissions.join(',')}`"
+      class="theme-home-host"
+      :theme="themeRuntimePackage"
+      :snapshot="themeRuntimeSnapshot"
+      :environment="themeRuntimeEnvironment"
+      :permissions="themeRuntimePermissions"
+      :slots="themeRuntimeSlots"
+      :title="themeRuntimePackage.manifest.name"
+      :execute="executeThemeRequest"
+      @failed="handleThemeRuntimeFailure"
+    />
     <div v-if="offlineUnavailable" class="offline-unavailable" data-testid="offline-unavailable">
       <NCard :title="$t('panelHome.offlineUnavailable')" size="small">
         <NSpace vertical>
@@ -863,7 +1053,7 @@ function handleAddItem(itemIconGroupId?: number) {
         </NSpace>
       </NCard>
     </div>
-    <div v-if="homeReady" ref="scrollContainerRef" class="home-scroll-container absolute w-full h-full overflow-auto">
+    <div v-if="homeReady && !themeRuntimeActive" ref="scrollContainerRef" class="home-scroll-container absolute w-full h-full overflow-auto">
       <div
         class="p-2.5 mx-auto"
         :class="{ 'directory-page': directoryLayout }"
@@ -874,6 +1064,15 @@ function handleAddItem(itemIconGroupId?: number) {
           background: directoryLayout ? 'transparent' : undefined,
         }"
       >
+        <div v-if="themeRuntimeNeedsConsent" class="theme-runtime-notice" role="status" data-testid="theme-runtime-consent">
+          <span>{{ themeRuntimeFailureMessage || $t('themePackage.runtimePrompt', { name: themeRuntimePackage?.manifest.name, permissions: themeRequiredPermissions.join(', ') || $t('themePackage.noRuntimePermissions') }) }}</span>
+          <NButton size="small" type="primary" :loading="themeRuntimeGrantSaving" @click="grantThemeRuntimePermissions">
+            {{ $t('themePackage.runtimeEnable') }}
+          </NButton>
+        </div>
+        <div v-if="themeRuntimeFailed" class="theme-runtime-notice theme-runtime-notice--error" role="alert" data-testid="theme-runtime-fallback">
+          <span>{{ $t('themePackage.runtimeLoadFailed') }}</span>
+        </div>
         <!-- 头 -->
         <div class="home-header mx-[auto] w-[80%]">
           <div class="home-header-row flex mx-[auto] items-center justify-center text-white">
@@ -895,22 +1094,22 @@ function handleAddItem(itemIconGroupId?: number) {
         </div>
 
         <nav v-if="directoryLayout && directoryRoots.length" class="directory-folders" aria-label="Bookmark groups">
-          <button v-for="group in directoryRoots" :key="group.id" type="button" :class="{ active: Number(activeDirectoryId) === Number(group.id) }" @click="activeDirectoryId = Number(group.id)">
+          <button v-for="group in directoryRoots" :key="group.id" type="button" :aria-pressed="Number(activeDirectoryId) === Number(group.id)" :class="{ active: Number(activeDirectoryId) === Number(group.id) }" @click="activeDirectoryId = Number(group.id)">
             <SvgIcon :icon="group.icon || 'mdi-folder-outline'" />
             <span>{{ group.title }}</span>
           </button>
         </nav>
         <div v-if="directoryLayout" class="directory-brand-controls">
           <span>{{ activeSpace?.side === 'yang' ? 'Yang-Panel' : 'Yin-Panel' }}</span>
-          <Clock :hide-second="!panelState.panelConfig.clockShowSecond" />
+          <Clock class="directory-clock" :hide-second="!panelState.panelConfig.clockShowSecond" />
         </div>
 
         <!-- 应用盒子 -->
         <div
           class="home-content"
           :class="{
-            'home-content--with-monitor': monitorEnabled && panelState.panelConfig.systemMonitorShow,
-            'home-content--monitor-info': monitorEnabled && panelState.panelConfig.systemMonitorShow && panelState.panelConfig.iconStyle === PanelPanelConfigStyleEnum.info,
+            'home-content--with-monitor': !directoryLayout && monitorEnabled && panelState.panelConfig.systemMonitorShow,
+            'home-content--monitor-info': !directoryLayout && monitorEnabled && panelState.panelConfig.systemMonitorShow && panelState.panelConfig.iconStyle === PanelPanelConfigStyleEnum.info,
             'directory-content': directoryLayout,
           }"
           :style="{ marginLeft: `${panelState.panelConfig.marginX}px`, marginRight: `${panelState.panelConfig.marginX}px` }"
@@ -919,7 +1118,10 @@ function handleAddItem(itemIconGroupId?: number) {
           <div
             v-if="monitorEnabled && panelState.panelConfig.systemMonitorShow"
             class="system-monitor-layer"
-            :class="{ 'system-monitor-layer--info': panelState.panelConfig.iconStyle === PanelPanelConfigStyleEnum.info }"
+            :class="{
+              'system-monitor-layer--info': panelState.panelConfig.iconStyle === PanelPanelConfigStyleEnum.info,
+              'system-monitor-layer--directory': directoryLayout,
+            }"
           >
             <SystemMonitor
               :show-title="panelState.panelConfig.systemMonitorShowTitle"
@@ -933,13 +1135,13 @@ function handleAddItem(itemIconGroupId?: number) {
             v-for="(itemGroup, itemGroupIndex) in directoryItems" :key="itemGroupIndex"
             v-show="!groupHidden(itemGroupIndex)"
             data-item-group data-testid="item-group"
-            class="item-list mt-[50px] min-h-[110px]"
-            :class="itemGroup.sortStatus ? 'shadow-2xl border shadow-[0_0_30px_10px_rgba(0,0,0,0.3)]  p-[10px] rounded-2xl' : ''"
+            class="item-list min-h-[110px]"
+            :class="{ 'item-list--sorting': itemGroup.sortStatus }"
             @mouseenter="handleSetHoverStatus(itemGroupIndex, true)"
             @mouseleave="handleSetHoverStatus(itemGroupIndex, false)"
           >
             <!-- 分组标题 -->
-            <div class="text-white text-xl font-extrabold mb-[20px] flex items-center directory-group-heading" :style="{ marginLeft: `${10 + (itemGroup.depth || 0) * 24}px` }">
+            <div class="directory-group-heading flex items-center" :style="{ marginLeft: `${10 + (itemGroup.depth || 0) * 24}px` }">
               <span class="group-title text-shadow">
                 {{ itemGroup.title }}
               </span>
@@ -948,14 +1150,14 @@ function handleAddItem(itemIconGroupId?: number) {
               </span>
               <div
                 v-if="parsePublicCodeFromPath() === '' && authStore.token && canWrite"
-                class="group-buttons ml-2 delay-100 transition-opacity flex"
+                class="group-buttons flex"
                 :class="itemGroup.hoverStatus ? 'opacity-100' : 'opacity-0'"
               >
                 <span class="mr-2 cursor-pointer" :title="t('common.add')" @click="handleAddItem(itemGroup.id)">
-                  <SvgIcon class="text-white font-xl" icon="typcn:plus" />
+                  <SvgIcon class="group-action-icon" icon="typcn:plus" />
                 </span>
                 <span class="mr-2 cursor-pointer " :title="t('common.sort')" @click="handleSetSortStatus(itemGroupIndex, !itemGroup.sortStatus)">
-                  <SvgIcon class="text-white font-xl" icon="ri:drag-drop-line" />
+                  <SvgIcon class="group-action-icon" icon="ri:drag-drop-line" />
                 </span>
               </div>
             </div>
@@ -1014,6 +1216,7 @@ function handleAddItem(itemIconGroupId?: number) {
                       :icon-text-info-hide-description="!panelState.panelConfig.iconTextInfoHideDescription"
                       :icon-text-icon-hide-title="panelState.panelConfig.iconTextIconHideTitle || false"
                       :style="1"
+                      :directory="directoryLayout"
                       @click="handleItemClick(itemGroupIndex, item)"
                     />
                   </div>
@@ -1026,6 +1229,7 @@ function handleAddItem(itemIconGroupId?: number) {
                       :icon-text-info-hide-description="!panelState.panelConfig.iconTextInfoHideDescription"
                       :icon-text-icon-hide-title="panelState.panelConfig.iconTextIconHideTitle || false"
                       :style="1"
+                      :directory="directoryLayout"
                       @click="handleAddItem(itemGroup.id)"
                     />
                   </div>
@@ -1175,6 +1379,9 @@ function handleAddItem(itemIconGroupId?: number) {
 .space-status-dot { width: 7px; height: 7px; margin-right: 8px; border-radius: 50%; background: var(--yin-success); box-shadow: 0 0 var(--yin-component-surface-glow) var(--yin-success); }
 .offline-status { position: fixed; z-index: 21; top: 14px; right: 18px; display: flex; gap: var(--yin-component-group-gap); color: var(--yin-text); font-size: var(--yin-fontSmallSize); text-shadow: var(--yin-effect-text-shadow); }
 .offline-unavailable { position: fixed; z-index: 31; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(0, 0, 0, 0.48); }
+.theme-home-host { position: absolute; z-index: 1; inset: 0; overflow: hidden; pointer-events: auto; }
+.theme-runtime-notice { display: flex; align-items: center; justify-content: space-between; gap: var(--yin-component-group-gap); margin: var(--yin-component-group-section-spacing) auto; padding: var(--yin-component-card-padding); border: var(--yin-component-button-border-width) solid var(--yin-border); border-radius: var(--yin-component-card-radius); background: var(--yin-surfaceElevated); color: var(--yin-text); }
+.theme-runtime-notice--error { border-color: var(--yin-danger); }
 </style>
 
 <style>
@@ -1183,7 +1390,8 @@ html {
   overflow: hidden;
   background-color: var(--yin-canvas);
 }
-html:has(:root[data-yin-layout='directory']) body { background-color: transparent; }
+:root[data-yin-layout='directory'] body { background-color: transparent; }
+:root[data-yin-layout='directory'] .directory-folders button { min-height: max(var(--yin-component-button-height), 44px); }
 </style>
 
 <style scoped>
@@ -1204,7 +1412,7 @@ html:has(:root[data-yin-layout='directory']) body { background-color: transparen
   color: var(--yin-text);
 }
 
-.sun-main:global(:has(:root[data-yin-layout='directory'])) { background: transparent; color: var(--yin-text); }
+:global(:root[data-yin-layout='directory'] .sun-main) { background: transparent; color: var(--yin-text); }
 
 .sun-main.theme-defaults .home-header-row,
 .sun-main.theme-defaults .item-list > div:first-child {
@@ -1217,15 +1425,15 @@ html:has(:root[data-yin-layout='directory']) body { background-color: transparen
 }
 
 .sun-main.theme-defaults .space-status-bar,
-:global(:root[data-yin-layout='directory']) .space-status-bar {
+:root[data-yin-layout='directory'] .space-status-bar {
   border-color: var(--yin-border);
   background-color: var(--yin-surfaceElevated);
 }
 
 .sun-main.theme-defaults .space-status-button,
 .sun-main.theme-defaults .offline-status,
-:global(:root[data-yin-layout='directory']) .space-status-button,
-:global(:root[data-yin-layout='directory']) .offline-status {
+:root[data-yin-layout='directory'] .space-status-button,
+:root[data-yin-layout='directory'] .offline-status {
   color: var(--yin-text);
   text-shadow: none;
 }
@@ -1379,26 +1587,24 @@ html:has(:root[data-yin-layout='directory']) body { background-color: transparen
 .home-content { position: relative; }
 .home-scroll-container { position: relative; z-index: 1; pointer-events: none; }
 .home-scroll-container > * { pointer-events: auto; }
-:global(:root[data-yin-layout='directory']) .home-scroll-container { background: transparent; }
-:global(:root[data-yin-layout='split']) .home-content { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: var(--yin-spaceLg); }
-:global(:root[data-yin-layout='directory']) .home-header { width: min(640px, 100%); }
-:global(:root[data-yin-layout='directory']) .home-header-row { display: none; }
-:global(:root[data-yin-layout='directory']) .directory-brand-controls { display: flex; justify-content: space-between; align-items: center; margin: 14px auto 0; color: var(--yin-text); font-size: 12px; }
-:global(:root[data-yin-layout='directory']) .directory-search { margin-top: 8px; }
-:global(:root[data-yin-layout='directory']) .home-content { margin-top: var(--yin-component-group-section-spacing); padding: var(--yin-component-card-padding); border: var(--yin-component-card-border-width) var(--yin-component-card-border-style) var(--yin-border); border-radius: var(--yin-component-card-radius); background: var(--yin-surfaceElevated); box-shadow: var(--yin-component-card-shadow); }
-:global(:root[data-yin-layout='directory']) .item-list { min-height: 0; margin-top: 0; padding: var(--yin-component-group-section-spacing) 0; border-bottom: var(--yin-borderWidth) solid var(--yin-border); }
-:global(:root[data-yin-layout='directory']) .item-list:last-child { border-bottom: 0; }
-:global(:root[data-yin-layout='directory']) .directory-group-heading { margin: 0 0 var(--yin-spaceSm) !important; color: var(--yin-text); font-family: var(--yin-fontDisplay); font-size: var(--yin-fontBodySize); font-weight: var(--yin-fontHeadingWeight); }
-:global(:root[data-yin-layout='directory']) .directory-group-heading .group-title { text-shadow: none; }
-:global(:root[data-yin-layout='directory']) .directory-folders { display: flex; max-width: 100%; gap: var(--yin-component-group-gap); margin: var(--yin-component-group-section-spacing) auto 0; overflow-x: auto; padding: var(--yin-spaceXs) 0 var(--yin-spaceSm); scrollbar-width: thin; }
-:global(:root[data-yin-layout='directory']) .directory-folders button { display: flex; flex: 0 0 auto; align-items: center; gap: var(--yin-component-app-icon-gap); min-height: var(--yin-component-button-height); padding: 0 var(--yin-component-button-padding-x); border: var(--yin-component-button-border-width) solid var(--yin-border); border-radius: var(--yin-component-button-radius); background: var(--yin-component-sidebar-surface, var(--yin-surfaceElevated)); color: var(--yin-text); cursor: pointer; transition: all var(--yin-component-state-hover-duration) var(--yin-component-state-easing); }
-:global(:root[data-yin-layout='directory']) .directory-folders button.active { border-color: var(--yin-primary); color: var(--yin-primary); }
-:global(:root[data-yin-layout='directory']) .icon-small-box { display: flex; flex-wrap: wrap; gap: var(--yin-component-group-gap); }
-:global(:root[data-yin-layout='directory']) .app-icon { width: auto; }
-:global(:root[data-yin-layout='directory']) .app-icon-small { display: flex; align-items: center; gap: var(--yin-component-app-icon-gap); }
-:global(:root[data-yin-layout='directory']) .app-icon-small-icon { width: 30px; height: 30px; margin: 0; border-radius: 5px; }
-:global(:root[data-yin-layout='directory']) .app-icon-small-title { max-width: 190px; margin: 0; color: var(--yin-text) !important; text-align: left; text-shadow: none; white-space: nowrap; }
-:global(:root[data-yin-layout='directory']) .home-content .group-buttons svg { color: var(--yin-text); }
+:root[data-yin-layout='directory'] .home-scroll-container { background: transparent; }
+:root[data-yin-layout='split'] .home-content { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: var(--yin-spaceLg); }
+:root[data-yin-layout='directory'] .home-header { width: min(640px, 100%); }
+:root[data-yin-layout='directory'] .home-header-row { display: none; }
+:global(:root[data-yin-layout='directory'] .directory-brand-controls) { display: flex; justify-content: space-between; align-items: center; margin: 14px auto 0; color: var(--yin-text); font-size: var(--yin-fontBodySize); }
+:global(:root[data-yin-layout='directory'] .directory-brand-controls > span) { flex: 0 0 auto; white-space: nowrap; }
+:global(:root[data-yin-layout='directory'] .directory-brand-controls .directory-clock) { width: auto; flex: 0 0 auto; text-align: right; }
+:global(:root[data-yin-layout='directory'] .directory-search) { margin-top: 8px; }
+:global(:root[data-yin-layout='directory'] .home-content) { margin-top: var(--yin-component-group-section-spacing); padding: var(--yin-component-card-padding); border: var(--yin-component-card-border-width) var(--yin-component-card-border-style) var(--yin-border); border-radius: var(--yin-component-card-radius); background: var(--yin-surfaceElevated); box-shadow: var(--yin-component-card-shadow); }
+:global(:root[data-yin-layout='directory'] .item-list) { min-height: 0; margin-top: 0; padding: var(--yin-component-group-section-spacing) 0; border-bottom: var(--yin-borderWidth) solid var(--yin-border); }
+:global(:root[data-yin-layout='directory'] .item-list:last-child) { border-bottom: 0; }
+:global(:root[data-yin-layout='directory'] .directory-group-heading) { margin: 0 0 var(--yin-spaceSm) !important; color: var(--yin-text); font-family: var(--yin-fontDisplay); font-size: var(--yin-fontBodySize); font-weight: var(--yin-fontHeadingWeight); }
+:global(:root[data-yin-layout='directory'] .directory-group-heading .group-title) { text-shadow: none; }
+:global(:root[data-yin-layout='directory'] .directory-folders) { display: flex; max-width: 100%; gap: var(--yin-component-group-gap); margin: var(--yin-component-group-section-spacing) auto 0; overflow-x: auto; padding: var(--yin-spaceXs) 0 var(--yin-spaceSm); scrollbar-width: thin; }
+:global(:root[data-yin-layout='directory'] .directory-folders button) { display: flex; flex: 0 0 auto; align-items: center; gap: var(--yin-component-app-icon-gap); min-height: max(var(--yin-component-button-height), 44px); padding: 0 var(--yin-component-button-padding-x); border: var(--yin-component-button-border-width) solid var(--yin-border); border-radius: var(--yin-component-button-radius); background: var(--yin-component-sidebar-surface, var(--yin-surfaceElevated)); color: var(--yin-text); cursor: pointer; transition: all var(--yin-component-state-hover-duration) var(--yin-component-state-easing); }
+:global(:root[data-yin-layout='directory'] .directory-folders button.active) { border-color: var(--yin-primary); color: var(--yin-primary); }
+:global(:root[data-yin-layout='directory'] .icon-small-box) { display: flex; flex-wrap: wrap; gap: var(--yin-component-group-gap); }
+:global(:root[data-yin-layout='directory'] .home-content .group-buttons svg) { color: var(--yin-text); }
 
 .home-content--with-monitor {
   padding-top: 190px;
@@ -1426,6 +1632,17 @@ html:has(:root[data-yin-layout='directory']) body { background-color: transparen
   max-height: 220px;
 }
 
+.system-monitor-layer--directory {
+  position: relative;
+  z-index: auto;
+  inset: auto;
+  max-width: none;
+  max-height: none;
+  margin-bottom: var(--yin-component-group-section-spacing);
+  overflow: visible;
+  contain: none;
+}
+
 .text-shadow {
   text-shadow: var(--yin-effect-text-shadow);
 }
@@ -1435,9 +1652,15 @@ html:has(:root[data-yin-layout='directory']) body { background-color: transparen
 }
 
 .item-list { margin-top: var(--yin-component-group-section-spacing); }
+.item-list--sorting { padding: var(--yin-component-group-padding); border: var(--yin-component-card-border-width) var(--yin-component-card-border-style) var(--yin-border); border-radius: var(--yin-component-card-radius); background: var(--yin-component-card-surface, var(--yin-surfaceElevated)); box-shadow: var(--yin-component-card-shadow); }
+.directory-group-heading { margin-bottom: var(--yin-component-group-gap); color: var(--yin-text); font-family: var(--yin-fontDisplay); font-size: var(--yin-component-group-heading-size); font-weight: var(--yin-component-group-heading-weight); }
+.group-buttons { margin-left: var(--yin-spaceSm); transition: opacity var(--yin-component-state-hover-duration) var(--yin-component-state-easing); }
+.group-buttons > span { margin-right: var(--yin-spaceSm); color: var(--yin-text); cursor: pointer; }
+.group-action-icon { font-size: var(--yin-component-iconography-size); }
 
 .fixed-element {
   position: fixed;
+  z-index: 22;
   /* 将元素固定在屏幕上 */
   right: 10px;
   /* 距离屏幕顶部的距离 */
@@ -1485,13 +1708,13 @@ html:has(:root[data-yin-layout='directory']) body { background-color: transparen
   .home-header-row .logo span { font-size: 1.35rem; }
   .home-header-row .divider { margin-left: 4px; margin-right: 4px; }
   .icon-info-box { gap: 10px; grid-template-columns: 1fr; }
-  :global(:root[data-yin-layout='directory']) .icon-small-box { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; }
-  :global(:root[data-yin-layout='directory']) .app-icon-small-title { max-width: calc(100vw - 100px); overflow: hidden; text-overflow: ellipsis; }
+  :global(:root[data-yin-layout='directory'] .icon-small-box) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--yin-component-group-gap); }
   .icon-small-box { gap: 12px 8px; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); }
   .system-monitor { overflow: hidden; }
   .home-content--with-monitor { padding-top: 300px; }
   .home-content--monitor-info { padding-top: 380px; }
   .system-monitor-layer { max-height: 320px; }
   .system-monitor-layer--info { max-height: 370px; }
+  .system-monitor-layer--directory { max-height: none; }
 }
 </style>

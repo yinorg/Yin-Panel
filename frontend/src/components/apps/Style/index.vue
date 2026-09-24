@@ -68,7 +68,7 @@ async function loadThemePackages() {
 async function uploadThemePackage(file?: File, confirmed = false): Promise<void> {
   if (!file) return
   const result = await installThemePackage(file, confirmed)
-  if (result.code !== 0 && !confirmed && /unverified/i.test(result.msg)) {
+  if (result.code !== 0 && !confirmed && /unverified|unsigned/i.test(result.msg)) {
     if (window.confirm(t('themePackage.confirmUnverified')))
       return uploadThemePackage(file, true)
   }

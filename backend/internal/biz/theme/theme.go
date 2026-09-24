@@ -998,37 +998,37 @@ func ratio(a, b color) float64 {
 func Builtin() *Package {
 	light := map[string]string{"canvas": "#ffffff", "surface": "#f3f6f8", "surfaceElevated": "#ffffff", "text": "#172126", "textMuted": "#53636a", "border": "#d5dfe2", "primary": "#075b68", "onPrimary": "#ffffff", "secondary": "#8b4412", "success": "#176b45", "warning": "#805200", "danger": "#a12627", "focusRing": "#075b68"}
 	dark := map[string]string{"canvas": "#171d20", "surface": "#222a2e", "surfaceElevated": "#2b353a", "text": "#f1f5f6", "textMuted": "#b0bec3", "border": "#536168", "primary": "#72d6df", "onPrimary": "#102326", "secondary": "#f0a66d", "success": "#71d8a0", "warning": "#f2c46c", "danger": "#ff9792", "focusRing": "#72d6df"}
-	return builtinPackage(builtinDefaultID, "Yin Default", "2.1.0", light, dark, "yin")
+	return builtinPackage(builtinDefaultID, "Yin Default", "2.2.0", light, dark, "yin")
 }
 
 func BuiltinMist() *Package {
 	light := map[string]string{"canvas": "#f4f7f6", "surface": "#ffffff", "surfaceElevated": "#ffffff", "text": "#172826", "textMuted": "#586966", "border": "#d6e2df", "primary": "#b43743", "onPrimary": "#ffffff", "secondary": "#08796a", "success": "#197349", "warning": "#785300", "danger": "#a52d34", "focusRing": "#b43743"}
 	dark := map[string]string{"canvas": "#151d1c", "surface": "#202a29", "surfaceElevated": "#2a3634", "text": "#f0f6f3", "textMuted": "#b4c3be", "border": "#4b605a", "primary": "#f28b80", "onPrimary": "#311717", "secondary": "#74d4bd", "success": "#76d39b", "warning": "#f0c66f", "danger": "#ff9b95", "focusRing": "#f28b80"}
-	return builtinPackage(builtinMistID, "Yin Mist", "1.1.0", light, dark, "mist")
+	return builtinPackage(builtinMistID, "Yin Mist", "1.2.0", light, dark, "mist")
 }
 
 func BuiltinHorizon() *Package {
 	light := map[string]string{"canvas": "#f4f8fa", "surface": "#ffffff", "surfaceElevated": "#ffffff", "text": "#20282c", "textMuted": "#64737a", "border": "#d8e0e3", "primary": "#176b80", "onPrimary": "#ffffff", "secondary": "#b4543c", "success": "#28734d", "warning": "#805500", "danger": "#a63338", "focusRing": "#176b80"}
 	dark := map[string]string{"canvas": "#171d20", "surface": "#22292c", "surfaceElevated": "#2b3438", "text": "#f2f5f6", "textMuted": "#b7c1c4", "border": "#536066", "primary": "#78c5d4", "onPrimary": "#14262a", "secondary": "#eea080", "success": "#79d4a1", "warning": "#f1c66d", "danger": "#ff9994", "focusRing": "#78c5d4"}
-	return builtinPackage(builtinHorizonID, "Yin Horizon", "1.1.0", light, dark, "horizon")
+	return builtinPackage(builtinHorizonID, "Yin Horizon", "1.2.0", light, dark, "horizon")
 }
 
 func BuiltinGlass() *Package {
 	light := map[string]string{"canvas": "#e7edf4", "surface": "#edf2f8", "surfaceElevated": "#f8fbff", "text": "#182535", "textMuted": "#53677c", "border": "#a9bed3", "primary": "#2666a6", "onPrimary": "#ffffff", "secondary": "#8059a8", "success": "#176b45", "warning": "#805200", "danger": "#a12627", "focusRing": "#2666a6"}
 	dark := map[string]string{"canvas": "#101827", "surface": "#19263a", "surfaceElevated": "#25354c", "text": "#eef5ff", "textMuted": "#a6b8cd", "border": "#526c89", "primary": "#73b9ff", "onPrimary": "#10253d", "secondary": "#c6a4ff", "success": "#71d8a0", "warning": "#f2c46c", "danger": "#ff9792", "focusRing": "#73b9ff"}
-	return builtinPackage(builtinGlassID, "Yin Glass", "1.0.0", light, dark, "glass")
+	return builtinPackage(builtinGlassID, "Yin Glass", "1.1.0", light, dark, "glass")
 }
 
 func BuiltinMinimal() *Package {
 	light := map[string]string{"canvas": "#ffffff", "surface": "#fafafa", "surfaceElevated": "#ffffff", "text": "#202020", "textMuted": "#666666", "border": "#e6e6e6", "primary": "#303030", "onPrimary": "#ffffff", "secondary": "#526b5d", "success": "#176b45", "warning": "#805200", "danger": "#a12627", "focusRing": "#526b5d"}
 	dark := map[string]string{"canvas": "#141414", "surface": "#1b1b1b", "surfaceElevated": "#202020", "text": "#eeeeee", "textMuted": "#aaaaaa", "border": "#363636", "primary": "#d0d0d0", "onPrimary": "#181818", "secondary": "#9db7a7", "success": "#71d8a0", "warning": "#f2c46c", "danger": "#ff9792", "focusRing": "#9db7a7"}
-	return builtinPackage(builtinMinimalID, "Yin Minimal", "1.0.0", light, dark, "minimal")
+	return builtinPackage(builtinMinimalID, "Yin Minimal", "1.1.0", light, dark, "minimal")
 }
 
 func BuiltinCyber() *Package {
 	light := map[string]string{"canvas": "#f5f3ff", "surface": "#ffffff", "surfaceElevated": "#ffffff", "text": "#251847", "textMuted": "#65568a", "border": "#8f77c8", "primary": "#5a27d5", "onPrimary": "#ffffff", "secondary": "#007b83", "success": "#176b45", "warning": "#805200", "danger": "#a12627", "focusRing": "#5a27d5"}
 	dark := map[string]string{"canvas": "#100b20", "surface": "#19112e", "surfaceElevated": "#24173e", "text": "#f5edff", "textMuted": "#b5a5d5", "border": "#6746a0", "primary": "#ed4bc5", "onPrimary": "#210c27", "secondary": "#42e5df", "success": "#71d8a0", "warning": "#f2c46c", "danger": "#ff9792", "focusRing": "#42e5df"}
-	return builtinPackage(builtinCyberID, "Yin Cyber", "1.0.0", light, dark, "cyber")
+	return builtinPackage(builtinCyberID, "Yin Cyber", "1.1.0", light, dark, "cyber")
 }
 
 func Builtins() []*Package {
@@ -1065,6 +1065,9 @@ func makeDocument(palette map[string]string, dark bool, preset string) json.RawM
 	fontBody := []string{"Inter", "system-ui", "sans-serif"}
 	fontDisplay := []string{"Inter", "system-ui", "sans-serif"}
 	baseRadius, cardPadding, groupGap, iconSize, duration, searchBlur := 8.0, 16.0, 20.0, 70.0, 180.0, 0.0
+	monitorIconSize := 35.0
+	groupHeadingSize, groupHeadingWeight := 20.0, 800
+	monitorHeadingSize, monitorHeadingWeight := 20.0, 800
 	surfaceStyle, density, borderStyle := "solid", "standard", "solid"
 	if dark {
 		shadowColor = "#080d12"
@@ -1072,19 +1075,29 @@ func makeDocument(palette map[string]string, dark bool, preset string) json.RawM
 	switch preset {
 	case "glass":
 		baseRadius, cardPadding, groupGap, iconSize, duration, searchBlur = 18, 22, 28, 76, 260, 18
+		monitorIconSize = 32
+		groupHeadingSize, groupHeadingWeight, monitorHeadingSize, monitorHeadingWeight = 22, 600, 20, 600
 		surfaceStyle, density, shadowColor = "glass", "comfortable", "#37628c"
 	case "minimal":
 		baseRadius, cardPadding, groupGap, iconSize, duration = 2, 22, 28, 64, 100
+		monitorIconSize = 30
+		groupHeadingSize, groupHeadingWeight, monitorHeadingSize, monitorHeadingWeight = 16, 600, 16, 600
 		surfaceStyle, density, shadowColor, borderStyle = "solid", "spacious", "#808080", "solid"
 	case "cyber":
 		baseRadius, cardPadding, groupGap, iconSize, duration = 1, 14, 16, 72, 90
+		monitorIconSize = 36
+		groupHeadingSize, groupHeadingWeight, monitorHeadingSize, monitorHeadingWeight = 20, 700, 20, 700
 		surfaceStyle, density, shadowColor, borderStyle = "gradient", "compact", "#ed4bc5", "double"
 		fontBody = []string{"IBM Plex Mono", "monospace"}
 		fontDisplay = []string{"Orbitron", "IBM Plex Mono", "monospace"}
 	case "horizon":
 		baseRadius, cardPadding, groupGap, iconSize, duration, searchBlur, surfaceStyle = 5, 16, 18, 64, 160, 10, "frosted"
+		monitorIconSize = 32
+		groupHeadingSize, groupHeadingWeight, monitorHeadingSize, monitorHeadingWeight = 18, 600, 18, 600
 	case "mist":
 		baseRadius, cardPadding, groupGap, iconSize, duration, searchBlur = 10, 18, 24, 72, 220, 10
+		monitorIconSize = 34
+		groupHeadingSize, groupHeadingWeight, monitorHeadingSize, monitorHeadingWeight = 20, 600, 20, 600
 		surfaceStyle = "frosted"
 	}
 	if preset == "minimal" {
@@ -1112,20 +1125,26 @@ func makeDocument(palette map[string]string, dark bool, preset string) json.RawM
 	if preset == "cyber" {
 		texture = "grid"
 	}
+	searchOptionSize, searchOptionGap := 40.0, 10.0
+	if density == "compact" {
+		searchOptionSize, searchOptionGap = 36, 6
+	} else if density == "spacious" {
+		searchOptionSize, searchOptionGap = 44, 12
+	}
 	zero := px(0)
 	shadow := map[string]any{"color": shadowColor, "offsetX": zero, "offsetY": px(4), "blur": px(18), "spread": px(0)}
 	component := map[string]any{
 		"appIcon":       map[string]any{"$type": "dimension", "size": map[string]any{"$value": px(iconSize)}, "radius": map[string]any{"$value": px(baseRadius)}, "gap": map[string]any{"$value": px(8)}, "surface": map[string]any{"$type": "color", "$value": "{semantic.color.surfaceElevated}"}, "shadow": map[string]any{"$type": "shadow", "$value": shadow}},
 		"card":          map[string]any{"$type": "dimension", "padding": map[string]any{"$value": px(cardPadding)}, "radius": map[string]any{"$value": px(baseRadius)}, "borderWidth": map[string]any{"$value": px(1)}, "borderStyle": map[string]any{"$type": "string", "$value": borderStyle}, "surfaceMode": map[string]any{"$type": "string", "$value": surfaceStyle}, "shadow": map[string]any{"$type": "shadow", "$value": shadow}},
-		"group":         map[string]any{"$type": "dimension", "gap": map[string]any{"$value": px(groupGap)}, "sectionSpacing": map[string]any{"$value": px(groupGap)}, "padding": map[string]any{"$value": px(cardPadding)}},
-		"searchBox":     map[string]any{"$type": "dimension", "height": map[string]any{"$value": px(44)}, "radius": map[string]any{"$value": px(baseRadius)}, "borderWidth": map[string]any{"$value": px(1)}, "surface": map[string]any{"$type": "color", "$value": "{semantic.color.surfaceElevated}"}, "surfaceMode": map[string]any{"$type": "string", "$value": surfaceStyle}, "blur": map[string]any{"$value": px(searchBlur)}, "shadow": map[string]any{"$type": "shadow", "$value": shadow}},
+		"group":         map[string]any{"$type": "dimension", "gap": map[string]any{"$value": px(groupGap)}, "sectionSpacing": map[string]any{"$value": px(groupGap)}, "padding": map[string]any{"$value": px(cardPadding)}, "headingSize": map[string]any{"$value": px(groupHeadingSize)}, "headingWeight": map[string]any{"$type": "fontWeight", "$value": groupHeadingWeight}},
+		"searchBox":     map[string]any{"$type": "dimension", "height": map[string]any{"$value": px(44)}, "radius": map[string]any{"$value": px(baseRadius)}, "borderWidth": map[string]any{"$value": px(1)}, "optionSize": map[string]any{"$value": px(searchOptionSize)}, "optionGap": map[string]any{"$value": px(searchOptionGap)}, "surface": map[string]any{"$type": "color", "$value": "{semantic.color.surfaceElevated}"}, "surfaceMode": map[string]any{"$type": "string", "$value": surfaceStyle}, "blur": map[string]any{"$value": px(searchBlur)}, "shadow": map[string]any{"$type": "shadow", "$value": shadow}},
 		"sidebar":       map[string]any{"$type": "dimension", "padding": map[string]any{"$value": px(cardPadding)}, "radius": map[string]any{"$value": px(baseRadius)}, "surface": map[string]any{"$type": "color", "$value": "{semantic.color.surfaceElevated}"}, "surfaceMode": map[string]any{"$type": "string", "$value": surfaceStyle}},
 		"dialog":        map[string]any{"$type": "dimension", "padding": map[string]any{"$value": px(cardPadding)}, "radius": map[string]any{"$value": px(baseRadius)}, "surface": map[string]any{"$type": "color", "$value": "{semantic.color.surfaceElevated}"}, "surfaceMode": map[string]any{"$type": "string", "$value": surfaceStyle}, "shadow": map[string]any{"$type": "shadow", "$value": shadow}},
 		"menu":          map[string]any{"$type": "dimension", "padding": map[string]any{"$value": px(6)}, "radius": map[string]any{"$value": px(baseRadius)}, "surface": map[string]any{"$type": "color", "$value": "{semantic.color.surfaceElevated}"}, "surfaceMode": map[string]any{"$type": "string", "$value": surfaceStyle}, "shadow": map[string]any{"$type": "shadow", "$value": shadow}},
 		"button":        map[string]any{"$type": "dimension", "height": map[string]any{"$value": px(36)}, "paddingX": map[string]any{"$value": px(14)}, "radius": map[string]any{"$value": px(baseRadius)}, "borderWidth": map[string]any{"$value": px(1)}, "surfaceMode": map[string]any{"$type": "string", "$value": surfaceStyle}},
 		"input":         map[string]any{"$type": "dimension", "height": map[string]any{"$value": px(36)}, "paddingX": map[string]any{"$value": px(12)}, "radius": map[string]any{"$value": px(baseRadius)}, "borderWidth": map[string]any{"$value": px(1)}, "surfaceMode": map[string]any{"$type": "string", "$value": surfaceStyle}},
 		"tooltip":       map[string]any{"$type": "dimension", "padding": map[string]any{"$value": px(8)}, "radius": map[string]any{"$value": px(baseRadius)}, "surfaceMode": map[string]any{"$type": "string", "$value": surfaceStyle}, "shadow": map[string]any{"$type": "shadow", "$value": shadow}},
-		"systemMonitor": map[string]any{"$type": "dimension", "gap": map[string]any{"$value": px(groupGap)}, "padding": map[string]any{"$value": px(cardPadding)}, "radius": map[string]any{"$value": px(baseRadius)}, "iconSize": map[string]any{"$value": px(28)}},
+		"systemMonitor": map[string]any{"$type": "dimension", "gap": map[string]any{"$value": px(groupGap)}, "padding": map[string]any{"$value": px(cardPadding)}, "radius": map[string]any{"$value": px(baseRadius)}, "iconSize": map[string]any{"$value": px(monitorIconSize)}, "headingSize": map[string]any{"$value": px(monitorHeadingSize)}, "headingWeight": map[string]any{"$type": "fontWeight", "$value": monitorHeadingWeight}},
 		"state":         map[string]any{"$type": "duration", "hoverDuration": map[string]any{"$value": ms(duration)}, "pressDuration": map[string]any{"$value": ms(80)}, "enterDuration": map[string]any{"$value": ms(duration)}, "easing": map[string]any{"$type": "cubicBezier", "$value": []float64{.2, .8, .2, 1}}, "hoverScale": map[string]any{"$type": "number", "$value": 1.02}, "pressScale": map[string]any{"$type": "number", "$value": .96}, "tiltDegrees": map[string]any{"$type": "number", "$value": tiltDegrees}, "spaceTransitionDuration": map[string]any{"$type": "duration", "$value": ms(duration * 5.5)}, "spaceTransitionEasing": map[string]any{"$type": "cubicBezier", "$value": []float64{.22, .61, .36, 1}}},
 		"surface":       map[string]any{"$type": "number", "opacity": map[string]any{"$value": .88}, "blur": map[string]any{"$type": "dimension", "$value": px(16)}, "glow": map[string]any{"$type": "dimension", "$value": px(glow)}},
 		"iconography":   map[string]any{"$type": "dimension", "size": map[string]any{"$value": px(20)}, "containerRadius": map[string]any{"$value": px(baseRadius)}, "strokeWidth": map[string]any{"$type": "number", "$value": 1.8}},

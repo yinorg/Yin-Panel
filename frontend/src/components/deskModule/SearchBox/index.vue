@@ -113,22 +113,22 @@ onUnmounted(() => window.removeEventListener('yin-panel-search-config-saved', ha
 
 <template>
   <div class="search-box w-full" @keydown.enter="handleSearchClick" @keydown.esc="handleClearSearchTerm">
-    <div class="search-container flex rounded-2xl items-center justify-center w-full" :style="props.directory ? undefined : { background, color: textColor }" :class="{ focused: isFocused, 'search-container--directory': directory }">
-      <div class="search-box-btn-engine w-[40px] flex justify-center cursor-pointer" @click="handleEngineClick">
+    <div class="search-container flex items-center justify-center w-full" :style="props.directory ? undefined : { background, color: textColor }" :class="{ focused: isFocused, 'search-container--directory': directory }">
+      <div class="search-box-btn-engine flex justify-center cursor-pointer" @click="handleEngineClick">
         <NAvatar :src="state.currentSearchEngine.iconSrc" style="background-color: transparent;" :size="20" />
       </div>
       <input data-testid="home-search-input" v-model="searchTerm" :placeholder="$t('deskModule.searchBox.inputPlaceholder')" @focus="onFocus" @blur="onBlur" @input="handleItemSearch">
-      <div v-if="searchTerm !== ''" class="search-box-btn-clear w-[25px] mr-[10px] flex justify-center cursor-pointer" @click="handleClearSearchTerm">
+      <div v-if="searchTerm !== ''" class="search-box-btn-clear w-[25px] flex justify-center cursor-pointer" @click="handleClearSearchTerm">
         <SvgIcon style="width: 20px;height: 20px;" icon="line-md:close-small" />
       </div>
       <div class="search-box-btn-search w-[25px] flex justify-center cursor-pointer" @click="handleSearchClick">
         <SvgIcon style="width: 20px;height: 20px;" icon="iconamoon:search-fill" />
       </div>
     </div>
-    <div v-if="searchSelectListShow" class="search-engines w-full mt-[10px] rounded-xl p-[10px]" :class="{ 'search-engines--directory': directory }" :style="directory ? undefined : { background }">
+    <div v-if="searchSelectListShow" class="search-engines w-full mt-[10px]" :class="{ 'search-engines--directory': directory }" :style="directory ? undefined : { background }">
       <div class="flex items-center">
         <div class="flex items-center flex-wrap">
-          <div v-for="item, index in searchEngineList" :key="index" :title="item.title" class="search-engine-option w-[40px] h-[40px] cursor-pointer flex items-center justify-center mr-[10px] mb-[10px]" @click="handleEngineUpdate(item)">
+          <div v-for="item, index in searchEngineList" :key="index" :title="item.title" class="search-engine-option cursor-pointer flex items-center justify-center" @click="handleEngineUpdate(item)">
             <NAvatar :src="item.iconSrc" style="background-color: transparent;" :size="20" />
           </div>
         </div>
@@ -142,7 +142,7 @@ onUnmounted(() => window.removeEventListener('yin-panel-search-config-saved', ha
 .search-container--directory input { color: var(--yin-text); }
 .search-container--directory input::placeholder { color: var(--yin-textMuted); }
 .search-engines--directory { border: var(--yin-component-search-box-border-width) solid var(--yin-border); border-radius: var(--yin-component-search-box-radius); background: var(--yin-surfaceElevated); box-shadow: var(--yin-component-search-box-shadow); }
-.search-engine-option { border-radius: var(--yin-component-input-radius); background: var(--yin-surface); }
+.search-engine-option { width: var(--yin-component-search-box-option-size); height: var(--yin-component-search-box-option-size); margin: 0 var(--yin-component-search-box-option-gap) var(--yin-component-search-box-option-gap) 0; border-radius: var(--yin-component-input-radius); background: var(--yin-surface); }
 </style>
 
 <style scoped>
@@ -150,12 +150,16 @@ onUnmounted(() => window.removeEventListener('yin-panel-search-config-saved', ha
   border: var(--yin-component-search-box-border-width) solid var(--yin-border);
   border-radius: var(--yin-component-search-box-radius);
   transition: box-shadow var(--yin-component-state-hover-duration) var(--yin-component-state-easing), backdrop-filter var(--yin-component-state-hover-duration) var(--yin-component-state-easing);
-  padding: 2px var(--yin-component-input-padding-x);
+  min-height: var(--yin-component-search-box-height);
+  padding: 0 var(--yin-component-input-padding-x);
   backdrop-filter: blur(var(--yin-component-search-box-blur));
   background: var(--yin-component-search-box-surface);
   color: var(--yin-text);
 }
-.search-engines { border-radius: var(--yin-component-menu-radius); background: var(--yin-component-menu-surface, var(--yin-surfaceElevated)); box-shadow: var(--yin-component-menu-shadow); }
+.search-engines { padding: var(--yin-component-menu-padding); border-radius: var(--yin-component-menu-radius); background: var(--yin-component-menu-surface, var(--yin-surfaceElevated)); box-shadow: var(--yin-component-menu-shadow); }
+.search-engines { margin-top: var(--yin-component-search-box-option-gap); }
+.search-box-btn-engine { flex: 0 0 var(--yin-component-search-box-option-size); }
+.search-box-btn-clear { margin-right: var(--yin-component-search-box-option-gap); }
 
 .search-container input {
   background-color: transparent;
@@ -163,7 +167,7 @@ onUnmounted(() => window.removeEventListener('yin-panel-search-config-saved', ha
   width: 100%;
   min-width: 0;
   height: var(--yin-component-search-box-height);
-  padding: 10px 5px;
+  padding: 0 var(--yin-spaceXs);
   border: none;
   outline: none;
   font: var(--yin-fontBodyWeight) var(--yin-fontBodySize)/var(--yin-lineHeightBody) var(--yin-fontBody);

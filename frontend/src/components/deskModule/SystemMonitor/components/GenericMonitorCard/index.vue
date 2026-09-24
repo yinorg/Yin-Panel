@@ -41,7 +41,7 @@ const propClass = ref(props.class)
         <div class="w-[60px] h-[70px]">
           <div class="w-[60px] h-full flex items-center justify-center text-white">
             <slot name="icon">
-              <SvgIcon :icon="icon ?? ''" style="width: 35px;height: 35px;" :style="{ color: textColor }" />
+              <SvgIcon :icon="icon ?? ''" :style="{ color: textColor, width: 'var(--yin-component-system-monitor-icon-size)', height: 'var(--yin-component-system-monitor-icon-size)' }" />
             </slot>
           </div>
         </div>

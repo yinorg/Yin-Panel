@@ -64,7 +64,7 @@ body {
 	--yin-shape-control: 4px;
 	--yin-shape-card: 6px;
 	--yin-shape-dialog: 8px;
-	--yin-density-scale: standard;
+	--yin-density-scale: 1;
 	--yin-component-card-padding: 16px;
 	--yin-component-card-radius: var(--yin-radiusCard);
 	--yin-component-card-border-width: 1px;
@@ -79,7 +79,11 @@ body {
 	--yin-component-group-gap: var(--yin-spaceLg);
 	--yin-component-group-section-spacing: var(--yin-spaceLg);
 	--yin-component-group-padding: 16px;
+	--yin-component-group-heading-size: 20px;
+	--yin-component-group-heading-weight: 800;
 	--yin-component-search-box-height: 44px;
+	--yin-component-search-box-option-size: 40px;
+	--yin-component-search-box-option-gap: 10px;
 	--yin-component-search-box-surface: var(--yin-surfaceElevated);
 	--yin-component-search-box-radius: var(--yin-radiusControl);
 	--yin-component-search-box-border-width: 1px;
@@ -109,7 +113,9 @@ body {
 	--yin-component-system-monitor-gap: var(--yin-spaceLg);
 	--yin-component-system-monitor-padding: 16px;
 	--yin-component-system-monitor-radius: var(--yin-radiusCard);
-	--yin-component-system-monitor-icon-size: 28px;
+	--yin-component-system-monitor-icon-size: 35px;
+	--yin-component-system-monitor-heading-size: 20px;
+	--yin-component-system-monitor-heading-weight: 800;
 	--yin-component-state-hover-duration: 180ms;
 	--yin-component-state-press-duration: 80ms;
 	--yin-component-state-enter-duration: 180ms;
@@ -119,6 +125,9 @@ body {
 	--yin-component-state-hover-scale: 1.02;
 	--yin-component-state-press-scale: .96;
 	--yin-component-surface-opacity: .88;
+	--yin-background-grid-opacity: 0;
+	--yin-background-dots-opacity: 0;
+	--yin-background-noise-opacity: 0;
 	--yin-component-surface-blur: 16px;
 	--yin-component-surface-glow: 0px;
 	--yin-component-iconography-size: 20px;
@@ -161,20 +170,21 @@ button, input, select, textarea, [role='button'] {
 	transition: background-color var(--yin-component-state-hover-duration) var(--yin-component-state-easing), border-color var(--yin-component-state-hover-duration) var(--yin-component-state-easing), box-shadow var(--yin-component-state-hover-duration) var(--yin-component-state-easing);
 }
 .n-card { padding: var(--yin-component-card-padding); box-shadow: var(--yin-component-card-shadow); }
-.n-popover, .n-dropdown-menu, .n-tooltip { box-shadow: var(--yin-component-menu-shadow); }
-.n-button { min-height: var(--yin-component-button-height); border-radius: var(--yin-component-button-radius); }
-.n-input, .n-base-selection { border-radius: var(--yin-component-input-radius); }
-.n-modal, .n-dialog { box-shadow: var(--yin-component-dialog-shadow); }
+.n-popover, .n-dropdown-menu { border-radius: var(--yin-component-menu-radius); box-shadow: var(--yin-component-menu-shadow); }
+.n-tooltip { padding: var(--yin-component-tooltip-padding); border-radius: var(--yin-component-tooltip-radius); box-shadow: var(--yin-component-tooltip-shadow); }
+.n-button { min-height: var(--yin-component-button-height); padding-inline: var(--yin-component-button-padding-x); border-radius: var(--yin-component-button-radius); border-width: var(--yin-component-button-border-width); }
+.n-input, .n-base-selection { min-height: var(--yin-component-input-height); border-width: var(--yin-component-input-border-width); border-radius: var(--yin-component-input-radius); }
+.n-modal, .n-dialog { border-radius: var(--yin-component-dialog-radius); box-shadow: var(--yin-component-dialog-shadow); }
+.n-modal, .n-dialog { animation-duration: var(--yin-component-state-enter-duration); }
+.n-dropdown-menu .n-dropdown-option { padding-inline: var(--yin-component-menu-padding); }
+.n-input .n-input__input-el { padding-inline: var(--yin-component-input-padding-x); }
 
-:root[data-yin-surface='transparent'] .theme-surface { background: transparent; box-shadow: none; }
+:root[data-yin-surface='transparent'] .theme-surface,
+:root[data-yin-surface='transparent'] .n-card { background: transparent; box-shadow: none; }
 :root[data-yin-surface='glass'] .theme-surface,
 :root[data-yin-surface='frosted'] .theme-surface,
 :root[data-yin-surface='glass'] .n-card,
-:root[data-yin-surface='frosted'] .n-card,
-:root[data-yin-surface='glass'] .n-modal,
-:root[data-yin-surface='frosted'] .n-modal,
-:root[data-yin-surface='glass'] .n-popover,
-:root[data-yin-surface='frosted'] .n-popover {
+:root[data-yin-surface='frosted'] .n-card {
 	background: color-mix(in srgb, var(--yin-surfaceElevated) calc(var(--yin-component-surface-opacity) * 100%), transparent);
 	backdrop-filter: blur(var(--yin-component-surface-blur));
 }
@@ -199,22 +209,42 @@ button, input, select, textarea, [role='button'] {
 	background: color-mix(in srgb, var(--yin-surfaceElevated) calc(var(--yin-component-surface-opacity) * 100%), transparent);
 }
 :root[data-yin-search-surface='gradient'] .search-container,
+:root[data-yin-sidebar-surface='gradient'] .space-status-bar,
 :root[data-yin-dialog-surface='gradient'] .command-center-panel,
-:root[data-yin-menu-surface='gradient'] .n-dropdown-menu {
+:root[data-yin-menu-surface='gradient'] .n-dropdown-menu,
+:root[data-yin-tooltip-surface='gradient'] .n-tooltip {
 	background: linear-gradient(135deg, var(--yin-surfaceElevated), color-mix(in srgb, var(--yin-primary) 18%, var(--yin-surfaceElevated)));
 }
 :root[data-yin-button-surface='glass'] .n-button,
+:root[data-yin-button-surface='frosted'] .n-button,
 :root[data-yin-input-surface='glass'] .n-input,
 :root[data-yin-input-surface='frosted'] .n-input {
 	backdrop-filter: blur(var(--yin-component-surface-blur));
 }
+:root[data-yin-button-surface='gradient'] .n-button,
+:root[data-yin-input-surface='gradient'] .n-input,
+:root[data-yin-input-surface='gradient'] .n-base-selection { background-image: linear-gradient(135deg, color-mix(in srgb, var(--yin-primary) 14%, transparent), transparent); }
+:root[data-yin-dialog-surface='transparent'] .n-modal,
+:root[data-yin-dialog-surface='transparent'] .n-dialog,
+:root[data-yin-search-surface='transparent'] .search-container,
+:root[data-yin-sidebar-surface='transparent'] .space-status-bar,
+:root[data-yin-menu-surface='transparent'] .n-dropdown-menu,
+:root[data-yin-tooltip-surface='transparent'] .n-tooltip,
+:root[data-yin-button-surface='transparent'] .n-button,
+:root[data-yin-input-surface='transparent'] .n-input { background-color: transparent; }
+:root[data-yin-search-surface='transparent'] .search-container,
+:root[data-yin-sidebar-surface='transparent'] .space-status-bar { box-shadow: none; }
 :root[data-yin-texture='grid'] body {
-	background-image: linear-gradient(color-mix(in srgb, var(--yin-border) 24%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--yin-border) 24%, transparent) 1px, transparent 1px);
-	background-size: 28px 28px;
+	background-image: linear-gradient(color-mix(in srgb, var(--yin-border) calc(var(--yin-background-grid-opacity) * 100%), transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--yin-border) calc(var(--yin-background-grid-opacity) * 100%), transparent) 1px, transparent 1px), var(--yin-background-image, none);
+	background-size: 28px 28px, 28px 28px, auto;
 }
 :root[data-yin-texture='dots'] body {
-	background-image: radial-gradient(color-mix(in srgb, var(--yin-border) 35%, transparent) 1px, transparent 1px);
-	background-size: 18px 18px;
+	background-image: radial-gradient(color-mix(in srgb, var(--yin-border) calc(var(--yin-background-dots-opacity) * 100%), transparent) 1px, transparent 1px), var(--yin-background-image, none);
+	background-size: 18px 18px, auto;
+}
+:root[data-yin-texture='noise'] body {
+	background-image: radial-gradient(color-mix(in srgb, var(--yin-text) calc(var(--yin-background-noise-opacity) * 100%), transparent) .5px, transparent .8px), radial-gradient(color-mix(in srgb, var(--yin-border) calc(var(--yin-background-noise-opacity) * 360%), transparent) .5px, transparent .8px), var(--yin-background-image, none);
+	background-size: 3px 3px, 5px 5px, auto;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -16,7 +16,8 @@ primitive.color.*
     -> component.appIcon.*, component.card.*, component.group.*,
        component.searchBox.*, component.sidebar.*, component.dialog.*,
        component.menu.*, component.button.*, component.input.*,
-       component.tooltip.*, component.systemMonitor.*
+       component.tooltip.*, component.systemMonitor.*, component.state.*,
+       component.surface.*, component.iconography.*
 ```
 
 The same DTCG document also declares `shape`, `spacing`, `density`, `elevation`, `motion`, `background`, and `effect`. Reference resolution is cycle checked. CSS string values reject rule delimiters and control characters; finite numbers, dimensions, duration, color, font family, shadow, and cubic-Bezier values are checked before application.
@@ -47,8 +48,10 @@ The same DTCG document also declares `shape`, `spacing`, `density`, `elevation`,
 | Button / Input | Naive UI heights and radii, plus global motion and focus tokens |
 | SystemMonitor | Group spacing, padding, radius, icon, text, and generated default colors |
 
+Official packages provide both schemes for AppIcon, Card, Group, SearchBox, Sidebar, Dialog, Menu, Button, Input, Tooltip, SystemMonitor, state, surface and iconography. Search option size and gap follow the package density. Optional component tokens remain optional for third party API v1/v2/v3 themes; consumers use the CSS defaults in `global.less` when an extension is absent. Updating built-in package versions causes installed built-ins to refresh without changing the selected theme or panel layout.
+
 ## Official Directions
 
 `org.yin.default` retains the Yin visual direction. `org.yin.glass` uses frosted surfaces, blur, larger radii and glow. `org.yin.minimal` uses small radii, spacious density, low motion and restrained elevation. `org.yin.cyber` uses monospace typography, compact density, double outlines, neon elevation and a grid texture. Mist and Horizon remain installed alternatives and use the same v3 contract. Horizon's directory layout is a separate panel preference.
 
-Run `npm run audit:theme-tokens` to discover remaining literal visual declarations in Vue style blocks and CSS/Less. Brand marks, user-authored item colors, data visualization colors, code highlighting, and markdown renderer styles need an explicit product decision before being converted.
+Run `npm run audit:theme-tokens` to scan home, common and desktop-module Vue template classes, bound styles and SFC style blocks, plus frontend CSS/Less. It reports literal visual values for review and fails if a configured file is missing, no consumer was scanned, or a default component variable has no consumer. Structural layout dimensions and decorative placements in `views/home/index.vue`/`CommandCenter` remain layout-owned; wallpaper transform/blur belongs to wallpaper configuration; `SystemMonitor/Edit/**` checkerboards are color-picker affordances; user-authored item/monitor colors and monitor chart states remain data-owned; brand/SVG artwork, Markdown and syntax-highlighting styles are also excluded from token migration. The report count is an inventory, not a pass/fail measure of theme quality.

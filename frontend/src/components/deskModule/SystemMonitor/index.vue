@@ -250,25 +250,25 @@ function handleRightMenuSelect(key: string | number) {
   <div class="system-monitor w-full">
     <div
       class="system-monitor-content"
-      :class="monitorGroup.sortStatus ? 'shadow-2xl border shadow-[0_0_30px_10px_rgba(0,0,0,0.3)]  p-[10px] rounded-2xl' : ''"
+      :class="{ 'system-monitor-content--sorting': monitorGroup.sortStatus }"
       @mouseenter="handleSetHoverStatus(true)"
       @mouseleave="handleSetHoverStatus(false)"
     >
       <!-- 分组标题 -->
-      <div class="system-monitor-header text-white text-xl font-extrabold mb-[20px] ml-[10px] flex items-center">
+      <div class="system-monitor-header flex items-center">
         <span v-if="showTitle" class="text-shadow">
           {{ $t('deskModule.systemMonitor.systemState') }}
         </span>
         <div
           v-if="allowEdit"
-          class="system-monitor-buttons ml-2 delay-100 transition-opacity flex"
+          class="system-monitor-buttons flex"
           :class="monitorGroup.hoverStatus ? 'opacity-100' : 'opacity-0'"
         >
           <span class="mr-2 cursor-pointer" @click="handleAddItem()">
-            <SvgIcon class="text-white font-xl" icon="typcn:plus" />
+            <SvgIcon class="system-monitor-action-icon" icon="typcn:plus" />
           </span>
           <span class="mr-2 cursor-pointer" @click="handleSetSortStatus(!monitorGroup.sortStatus)">
-            <SvgIcon class="text-white font-xl" icon="ri:drag-drop-line" />
+            <SvgIcon class="system-monitor-action-icon" icon="ri:drag-drop-line" />
           </span>
         </div>
       </div>
@@ -358,8 +358,12 @@ function handleRightMenuSelect(key: string | number) {
   text-shadow: var(--yin-effect-text-shadow);
 }
 
-.system-monitor-content { margin-top: var(--yin-component-system-monitor-gap); padding: var(--yin-component-system-monitor-padding); border-radius: var(--yin-component-system-monitor-radius); }
-.system-monitor-header { font-family: var(--yin-fontDisplay); font-size: var(--yin-fontHeadingSize); font-weight: var(--yin-fontHeadingWeight); }
+.system-monitor-content { margin-top: var(--yin-component-system-monitor-gap); border-radius: var(--yin-component-system-monitor-radius); transition: box-shadow var(--yin-component-state-hover-duration) var(--yin-component-state-easing), border-color var(--yin-component-state-hover-duration) var(--yin-component-state-easing), padding var(--yin-component-state-hover-duration) var(--yin-component-state-easing); }
+.system-monitor-content--sorting { padding: var(--yin-component-system-monitor-padding); border: var(--yin-component-card-border-width) var(--yin-component-card-border-style) var(--yin-border); box-shadow: var(--yin-component-card-shadow); }
+.system-monitor-header { margin: 0 0 var(--yin-component-system-monitor-gap) var(--yin-spaceSm); color: var(--yin-text); font-family: var(--yin-fontDisplay); font-size: var(--yin-component-system-monitor-heading-size); font-weight: var(--yin-component-system-monitor-heading-weight); }
+.system-monitor-buttons { margin-left: var(--yin-spaceSm); transition: opacity var(--yin-component-state-hover-duration) var(--yin-component-state-easing); }
+.system-monitor-buttons > span { margin-right: var(--yin-spaceSm); color: var(--yin-text); cursor: pointer; }
+.system-monitor-action-icon { font-size: var(--yin-component-iconography-size); }
 
 .icon-info-box {
   width: 100%;
@@ -373,7 +377,7 @@ function handleRightMenuSelect(key: string | number) {
   width: 100%;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(75px, 1fr));
-  gap: 18px;
+	gap: var(--yin-component-system-monitor-gap);
 
 }
 

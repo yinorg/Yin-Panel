@@ -51,10 +51,10 @@ const refreshInterval = 5000
         <!-- 图标 -->
         <div class="w-[60px] h-[70px]">
           <div class="app-icon w-[60px] h-full flex items-center justify-center text-white">
-            <SvgIcon v-if="monitorType === MonitorType.cpu" icon="solar-cpu-bold" :style="{ color: extendParam.color }" style="width:35px;height:35px" />
-            <SvgIcon v-if="monitorType === MonitorType.memory" icon="material-symbols-memory-alt-rounded" :style="{ color: extendParam.color }" style="width:35px;height:35px" />
-            <SvgIcon v-if="monitorType === MonitorType.disk" icon="clarity-hard-disk-solid" :style="{ color: extendParam.color }" style="width:35px;height:35px" />
-            <SvgIcon v-if="monitorType === MonitorType.network" icon="material-symbols:lan-outline-rounded" :style="{ color: extendParam.color }" style="width:35px;height:35px" />
+            <SvgIcon v-if="monitorType === MonitorType.cpu" icon="solar-cpu-bold" :style="{ color: extendParam.color, width: 'var(--yin-component-system-monitor-icon-size)', height: 'var(--yin-component-system-monitor-icon-size)' }" />
+            <SvgIcon v-if="monitorType === MonitorType.memory" icon="material-symbols-memory-alt-rounded" :style="{ color: extendParam.color, width: 'var(--yin-component-system-monitor-icon-size)', height: 'var(--yin-component-system-monitor-icon-size)' }" />
+            <SvgIcon v-if="monitorType === MonitorType.disk" icon="clarity-hard-disk-solid" :style="{ color: extendParam.color, width: 'var(--yin-component-system-monitor-icon-size)', height: 'var(--yin-component-system-monitor-icon-size)' }" />
+            <SvgIcon v-if="monitorType === MonitorType.network" icon="material-symbols:lan-outline-rounded" :style="{ color: extendParam.color, width: 'var(--yin-component-system-monitor-icon-size)', height: 'var(--yin-component-system-monitor-icon-size)' }" />
           </div>
         </div>
       </template>

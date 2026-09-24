@@ -12,12 +12,15 @@ interface Prop {
   iconTextInfoHideDescription: boolean
   iconTextIconHideTitle: boolean
   style: PanelPanelConfigStyleEnum
+  directory?: boolean
 }
 
 const props = withDefaults(defineProps<Prop>(), {
   size: 70,
+  directory: false,
 })
 
+const directoryIconSize = 30
 const defaultBackground = '#2a2a2a6b'
 
 const calculateLuminance = (color: string) => {
@@ -90,11 +93,17 @@ const cardStyle = computed(() => {
 </script>
 
 <template>
-  <div class="app-icon w-full" data-testid="home-item" :data-item-title="itemInfo?.title || ''">
+  <div
+    class="app-icon w-full"
+    :class="{ 'app-icon--directory': directory }"
+    :style="directory ? { '--app-icon-directory-size': `${directoryIconSize}px` } : undefined"
+    data-testid="home-item"
+    :data-item-title="itemInfo?.title || ''"
+  >
     <!-- 详情图标 -->
     <div
       v-if="style === PanelPanelConfigStyleEnum.info"
-      class="app-icon-info w-full rounded-2xl transition-all duration-200 hover:shadow-[0_0_25px_rgba(0,0,0,0.3)] flex card-container"
+      class="app-icon-info w-full flex card-container"
       :style="[
         { background: itemInfo?.icon?.backgroundColor || defaultBackground },
         cardStyle
@@ -104,9 +113,9 @@ const cardStyle = computed(() => {
       @mousemove="(e) => handleMouseMove(e, e.currentTarget)"
     >
       <!-- 图标 -->
-      <div class="app-icon-info-icon w-[70px] h-[70px]">
-        <div class="w-[70px] h-full flex items-center justify-center">
-          <ItemIcon :item-icon="itemInfo?.icon" force-background="transparent" :size="50" class="overflow-hidden rounded-xl" />
+      <div class="app-icon-info-icon">
+        <div class="app-icon-info-icon-inner flex items-center justify-center">
+          <ItemIcon :item-icon="itemInfo?.icon" force-background="transparent" :size="50" class="app-icon-glyph" />
         </div>
       </div>
 
@@ -114,13 +123,13 @@ const cardStyle = computed(() => {
       <!-- 如果为纯白色，将自动根据背景的明暗计算字体的黑白色 -->
       <div class="text-white flex items-center" :style="{ color: (iconTextColor === '#ffffff') ? textColor : iconTextColor, maxWidth: 'calc(100% - 80px)' }">
         <div class="app-icon-info-text-box w-full">
-          <div class="app-icon-info-text-box-title font-semibold w-full">
+          <div class="app-icon-info-text-box-title w-full">
             <NEllipsis>
               {{ itemInfo?.title }}
             </NEllipsis>
           </div>
           <div v-if="!iconTextInfoHideDescription" class="app-icon-info-text-box-description">
-            <NEllipsis :line-clamp="2" class="text-xs">
+            <NEllipsis :line-clamp="2" class="app-icon-info-text-box-description">
               {{ itemInfo?.description }}
             </NEllipsis>
           </div>
@@ -132,22 +141,22 @@ const cardStyle = computed(() => {
     </div>
 
     <!-- 极简(小)图标（APP） -->
-    <div v-if="style === PanelPanelConfigStyleEnum.icon" class="app-icon-small">
+    <div v-if="style === PanelPanelConfigStyleEnum.icon" class="app-icon-small" :class="{ 'app-icon-small--directory': directory }">
       <div
-        class="app-icon-small-icon overflow-hidden rounded-2xl sunpanel w-[70px] h-[70px] mx-auto transition-all duration-200 hover:shadow-[0_0_25px_rgba(0,0,0,0.3)] card-container"
+        class="app-icon-small-icon overflow-hidden sunpanel mx-auto card-container"
         :title="itemInfo?.description"
         :style="cardStyle"
         @mouseenter="handleMouseEnter"
         @mouseleave="handleMouseLeave"
         @mousemove="(e) => handleMouseMove(e, e.currentTarget)"
       >
-        <ItemIcon :item-icon="itemInfo?.icon" />
+        <ItemIcon :item-icon="itemInfo?.icon" :size="directory ? directoryIconSize : size" />
         <!-- Hover glow effect -->
         <div class="card-glow"></div>
       </div>
       <div
         v-if="!iconTextIconHideTitle"
-        class="app-icon-small-title text-center app-icon-text-shadow cursor-pointer mt-[2px]"
+        class="app-icon-small-title app-icon-text-shadow cursor-pointer"
         :style="{ color: iconTextColor }"
       >
         <span>{{ itemInfo?.title }}</span>
@@ -192,9 +201,35 @@ const cardStyle = computed(() => {
   border-radius: var(--yin-component-app-icon-radius);
   transition: transform var(--yin-component-state-hover-duration) var(--yin-component-state-easing), box-shadow var(--yin-component-state-hover-duration) var(--yin-component-state-easing), border-color var(--yin-component-state-hover-duration) var(--yin-component-state-easing);
 }
+.app-icon-info-icon { width: var(--yin-component-app-icon-size); height: var(--yin-component-app-icon-size); flex: 0 0 var(--yin-component-app-icon-size); }
+.app-icon-info-icon-inner { width: 100%; height: 100%; }
 .app-icon-info:hover, .app-icon-small-icon:hover { scale: var(--yin-component-state-hover-scale); }
 .app-icon-small-icon { width: var(--yin-component-app-icon-size); height: var(--yin-component-app-icon-size); }
-.app-icon-small-title { font-family: var(--yin-fontBody); font-size: var(--yin-fontSmallSize); font-weight: var(--yin-fontBodyWeight); }
+.app-icon-small-title { margin-top: var(--yin-spaceXs); text-align: center; font-family: var(--yin-fontBody); font-size: var(--yin-fontSmallSize); font-weight: var(--yin-fontHeadingWeight); }
+.app-icon-info-text-box-title { font-weight: var(--yin-fontHeadingWeight); }
+.app-icon-info-text-box-description { font-size: var(--yin-fontSmallSize); }
+.app-icon-glyph :deep(.item-icon) { overflow: hidden; border-radius: var(--yin-component-iconography-container-radius); }
+.app-icon-glyph :deep(svg) { stroke-width: var(--yin-component-iconography-stroke-width); }
+.app-icon--directory { width: auto; max-width: 100%; }
+.app-icon-small--directory { display: flex; align-items: center; gap: var(--yin-component-app-icon-gap); }
+.app-icon-small--directory .app-icon-small-icon {
+  flex: 0 0 var(--app-icon-directory-size);
+  width: var(--app-icon-directory-size);
+  height: var(--app-icon-directory-size);
+  margin: 0;
+  border-radius: var(--yin-component-iconography-container-radius);
+}
+.app-icon-small--directory .app-icon-small-title {
+  min-width: 0;
+  max-width: 36ch;
+  margin: 0;
+  font-size: var(--yin-fontBodySize);
+  color: var(--yin-text) !important;
+  text-align: left;
+  text-shadow: none;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
 :global(:root[data-yin-density='compact']) .app-icon-small { margin-bottom: 0; }
 :global(:root[data-yin-surface='glass']) .app-icon-small-icon,
 :global(:root[data-yin-surface='frosted']) .app-icon-small-icon { backdrop-filter: blur(var(--yin-component-surface-blur)); }

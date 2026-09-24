@@ -4,47 +4,70 @@ export interface ThemeManifest {
   packageVersion: string
   schemes: string[]
   documents: Record<string, string>
-  bindings: Record<string, string>
-  resources?: Array<{ path: string; sha256: string; mediaType: string; url: string }>
+  resources?: Array<{ path: string; sha256: string; mediaType: string; url?: string }>
   fonts?: Array<{ family: string; path: string; weight: number; style: string }>
-  apiVersion?: string
-  compatibility?: { engine: string; minimum: string; maximum?: string }
+  themeApi?: string
+  core?: string
+  entrypoints?: { script?: string; styles?: string[] }
+  runtime?: { supportedModes?: string[] }
+  contributes?: { views?: string[]; regions?: string[]; components?: string[] }
+  permissions?: { required?: Array<{ name: string; origins?: string[] }>; optional?: Array<{ name: string; origins?: string[] }> }
   wallpapers?: Record<string, { kind: 'image' | 'video' | 'webBundle' | 'externalUrl' | 'imageUrl'; source: string; poster?: string; overlayOpacity?: number }>
 }
 
 export interface ThemePackage {
   manifest: ThemeManifest
   documents: Record<string, Record<string, any>>
+  revision?: string
   verified: boolean
+}
+
+export interface ThemePackageV2 {
+  manifest: {
+    id: string
+    name: string
+    version: string
+    defaultScheme: string
+    themeApi?: string
+    core?: string
+    entrypoints?: { script?: string; styles?: string[] }
+    runtime?: { supportedModes?: string[] }
+    contributes?: { views?: string[]; regions?: string[]; components?: string[] }
+    permissions?: { required?: Array<{ name: string; origins?: string[] }>; optional?: Array<{ name: string; origins?: string[] }> }
+    tokens: { format: 'DTCG'; version: string; documents: Record<string, string> }
+    resources: Array<{ path: string; sha256: string; mediaType: string; url?: string }>
+  }
+  tokens: Record<string, Record<string, any>>
+  revision: string
+  verified: boolean
+}
+
+export function normalizeThemePackageV2(pkg: ThemePackageV2): ThemePackage {
+  return {
+    manifest: {
+      id: pkg.manifest.id,
+      name: pkg.manifest.name,
+      packageVersion: pkg.manifest.version,
+      themeApi: pkg.manifest.themeApi,
+      core: pkg.manifest.core,
+      entrypoints: pkg.manifest.entrypoints,
+      runtime: pkg.manifest.runtime,
+      contributes: pkg.manifest.contributes,
+      permissions: pkg.manifest.permissions,
+      schemes: Object.keys(pkg.manifest.tokens.documents),
+      documents: pkg.manifest.tokens.documents,
+      resources: pkg.manifest.resources || [],
+    },
+    documents: pkg.tokens,
+    revision: pkg.revision,
+    verified: pkg.verified,
+  }
 }
 
 export const semanticSlots = [
   'canvas', 'surface', 'surfaceElevated', 'text', 'textMuted', 'border', 'primary',
   'onPrimary', 'secondary', 'success', 'warning', 'danger', 'focusRing',
 ] as const
-
-export const designSlotTypes: Record<string, string> = {
-  fontBody: 'fontFamily', fontDisplay: 'fontFamily',
-  fontBodySize: 'dimension', fontSmallSize: 'dimension', fontHeadingSize: 'dimension',
-  fontBodyWeight: 'fontWeight', fontHeadingWeight: 'fontWeight',
-  lineHeightBody: 'number', lineHeightHeading: 'number',
-  spaceXs: 'dimension', spaceSm: 'dimension', spaceMd: 'dimension',
-  spaceLg: 'dimension', spaceXl: 'dimension',
-  radiusControl: 'dimension', radiusCard: 'dimension', radiusDialog: 'dimension',
-  borderWidth: 'dimension', shadowCard: 'shadow', shadowPopup: 'shadow',
-  controlHeight: 'dimension', iconSize: 'dimension',
-}
-
-const legacyLayoutSlots = new Set(['layoutTemplate', 'homeColumns', 'sidebarWidth', 'contentMaxWidth', 'pageGutter', 'breakpointMobile', 'breakpointTablet'])
-const api3Aliases: Record<string, string> = {
-  fontBody: 'semantic.typography.body', fontDisplay: 'semantic.typography.display',
-  fontBodySize: 'semantic.typography.bodySize', fontSmallSize: 'semantic.typography.smallSize', fontHeadingSize: 'semantic.typography.headingSize',
-  fontBodyWeight: 'semantic.typography.bodyWeight', fontHeadingWeight: 'semantic.typography.headingWeight',
-  lineHeightBody: 'semantic.typography.bodyLineHeight', lineHeightHeading: 'semantic.typography.headingLineHeight',
-  spaceXs: 'spacing.xs', spaceSm: 'spacing.sm', spaceMd: 'spacing.md', spaceLg: 'spacing.lg', spaceXl: 'spacing.xl',
-  radiusControl: 'shape.control', radiusCard: 'shape.card', radiusDialog: 'shape.dialog', borderWidth: 'shape.borderWidth',
-  shadowCard: 'elevation.card', shadowPopup: 'elevation.popup', controlHeight: 'component.button.height', iconSize: 'component.iconography.size',
-}
 
 export function resolvePanelValue<T>(themeDefault: T, storedValue: T | undefined, useThemeDefaults: boolean): T {
   return useThemeDefaults || storedValue === undefined ? themeDefault : storedValue
@@ -102,36 +125,46 @@ export function resolveThemeTokens(pkg: ThemePackage, scheme: string): Record<st
   }
 
   const slots: Record<string, string> = {}
-  const types: Record<string, string> = Object.fromEntries(semanticSlots.map(slot => [slot, 'color']))
-  if (pkg.manifest.apiVersion === '2') Object.assign(types, designSlotTypes)
-  for (const [slot, expectedType] of Object.entries(types)) {
-    if (legacyLayoutSlots.has(slot)) continue
-    const pointer = pkg.manifest.bindings[slot]
-    if (!pointer?.startsWith('/')) throw new Error(`Semantic slot "${slot}" is not bound`)
-    const name = pointer.slice(1).split('/').map(part => part.replaceAll('~1', '/').replaceAll('~0', '~')).join('.')
+  for (const name of tokens.keys()) {
     const token = resolve(name)
-    if (token.type !== expectedType) throw new Error(`Semantic slot "${slot}" is not a ${expectedType}`)
-    slots[slot] = cssToken(slot, token.type, token.value)
+    const parts = name.split('.')
+    if (parts[0] === 'semantic') parts.shift()
+    const variable = parts.map(part => part.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase()).join('-')
+    slots[variable] = cssToken(variable, token.type, token.value)
   }
-  if (pkg.manifest.apiVersion === '3') {
-    for (const name of tokens.keys()) {
-      const token = resolve(name)
-      const parts = name.split('.')
-      if (parts[0] === 'semantic') parts.shift()
-      const variable = parts.map(part => part.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase()).join('-')
-      let value = token.value
-      if (token.type === 'asset' && value) {
-        const resource = pkg.manifest.resources?.find(item => item.path === value)
-        if (!resource?.url) throw new Error(`Asset token "${name}" does not identify a packaged resource`)
-        value = `url(${JSON.stringify(resource.url)})`
-      }
-      slots[variable] = cssToken(variable, token.type, value)
-    }
-    for (const [alias, name] of Object.entries(api3Aliases)) {
-      if (!tokens.has(name)) continue
-      const token = resolve(name)
-      slots[alias] = cssToken(alias, token.type, token.value)
-    }
+  const semanticAliases: Record<string, string[]> = {
+    canvas: ['semantic.canvas', 'semantic.color.canvas'],
+    surface: ['semantic.surface', 'semantic.color.surface'],
+    surfaceElevated: ['semantic.surfaceElevated', 'semantic.color.surfaceElevated', 'semantic.surface', 'semantic.color.surface'],
+    text: ['semantic.text', 'semantic.color.text'],
+    textMuted: ['semantic.muted', 'semantic.textMuted', 'semantic.color.muted', 'semantic.color.textMuted'],
+    border: ['semantic.border', 'semantic.color.border'],
+    primary: ['semantic.primary', 'semantic.color.primary'],
+    onPrimary: ['semantic.onPrimary', 'semantic.color.onPrimary'],
+    secondary: ['semantic.secondary', 'semantic.color.secondary'],
+    success: ['semantic.success', 'semantic.color.success'],
+    warning: ['semantic.warning', 'semantic.color.warning'],
+    danger: ['semantic.danger', 'semantic.color.danger'],
+    focusRing: ['semantic.focusRing', 'semantic.color.focusRing', 'semantic.primary', 'semantic.color.primary'],
+    fontBody: ['semantic.typography.body'],
+    fontDisplay: ['semantic.typography.display'],
+    fontBodySize: ['semantic.typography.bodySize'],
+    fontSmallSize: ['semantic.typography.smallSize'],
+    fontHeadingSize: ['semantic.typography.headingSize'],
+    fontBodyWeight: ['semantic.typography.bodyWeight'],
+    fontHeadingWeight: ['semantic.typography.headingWeight'],
+    lineHeightBody: ['semantic.typography.bodyLineHeight'],
+    lineHeightHeading: ['semantic.typography.headingLineHeight'],
+    spaceMd: ['semantic.spacing.component', 'semantic.spacing.md'],
+    radiusCard: ['semantic.shape.cardRadius'],
+    radiusControl: ['semantic.shape.controlRadius'],
+    shadowCard: ['semantic.elevation.card'],
+  }
+  for (const [alias, names] of Object.entries(semanticAliases)) {
+    const name = names.find(candidate => tokens.has(candidate))
+    if (!name) continue
+    const token = resolve(name)
+    slots[alias] = cssToken(alias, token.type, token.value)
   }
   return slots
 }

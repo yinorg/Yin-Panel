@@ -50,6 +50,10 @@ func (a *UserConfigRouter) GetConfig(c *gin.Context) {
 		response.ErrorDatabase(c, err.Error())
 		return
 	}
+	if _, public := c.Get("publicSpaceID"); public {
+		response.SuccessData(c, gin.H{"panel": publicPanelConfig(cfg.Panel)})
+		return
+	}
 
 	response.SuccessData(c, cfg)
 }

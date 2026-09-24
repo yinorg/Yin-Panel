@@ -113,15 +113,15 @@ export function useTheme() {
         errorColor: slots.danger,
         fontFamily: slots.fontBody || 'var(--yin-fontBody)',
         fontSize: slots.fontBodySize || 'var(--yin-fontBodySize)',
-        borderRadius: slots.radiusControl || 'var(--yin-component-button-radius)',
-        heightMedium: slots.controlHeight || 'var(--yin-component-button-height)',
+        borderRadius: slots.radiusControl || 'var(--yin-radiusControl)',
+        heightMedium: slots.controlHeight || 'var(--yin-controlHeight)',
         boxShadow1: slots.shadowCard || 'var(--yin-shadowCard)',
         boxShadow2: slots.shadowPopup || 'var(--yin-shadowPopup)',
       },
-      Button: { heightMedium: slots.controlHeight || 'var(--yin-component-button-height)', borderRadiusMedium: slots.radiusControl || 'var(--yin-component-button-radius)' },
-      Input: { heightMedium: slots.controlHeight || 'var(--yin-component-input-height)', borderRadius: slots.radiusControl || 'var(--yin-component-input-radius)' },
-      Card: { borderRadius: slots.radiusCard || 'var(--yin-component-card-radius)', boxShadow: 'var(--yin-component-card-shadow)' },
-      Modal: { borderRadius: slots.radiusDialog || 'var(--yin-component-dialog-radius)' },
+      Button: { heightMedium: 'var(--yin-component-button-height)', borderRadiusMedium: 'var(--yin-component-button-radius)' },
+      Input: { heightMedium: 'var(--yin-component-input-height)', borderRadius: 'var(--yin-component-input-radius)' },
+      Card: { borderRadius: 'var(--yin-component-card-radius)', boxShadow: 'var(--yin-component-card-shadow)' },
+      Modal: { borderRadius: 'var(--yin-component-dialog-radius)' },
       Dialog: { borderRadius: 'var(--yin-component-dialog-radius)' },
       Popover: { borderRadius: 'var(--yin-component-menu-radius)' },
       Dropdown: { borderRadius: 'var(--yin-component-menu-radius)' },
@@ -151,9 +151,13 @@ export function useTheme() {
     for (const [slot, value] of Object.entries(slots))
       root.style.setProperty(`--yin-${slot}`, value)
     appliedSlots = Object.keys(slots)
-    const surfaceMode = slots['component-card-surface-mode'] || 'solid'
-    const density = slots['density-scale'] || 'standard'
-    const texture = slots['background-texture'] || 'none'
+    const surfaceOpacity = Number(slots['component-card-surface-opacity'] || 1)
+    const surfaceBlur = Number.parseFloat(slots['component-card-surface-blur'] || '0')
+    const surfaceGlow = Number.parseFloat(slots['component-card-surface-glow'] || '0')
+    const surfaceMode = slots['component-card-surface-mode'] || (surfaceOpacity < 0.9 && surfaceBlur > 0 ? 'glass' : surfaceBlur > 0 ? 'frosted' : surfaceGlow > 0 ? 'gradient' : 'solid')
+    const densityScale = Number(slots['density-scale'] || 1)
+    const density = slots['density-scale'] && Number.isNaN(densityScale) ? slots['density-scale'] : densityScale <= 0.9 ? 'compact' : densityScale >= 1.2 ? 'spacious' : densityScale > 1.04 ? 'comfortable' : 'standard'
+    const texture = slots['background-texture'] || (Number(slots['background-grid-opacity'] || 0) > 0 ? 'grid' : Number(slots['background-dots-opacity'] || 0) > 0 ? 'dots' : Number(slots['background-noise-opacity'] || 0) > 0 ? 'noise' : 'none')
     const validSurface = (mode?: string) => ['solid', 'transparent', 'glass', 'frosted', 'gradient'].includes(mode || '') ? mode : 'solid'
     root.dataset.yinSurface = validSurface(surfaceMode)
     root.dataset.yinSearchSurface = validSurface(slots['component-search-box-surface-mode'] || surfaceMode)

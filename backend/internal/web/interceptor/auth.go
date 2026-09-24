@@ -87,6 +87,11 @@ func Auth(c *gin.Context) {
 	c.Set("authMethod", authMethod)
 	if publicSpaceID != 0 {
 		c.Set("publicSpaceID", publicSpaceID)
+		if !publicCodeRouteAllowed(c, publicSpaceID) {
+			response.ErrorNoAccess(c)
+			c.Abort()
+			return
+		}
 	}
 	c.Next()
 }

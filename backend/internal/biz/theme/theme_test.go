@@ -27,26 +27,57 @@ func TestBuiltinPackageValidates(t *testing.T) {
 }
 
 func TestOfficialThemesHaveDistinctDTCGVisualDirections(t *testing.T) {
-	themes := map[string]*Package{"yin": Builtin(), "glass": BuiltinGlass(), "minimal": BuiltinMinimal(), "cyber": BuiltinCyber()}
-	cardModes := map[string]any{}
+	themes := map[string]*Package{"yin": Builtin(), "mist": BuiltinMist(), "horizon": BuiltinHorizon(), "glass": BuiltinGlass(), "minimal": BuiltinMinimal(), "cyber": BuiltinCyber()}
+	visualValues := map[string]map[string]any{"surface": {}, "radius": {}, "padding": {}, "density": {}, "motion": {}, "texture": {}, "font": {}, "monitorIcon": {}, "groupHeading": {}}
+	requiredComponents := []string{"appIcon", "card", "group", "searchBox", "sidebar", "dialog", "menu", "button", "input", "tooltip", "systemMonitor", "state", "surface", "iconography"}
 	for name, pkg := range themes {
 		if pkg.Manifest.DTCGVersion != "2025.10" || pkg.Manifest.APIVersion != "3" || pkg.Manifest.Compatibility == nil {
 			t.Fatalf("%s theme does not declare the DTCG v3 runtime contract", name)
 		}
-		var doc map[string]any
-		if err := json.Unmarshal(pkg.Documents["light"], &doc); err != nil {
-			t.Fatal(err)
-		}
-		card := doc["component"].(map[string]any)["card"].(map[string]any)
-		cardModes[name] = card["surfaceMode"].(map[string]any)["$value"]
-		for _, group := range []string{"primitive", "semantic", "component", "shape", "spacing", "density", "elevation", "motion", "background", "effect"} {
-			if _, exists := doc[group]; !exists {
-				t.Errorf("%s theme is missing DTCG token group %q", name, group)
+		for _, scheme := range []string{"light", "dark"} {
+			var doc map[string]any
+			if err := json.Unmarshal(pkg.Documents[scheme], &doc); err != nil {
+				t.Fatal(err)
+			}
+			for _, group := range []string{"primitive", "semantic", "component", "shape", "spacing", "density", "elevation", "motion", "background", "effect"} {
+				if _, exists := doc[group]; !exists {
+					t.Errorf("%s/%s theme is missing DTCG token group %q", name, scheme, group)
+				}
+			}
+			components := doc["component"].(map[string]any)
+			for _, componentName := range requiredComponents {
+				if _, exists := components[componentName]; !exists {
+					t.Errorf("%s/%s theme is missing component token group %q", name, scheme, componentName)
+				}
+			}
+			card := components["card"].(map[string]any)
+			search := components["searchBox"].(map[string]any)
+			state := components["state"].(map[string]any)
+			monitor := components["systemMonitor"].(map[string]any)
+			group := components["group"].(map[string]any)
+			semantic := doc["semantic"].(map[string]any)
+			visualValues["surface"][name+"/"+scheme] = components["card"].(map[string]any)["surfaceMode"].(map[string]any)["$value"]
+			visualValues["radius"][name+"/"+scheme] = card["radius"].(map[string]any)["$value"]
+			visualValues["padding"][name+"/"+scheme] = card["padding"].(map[string]any)["$value"]
+			visualValues["density"][name+"/"+scheme] = doc["density"].(map[string]any)["scale"].(map[string]any)["$value"]
+			visualValues["motion"][name+"/"+scheme] = state["hoverDuration"].(map[string]any)["$value"]
+			visualValues["texture"][name+"/"+scheme] = doc["background"].(map[string]any)["texture"].(map[string]any)["$value"]
+			visualValues["font"][name+"/"+scheme] = semantic["typography"].(map[string]any)["display"].(map[string]any)["$value"]
+			visualValues["monitorIcon"][name+"/"+scheme] = monitor["iconSize"].(map[string]any)["$value"]
+			visualValues["groupHeading"][name+"/"+scheme] = group["headingSize"].(map[string]any)["$value"]
+			if _, exists := search["optionSize"]; !exists {
+				t.Errorf("%s/%s theme is missing themed search option metrics", name, scheme)
 			}
 		}
 	}
-	if cardModes["yin"] == cardModes["glass"] || cardModes["yin"] == cardModes["cyber"] || cardModes["minimal"] == cardModes["glass"] {
-		t.Fatalf("official themes do not expose distinct surface directions: %v", cardModes)
+	for dimension, values := range visualValues {
+		unique := map[string]bool{}
+		for _, value := range values {
+			unique[fmt.Sprint(value)] = true
+		}
+		if len(unique) < 2 {
+			t.Errorf("official themes do not vary their %s tokens: %v", dimension, values)
+		}
 	}
 	var cyber map[string]any
 	if err := json.Unmarshal(themes["cyber"].Documents["light"], &cyber); err != nil {
@@ -254,8 +285,8 @@ func TestBuiltinHomeColumnsAndUpgrade(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if stored.Manifest.PackageVersion != "2.1.0" || stored.Manifest.APIVersion != "3" {
-		t.Fatalf("built-in package = %s API %s, want 2.1.0 API 3", stored.Manifest.PackageVersion, stored.Manifest.APIVersion)
+	if stored.Manifest.PackageVersion != "2.2.0" || stored.Manifest.APIVersion != "3" {
+		t.Fatalf("built-in package = %s API %s, want 2.2.0 API 3", stored.Manifest.PackageVersion, stored.Manifest.APIVersion)
 	}
 	for _, scheme := range stored.Manifest.Schemes {
 		var document map[string]any
