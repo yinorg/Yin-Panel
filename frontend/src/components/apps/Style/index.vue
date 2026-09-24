@@ -36,7 +36,7 @@ const previewMode = ref<'light' | 'dark'>('light')
 const webWallpaperInput = ref<HTMLInputElement | null>(null)
 const previewURL = computed(() => `${previewPage.value === 'login' ? '/login' : '/'}?themePreview=${encodeURIComponent(previewToken.value)}&themePreviewMode=${previewMode.value}`)
 const previewRemoteDomains = computed(() => Object.values(previewPackage.value?.manifest.wallpapers || {})
-  .filter(item => item.kind === 'externalUrl')
+  .filter(item => item.kind === 'externalUrl' || item.kind === 'imageUrl')
   .map(item => new URL(item.source).hostname))
 const wallpaperModeOptions = computed(() => [
   { label: t('themeWallpaper.follow'), value: 'theme' },
@@ -106,7 +106,7 @@ async function saveDefaultTheme() {
       return
     }
     const hosts = Object.values(detail.data.manifest.wallpapers || {})
-      .filter(item => item.kind === 'externalUrl')
+      .filter(item => item.kind === 'externalUrl' || item.kind === 'imageUrl')
       .map(item => new URL(item.source).hostname)
     if (hosts.length && !window.confirm(t('themeWallpaper.confirmExternal', { hosts: [...new Set(hosts)].join(', ') })))
       return
@@ -226,6 +226,11 @@ const iconTypeOptions = [
     value: PanelPanelConfigStyleEnum.icon,
   },
 ]
+
+const homeLayoutOptions = computed(() => [
+  { label: t('apps.baseSettings.homeLayoutStandard'), value: 'standard' },
+  { label: t('apps.baseSettings.homeLayoutDirectory'), value: 'directory' },
+])
 
 const maxWidthUnitOption = [
   {
@@ -447,6 +452,12 @@ function adoptThemeDefaults() {
     <NCard style="border-radius:10px" class="mt-[10px]" size="small">
       <div class="text-slate-500 mb-[5px] font-bold">
         {{ $t('common.icon') }}
+      </div>
+      <div class="mt-[5px]">
+        <div>{{ $t('apps.baseSettings.homeLayout') }}</div>
+        <div class="flex items-center mt-[5px]">
+          <NSelect v-model:value="panelState.panelConfig.homeLayout" :options="homeLayoutOptions" />
+        </div>
       </div>
       <div class="mt-[5px]">
         <div>

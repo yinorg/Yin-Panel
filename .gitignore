@@ -50,6 +50,7 @@ coverage/
 /cypress/screenshots/
 /playwright-report/
 /test-results/
+/frontend/test-results/
 /blob-report/
 /.nyc_output/
 

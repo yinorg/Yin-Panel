@@ -184,8 +184,10 @@ test('home keeps ordinary groups stable while system monitor data loads', async 
   await page.waitForTimeout(700)
   const finalTop = await firstGroup.boundingBox()
   const monitorBox = await page.locator('.system-monitor-layer').boundingBox()
+  expect(finalTop).not.toBeNull()
+  expect(monitorBox).not.toBeNull()
   expect(finalTop?.y).toBe(initialTop?.y)
-  expect(monitorBox?.y! + monitorBox?.height!).toBeLessThanOrEqual(finalTop?.y!)
+  expect(monitorBox!.y + monitorBox!.height).toBeLessThanOrEqual(finalTop!.y)
   await expect.poll(() => page.evaluate(() => (window as typeof window & { __clsMetric?: number }).__clsMetric || 0), { timeout: 2000 }).toBeLessThan(0.1)
 })
 

@@ -65,7 +65,7 @@ function handleSetHoverStatus(hoverStatus: boolean) {
 }
 
 const cardStyle: CardStyle = {
-  background: '#2a2a2a6b',
+  background: 'var(--yin-component-app-icon-surface, #2a2a2a6b)',
 }
 
 const monitorDatas = ref<MonitorData[]>([])
@@ -100,7 +100,7 @@ async function getData() {
   monitorDatas.value = await getAll()
 
   const defaultExtendParam = {
-    backgroundColor: '#2a2a2a6b', color: '#fff', progressColor: '#fff', progressRailColor: '#CFCFCFA8',
+    backgroundColor: 'var(--yin-component-app-icon-surface, #2a2a2a6b)', color: 'var(--yin-text)', progressColor: 'var(--yin-primary)', progressRailColor: 'var(--yin-border)',
   }
   if (monitorDatas.value.length > 0) {
     const types = new Set(monitorDatas.value.map(item => item.monitorType))
@@ -119,28 +119,28 @@ async function getData() {
     monitorDatas.value.push(
       {
         extendParam: {
-          backgroundColor: '#2a2a2a6b',
-          color: '#fff',
-          progressColor: '#fff',
-          progressRailColor: '#CFCFCFA8',
+          backgroundColor: 'var(--yin-component-app-icon-surface, #2a2a2a6b)',
+          color: 'var(--yin-text)',
+          progressColor: 'var(--yin-primary)',
+          progressRailColor: 'var(--yin-border)',
         },
         monitorType: MonitorType.cpu,
       },
       {
         extendParam: {
-          backgroundColor: '#2a2a2a6b',
-          color: '#fff',
-          progressColor: '#fff',
-          progressRailColor: '#CFCFCFA8',
+          backgroundColor: 'var(--yin-component-app-icon-surface, #2a2a2a6b)',
+          color: 'var(--yin-text)',
+          progressColor: 'var(--yin-primary)',
+          progressRailColor: 'var(--yin-border)',
         },
         monitorType: MonitorType.memory,
       },
       {
         extendParam: {
-          backgroundColor: '#2a2a2a6b',
-          color: '#fff',
-          progressColor: '#fff',
-          progressRailColor: '#CFCFCFA8',
+          backgroundColor: 'var(--yin-component-app-icon-surface, #2a2a2a6b)',
+          color: 'var(--yin-text)',
+          progressColor: 'var(--yin-primary)',
+          progressRailColor: 'var(--yin-border)',
         },
         monitorType: MonitorType.network,
       },
@@ -249,7 +249,7 @@ function handleRightMenuSelect(key: string | number) {
 <template>
   <div class="system-monitor w-full">
     <div
-      class="mt-[50px]"
+      class="system-monitor-content"
       :class="monitorGroup.sortStatus ? 'shadow-2xl border shadow-[0_0_30px_10px_rgba(0,0,0,0.3)]  p-[10px] rounded-2xl' : ''"
       @mouseenter="handleSetHoverStatus(true)"
       @mouseleave="handleSetHoverStatus(false)"
@@ -322,13 +322,13 @@ function handleRightMenuSelect(key: string | number) {
               :icon-text-color="iconTextColor"
             />
           </div>
-        </vuedraggable>
+        </VueDraggable>
       </template>
 
       <!-- 编辑栏 -->
       <template v-if="monitorGroup.sortStatus && allowEdit">
         <div class="system-monitor-edit-bar flex mt-[10px]">
-          <NButton color="#2a2a2a6b" @click="handleSaveSort()">
+          <NButton class="theme-tool-button" @click="handleSaveSort()">
             <template #icon>
               <SvgIcon class="text-white font-xl" icon="material-symbols:save" />
             </template>
@@ -351,18 +351,21 @@ function handleRightMenuSelect(key: string | number) {
 
 <style scoped>
 .text-shadow {
-  text-shadow: 2px 2px 50px rgb(0, 0, 0);
+  text-shadow: var(--yin-effect-text-shadow);
 }
 
 .app-icon-text-shadow {
-  text-shadow: 2px 2px 5px rgb(0, 0, 0);
+  text-shadow: var(--yin-effect-text-shadow);
 }
+
+.system-monitor-content { margin-top: var(--yin-component-system-monitor-gap); padding: var(--yin-component-system-monitor-padding); border-radius: var(--yin-component-system-monitor-radius); }
+.system-monitor-header { font-family: var(--yin-fontDisplay); font-size: var(--yin-fontHeadingSize); font-weight: var(--yin-fontHeadingWeight); }
 
 .icon-info-box {
   width: 100%;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 18px;
+  gap: var(--yin-component-system-monitor-gap);
 
 }
 

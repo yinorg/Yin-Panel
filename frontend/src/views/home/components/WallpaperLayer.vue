@@ -20,16 +20,16 @@ const wallpaper = computed(() => {
   if (!previewThemeDefaults && (config.wallpaperMode === 'custom' || (!config.wallpaperMode && config.backgroundImageSrc))) {
     const kind = config.wallpaperKind || 'image'
     const source = config.wallpaperSource || config.backgroundImageSrc || '/assets/bg-forest.webp'
-    return { kind, source, poster: config.wallpaperPoster || (kind === 'image' && !/\.gif(?:[?#]|$)/i.test(source) ? source : '/assets/bg-forest.webp') }
+    return { kind, source, poster: config.wallpaperPoster || (kind === 'image' && !/\.gif(?:[?#]|$)/i.test(source) ? source : '/assets/bg-forest.webp'), overlayOpacity: undefined }
   }
-  return activeThemeWallpaper.value || { kind: 'image', source: '/assets/bg-forest.webp', poster: '/assets/bg-forest.webp' }
+  return activeThemeWallpaper.value || { kind: 'image', source: '/assets/bg-forest.webp', poster: '/assets/bg-forest.webp', overlayOpacity: 0.85 }
 })
 
 const dynamic = computed(() => wallpaper.value?.kind !== 'image' || /\.gif(?:[?#]|$)/i.test(wallpaper.value?.source || ''))
 const play = computed(() => dynamic.value && !paused.value && !reducedMotion.value && visible.value && online.value && !failed.value)
 const mediaKind = computed(() => wallpaper.value?.kind)
 const maskColor = computed(() => previewThemeDefaults || panelState.panelConfig.wallpaperMode === 'theme' || panelState.panelConfig.useThemeDefaults
-  ? 'color-mix(in srgb, var(--yin-canvas) 85%, transparent)'
+  ? `color-mix(in srgb, var(--yin-canvas) ${(wallpaper.value?.overlayOpacity ?? 0.85) * 100}%, transparent)`
   : `rgba(0,0,0,${panelState.panelConfig.backgroundMaskNumber || 0})`)
 watch(() => wallpaper.value?.source, () => { failed.value = false; posterFailed.value = false; interacting.value = false })
 
@@ -87,6 +87,7 @@ onUnmounted(() => {
       @error="failed = true"
     />
     <div class="wallpaper-mask" :style="{ backgroundColor: maskColor }" />
+    <Teleport to="body">
     <div v-if="dynamic && !failed" class="wallpaper-controls">
       <button class="wallpaper-control" type="button" :title="paused ? $t('themeWallpaper.wallpaperPlay') : $t('themeWallpaper.wallpaperPause')" :aria-label="paused ? $t('themeWallpaper.wallpaperPlay') : $t('themeWallpaper.wallpaperPause')" @click="paused = !paused; interacting = false">
         <SvgIcon :icon="paused ? 'tabler-player-play' : 'tabler-player-pause'" />
@@ -95,16 +96,17 @@ onUnmounted(() => {
         <SvgIcon :icon="interacting ? 'tabler-arrow-back-up' : 'tabler-hand-click'" />
       </button>
     </div>
+    </Teleport>
   </div>
 </template>
 
 <style scoped>
-.wallpaper-layer { position: fixed; inset: 0; width: 100vw; height: 100dvh; overflow: hidden; background: var(--yin-canvas); }
+.wallpaper-layer { position: fixed; z-index: 0; inset: 0; width: 100vw; height: 100dvh; overflow: hidden; background: var(--yin-canvas); }
 .wallpaper-media { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scale(1.03); filter: blur(var(--wallpaper-blur)); }
 .wallpaper-frame { border: 0; pointer-events: none; }
-.wallpaper-frame--interactive { z-index: 35; pointer-events: auto; filter: none; }
+.wallpaper-frame--interactive { z-index: 1; pointer-events: auto; filter: none; }
 .wallpaper-mask { position: absolute; inset: 0; pointer-events: none; }
-.wallpaper-controls { position: fixed; bottom: 16px; right: 16px; z-index: 45; display: flex; gap: 8px; }
+.wallpaper-controls { position: fixed; bottom: 16px; right: 16px; z-index: 20; display: flex; gap: 8px; }
 .wallpaper-control { width: 36px; height: 36px; display: grid; place-items: center; border: 1px solid var(--yin-border); border-radius: var(--yin-radiusControl); background: var(--yin-surfaceElevated); color: var(--yin-text); box-shadow: var(--yin-shadowPopup); cursor: pointer; }
 .wallpaper-control:focus-visible { outline: 2px solid var(--yin-focusRing); }
 </style>

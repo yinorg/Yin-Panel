@@ -8,7 +8,8 @@ export interface ThemeManifest {
   resources?: Array<{ path: string; sha256: string; mediaType: string; url: string }>
   fonts?: Array<{ family: string; path: string; weight: number; style: string }>
   apiVersion?: string
-  wallpapers?: Record<string, { kind: 'image' | 'video' | 'webBundle' | 'externalUrl'; source: string; poster?: string }>
+  compatibility?: { engine: string; minimum: string; maximum?: string }
+  wallpapers?: Record<string, { kind: 'image' | 'video' | 'webBundle' | 'externalUrl' | 'imageUrl'; source: string; poster?: string; overlayOpacity?: number }>
 }
 
 export interface ThemePackage {
@@ -31,10 +32,18 @@ export const designSlotTypes: Record<string, string> = {
   spaceLg: 'dimension', spaceXl: 'dimension',
   radiusControl: 'dimension', radiusCard: 'dimension', radiusDialog: 'dimension',
   borderWidth: 'dimension', shadowCard: 'shadow', shadowPopup: 'shadow',
-  controlHeight: 'dimension', iconSize: 'dimension', sidebarWidth: 'dimension',
-  contentMaxWidth: 'dimension', pageGutter: 'dimension',
-  breakpointMobile: 'dimension', breakpointTablet: 'dimension',
-  layoutTemplate: 'string', homeColumns: 'number',
+  controlHeight: 'dimension', iconSize: 'dimension',
+}
+
+const legacyLayoutSlots = new Set(['layoutTemplate', 'homeColumns', 'sidebarWidth', 'contentMaxWidth', 'pageGutter', 'breakpointMobile', 'breakpointTablet'])
+const api3Aliases: Record<string, string> = {
+  fontBody: 'semantic.typography.body', fontDisplay: 'semantic.typography.display',
+  fontBodySize: 'semantic.typography.bodySize', fontSmallSize: 'semantic.typography.smallSize', fontHeadingSize: 'semantic.typography.headingSize',
+  fontBodyWeight: 'semantic.typography.bodyWeight', fontHeadingWeight: 'semantic.typography.headingWeight',
+  lineHeightBody: 'semantic.typography.bodyLineHeight', lineHeightHeading: 'semantic.typography.headingLineHeight',
+  spaceXs: 'spacing.xs', spaceSm: 'spacing.sm', spaceMd: 'spacing.md', spaceLg: 'spacing.lg', spaceXl: 'spacing.xl',
+  radiusControl: 'shape.control', radiusCard: 'shape.card', radiusDialog: 'shape.dialog', borderWidth: 'shape.borderWidth',
+  shadowCard: 'elevation.card', shadowPopup: 'elevation.popup', controlHeight: 'component.button.height', iconSize: 'component.iconography.size',
 }
 
 export function resolvePanelValue<T>(themeDefault: T, storedValue: T | undefined, useThemeDefaults: boolean): T {
@@ -46,7 +55,7 @@ export function selectThemeScheme(schemes: string[], mode: 'light' | 'dark' | 'a
   return mode === 'auto' ? osTheme : mode
 }
 
-export function resolveThemeSlots(pkg: ThemePackage, scheme: string): Record<string, string> {
+export function resolveThemeTokens(pkg: ThemePackage, scheme: string): Record<string, string> {
   const selectedScheme = pkg.manifest.schemes.length === 1 ? pkg.manifest.schemes[0] : scheme
   const document = pkg.documents[selectedScheme]
   if (!document)
@@ -96,6 +105,7 @@ export function resolveThemeSlots(pkg: ThemePackage, scheme: string): Record<str
   const types: Record<string, string> = Object.fromEntries(semanticSlots.map(slot => [slot, 'color']))
   if (pkg.manifest.apiVersion === '2') Object.assign(types, designSlotTypes)
   for (const [slot, expectedType] of Object.entries(types)) {
+    if (legacyLayoutSlots.has(slot)) continue
     const pointer = pkg.manifest.bindings[slot]
     if (!pointer?.startsWith('/')) throw new Error(`Semantic slot "${slot}" is not bound`)
     const name = pointer.slice(1).split('/').map(part => part.replaceAll('~1', '/').replaceAll('~0', '~')).join('.')
@@ -103,20 +113,45 @@ export function resolveThemeSlots(pkg: ThemePackage, scheme: string): Record<str
     if (token.type !== expectedType) throw new Error(`Semantic slot "${slot}" is not a ${expectedType}`)
     slots[slot] = cssToken(slot, token.type, token.value)
   }
-  if (pkg.manifest.apiVersion === '2' && Number.parseFloat(slots.breakpointMobile) >= Number.parseFloat(slots.breakpointTablet))
-    throw new Error('Theme breakpoints are not ordered')
+  if (pkg.manifest.apiVersion === '3') {
+    for (const name of tokens.keys()) {
+      const token = resolve(name)
+      const parts = name.split('.')
+      if (parts[0] === 'semantic') parts.shift()
+      const variable = parts.map(part => part.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase()).join('-')
+      let value = token.value
+      if (token.type === 'asset' && value) {
+        const resource = pkg.manifest.resources?.find(item => item.path === value)
+        if (!resource?.url) throw new Error(`Asset token "${name}" does not identify a packaged resource`)
+        value = `url(${JSON.stringify(resource.url)})`
+      }
+      slots[variable] = cssToken(variable, token.type, value)
+    }
+    for (const [alias, name] of Object.entries(api3Aliases)) {
+      if (!tokens.has(name)) continue
+      const token = resolve(name)
+      slots[alias] = cssToken(alias, token.type, token.value)
+    }
+  }
   return slots
 }
+
+export const resolveThemeSlots = resolveThemeTokens
 
 export function resolveWallpaper(pkg: ThemePackage, scheme: string) {
   const selected = pkg.manifest.schemes.length === 1 ? pkg.manifest.schemes[0] : scheme
   const wallpaper = pkg.manifest.wallpapers?.[selected]
   if (!wallpaper) return null
   const asset = (path: string) => pkg.manifest.resources?.find(item => item.path === path)?.url || ''
-  const source = wallpaper.kind === 'externalUrl' ? wallpaper.source : asset(wallpaper.source)
-  const poster = asset(wallpaper.poster || wallpaper.source)
+  const source = wallpaper.kind === 'externalUrl' || wallpaper.kind === 'imageUrl' ? wallpaper.source : asset(wallpaper.source)
+  const poster = wallpaper.kind === 'imageUrl' ? wallpaper.source : asset(wallpaper.poster || wallpaper.source)
   if (!source || !poster) return null
-  return { kind: wallpaper.kind, source, poster }
+  const opacity = resolveThemeTokens(pkg, selected)['background-overlay-opacity']
+  const overlayOpacity = wallpaper.overlayOpacity ?? (opacity === undefined ? undefined : Number.parseFloat(opacity))
+  const executableWallpaper = wallpaper.kind === 'webBundle' || wallpaper.kind === 'externalUrl'
+  return executableWallpaper
+    ? { kind: 'image', source: poster, poster, overlayOpacity }
+    : { kind: wallpaper.kind === 'imageUrl' ? 'image' : wallpaper.kind, source, poster, overlayOpacity }
 }
 
 function cssToken(slot: string, type: string, value: any): string {
@@ -143,11 +178,65 @@ function cssToken(slot: string, type: string, value: any): string {
   }
   if (type === 'number') {
     if (typeof value !== 'number' || !Number.isFinite(value)) throw new Error(`Semantic slot "${slot}" has an invalid number`)
+    if (slot.endsWith('tiltDegrees') && (value < 0 || value > 12)) throw new Error(`Token "${slot}" is out of range`)
+    if (slot.toLowerCase().includes('opacity') && (value < 0 || value > 1)) throw new Error(`Token "${slot}" is out of range`)
+    if (slot.toLowerCase().includes('scale') && (value < 0.5 || value > 1.5)) throw new Error(`Token "${slot}" is out of range`)
     return String(value)
   }
   if (type === 'string') {
-    if (!['centered', 'split'].includes(value)) throw new Error(`Semantic slot "${slot}" has an invalid layout`)
+    if (typeof value !== 'string' || value.length > 200 || /[;{}<>\u0000-\u001f]/.test(value)) throw new Error(`Token "${slot}" has an invalid string`)
     return value
+  }
+  if (type === 'asset') {
+    if (typeof value !== 'string' || value.length > 2048 || /[\u0000-\u001f;]/.test(value)) throw new Error(`Token "${slot}" has an invalid asset reference`)
+    return value
+  }
+  if (type === 'boolean') {
+    if (typeof value !== 'boolean') throw new Error(`Token "${slot}" has an invalid boolean`)
+    return String(value)
+  }
+  if (type === 'strokeStyle') {
+    if (!['solid', 'dashed', 'dotted', 'double', 'groove', 'ridge', 'inset', 'outset'].includes(value)) throw new Error(`Token "${slot}" has an invalid stroke style`)
+    return value
+  }
+  if (type === 'border') {
+    const color = cssColor(value?.color)
+    const width = cssToken(slot, 'dimension', value?.width)
+    const style = cssToken(slot, 'strokeStyle', value?.style)
+    if (!color) throw new Error(`Token "${slot}" has an invalid border`)
+    return `${width} ${style} ${color}`
+  }
+  if (type === 'typography') {
+    const family = cssToken(slot, 'fontFamily', value?.fontFamily)
+    const size = cssToken(slot, 'dimension', value?.fontSize)
+    const weight = cssToken(slot, 'fontWeight', value?.fontWeight)
+    const lineHeight = value?.lineHeight === undefined ? '' : `/${cssToken(slot, 'number', value.lineHeight)}`
+    const style = value?.fontStyle === 'italic' ? 'italic ' : ''
+    return `${style}${weight} ${size}${lineHeight} ${family}`
+  }
+  if (type === 'transition') {
+    const property = typeof value?.property === 'string' && /^[\w-]+$/.test(value.property) ? value.property : 'all'
+    const duration = cssToken(slot, 'duration', value?.duration)
+    const delay = value?.delay ? ` ${cssToken(slot, 'duration', value.delay)}` : ''
+    const timing = value?.timingFunction ? ` ${cssToken(slot, 'cubicBezier', value.timingFunction)}` : ''
+    return `${property} ${duration}${timing}${delay}`
+  }
+  if (type === 'gradient') {
+    if (!Array.isArray(value) || value.length < 2 || value.length > 16) throw new Error(`Token "${slot}" has an invalid gradient`)
+    const stops = value.map((stop: any) => {
+      const color = cssColor(stop?.color)
+      if (!color || typeof stop?.position !== 'number' || stop.position < 0 || stop.position > 1) throw new Error(`Token "${slot}" has an invalid gradient stop`)
+      return `${color} ${stop.position * 100}%`
+    })
+    return `linear-gradient(180deg, ${stops.join(', ')})`
+  }
+  if (type === 'duration') {
+    if (!value || typeof value.value !== 'number' || value.value < 0 || value.value > 10000 || !['ms', 's'].includes(value.unit)) throw new Error(`Token "${slot}" has an invalid duration`)
+    return `${value.value}${value.unit}`
+  }
+  if (type === 'cubicBezier') {
+    if (!Array.isArray(value) || value.length !== 4 || !value.every((point: unknown) => typeof point === 'number' && Number.isFinite(point)) || value[0] < 0 || value[0] > 1 || value[2] < 0 || value[2] > 1) throw new Error(`Token "${slot}" has an invalid cubicBezier`)
+    return `cubic-bezier(${value.join(', ')})`
   }
   if (type === 'shadow') {
     const layers = Array.isArray(value) ? value : [value]
@@ -155,7 +244,11 @@ function cssToken(slot: string, type: string, value: any): string {
     return layers.map((layer: any) => {
       const color = cssColor(layer?.color)
       if (!color) throw new Error(`Semantic slot "${slot}" has an invalid shadow color`)
-      const fields = ['offsetX', 'offsetY', 'blur', 'spread'].map(field => cssToken(slot, 'dimension', layer[field]))
+    const fields = ['offsetX', 'offsetY', 'blur', 'spread'].map((field) => {
+      const dimension = layer[field]
+      if (!dimension || typeof dimension.value !== 'number' || !Number.isFinite(dimension.value) || Math.abs(dimension.value) > 96 || (field === 'blur' && dimension.value < 0) || !['px', 'rem'].includes(dimension.unit)) throw new Error(`Semantic slot "${slot}" has an invalid shadow dimension`)
+      return `${dimension.value}${dimension.unit}`
+    })
       return `${layer.inset ? 'inset ' : ''}${fields.join(' ')} ${color}`
     }).join(', ')
   }

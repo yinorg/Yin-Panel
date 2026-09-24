@@ -30,7 +30,7 @@ func slotTypes(version string) map[string]string {
 	for name, typ := range requiredSlots {
 		result[name] = typ
 	}
-	if version == APIVersion {
+	if version == "2" {
 		for name, typ := range v2Slots {
 			result[name] = typ
 		}
@@ -96,8 +96,8 @@ func validateDesignSlot(name string, value any) error {
 			return fmt.Errorf("binding %s must be an integer from 1 to 12", name)
 		}
 	case "layoutTemplate":
-		if value != "centered" && value != "split" {
-			return fmt.Errorf("binding %s must be centered or split", name)
+		if value != "centered" && value != "split" && value != "directory" {
+			return fmt.Errorf("binding %s must be centered, split, or directory", name)
 		}
 	case "shadowCard", "shadowPopup":
 		if err := validateShadow(value); err != nil {

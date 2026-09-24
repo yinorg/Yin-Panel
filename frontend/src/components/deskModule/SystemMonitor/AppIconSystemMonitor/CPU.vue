@@ -22,11 +22,6 @@ watch(() => snapshot?.value?.CPU_INFO, value => { if (value) cpuState.value = va
 async function getData() {
   if (snapshot) return
   if (document.hidden) return
-  try {
-  }
-  catch (error) {
-
-  }
 }
 
 onMounted(() => {

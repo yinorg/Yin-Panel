@@ -27,11 +27,6 @@ function formatMemorySize(v: number): string {
 async function getData() {
   if (snapshot) return
   if (document.hidden) return
-  try {
-  }
-  catch (error) {
-
-  }
 }
 
 onMounted(() => {

@@ -11,7 +11,7 @@
             <div class="w-[25px]">
                 <span v-if="item.children" class="cursor-pointer">
                     <!-- 收起展开：'rotate-90' :'rotate-0' -->
-                    <SvgIcon width="18" height="18" class="list-expand" :class="item.extand?'rotate-90':'rotate-0'" icon="ic:round-play-arrow" />
+                    <SvgIcon width="18" height="18" class="list-expand" :class="item.extand ? 'rotate-90' : 'rotate-0'" icon="ic:round-play-arrow" />
                 </span>
             </div>
 
@@ -36,7 +36,6 @@
 
 <script setup lang="ts">
 import { SvgIcon } from '../../../components/common'
-import { defineProps } from "vue"
 defineProps<{
     items: Array<any>,
     isChilden?: boolean

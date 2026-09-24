@@ -2,6 +2,10 @@
   "name": "yin-panel",
   "version": "0.0.0",
   "private": false,
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "packageManager": "pnpm@9.15.5",
   "description": "Yin-Panel Web",
   "author": "BraisedHunter <95302870@qq.com>",
   "keywords": [
@@ -10,6 +14,7 @@
   ],
   "scripts": {
     "check:i18n": "node scripts/check-i18n-keys.mjs",
+    "audit:theme-tokens": "node scripts/audit-theme-tokens.mjs",
     "dev": "vite",
     "build": "run-p add-version type-check build-only",
     "add-version": "node ./add-frontend-version.js",
@@ -17,59 +22,84 @@
     "build-only": "vite build",
     "test:perf": "npm run build-only && playwright test",
     "type-check": "vue-tsc --noEmit",
-    "lint": "eslint .",
+    "lint": "npm run audit:theme-tokens && eslint .",
     "lint:fix": "eslint . --fix",
-    "bootstrap": "pnpm install && pnpm run common:prepare",
-    "common:cleanup": "rimraf node_modules && rimraf pnpm-lock.yaml",
+    "bootstrap": "npm install && npm run common:prepare",
+    "bootstrap:pnpm": "pnpm install && pnpm run common:prepare",
+    "common:cleanup": "rimraf node_modules",
     "common:prepare": "husky install"
   },
   "dependencies": {
+    "@iconify/vue": "^5.0.3",
     "@traptitech/markdown-it-katex": "^3.6.0",
-    "@vueuse/core": "^9.13.0",
-    "highlight.js": "^11.11.1",
-    "katex": "^0.16.21",
-    "markdown-it": "^13.0.2",
-    "moment": "^2.30.1",
-    "naive-ui": "^2.41.0",
-    "pinia": "^2.3.1",
-    "vue": "^3.5.13",
-    "vue-draggable-plus": "^0.2.7",
-    "vue-i18n": "^9.14.2",
-    "vue-router": "^4.5.0",
-    "vuedraggable": "^4.1.0"
+    "@vueuse/core": "^15.0.0",
+    "axios": "^1.20.0",
+    "crypto-js": "^4.2.0",
+    "highlight.js": "^11.12.0",
+    "katex": "^0.18.9",
+    "markdown-it": "^15.0.2",
+    "markdown-it-link-attributes": "^4.0.1",
+    "moment": "^2.31.0",
+    "naive-ui": "^2.45.3",
+    "pinia": "^4.0.3",
+    "vue": "^3.5.43",
+    "vue-draggable-plus": "^0.6.1",
+    "vue-i18n": "^11.4.12",
+    "vue-router": "^5.3.1"
   },
   "devDependencies": {
-    "@antfu/eslint-config": "^0.35.3",
-    "@commitlint/cli": "^17.8.1",
-    "@commitlint/config-conventional": "^17.8.1",
-    "@iconify/vue": "^4.3.0",
+    "@antfu/eslint-config": "^9.5.1",
+    "@commitlint/cli": "^21.2.3",
+    "@commitlint/config-conventional": "^21.2.3",
     "@playwright/test": "^1.63.0",
     "@types/crypto-js": "^4.2.2",
-    "@types/katex": "^0.16.7",
-    "@types/markdown-it": "^12.2.3",
+    "@types/katex": "^0.16.8",
+    "@types/markdown-it": "^14.2.0",
     "@types/markdown-it-link-attributes": "^3.0.5",
-    "@types/node": "^18.19.76",
-    "@vitejs/plugin-vue": "^4.6.2",
-    "autoprefixer": "^10.4.20",
-    "axios": "^1.7.9",
-    "crypto-js": "^4.2.0",
-    "eslint": "^8.57.1",
-    "less": "^4.2.2",
-    "lint-staged": "^13.3.0",
-    "markdown-it-link-attributes": "^4.0.1",
+    "@types/node": "^22.20.4",
+    "@types/sortablejs": "^1.15.9",
+    "@tailwindcss/postcss": "^4.3.3",
+    "@vitejs/plugin-vue": "^6.0.9",
+    "eslint": "^10.11.0",
+    "esbuild": "^0.28.1",
+    "fast-glob": "^3.3.3",
+    "less": "^4.9.1",
+    "lint-staged": "^17.5.1",
     "npm-run-all": "^4.1.5",
-    "postcss": "^8.5.3",
-    "rimraf": "^4.4.1",
-    "tailwindcss": "^3.4.17",
-    "typescript": "~4.9.5",
-    "vite": "^4.5.9",
-    "vite-plugin-pwa": "^0.14.7",
+    "postcss": "^8.5.28",
+    "rimraf": "^6.1.3",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^6.0.3",
+    "vite": "^8.3.0",
+    "vite-plugin-pwa": "^1.3.0",
     "vite-plugin-svg-icons": "^2.0.1",
-    "vue-tsc": "^1.8.27"
+    "workbox-build": "^7.4.1",
+    "workbox-window": "^7.4.1",
+    "vue-tsc": "^3.3.11"
   },
   "lint-staged": {
     "*.{ts,tsx,vue}": [
-      "pnpm lint:fix"
+      "eslint --fix"
     ]
+  },
+  "overrides": {
+    "workbox-build": "^7.4.1",
+    "workbox-window": "^7.4.1",
+    "svg-baker": {
+      "image-size": "^2.0.4",
+      "micromatch": "^4.0.8",
+      "postcss": "^8.5.28"
+    },
+    "braces": "^3.0.3"
+  },
+  "pnpm": {
+    "overrides": {
+      "workbox-build": "^7.4.1",
+      "workbox-window": "^7.4.1",
+      "svg-baker>image-size": "^2.0.4",
+      "svg-baker>micromatch": "^4.0.8",
+      "svg-baker>postcss": "^8.5.28",
+      "braces": "^3.0.3"
+    }
   }
 }

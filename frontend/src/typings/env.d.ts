@@ -1,5 +1,7 @@
 /// <reference types="vite/client" />
 
+declare module 'virtual:svg-icons-register' {}
+
 interface ImportMetaEnv {
 	readonly VITE_GLOB_API_URL: string;
 	readonly VITE_APP_API_BASE_URL: string;

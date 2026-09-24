@@ -111,9 +111,43 @@ test('v2 converts typography, dimensions, shadows, and layout slots', () => {
     pkg.manifest.bindings[slot] = `/design/${slot}`
   }
   const slots = resolveThemeSlots(pkg, 'light')
-  expect(slots).toMatchObject({ fontBody: 'Inter, system-ui', controlHeight: '12px', layoutTemplate: 'split', shadowCard: '0px 2px 12px 0px #172126' })
+  expect(slots).toMatchObject({ fontBody: 'Inter, system-ui', controlHeight: '12px', shadowCard: '0px 2px 12px 0px #172126' })
+  expect(slots.layoutTemplate).toBeUndefined()
   pkg.documents.light.design.controlHeight.$value = { value: -1, unit: 'px' }
   expect(() => resolveThemeSlots(pkg, 'light')).toThrow(/dimension/i)
+})
+
+test('v3 resolves grouped DTCG component tokens and preserves layout as user configuration', () => {
+  const pkg = makePackage(['light'])
+  const palette = pkg.documents.light.color
+  palette.focusRing.$value = '{primitive.color.primary}'
+  pkg.manifest.apiVersion = '3'
+  pkg.manifest.bindings = Object.fromEntries(semanticSlots.map(slot => [slot, `/semantic/color/${slot}`]))
+  pkg.documents.light = {
+    $schema: 'https://design-tokens.github.io/community-group/format/2025.10/schema.json',
+    primitive: { color: palette },
+    semantic: { color: palette },
+    component: {
+      card: {
+        $type: 'dimension',
+        padding: { $value: { value: 22, unit: 'px' } },
+        radius: { $value: { value: 18, unit: 'px' } },
+        surfaceMode: { $type: 'string', $value: 'glass' },
+      },
+    },
+    background: { texture: { $type: 'string', $value: 'grid' } },
+  }
+
+  const slots = resolveThemeSlots(pkg, 'light')
+  expect(slots).toMatchObject({
+    canvas: '#ffffff',
+    'color-primary': '#075b68',
+    'component-card-padding': '22px',
+    'component-card-radius': '18px',
+    'component-card-surface-mode': 'glass',
+    'background-texture': 'grid',
+  })
+  expect(slots.layoutTemplate).toBeUndefined()
 })
 
 test('wallpaper uses the selected scheme and versioned assets', () => {
@@ -127,5 +161,5 @@ test('wallpaper uses the selected scheme and versioned assets', () => {
     { path: 'wallpaper/poster.png', sha256: '', mediaType: 'image/png', url: '/assets/poster-v2.png' },
   ]
   expect(resolveWallpaper(pkg, 'light')).toMatchObject({ kind: 'image', source: '/assets/light-v1.webp' })
-  expect(resolveWallpaper(pkg, 'dark')).toEqual({ kind: 'externalUrl', source: 'https://example.test/live', poster: '/assets/poster-v2.png' })
+  expect(resolveWallpaper(pkg, 'dark')).toEqual({ kind: 'image', source: '/assets/poster-v2.png', poster: '/assets/poster-v2.png', overlayOpacity: undefined })
 })

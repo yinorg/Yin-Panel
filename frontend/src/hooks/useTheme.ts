@@ -113,15 +113,21 @@ export function useTheme() {
         errorColor: slots.danger,
         fontFamily: slots.fontBody || 'var(--yin-fontBody)',
         fontSize: slots.fontBodySize || 'var(--yin-fontBodySize)',
-        borderRadius: slots.radiusControl || 'var(--yin-radiusControl)',
-        heightMedium: slots.controlHeight || 'var(--yin-controlHeight)',
+        borderRadius: slots.radiusControl || 'var(--yin-component-button-radius)',
+        heightMedium: slots.controlHeight || 'var(--yin-component-button-height)',
         boxShadow1: slots.shadowCard || 'var(--yin-shadowCard)',
         boxShadow2: slots.shadowPopup || 'var(--yin-shadowPopup)',
       },
-      Button: { heightMedium: slots.controlHeight, borderRadiusMedium: slots.radiusControl },
-      Input: { heightMedium: slots.controlHeight, borderRadius: slots.radiusControl },
-      Card: { borderRadius: slots.radiusCard },
-      Modal: { borderRadius: slots.radiusDialog },
+      Button: { heightMedium: slots.controlHeight || 'var(--yin-component-button-height)', borderRadiusMedium: slots.radiusControl || 'var(--yin-component-button-radius)' },
+      Input: { heightMedium: slots.controlHeight || 'var(--yin-component-input-height)', borderRadius: slots.radiusControl || 'var(--yin-component-input-radius)' },
+      Card: { borderRadius: slots.radiusCard || 'var(--yin-component-card-radius)', boxShadow: 'var(--yin-component-card-shadow)' },
+      Modal: { borderRadius: slots.radiusDialog || 'var(--yin-component-dialog-radius)' },
+      Dialog: { borderRadius: 'var(--yin-component-dialog-radius)' },
+      Popover: { borderRadius: 'var(--yin-component-menu-radius)' },
+      Dropdown: { borderRadius: 'var(--yin-component-menu-radius)' },
+      Tooltip: { borderRadius: 'var(--yin-component-tooltip-radius)' },
+      Select: { peers: { InternalSelection: { borderRadius: 'var(--yin-component-input-radius)' } } },
+      Menu: { borderRadius: 'var(--yin-component-menu-radius)' },
     }
   })
 
@@ -145,16 +151,20 @@ export function useTheme() {
     for (const [slot, value] of Object.entries(slots))
       root.style.setProperty(`--yin-${slot}`, value)
     appliedSlots = Object.keys(slots)
-    root.dataset.yinLayout = slots.layoutTemplate || 'centered'
-    const mobile = Number.parseFloat(slots.breakpointMobile || '640')
-    const tablet = Number.parseFloat(slots.breakpointTablet || '1024')
-    let responsive = document.getElementById('yin-theme-responsive') as HTMLStyleElement | null
-    if (!responsive) {
-      responsive = document.createElement('style')
-      responsive.id = 'yin-theme-responsive'
-      document.head.appendChild(responsive)
-    }
-    responsive.textContent = `@media (max-width: ${mobile}px) { :root { --yin-activeColumns: 1; --yin-activeSidebarWidth: 0px; } } @media (min-width: ${mobile + 1}px) and (max-width: ${tablet}px) { :root { --yin-activeColumns: 2; --yin-activeSidebarWidth: var(--yin-sidebarWidth); } } @media (min-width: ${tablet + 1}px) { :root { --yin-activeColumns: var(--yin-homeColumns); --yin-activeSidebarWidth: var(--yin-sidebarWidth); } }`
+    const surfaceMode = slots['component-card-surface-mode'] || 'solid'
+    const density = slots['density-scale'] || 'standard'
+    const texture = slots['background-texture'] || 'none'
+    const validSurface = (mode?: string) => ['solid', 'transparent', 'glass', 'frosted', 'gradient'].includes(mode || '') ? mode : 'solid'
+    root.dataset.yinSurface = validSurface(surfaceMode)
+    root.dataset.yinSearchSurface = validSurface(slots['component-search-box-surface-mode'] || surfaceMode)
+    root.dataset.yinSidebarSurface = validSurface(slots['component-sidebar-surface-mode'] || surfaceMode)
+    root.dataset.yinDialogSurface = validSurface(slots['component-dialog-surface-mode'] || surfaceMode)
+    root.dataset.yinMenuSurface = validSurface(slots['component-menu-surface-mode'] || surfaceMode)
+    root.dataset.yinButtonSurface = validSurface(slots['component-button-surface-mode'] || surfaceMode)
+    root.dataset.yinInputSurface = validSurface(slots['component-input-surface-mode'] || surfaceMode)
+    root.dataset.yinTooltipSurface = validSurface(slots['component-tooltip-surface-mode'] || surfaceMode)
+    root.dataset.yinDensity = ['compact', 'standard', 'comfortable', 'spacious'].includes(density) ? density : 'standard'
+    root.dataset.yinTexture = ['none', 'grid', 'dots', 'noise'].includes(texture) ? texture : 'none'
   }, { immediate: true })
 
   watch(activeThemePackage, (pkg) => {

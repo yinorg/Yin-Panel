@@ -87,12 +87,20 @@ helm upgrade --install yin-panel ./distribution/helm-chart/yin-panel \
 
 ## 源码开发
 
-环境要求：Go `1.24`、Node.js `18+` 和 npm/pnpm。
+环境要求：Go `1.24`、Node.js `22.22.2`、npm 或 pnpm `9.15.5`。
 
 ```bash
 cd frontend
 npm ci
 npm run build-only
+```
+
+也可以使用锁定版本的 pnpm：
+
+```bash
+cd frontend
+corepack pnpm install --frozen-lockfile
+pnpm run build-only
 ```
 
 ```bash

@@ -13,7 +13,7 @@ interface Prop {
 
 const props = withDefaults(defineProps<Prop>(), {})
 
-const defaultBackground = '#2a2a2a6b'
+const defaultBackground = 'var(--yin-component-app-icon-surface, #2a2a2a6b)'
 const propClass = ref(props.class)
 </script>
 
@@ -52,3 +52,14 @@ const propClass = ref(props.class)
     </div>
   </div>
 </template>
+
+<style scoped>
+.item-card-info, .item-card-small-icon {
+  border-radius: var(--yin-component-card-radius);
+  border: var(--yin-component-card-border-width) var(--yin-component-card-border-style) var(--yin-border);
+  box-shadow: var(--yin-component-card-shadow);
+  transition: transform var(--yin-component-state-hover-duration) var(--yin-component-state-easing), box-shadow var(--yin-component-state-hover-duration) var(--yin-component-state-easing);
+}
+.item-card-small-icon { width: var(--yin-component-app-icon-size); height: var(--yin-component-app-icon-size); }
+.item-card-small-title { font: var(--yin-fontBodyWeight) var(--yin-fontSmallSize)/var(--yin-lineHeightBody) var(--yin-fontBody); }
+</style>

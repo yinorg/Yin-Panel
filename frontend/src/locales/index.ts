@@ -30,10 +30,11 @@ export function resolveBrowserLocale(): SupportedLocale {
 }
 
 const i18n = createI18n({
+  legacy: false,
+  globalInjection: true,
   locale: defaultLocale,
   // Missing translations must never fall back to Simplified Chinese.
   fallbackLocale: 'en-US',
-  allowComposition: true,
   messages: {
     'en-US': enUS,
     'zh-CN': zhCN,
@@ -55,7 +56,7 @@ export const t = i18n.global.t
 export function setLocale(locale: string) {
   const resolvedLocale = locale === 'auto' ? resolveBrowserLocale() : locale
   const activeLocale = (supportedLocales as readonly string[]).includes(resolvedLocale) ? resolvedLocale as SupportedLocale : defaultLocale
-  i18n.global.locale = activeLocale
+  i18n.global.locale.value = activeLocale
   if (typeof document !== 'undefined')
     document.documentElement.lang = activeLocale
 }

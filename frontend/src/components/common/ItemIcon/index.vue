@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { NAvatar } from 'naive-ui'
-import { computed, ref, withDefaults } from 'vue'
+import { computed, ref } from 'vue'
 import { SvgIconOnline } from '../index'
 
 interface Prop {
@@ -10,7 +10,7 @@ interface Prop {
 }
 
 const props = withDefaults(defineProps<Prop>(), { size: 70 })
-const defaultBackground = '#2a2a2a6b'
+const defaultBackground = 'var(--yin-component-app-icon-surface, #2a2a2a6b)'
 const defaultStyle = ref({
   width: `${props.size}px`,
   height: `${props.size}px`,
@@ -48,7 +48,7 @@ const handleImageError = (event: Event) => {
 
         <template v-else-if="itemIcon?.itemType === 3">
           <NAvatar :size="props.size" :style="{ backgroundColor: (forceBackground ?? itemIcon?.backgroundColor) || defaultBackground }">
-            <SvgIconOnline style="font-size: 35px;" :icon="itemIcon.text" />
+            <SvgIconOnline :style="{ fontSize: 'var(--yin-component-iconography-size)' }" :icon="itemIcon.text" />
           </NAvatar>
         </template>
       </template>

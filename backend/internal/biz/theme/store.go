@@ -255,7 +255,7 @@ func SetDefaultConfirmed(db *gorm.DB, actorID uint, packageID string, confirmExt
 			return err
 		}
 		for _, wallpaper := range manifest.Wallpapers {
-			if wallpaper.Kind == "externalUrl" && !confirmExternal {
+			if (wallpaper.Kind == "externalUrl" || wallpaper.Kind == "imageUrl") && !confirmExternal {
 				return errors.New("external wallpaper requires administrator confirmation")
 			}
 		}
@@ -291,7 +291,7 @@ func Remove(db *gorm.DB, actorID uint, packageID string) error {
 		if err := tx.Where("package_id = ?", packageID).Delete(&AssetRecord{}).Error; err != nil {
 			return err
 		}
-		if packageID == builtinMistID {
+		if packageID != builtinDefaultID && isBuiltinThemeID(packageID) {
 			if err := tx.Model(&record).Update("removed", true).Error; err != nil {
 				return err
 			}

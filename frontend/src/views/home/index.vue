@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { VueDraggable } from 'vue-draggable-plus'
 import { NBackTop, NButton, NButtonGroup, NCard, NDropdown, NInput, NModal, NSkeleton, NSpin, NSpace, useDialog, useMessage } from 'naive-ui'
-import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { createGroup, createSpace, getGroups, getItems, getSpaces, sortSpaces, spaceDisplayName, type Space } from '../../api/panel/space'
 import Clock from '../../components/deskModule/Clock/index.vue'
 import SearchBox from '../../components/deskModule/SearchBox/index.vue'
@@ -40,6 +40,30 @@ const previewThemeDefaults = new URLSearchParams(window.location.search).has('th
 const useThemeDefaults = computed(() => previewThemeDefaults || !!panelState.panelConfig.useThemeDefaults)
 const useThemeColors = computed(() => useThemeDefaults.value || panelState.panelConfig.wallpaperMode === 'theme')
 const panelIconTextColor = computed(() => resolvePanelValue('var(--yin-text)', panelState.panelConfig.iconTextColor, useThemeDefaults.value))
+const directoryLayout = computed(() => panelState.panelConfig.homeLayout === 'directory')
+const directoryRoots = computed(() => items.value.filter(group => !group.parentId))
+const activeDirectoryId = ref<number | null>(null)
+watch(directoryLayout, (enabled) => {
+  document.documentElement.dataset.yinLayout = enabled ? 'directory' : 'standard'
+}, { immediate: true })
+const directoryItems = computed(() => {
+  if (!directoryLayout.value) return filterItems.value
+  if (filterItems.value.length !== items.value.length) return filterItems.value
+  const selected = activeDirectoryId.value ?? directoryRoots.value[0]?.id
+  if (!selected) return items.value
+  const visible = new Set<number>([Number(selected)])
+  let changed = true
+  while (changed) {
+    changed = false
+    items.value.forEach(group => {
+      if (group.parentId && visible.has(Number(group.parentId)) && !visible.has(Number(group.id))) {
+        visible.add(Number(group.id))
+        changed = true
+      }
+    })
+  }
+  return items.value.filter(group => visible.has(Number(group.id)))
+})
 
 const scrollContainerRef = ref<HTMLElement | undefined>(undefined)
 
@@ -49,7 +73,6 @@ const windowShow = ref<boolean>(false)
 const windowSrc = ref<string>('')
 const windowTitle = ref<string>('')
 
-const windowIframeRef = ref(null)
 const windowIframeIsLoad = ref<boolean>(false)
 
 const dropdownMenuX = ref(0)
@@ -263,6 +286,8 @@ function applyGroups(data: ItemGroup[], itemsByGroup = new Map<number, Panel.Ite
     collapsedGroups.value = initiallyCollapsed
     flattened.forEach(group => loadedGroups.add(Number(group.id)))
     filterItems.value = items.value
+    if (!activeDirectoryId.value || !flattened.some(group => Number(group.id) === activeDirectoryId.value && !group.parentId))
+      activeDirectoryId.value = Number(flattened.find(group => !group.parentId)?.id) || null
 }
 
 function groupHidden(index: number) {
@@ -678,6 +703,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  delete document.documentElement.dataset.yinLayout
   window.removeEventListener('keydown', handleGlobalKeydown)
   window.removeEventListener('online', handleOnline)
   window.removeEventListener('offline', handleOffline)
@@ -837,13 +863,15 @@ function handleAddItem(itemIconGroupId?: number) {
         </NSpace>
       </NCard>
     </div>
-    <div v-if="homeReady" ref="scrollContainerRef" class="absolute w-full h-full overflow-auto">
+    <div v-if="homeReady" ref="scrollContainerRef" class="home-scroll-container absolute w-full h-full overflow-auto">
       <div
         class="p-2.5 mx-auto"
+        :class="{ 'directory-page': directoryLayout }"
         :style="{
-          marginTop: resolvePanelValue('var(--yin-spaceLg)', `${panelState.panelConfig.marginTop}%`, useThemeDefaults),
-          marginBottom: resolvePanelValue('var(--yin-spaceLg)', `${panelState.panelConfig.marginBottom}%`, useThemeDefaults),
-          maxWidth: resolvePanelValue('var(--yin-contentMaxWidth)', `${panelState.panelConfig.maxWidth ?? 1200}${panelState.panelConfig.maxWidthUnit}`, useThemeDefaults),
+          marginTop: `${panelState.panelConfig.marginTop}%`,
+          marginBottom: `${panelState.panelConfig.marginBottom}%`,
+          maxWidth: `${panelState.panelConfig.maxWidth ?? 1200}${panelState.panelConfig.maxWidthUnit}`,
+          background: directoryLayout ? 'transparent' : undefined,
         }"
       >
         <!-- 头 -->
@@ -861,9 +889,20 @@ function handleAddItem(itemIconGroupId?: number) {
               <Clock :hide-second="!panelState.panelConfig.clockShowSecond" />
             </div>
           </div>
-          <div v-if="panelState.panelConfig.searchBoxShow" class="flex mt-[20px] mx-auto sm:w-full lg:w-[80%]">
-            <SearchBox :space-id="activeSpace?.id" :session-only="sessionOnlyCache" @itemSearch="itemFrontEndSearch" @search-engine-change="commandCenterSearchEngine = $event" />
+          <div v-if="panelState.panelConfig.searchBoxShow" class="flex mt-[20px] mx-auto sm:w-full lg:w-[80%]" :class="{ 'directory-search': directoryLayout }">
+            <SearchBox :space-id="activeSpace?.id" :session-only="sessionOnlyCache" :directory="directoryLayout" @itemSearch="itemFrontEndSearch" @search-engine-change="commandCenterSearchEngine = $event" />
           </div>
+        </div>
+
+        <nav v-if="directoryLayout && directoryRoots.length" class="directory-folders" aria-label="Bookmark groups">
+          <button v-for="group in directoryRoots" :key="group.id" type="button" :class="{ active: Number(activeDirectoryId) === Number(group.id) }" @click="activeDirectoryId = Number(group.id)">
+            <SvgIcon :icon="group.icon || 'mdi-folder-outline'" />
+            <span>{{ group.title }}</span>
+          </button>
+        </nav>
+        <div v-if="directoryLayout" class="directory-brand-controls">
+          <span>{{ activeSpace?.side === 'yang' ? 'Yang-Panel' : 'Yin-Panel' }}</span>
+          <Clock :hide-second="!panelState.panelConfig.clockShowSecond" />
         </div>
 
         <!-- 应用盒子 -->
@@ -872,8 +911,9 @@ function handleAddItem(itemIconGroupId?: number) {
           :class="{
             'home-content--with-monitor': monitorEnabled && panelState.panelConfig.systemMonitorShow,
             'home-content--monitor-info': monitorEnabled && panelState.panelConfig.systemMonitorShow && panelState.panelConfig.iconStyle === PanelPanelConfigStyleEnum.info,
+            'directory-content': directoryLayout,
           }"
-          :style="{ marginLeft: resolvePanelValue('var(--yin-pageGutter)', `${panelState.panelConfig.marginX}px`, useThemeDefaults), marginRight: resolvePanelValue('var(--yin-pageGutter)', `${panelState.panelConfig.marginX}px`, useThemeDefaults) }"
+          :style="{ marginLeft: `${panelState.panelConfig.marginX}px`, marginRight: `${panelState.panelConfig.marginX}px` }"
         >
           <!-- 系统监控状态 -->
           <div
@@ -890,7 +930,7 @@ function handleAddItem(itemIconGroupId?: number) {
 
           <!-- 组纵向排列 -->
           <div
-            v-for="(itemGroup, itemGroupIndex) in filterItems" :key="itemGroupIndex"
+            v-for="(itemGroup, itemGroupIndex) in directoryItems" :key="itemGroupIndex"
             v-show="!groupHidden(itemGroupIndex)"
             data-item-group data-testid="item-group"
             class="item-list mt-[50px] min-h-[110px]"
@@ -899,7 +939,7 @@ function handleAddItem(itemIconGroupId?: number) {
             @mouseleave="handleSetHoverStatus(itemGroupIndex, false)"
           >
             <!-- 分组标题 -->
-            <div class="text-white text-xl font-extrabold mb-[20px] flex items-center" :style="{ marginLeft: `${10 + (itemGroup.depth || 0) * 24}px` }">
+            <div class="text-white text-xl font-extrabold mb-[20px] flex items-center directory-group-heading" :style="{ marginLeft: `${10 + (itemGroup.depth || 0) * 24}px` }">
               <span class="group-title text-shadow">
                 {{ itemGroup.title }}
               </span>
@@ -921,7 +961,7 @@ function handleAddItem(itemIconGroupId?: number) {
             </div>
 
             <!-- 详情图标 -->
-            <div v-if="panelState.panelConfig.iconStyle === PanelPanelConfigStyleEnum.info">
+            <div v-if="!directoryLayout && panelState.panelConfig.iconStyle === PanelPanelConfigStyleEnum.info">
               <div v-if="itemGroup.items && !collapsedGroups.has(Number(itemGroup.id))">
                 <VueDraggable
                   v-model="itemGroup.items" item-key="sort" :animation="300"
@@ -957,7 +997,7 @@ function handleAddItem(itemIconGroupId?: number) {
             </div>
 
             <!-- APP图标宫型盒子 -->
-            <div v-if="panelState.panelConfig.iconStyle === PanelPanelConfigStyleEnum.icon">
+            <div v-if="directoryLayout || panelState.panelConfig.iconStyle === PanelPanelConfigStyleEnum.icon">
               <div v-if="itemGroup.items && !collapsedGroups.has(Number(itemGroup.id))">
                 <VueDraggable
                   v-model="itemGroup.items" item-key="sort" :animation="300"
@@ -989,7 +1029,7 @@ function handleAddItem(itemIconGroupId?: number) {
                       @click="handleAddItem(itemGroup.id)"
                     />
                   </div>
-                </vuedraggable>
+                </VueDraggable>
               </div>
             </div>
 
@@ -1020,6 +1060,7 @@ function handleAddItem(itemIconGroupId?: number) {
     />
 
     <!-- 悬浮按钮 -->
+    <Teleport to="body">
     <div v-if="homeReady && parsePublicCodeFromPath() === '' && authStore.token && canWrite" class="fixed-element shadow-[0_0_10px_2px_rgba(0,0,0,0.2)]">
       <NButtonGroup vertical>
         <NButton data-testid="floating-refresh-button" color="#2a2a2a6b" :title="$t('common.refresh')" @mousedown="handleFloatingButtonMouseDown" @click="handleFloatingButtonClick($event, refreshCurrentSpace)">
@@ -1060,6 +1101,7 @@ function handleAddItem(itemIconGroupId?: number) {
 
       <AppStarter v-model:visible="settingModalShow" @spaces-changed="handleSpacesChanged" />
     </div>
+    </Teleport>
 
     <NBackTop
       v-if="homeReady"
@@ -1101,7 +1143,7 @@ function handleAddItem(itemIconGroupId?: number) {
           <NSkeleton height="180px" width="100%" class="mt-[20px] rounded-lg" />
         </div>
         <iframe
-          v-show="!windowIframeIsLoad" id="windowIframeId" ref="windowIframeRef" :src="windowSrc"
+          v-show="!windowIframeIsLoad" id="windowIframeId" :src="windowSrc"
           class="w-full h-full" frameborder="0" @load="handWindowIframeIdLoad"
         />
       </div>
@@ -1122,16 +1164,16 @@ function handleAddItem(itemIconGroupId?: number) {
   top: 14px;
   left: 50%;
   transform: translateX(-50%);
-  padding: 3px;
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  border-radius: 999px;
-  background: rgba(18, 22, 28, 0.46);
-  backdrop-filter: blur(14px);
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
+  padding: var(--yin-component-sidebar-padding);
+  border: var(--yin-component-button-border-width) solid var(--yin-border);
+  border-radius: var(--yin-component-sidebar-radius);
+  background: color-mix(in srgb, var(--yin-surfaceElevated) calc(var(--yin-component-surface-opacity) * 100%), transparent);
+  backdrop-filter: blur(var(--yin-component-surface-blur));
+  box-shadow: var(--yin-component-menu-shadow);
 }
-.space-status-button { color: white; min-width: 140px; }
-.space-status-dot { width: 7px; height: 7px; margin-right: 8px; border-radius: 50%; background: #7dd3fc; box-shadow: 0 0 10px #7dd3fc; }
-.offline-status { position: fixed; z-index: 21; top: 14px; right: 18px; display: flex; gap: 8px; color: white; font-size: 12px; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7); }
+.space-status-button { color: var(--yin-text); min-width: 140px; }
+.space-status-dot { width: 7px; height: 7px; margin-right: 8px; border-radius: 50%; background: var(--yin-success); box-shadow: 0 0 var(--yin-component-surface-glow) var(--yin-success); }
+.offline-status { position: fixed; z-index: 21; top: 14px; right: 18px; display: flex; gap: var(--yin-component-group-gap); color: var(--yin-text); font-size: var(--yin-fontSmallSize); text-shadow: var(--yin-effect-text-shadow); }
 .offline-unavailable { position: fixed; z-index: 31; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(0, 0, 0, 0.48); }
 </style>
 
@@ -1141,6 +1183,7 @@ html {
   overflow: hidden;
   background-color: var(--yin-canvas);
 }
+html:has(:root[data-yin-layout='directory']) body { background-color: transparent; }
 </style>
 
 <style scoped>
@@ -1161,6 +1204,8 @@ html {
   color: var(--yin-text);
 }
 
+.sun-main:global(:has(:root[data-yin-layout='directory'])) { background: transparent; color: var(--yin-text); }
+
 .sun-main.theme-defaults .home-header-row,
 .sun-main.theme-defaults .item-list > div:first-child {
   color: var(--yin-text) !important;
@@ -1171,19 +1216,22 @@ html {
   text-shadow: none;
 }
 
-.sun-main.theme-defaults .space-status-bar {
+.sun-main.theme-defaults .space-status-bar,
+:global(:root[data-yin-layout='directory']) .space-status-bar {
   border-color: var(--yin-border);
   background-color: var(--yin-surfaceElevated);
 }
 
 .sun-main.theme-defaults .space-status-button,
-.sun-main.theme-defaults .offline-status {
+.sun-main.theme-defaults .offline-status,
+:global(:root[data-yin-layout='directory']) .space-status-button,
+:global(:root[data-yin-layout='directory']) .offline-status {
   color: var(--yin-text);
   text-shadow: none;
 }
 
 .sun-main.side-switching {
-  animation: panel-content-pulse 1000ms ease-in-out;
+  animation: panel-content-pulse var(--yin-component-state-space-transition-duration, 1000ms) var(--yin-component-state-space-transition-easing, ease-in-out);
 }
 
 @keyframes panel-content-pulse {
@@ -1213,7 +1261,7 @@ html {
   aspect-ratio: 1;
   display: grid;
   place-items: center;
-  animation: taiji-aura 1000ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  animation: taiji-aura var(--yin-component-state-space-transition-duration, 1000ms) var(--yin-component-state-space-transition-easing, cubic-bezier(0.22, 0.61, 0.36, 1)) both;
 }
 
 .taiji-symbol {
@@ -1223,11 +1271,11 @@ html {
   width: 58%;
   aspect-ratio: 1;
   overflow: hidden;
-  border: 3px solid rgba(255, 255, 255, 0.82);
+  border: var(--yin-effect-focus-width, 2px) solid color-mix(in srgb, var(--yin-surfaceElevated) 82%, transparent);
   border-radius: 50%;
-  background: linear-gradient(90deg, #18212b 0 50%, #f4efe2 50%);
-  box-shadow: 0 0 34px rgba(255, 255, 255, 0.3), 0 0 80px rgba(13, 18, 24, 0.3);
-  animation: taiji-spin 1000ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  background: linear-gradient(90deg, var(--yin-text) 0 50%, var(--yin-surfaceElevated) 50%);
+  box-shadow: 0 0 var(--yin-component-surface-glow, 34px) color-mix(in srgb, var(--yin-surfaceElevated) 30%, transparent), 0 0 calc(var(--yin-component-surface-glow, 34px) * 2.35) color-mix(in srgb, var(--yin-text) 30%, transparent);
+  animation: taiji-spin var(--yin-component-state-space-transition-duration, 1000ms) var(--yin-component-state-space-transition-easing, cubic-bezier(0.22, 0.61, 0.36, 1)) both;
 }
 
 .taiji-symbol.taiji-yang {
@@ -1246,12 +1294,12 @@ html {
 
 .taiji-symbol::before {
   top: 0;
-  background: #f4efe2;
+  background: var(--yin-surfaceElevated);
 }
 
 .taiji-symbol::after {
   bottom: 0;
-  background: #18212b;
+  background: var(--yin-text);
 }
 
 .taiji-dot {
@@ -1265,13 +1313,13 @@ html {
 .taiji-dot-dark {
   top: 25%;
   left: 44%;
-  background: #18212b;
+  background: var(--yin-text);
 }
 
 .taiji-dot-light {
   bottom: 25%;
   left: 44%;
-  background: #f4efe2;
+  background: var(--yin-surfaceElevated);
 }
 
 .taiji-bagua {
@@ -1279,7 +1327,7 @@ html {
   inset: 0;
   border: 1px solid rgba(255, 255, 255, 0.42);
   border-radius: 50%;
-  animation: taiji-spin 1000ms cubic-bezier(0.22, 0.61, 0.36, 1) reverse both;
+  animation: taiji-spin var(--yin-component-state-space-transition-duration, 1000ms) var(--yin-component-state-space-transition-easing, cubic-bezier(0.22, 0.61, 0.36, 1)) reverse both;
 }
 
 .taiji-bagua span {
@@ -1329,7 +1377,28 @@ html {
 }
 
 .home-content { position: relative; }
+.home-scroll-container { position: relative; z-index: 1; pointer-events: none; }
+.home-scroll-container > * { pointer-events: auto; }
+:global(:root[data-yin-layout='directory']) .home-scroll-container { background: transparent; }
 :global(:root[data-yin-layout='split']) .home-content { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: var(--yin-spaceLg); }
+:global(:root[data-yin-layout='directory']) .home-header { width: min(640px, 100%); }
+:global(:root[data-yin-layout='directory']) .home-header-row { display: none; }
+:global(:root[data-yin-layout='directory']) .directory-brand-controls { display: flex; justify-content: space-between; align-items: center; margin: 14px auto 0; color: var(--yin-text); font-size: 12px; }
+:global(:root[data-yin-layout='directory']) .directory-search { margin-top: 8px; }
+:global(:root[data-yin-layout='directory']) .home-content { margin-top: var(--yin-component-group-section-spacing); padding: var(--yin-component-card-padding); border: var(--yin-component-card-border-width) var(--yin-component-card-border-style) var(--yin-border); border-radius: var(--yin-component-card-radius); background: var(--yin-surfaceElevated); box-shadow: var(--yin-component-card-shadow); }
+:global(:root[data-yin-layout='directory']) .item-list { min-height: 0; margin-top: 0; padding: var(--yin-component-group-section-spacing) 0; border-bottom: var(--yin-borderWidth) solid var(--yin-border); }
+:global(:root[data-yin-layout='directory']) .item-list:last-child { border-bottom: 0; }
+:global(:root[data-yin-layout='directory']) .directory-group-heading { margin: 0 0 var(--yin-spaceSm) !important; color: var(--yin-text); font-family: var(--yin-fontDisplay); font-size: var(--yin-fontBodySize); font-weight: var(--yin-fontHeadingWeight); }
+:global(:root[data-yin-layout='directory']) .directory-group-heading .group-title { text-shadow: none; }
+:global(:root[data-yin-layout='directory']) .directory-folders { display: flex; max-width: 100%; gap: var(--yin-component-group-gap); margin: var(--yin-component-group-section-spacing) auto 0; overflow-x: auto; padding: var(--yin-spaceXs) 0 var(--yin-spaceSm); scrollbar-width: thin; }
+:global(:root[data-yin-layout='directory']) .directory-folders button { display: flex; flex: 0 0 auto; align-items: center; gap: var(--yin-component-app-icon-gap); min-height: var(--yin-component-button-height); padding: 0 var(--yin-component-button-padding-x); border: var(--yin-component-button-border-width) solid var(--yin-border); border-radius: var(--yin-component-button-radius); background: var(--yin-component-sidebar-surface, var(--yin-surfaceElevated)); color: var(--yin-text); cursor: pointer; transition: all var(--yin-component-state-hover-duration) var(--yin-component-state-easing); }
+:global(:root[data-yin-layout='directory']) .directory-folders button.active { border-color: var(--yin-primary); color: var(--yin-primary); }
+:global(:root[data-yin-layout='directory']) .icon-small-box { display: flex; flex-wrap: wrap; gap: var(--yin-component-group-gap); }
+:global(:root[data-yin-layout='directory']) .app-icon { width: auto; }
+:global(:root[data-yin-layout='directory']) .app-icon-small { display: flex; align-items: center; gap: var(--yin-component-app-icon-gap); }
+:global(:root[data-yin-layout='directory']) .app-icon-small-icon { width: 30px; height: 30px; margin: 0; border-radius: 5px; }
+:global(:root[data-yin-layout='directory']) .app-icon-small-title { max-width: 190px; margin: 0; color: var(--yin-text) !important; text-align: left; text-shadow: none; white-space: nowrap; }
+:global(:root[data-yin-layout='directory']) .home-content .group-buttons svg { color: var(--yin-text); }
 
 .home-content--with-monitor {
   padding-top: 190px;
@@ -1358,12 +1427,14 @@ html {
 }
 
 .text-shadow {
-  text-shadow: 2px 2px 50px rgb(0, 0, 0);
+  text-shadow: var(--yin-effect-text-shadow);
 }
 
 .app-icon-text-shadow {
-  text-shadow: 2px 2px 5px rgb(0, 0, 0);
+  text-shadow: var(--yin-effect-text-shadow);
 }
+
+.item-list { margin-top: var(--yin-component-group-section-spacing); }
 
 .fixed-element {
   position: fixed;
@@ -1378,7 +1449,7 @@ html {
   width: 100%;
   display: grid;
   grid-template-columns: repeat(var(--yin-activeColumns), minmax(0, 1fr));
-  gap: var(--yin-spaceLg);
+  gap: var(--yin-component-group-gap);
 
 }
 
@@ -1386,7 +1457,7 @@ html {
   width: 100%;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(75px, 1fr));
-  gap: var(--yin-spaceLg);
+  gap: var(--yin-component-group-gap);
 
 }
 
@@ -1414,6 +1485,8 @@ html {
   .home-header-row .logo span { font-size: 1.35rem; }
   .home-header-row .divider { margin-left: 4px; margin-right: 4px; }
   .icon-info-box { gap: 10px; grid-template-columns: 1fr; }
+  :global(:root[data-yin-layout='directory']) .icon-small-box { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; }
+  :global(:root[data-yin-layout='directory']) .app-icon-small-title { max-width: calc(100vw - 100px); overflow: hidden; text-overflow: ellipsis; }
   .icon-small-box { gap: 12px 8px; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); }
   .system-monitor { overflow: hidden; }
   .home-content--with-monitor { padding-top: 300px; }

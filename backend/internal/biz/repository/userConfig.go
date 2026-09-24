@@ -9,6 +9,7 @@ import (
 )
 
 type PanelConfig struct {
+	HomeLayout                  string   `json:"homeLayout,omitempty"`
 	BackgroundImageSrc          string   `json:"backgroundImageSrc,omitempty"`
 	WallpaperMode               string   `json:"wallpaperMode,omitempty"`
 	WallpaperKind               string   `json:"wallpaperKind,omitempty"`

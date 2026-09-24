@@ -26,6 +26,37 @@ func TestBuiltinPackageValidates(t *testing.T) {
 	}
 }
 
+func TestOfficialThemesHaveDistinctDTCGVisualDirections(t *testing.T) {
+	themes := map[string]*Package{"yin": Builtin(), "glass": BuiltinGlass(), "minimal": BuiltinMinimal(), "cyber": BuiltinCyber()}
+	cardModes := map[string]any{}
+	for name, pkg := range themes {
+		if pkg.Manifest.DTCGVersion != "2025.10" || pkg.Manifest.APIVersion != "3" || pkg.Manifest.Compatibility == nil {
+			t.Fatalf("%s theme does not declare the DTCG v3 runtime contract", name)
+		}
+		var doc map[string]any
+		if err := json.Unmarshal(pkg.Documents["light"], &doc); err != nil {
+			t.Fatal(err)
+		}
+		card := doc["component"].(map[string]any)["card"].(map[string]any)
+		cardModes[name] = card["surfaceMode"].(map[string]any)["$value"]
+		for _, group := range []string{"primitive", "semantic", "component", "shape", "spacing", "density", "elevation", "motion", "background", "effect"} {
+			if _, exists := doc[group]; !exists {
+				t.Errorf("%s theme is missing DTCG token group %q", name, group)
+			}
+		}
+	}
+	if cardModes["yin"] == cardModes["glass"] || cardModes["yin"] == cardModes["cyber"] || cardModes["minimal"] == cardModes["glass"] {
+		t.Fatalf("official themes do not expose distinct surface directions: %v", cardModes)
+	}
+	var cyber map[string]any
+	if err := json.Unmarshal(themes["cyber"].Documents["light"], &cyber); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(fmt.Sprint(cyber["semantic"].(map[string]any)["typography"].(map[string]any)["display"].(map[string]any)["$value"]), "monospace") {
+		t.Fatal("Cyber theme does not declare its monospace display type")
+	}
+}
+
 func TestBuiltinMistRemovalPersistsUntilUpgrade(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open("file:builtin-mist-removal?mode=memory&cache=shared"), &gorm.Config{})
 	if err != nil {
@@ -83,6 +114,77 @@ func TestBuiltinMistRemovalPersistsUntilUpgrade(t *testing.T) {
 	}
 }
 
+func TestBuiltinHorizonLayoutWallpaperAndRemoval(t *testing.T) {
+	pkg := BuiltinHorizon()
+	if err := Validate(pkg); err != nil {
+		t.Fatalf("Horizon package rejected: %v", err)
+	}
+	var light map[string]any
+	if err := json.Unmarshal(pkg.Documents["light"], &light); err != nil {
+		t.Fatal(err)
+	}
+	if pkg.Manifest.APIVersion != "3" {
+		t.Fatalf("Horizon package API = %q, want 3", pkg.Manifest.APIVersion)
+	}
+	if _, exists := light["design"]; exists {
+		t.Fatal("Horizon declares visual layout configuration in its theme tokens")
+	}
+	if _, exists := light["component"].(map[string]any)["appIcon"]; !exists {
+		t.Fatal("Horizon does not declare component tokens")
+	}
+
+	remote := Builtin()
+	remote.Manifest.ID = "test.image-url"
+	remote.Manifest.Name = "Image URL"
+	opacity := 0.28
+	remote.Manifest.Wallpapers = map[string]Wallpaper{
+		"light": {Kind: "imageUrl", Source: "https://images.example.test/bridge.jpg", OverlayOpacity: &opacity},
+		"dark":  {Kind: "imageUrl", Source: "https://images.example.test/bridge-dark.jpg", OverlayOpacity: &opacity},
+	}
+	if _, err := ParseArchive(archivePackage(t, remote, nil), true); err != nil {
+		t.Fatalf("valid HTTPS image wallpaper rejected: %v", err)
+	}
+	opacity = 1.1
+	if _, err := ParseArchive(archivePackage(t, remote, nil), true); err == nil {
+		t.Fatal("out-of-range wallpaper overlay opacity accepted")
+	}
+
+	db, err := gorm.Open(sqlite.Open("file:builtin-horizon-removal?mode=memory&cache=shared"), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := Migrate(db); err != nil {
+		t.Fatal(err)
+	}
+	if err := EnsureBuiltin(db); err != nil {
+		t.Fatal(err)
+	}
+	if err := SetDefault(db, 1, builtinHorizonID); err != nil {
+		t.Fatal(err)
+	}
+	if err := Remove(db, 1, builtinHorizonID); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := DefaultID(db); err != nil || got != builtinDefaultID {
+		t.Fatalf("Horizon removal default fallback = %q, err=%v", got, err)
+	}
+	if err := EnsureBuiltin(db); err != nil {
+		t.Fatal(err)
+	}
+	if packages, err := List(db); err != nil || containsPackage(packages, builtinHorizonID) {
+		t.Fatalf("removed Horizon was restored at the same version: packages=%v err=%v", packageIDs(packages), err)
+	}
+	if err := db.Model(&PackageRecord{}).Where("id = ?", builtinHorizonID).Update("version", "0.9.0").Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := EnsureBuiltin(db); err != nil {
+		t.Fatal(err)
+	}
+	if packages, err := List(db); err != nil || !containsPackage(packages, builtinHorizonID) {
+		t.Fatalf("Horizon was not restored after upgrade: packages=%v err=%v", packageIDs(packages), err)
+	}
+}
+
 func TestBuiltinThemeIDsCannotBeInstalledAsArchives(t *testing.T) {
 	pkg := Builtin()
 	pkg.Manifest.ID = builtinMistID
@@ -128,18 +230,7 @@ func TestBuiltinHomeColumnsAndUpgrade(t *testing.T) {
 	}
 
 	old := Builtin()
-	old.Manifest.PackageVersion = "2.0.0"
-	for _, scheme := range old.Manifest.Schemes {
-		var document map[string]any
-		if err := json.Unmarshal(old.Documents[scheme], &document); err != nil {
-			t.Fatal(err)
-		}
-		document["design"].(map[string]any)["homeColumns"].(map[string]any)["$value"] = 4
-		old.Documents[scheme], err = json.Marshal(document)
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
+	old.Manifest.PackageVersion = "2.0.1"
 	manifest, err := json.Marshal(old.Manifest)
 	if err != nil {
 		t.Fatal(err)
@@ -163,17 +254,17 @@ func TestBuiltinHomeColumnsAndUpgrade(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if stored.Manifest.PackageVersion != "2.0.1" {
-		t.Fatalf("built-in package version = %q, want 2.0.1", stored.Manifest.PackageVersion)
+	if stored.Manifest.PackageVersion != "2.1.0" || stored.Manifest.APIVersion != "3" {
+		t.Fatalf("built-in package = %s API %s, want 2.1.0 API 3", stored.Manifest.PackageVersion, stored.Manifest.APIVersion)
 	}
 	for _, scheme := range stored.Manifest.Schemes {
 		var document map[string]any
 		if err := json.Unmarshal(stored.Documents[scheme], &document); err != nil {
 			t.Fatal(err)
 		}
-		columns := document["design"].(map[string]any)["homeColumns"].(map[string]any)["$value"]
-		if columns != float64(12) {
-			t.Errorf("%s homeColumns = %v, want 12", scheme, columns)
+		card := document["component"].(map[string]any)["card"].(map[string]any)
+		if _, exists := card["padding"]; !exists {
+			t.Errorf("%s component card padding token is missing", scheme)
 		}
 	}
 }
@@ -208,7 +299,7 @@ func TestValidationRejectsWrongBoundType(t *testing.T) {
 	if err := json.Unmarshal(pkg.Documents["light"], &doc); err != nil {
 		t.Fatal(err)
 	}
-	doc["color"].(map[string]any)["$type"] = "number"
+	doc["semantic"].(map[string]any)["color"].(map[string]any)["$type"] = "number"
 	content, err := json.Marshal(doc)
 	if err != nil {
 		t.Fatal(err)
@@ -225,7 +316,7 @@ func TestValidationRejectsReferenceTypeMismatch(t *testing.T) {
 	if err := json.Unmarshal(pkg.Documents["light"], &doc); err != nil {
 		t.Fatal(err)
 	}
-	doc["invalid"] = map[string]any{"$type": "string", "reference": map[string]any{"$value": "{color.primary}"}}
+	doc["invalid"] = map[string]any{"$type": "string", "reference": map[string]any{"$value": "{primitive.color.primary}"}}
 	content, err := json.Marshal(doc)
 	if err != nil {
 		t.Fatal(err)
@@ -270,7 +361,7 @@ func setTokenValue(t *testing.T, pkg *Package, scheme, name string, value any) {
 	if err := json.Unmarshal(pkg.Documents[scheme], &doc); err != nil {
 		t.Fatal(err)
 	}
-	doc["color"].(map[string]any)[name].(map[string]any)["$value"] = value
+	doc["semantic"].(map[string]any)["color"].(map[string]any)[name].(map[string]any)["$value"] = value
 	content, err := json.Marshal(doc)
 	if err != nil {
 		t.Fatal(err)
@@ -331,7 +422,9 @@ func TestArchiveRejectsInvalidManifestBindingsAndSchemes(t *testing.T) {
 		name   string
 		mutate func(*Package)
 	}{
-		{name: "api version", mutate: func(pkg *Package) { pkg.Manifest.APIVersion = "3" }},
+		{name: "api version", mutate: func(pkg *Package) { pkg.Manifest.APIVersion = "4" }},
+		{name: "api v3 compatibility missing", mutate: func(pkg *Package) { pkg.Manifest.Compatibility = nil }},
+		{name: "api v3 engine too new", mutate: func(pkg *Package) { pkg.Manifest.Compatibility.Minimum = "2.0.0" }},
 		{name: "missing slot", mutate: func(pkg *Package) { delete(pkg.Manifest.Bindings, "focusRing") }},
 		{name: "unknown pointer", mutate: func(pkg *Package) { pkg.Manifest.Bindings["focusRing"] = "/color/missing" }},
 		{name: "unsupported scheme", mutate: func(pkg *Package) { pkg.Manifest.Schemes = []string{"contrast"} }},
@@ -589,11 +682,20 @@ func TestV1PackageStillInstalls(t *testing.T) {
 
 func TestV2DesignBindingsRejectBadValues(t *testing.T) {
 	pkg := Builtin()
+	pkg.Manifest.APIVersion = "2"
+	for slot := range v2Slots {
+		pkg.Manifest.Bindings[slot] = "/design/" + slot
+	}
 	var doc map[string]any
 	if err := json.Unmarshal(pkg.Documents["light"], &doc); err != nil {
 		t.Fatal(err)
 	}
-	doc["design"].(map[string]any)["controlHeight"].(map[string]any)["$value"] = map[string]any{"value": 10, "unit": "px"}
+	design := map[string]any{}
+	for slot, value := range builtinDesignValues(false) {
+		design[slot] = map[string]any{"$type": v2Slots[slot], "$value": value}
+	}
+	doc["design"] = design
+	design["controlHeight"].(map[string]any)["$value"] = map[string]any{"value": 10, "unit": "px"}
 	pkg.Documents["light"], _ = json.Marshal(doc)
 	if err := Validate(pkg); err == nil || !strings.Contains(err.Error(), "controlHeight") {
 		t.Fatalf("invalid component height accepted: %v", err)
@@ -641,6 +743,38 @@ func TestExternalWallpaperNeedsPosterAndAdminConfirmation(t *testing.T) {
 	pkg.Manifest.Wallpapers["dark"] = Wallpaper{Kind: "externalUrl", Source: "javascript:alert(1)", Poster: "wallpaper/poster.png"}
 	if _, err := ParseArchive(archivePackage(t, pkg, nil), true); err == nil {
 		t.Fatal("unsafe external URL accepted")
+	}
+}
+
+func TestRemoteImageDefaultRequiresAdministratorConfirmation(t *testing.T) {
+	pkg := Builtin()
+	pkg.Manifest.ID = "test.remote-image-default"
+	pkg.Manifest.Name = "Remote Image Default"
+	pkg.Manifest.Wallpapers = map[string]Wallpaper{
+		"light": {Kind: "imageUrl", Source: "https://images.example.test/light.jpg"},
+		"dark":  {Kind: "imageUrl", Source: "https://images.example.test/dark.jpg"},
+	}
+	if _, err := ParseArchive(archivePackage(t, pkg, nil), true); err != nil {
+		t.Fatalf("valid remote image theme rejected: %v", err)
+	}
+	db, err := gorm.Open(sqlite.Open("file:remote-image-default?mode=memory&cache=shared"), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := Migrate(db); err != nil {
+		t.Fatal(err)
+	}
+	if err := EnsureBuiltin(db); err != nil {
+		t.Fatal(err)
+	}
+	if err := Install(db, 1, pkg); err != nil {
+		t.Fatal(err)
+	}
+	if err := SetDefault(db, 1, pkg.Manifest.ID); err == nil || !strings.Contains(err.Error(), "confirmation") {
+		t.Fatalf("unconfirmed remote image default accepted: %v", err)
+	}
+	if err := SetDefaultConfirmed(db, 1, pkg.Manifest.ID, true); err != nil {
+		t.Fatalf("confirmed remote image default rejected: %v", err)
 	}
 }
 

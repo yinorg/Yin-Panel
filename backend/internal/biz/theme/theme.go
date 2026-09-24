@@ -22,12 +22,17 @@ import (
 
 const (
 	FormatVersion    = 1
-	APIVersion       = "2"
+	APIVersion       = "3"
 	DTCGVersion      = "2025.10"
+	EngineVersion    = "1.0.0"
 	MaxArchive       = 32 << 20
 	MaxExpanded      = 48 << 20
 	builtinDefaultID = "org.yin.default"
 	builtinMistID    = "org.yin.mist"
+	builtinHorizonID = "org.yin.horizon"
+	builtinGlassID   = "org.yin.glass"
+	builtinMinimalID = "org.yin.minimal"
+	builtinCyberID   = "org.yin.cyber"
 )
 
 var requiredSlots = map[string]string{
@@ -53,9 +58,10 @@ type Resource struct {
 }
 
 type Wallpaper struct {
-	Kind   string `json:"kind"`
-	Source string `json:"source"`
-	Poster string `json:"poster,omitempty"`
+	Kind           string   `json:"kind"`
+	Source         string   `json:"source"`
+	Poster         string   `json:"poster,omitempty"`
+	OverlayOpacity *float64 `json:"overlayOpacity,omitempty"`
 }
 
 type FontResource struct {
@@ -76,9 +82,16 @@ type Manifest struct {
 	Schemes        []string             `json:"schemes"`
 	Documents      map[string]string    `json:"documents"`
 	Bindings       map[string]string    `json:"bindings"`
+	Compatibility  *Compatibility       `json:"compatibility,omitempty"`
 	Resources      []Resource           `json:"resources"`
 	Wallpapers     map[string]Wallpaper `json:"wallpapers,omitempty"`
 	Fonts          []FontResource       `json:"fonts,omitempty"`
+}
+
+type Compatibility struct {
+	Engine  string `json:"engine"`
+	Minimum string `json:"minimum"`
+	Maximum string `json:"maximum,omitempty"`
 }
 
 type Package struct {
@@ -228,10 +241,10 @@ func validateWallpaperAssets(pkg *Package) error {
 		}
 	}
 	for _, wallpaper := range pkg.Manifest.Wallpapers {
-		if wallpaper.Kind != "externalUrl" && !validWallpaperBytes(pkg.Resources[wallpaper.Source]) {
+		if wallpaper.Kind != "externalUrl" && wallpaper.Kind != "imageUrl" && !validWallpaperBytes(pkg.Resources[wallpaper.Source]) {
 			return fmt.Errorf("wallpaper source %q has invalid content", wallpaper.Source)
 		}
-		if wallpaper.Poster != "" && !validWallpaperBytes(pkg.Resources[wallpaper.Poster]) {
+		if wallpaper.Poster != "" && wallpaper.Kind != "imageUrl" && !validWallpaperBytes(pkg.Resources[wallpaper.Poster]) {
 			return fmt.Errorf("wallpaper poster %q has invalid content", wallpaper.Poster)
 		}
 	}
@@ -274,11 +287,19 @@ func strictJSON(data []byte, out any) error {
 }
 
 func validateManifest(m Manifest) error {
-	if m.Format != "yin-theme" || m.FormatVersion != FormatVersion || (m.APIVersion != "1" && m.APIVersion != APIVersion) || m.DTCGVersion != DTCGVersion {
+	if m.Format != "yin-theme" || m.FormatVersion != FormatVersion || (m.APIVersion != "1" && m.APIVersion != "2" && m.APIVersion != APIVersion) || m.DTCGVersion != DTCGVersion {
 		return errors.New("unsupported theme format, package API, or DTCG version")
 	}
 	if !idPattern.MatchString(m.ID) || isBuiltinThemeID(m.ID) || strings.TrimSpace(m.Name) == "" || len(m.Name) > 100 || !versionPattern.MatchString(m.PackageVersion) {
 		return errors.New("invalid theme identity or reserved package ID")
+	}
+	if m.APIVersion == "3" {
+		if m.Compatibility == nil || m.Compatibility.Engine != "yin-theme-engine" || !versionPattern.MatchString(m.Compatibility.Minimum) || (m.Compatibility.Maximum != "" && !versionPattern.MatchString(m.Compatibility.Maximum)) {
+			return errors.New("API v3 themes must declare valid engine compatibility")
+		}
+		if compareThemeVersion(EngineVersion, m.Compatibility.Minimum) < 0 || (m.Compatibility.Maximum != "" && compareThemeVersion(EngineVersion, m.Compatibility.Maximum) > 0) {
+			return errors.New("theme package is incompatible with this Yin Theme Engine version")
+		}
 	}
 	if len(m.Schemes) == 0 || len(m.Schemes) > 2 || len(m.Documents) != len(m.Schemes) {
 		return errors.New("theme must declare one or two complete schemes")
@@ -343,6 +364,28 @@ func validateManifest(m Manifest) error {
 	return nil
 }
 
+func compareThemeVersion(left, right string) int {
+	parse := func(value string) [3]int {
+		core := strings.SplitN(strings.SplitN(value, "+", 2)[0], "-", 2)[0]
+		parts := strings.Split(core, ".")
+		version := [3]int{}
+		for i := 0; i < len(parts) && i < len(version); i++ {
+			_, _ = fmt.Sscanf(parts[i], "%d", &version[i])
+		}
+		return version
+	}
+	a, b := parse(left), parse(right)
+	for i := range a {
+		if a[i] < b[i] {
+			return -1
+		}
+		if a[i] > b[i] {
+			return 1
+		}
+	}
+	return 0
+}
+
 func validateWallpaper(w Wallpaper, resources map[string]string) error {
 	if w.Source == "" {
 		return errors.New("source is required")
@@ -365,13 +408,21 @@ func validateWallpaper(w Wallpaper, resources map[string]string) error {
 		if err != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil || u.Fragment != "" || len(w.Source) > 2048 {
 			return errors.New("external wallpaper must use a plain HTTPS URL")
 		}
+	case "imageUrl":
+		u, err := url.Parse(w.Source)
+		if err != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil || u.Fragment != "" || len(w.Source) > 2048 {
+			return errors.New("image wallpaper must use a plain HTTPS URL")
+		}
 	default:
 		return errors.New("unknown wallpaper kind")
 	}
-	if w.Poster == "" && w.Kind != "image" {
+	if w.OverlayOpacity != nil && (*w.OverlayOpacity < 0 || *w.OverlayOpacity > 1 || math.IsNaN(*w.OverlayOpacity) || math.IsInf(*w.OverlayOpacity, 0)) {
+		return errors.New("wallpaper overlay opacity must be between 0 and 1")
+	}
+	if w.Poster == "" && w.Kind != "image" && w.Kind != "imageUrl" {
 		return errors.New("dynamic wallpaper requires a poster")
 	}
-	if w.Poster != "" && !strings.HasPrefix(resources[w.Poster], "image/") {
+	if w.Poster != "" && w.Kind != "imageUrl" && !strings.HasPrefix(resources[w.Poster], "image/") {
 		return errors.New("poster must be a declared image")
 	}
 	return nil
@@ -420,8 +471,14 @@ func Validate(pkg *Package) error {
 		flat := map[string]token{}
 		flatten(doc, "", "", flat)
 		for name := range flat {
-			if _, err := resolveToken(name, flat, map[string]bool{}); err != nil {
+			resolved, err := resolveToken(name, flat, map[string]bool{})
+			if err != nil {
 				return fmt.Errorf("scheme %s: %w", scheme, err)
+			}
+			if pkg.Manifest.APIVersion == "3" {
+				if err := validateAPIV3Token(name, resolved, pkg.Manifest.Resources); err != nil {
+					return fmt.Errorf("scheme %s: %w", scheme, err)
+				}
 			}
 		}
 		resolvedSlots := map[string]any{}
@@ -446,7 +503,7 @@ func Validate(pkg *Package) error {
 			}
 			resolvedSlots[slot] = t.value
 		}
-		if pkg.Manifest.APIVersion == APIVersion {
+		if pkg.Manifest.APIVersion == "2" {
 			mobile, _, _ := dimension(resolvedSlots["breakpointMobile"])
 			tablet, _, _ := dimension(resolvedSlots["breakpointTablet"])
 			if mobile >= tablet {
@@ -458,6 +515,172 @@ func Validate(pkg *Package) error {
 		}
 	}
 	return nil
+}
+
+func validateAPIV3Token(name string, value token, resources []Resource) error {
+	invalid := func() error { return fmt.Errorf("token %q has an invalid %s value", name, value.typ) }
+	switch value.typ {
+	case "color":
+		if _, err := parseColor(value.value); err != nil {
+			return invalid()
+		}
+	case "dimension":
+		n, unit, ok := dimension(value.value)
+		if !ok || n < 0 || (unit != "px" && unit != "rem") || n > 4096 {
+			return invalid()
+		}
+	case "number":
+		n, ok := number(value.value)
+		if !ok || math.Abs(n) > 10000 {
+			return invalid()
+		}
+		lower := strings.ToLower(name)
+		if strings.Contains(lower, "opacity") && (n < 0 || n > 1) {
+			return invalid()
+		}
+		if strings.Contains(lower, "scale") && (n < .5 || n > 1.5) {
+			return invalid()
+		}
+		if strings.HasSuffix(lower, "tiltdegrees") && (n < 0 || n > 12) {
+			return invalid()
+		}
+	case "fontFamily":
+		if err := validateDesignSlot("fontBody", value.value); err != nil {
+			return invalid()
+		}
+	case "fontWeight":
+		switch current := value.value.(type) {
+		case json.Number:
+			n, _ := current.Float64()
+			if n < 100 || n > 900 {
+				return invalid()
+			}
+		case string:
+			if !regexp.MustCompile(`^(thin|hairline|extra-light|ultra-light|light|normal|regular|medium|semi-bold|demi-bold|bold|extra-bold|ultra-bold|black|heavy|extra-black|ultra-black)$`).MatchString(current) {
+				return invalid()
+			}
+		default:
+			return invalid()
+		}
+	case "duration":
+		v, ok := value.value.(map[string]any)
+		if !ok {
+			return invalid()
+		}
+		n, numberOK := number(v["value"])
+		unit, unitOK := v["unit"].(string)
+		if !numberOK || n < 0 || n > 10000 || !unitOK || (unit != "ms" && unit != "s") {
+			return invalid()
+		}
+	case "cubicBezier":
+		points, ok := value.value.([]any)
+		if !ok || len(points) != 4 {
+			return invalid()
+		}
+		for i, point := range points {
+			n, valid := number(point)
+			if !valid || ((i == 0 || i == 2) && (n < 0 || n > 1)) || math.Abs(n) > 10 {
+				return invalid()
+			}
+		}
+	case "boolean":
+		if _, ok := value.value.(bool); !ok {
+			return invalid()
+		}
+	case "border":
+		v, ok := value.value.(map[string]any)
+		if !ok {
+			return invalid()
+		}
+		if _, err := parseColor(v["color"]); err != nil {
+			return invalid()
+		}
+		if _, _, ok := dimension(v["width"]); !ok {
+			return invalid()
+		}
+		style, ok := v["style"].(string)
+		if !ok || !regexp.MustCompile(`^(solid|dashed|dotted|double|groove|ridge|inset|outset)$`).MatchString(style) {
+			return invalid()
+		}
+	case "typography":
+		v, ok := value.value.(map[string]any)
+		if !ok || validateDesignSlot("fontBody", v["fontFamily"]) != nil || validateAPIV3Token(name+".fontSize", token{typ: "dimension", value: v["fontSize"]}, resources) != nil || validateAPIV3Token(name+".fontWeight", token{typ: "fontWeight", value: v["fontWeight"]}, resources) != nil {
+			return invalid()
+		}
+		if line, exists := v["lineHeight"]; exists {
+			n, ok := number(line)
+			if !ok || n < .5 || n > 5 {
+				return invalid()
+			}
+		}
+		if style, exists := v["fontStyle"]; exists {
+			s, ok := style.(string)
+			if !ok || (s != "normal" && s != "italic") {
+				return invalid()
+			}
+		}
+	case "transition":
+		v, ok := value.value.(map[string]any)
+		if !ok || validateAPIV3Token(name+".duration", token{typ: "duration", value: v["duration"]}, resources) != nil {
+			return invalid()
+		}
+		if delay, exists := v["delay"]; exists && validateAPIV3Token(name+".delay", token{typ: "duration", value: delay}, resources) != nil {
+			return invalid()
+		}
+		if timing, exists := v["timingFunction"]; exists && validateAPIV3Token(name+".timingFunction", token{typ: "cubicBezier", value: timing}, resources) != nil {
+			return invalid()
+		}
+		if property, exists := v["property"]; exists {
+			p, ok := property.(string)
+			if !ok || !regexp.MustCompile(`^[\w-]+$`).MatchString(p) {
+				return invalid()
+			}
+		}
+	case "gradient":
+		stops, ok := value.value.([]any)
+		if !ok || len(stops) < 2 || len(stops) > 16 {
+			return invalid()
+		}
+		for _, raw := range stops {
+			stop, ok := raw.(map[string]any)
+			if !ok {
+				return invalid()
+			}
+			if _, err := parseColor(stop["color"]); err != nil {
+				return invalid()
+			}
+			position, ok := number(stop["position"])
+			if !ok || position < 0 || position > 1 {
+				return invalid()
+			}
+		}
+	case "string", "strokeStyle":
+		v, ok := value.value.(string)
+		if !ok || len(v) > 2048 || strings.ContainsAny(v, ";{}<>\r\n\x00") {
+			return invalid()
+		}
+	case "asset":
+		asset, ok := value.value.(string)
+		if !ok || (asset != "" && !hasDeclaredResource(resources, asset)) {
+			return invalid()
+		}
+	case "shadow":
+		if err := validateShadow(value.value); err != nil {
+			return invalid()
+		}
+	default:
+		return invalid()
+	}
+	return nil
+}
+
+func hasDeclaredResource(resources []Resource, name string) bool {
+	for _, resource := range resources {
+		if resource.Path == name && strings.HasPrefix(resource.MediaType, "image/") {
+			return true
+		}
+	}
+	return false
 }
 
 type token struct {
@@ -775,47 +998,153 @@ func ratio(a, b color) float64 {
 func Builtin() *Package {
 	light := map[string]string{"canvas": "#ffffff", "surface": "#f3f6f8", "surfaceElevated": "#ffffff", "text": "#172126", "textMuted": "#53636a", "border": "#d5dfe2", "primary": "#075b68", "onPrimary": "#ffffff", "secondary": "#8b4412", "success": "#176b45", "warning": "#805200", "danger": "#a12627", "focusRing": "#075b68"}
 	dark := map[string]string{"canvas": "#171d20", "surface": "#222a2e", "surfaceElevated": "#2b353a", "text": "#f1f5f6", "textMuted": "#b0bec3", "border": "#536168", "primary": "#72d6df", "onPrimary": "#102326", "secondary": "#f0a66d", "success": "#71d8a0", "warning": "#f2c46c", "danger": "#ff9792", "focusRing": "#72d6df"}
-	return builtinPackage(builtinDefaultID, "Yin Default", "2.0.1", light, dark)
+	return builtinPackage(builtinDefaultID, "Yin Default", "2.1.0", light, dark, "yin")
 }
 
 func BuiltinMist() *Package {
 	light := map[string]string{"canvas": "#f4f7f6", "surface": "#ffffff", "surfaceElevated": "#ffffff", "text": "#172826", "textMuted": "#586966", "border": "#d6e2df", "primary": "#b43743", "onPrimary": "#ffffff", "secondary": "#08796a", "success": "#197349", "warning": "#785300", "danger": "#a52d34", "focusRing": "#b43743"}
 	dark := map[string]string{"canvas": "#151d1c", "surface": "#202a29", "surfaceElevated": "#2a3634", "text": "#f0f6f3", "textMuted": "#b4c3be", "border": "#4b605a", "primary": "#f28b80", "onPrimary": "#311717", "secondary": "#74d4bd", "success": "#76d39b", "warning": "#f0c66f", "danger": "#ff9b95", "focusRing": "#f28b80"}
-	return builtinPackage(builtinMistID, "Yin Mist", "1.0.0", light, dark)
+	return builtinPackage(builtinMistID, "Yin Mist", "1.1.0", light, dark, "mist")
+}
+
+func BuiltinHorizon() *Package {
+	light := map[string]string{"canvas": "#f4f8fa", "surface": "#ffffff", "surfaceElevated": "#ffffff", "text": "#20282c", "textMuted": "#64737a", "border": "#d8e0e3", "primary": "#176b80", "onPrimary": "#ffffff", "secondary": "#b4543c", "success": "#28734d", "warning": "#805500", "danger": "#a63338", "focusRing": "#176b80"}
+	dark := map[string]string{"canvas": "#171d20", "surface": "#22292c", "surfaceElevated": "#2b3438", "text": "#f2f5f6", "textMuted": "#b7c1c4", "border": "#536066", "primary": "#78c5d4", "onPrimary": "#14262a", "secondary": "#eea080", "success": "#79d4a1", "warning": "#f1c66d", "danger": "#ff9994", "focusRing": "#78c5d4"}
+	return builtinPackage(builtinHorizonID, "Yin Horizon", "1.1.0", light, dark, "horizon")
+}
+
+func BuiltinGlass() *Package {
+	light := map[string]string{"canvas": "#e7edf4", "surface": "#edf2f8", "surfaceElevated": "#f8fbff", "text": "#182535", "textMuted": "#53677c", "border": "#a9bed3", "primary": "#2666a6", "onPrimary": "#ffffff", "secondary": "#8059a8", "success": "#176b45", "warning": "#805200", "danger": "#a12627", "focusRing": "#2666a6"}
+	dark := map[string]string{"canvas": "#101827", "surface": "#19263a", "surfaceElevated": "#25354c", "text": "#eef5ff", "textMuted": "#a6b8cd", "border": "#526c89", "primary": "#73b9ff", "onPrimary": "#10253d", "secondary": "#c6a4ff", "success": "#71d8a0", "warning": "#f2c46c", "danger": "#ff9792", "focusRing": "#73b9ff"}
+	return builtinPackage(builtinGlassID, "Yin Glass", "1.0.0", light, dark, "glass")
+}
+
+func BuiltinMinimal() *Package {
+	light := map[string]string{"canvas": "#ffffff", "surface": "#fafafa", "surfaceElevated": "#ffffff", "text": "#202020", "textMuted": "#666666", "border": "#e6e6e6", "primary": "#303030", "onPrimary": "#ffffff", "secondary": "#526b5d", "success": "#176b45", "warning": "#805200", "danger": "#a12627", "focusRing": "#526b5d"}
+	dark := map[string]string{"canvas": "#141414", "surface": "#1b1b1b", "surfaceElevated": "#202020", "text": "#eeeeee", "textMuted": "#aaaaaa", "border": "#363636", "primary": "#d0d0d0", "onPrimary": "#181818", "secondary": "#9db7a7", "success": "#71d8a0", "warning": "#f2c46c", "danger": "#ff9792", "focusRing": "#9db7a7"}
+	return builtinPackage(builtinMinimalID, "Yin Minimal", "1.0.0", light, dark, "minimal")
+}
+
+func BuiltinCyber() *Package {
+	light := map[string]string{"canvas": "#f5f3ff", "surface": "#ffffff", "surfaceElevated": "#ffffff", "text": "#251847", "textMuted": "#65568a", "border": "#8f77c8", "primary": "#5a27d5", "onPrimary": "#ffffff", "secondary": "#007b83", "success": "#176b45", "warning": "#805200", "danger": "#a12627", "focusRing": "#5a27d5"}
+	dark := map[string]string{"canvas": "#100b20", "surface": "#19112e", "surfaceElevated": "#24173e", "text": "#f5edff", "textMuted": "#b5a5d5", "border": "#6746a0", "primary": "#ed4bc5", "onPrimary": "#210c27", "secondary": "#42e5df", "success": "#71d8a0", "warning": "#f2c46c", "danger": "#ff9792", "focusRing": "#42e5df"}
+	return builtinPackage(builtinCyberID, "Yin Cyber", "1.0.0", light, dark, "cyber")
 }
 
 func Builtins() []*Package {
-	return []*Package{Builtin(), BuiltinMist()}
+	return []*Package{Builtin(), BuiltinMist(), BuiltinHorizon(), BuiltinGlass(), BuiltinMinimal(), BuiltinCyber()}
 }
 
 func isBuiltinThemeID(id string) bool {
-	return id == builtinDefaultID || id == builtinMistID
+	return id == builtinDefaultID || id == builtinMistID || id == builtinHorizonID || id == builtinGlassID || id == builtinMinimalID || id == builtinCyberID
 }
 
-func builtinPackage(id, name, version string, light, dark map[string]string) *Package {
+func builtinPackage(id, name, version string, light, dark map[string]string, preset string) *Package {
 	bindings := map[string]string{}
 	names := []string{"canvas", "surface", "surfaceElevated", "text", "textMuted", "border", "primary", "onPrimary", "secondary", "success", "warning", "danger", "focusRing"}
 	for _, name := range names {
-		bindings[name] = "/color/" + name
+		bindings[name] = "/semantic/color/" + name
 	}
-	for name := range v2Slots {
-		bindings[name] = "/design/" + name
-	}
-	manifest := Manifest{Format: "yin-theme", FormatVersion: FormatVersion, ID: id, Name: name, PackageVersion: version, APIVersion: APIVersion, DTCGVersion: DTCGVersion, Schemes: []string{"light", "dark"}, Documents: map[string]string{"light": "tokens/light.json", "dark": "tokens/dark.json"}, Bindings: bindings}
-	return &Package{Manifest: manifest, Documents: map[string]json.RawMessage{"light": makeDocument(light, false), "dark": makeDocument(dark, true)}, Resources: map[string]ResourceData{}, Verified: true}
+	manifest := Manifest{Format: "yin-theme", FormatVersion: FormatVersion, ID: id, Name: name, PackageVersion: version, APIVersion: APIVersion, DTCGVersion: DTCGVersion, Compatibility: &Compatibility{Engine: "yin-theme-engine", Minimum: "1.0.0"}, Schemes: []string{"light", "dark"}, Documents: map[string]string{"light": "tokens/light.json", "dark": "tokens/dark.json"}, Bindings: bindings}
+	return &Package{Manifest: manifest, Documents: map[string]json.RawMessage{"light": makeDocument(light, false, preset), "dark": makeDocument(dark, true, preset)}, Resources: map[string]ResourceData{}, Verified: true}
 }
 
-func makeDocument(palette map[string]string, dark bool) json.RawMessage {
-	colors := map[string]any{"$type": "color"}
+func makeDocument(palette map[string]string, dark bool, preset string) json.RawMessage {
+	primitiveColors := map[string]any{"$type": "color"}
 	for name, hexColor := range palette {
 		parsed, _ := parseColor(hexColor)
-		colors[name] = map[string]any{"$value": map[string]any{"colorSpace": "srgb", "components": []float64{parsed.r, parsed.g, parsed.b}, "alpha": 1}}
+		primitiveColors[name] = map[string]any{"$value": map[string]any{"colorSpace": "srgb", "components": []float64{parsed.r, parsed.g, parsed.b}, "alpha": 1}}
 	}
-	design := map[string]any{}
-	for name, value := range builtinDesignValues(dark) {
-		design[name] = map[string]any{"$type": v2Slots[name], "$value": value}
+	semanticColors := map[string]any{"$type": "color"}
+	for name := range palette {
+		semanticColors[name] = map[string]any{"$value": "{primitive.color." + name + "}"}
 	}
-	document := map[string]any{"$schema": "https://design-tokens.github.io/community-group/format/2025.10/schema.json", "color": colors, "design": design}
+	px := func(value float64) map[string]any { return map[string]any{"value": value, "unit": "px"} }
+	ms := func(value float64) map[string]any { return map[string]any{"value": value, "unit": "ms"} }
+	shadowColor := "#24323b"
+	fontBody := []string{"Inter", "system-ui", "sans-serif"}
+	fontDisplay := []string{"Inter", "system-ui", "sans-serif"}
+	baseRadius, cardPadding, groupGap, iconSize, duration, searchBlur := 8.0, 16.0, 20.0, 70.0, 180.0, 0.0
+	surfaceStyle, density, borderStyle := "solid", "standard", "solid"
+	if dark {
+		shadowColor = "#080d12"
+	}
+	switch preset {
+	case "glass":
+		baseRadius, cardPadding, groupGap, iconSize, duration, searchBlur = 18, 22, 28, 76, 260, 18
+		surfaceStyle, density, shadowColor = "glass", "comfortable", "#37628c"
+	case "minimal":
+		baseRadius, cardPadding, groupGap, iconSize, duration = 2, 22, 28, 64, 100
+		surfaceStyle, density, shadowColor, borderStyle = "solid", "spacious", "#808080", "solid"
+	case "cyber":
+		baseRadius, cardPadding, groupGap, iconSize, duration = 1, 14, 16, 72, 90
+		surfaceStyle, density, shadowColor, borderStyle = "gradient", "compact", "#ed4bc5", "double"
+		fontBody = []string{"IBM Plex Mono", "monospace"}
+		fontDisplay = []string{"Orbitron", "IBM Plex Mono", "monospace"}
+	case "horizon":
+		baseRadius, cardPadding, groupGap, iconSize, duration, searchBlur, surfaceStyle = 5, 16, 18, 64, 160, 10, "frosted"
+	case "mist":
+		baseRadius, cardPadding, groupGap, iconSize, duration, searchBlur = 10, 18, 24, 72, 220, 10
+		surfaceStyle = "frosted"
+	}
+	if preset == "minimal" {
+		shadowColor = "#000000"
+	}
+	headingWeight := 600
+	if preset == "cyber" {
+		headingWeight = 700
+	}
+	glow := 0.0
+	if preset == "glass" || preset == "cyber" {
+		glow = 22
+	}
+	tiltDegrees := 8
+	if preset == "glass" {
+		tiltDegrees = 3
+	}
+	if preset == "minimal" {
+		tiltDegrees = 0
+	}
+	if preset == "cyber" {
+		tiltDegrees = 6
+	}
+	texture := "none"
+	if preset == "cyber" {
+		texture = "grid"
+	}
+	zero := px(0)
+	shadow := map[string]any{"color": shadowColor, "offsetX": zero, "offsetY": px(4), "blur": px(18), "spread": px(0)}
+	component := map[string]any{
+		"appIcon":       map[string]any{"$type": "dimension", "size": map[string]any{"$value": px(iconSize)}, "radius": map[string]any{"$value": px(baseRadius)}, "gap": map[string]any{"$value": px(8)}, "surface": map[string]any{"$type": "color", "$value": "{semantic.color.surfaceElevated}"}, "shadow": map[string]any{"$type": "shadow", "$value": shadow}},
+		"card":          map[string]any{"$type": "dimension", "padding": map[string]any{"$value": px(cardPadding)}, "radius": map[string]any{"$value": px(baseRadius)}, "borderWidth": map[string]any{"$value": px(1)}, "borderStyle": map[string]any{"$type": "string", "$value": borderStyle}, "surfaceMode": map[string]any{"$type": "string", "$value": surfaceStyle}, "shadow": map[string]any{"$type": "shadow", "$value": shadow}},
+		"group":         map[string]any{"$type": "dimension", "gap": map[string]any{"$value": px(groupGap)}, "sectionSpacing": map[string]any{"$value": px(groupGap)}, "padding": map[string]any{"$value": px(cardPadding)}},
+		"searchBox":     map[string]any{"$type": "dimension", "height": map[string]any{"$value": px(44)}, "radius": map[string]any{"$value": px(baseRadius)}, "borderWidth": map[string]any{"$value": px(1)}, "surface": map[string]any{"$type": "color", "$value": "{semantic.color.surfaceElevated}"}, "surfaceMode": map[string]any{"$type": "string", "$value": surfaceStyle}, "blur": map[string]any{"$value": px(searchBlur)}, "shadow": map[string]any{"$type": "shadow", "$value": shadow}},
+		"sidebar":       map[string]any{"$type": "dimension", "padding": map[string]any{"$value": px(cardPadding)}, "radius": map[string]any{"$value": px(baseRadius)}, "surface": map[string]any{"$type": "color", "$value": "{semantic.color.surfaceElevated}"}, "surfaceMode": map[string]any{"$type": "string", "$value": surfaceStyle}},
+		"dialog":        map[string]any{"$type": "dimension", "padding": map[string]any{"$value": px(cardPadding)}, "radius": map[string]any{"$value": px(baseRadius)}, "surface": map[string]any{"$type": "color", "$value": "{semantic.color.surfaceElevated}"}, "surfaceMode": map[string]any{"$type": "string", "$value": surfaceStyle}, "shadow": map[string]any{"$type": "shadow", "$value": shadow}},
+		"menu":          map[string]any{"$type": "dimension", "padding": map[string]any{"$value": px(6)}, "radius": map[string]any{"$value": px(baseRadius)}, "surface": map[string]any{"$type": "color", "$value": "{semantic.color.surfaceElevated}"}, "surfaceMode": map[string]any{"$type": "string", "$value": surfaceStyle}, "shadow": map[string]any{"$type": "shadow", "$value": shadow}},
+		"button":        map[string]any{"$type": "dimension", "height": map[string]any{"$value": px(36)}, "paddingX": map[string]any{"$value": px(14)}, "radius": map[string]any{"$value": px(baseRadius)}, "borderWidth": map[string]any{"$value": px(1)}, "surfaceMode": map[string]any{"$type": "string", "$value": surfaceStyle}},
+		"input":         map[string]any{"$type": "dimension", "height": map[string]any{"$value": px(36)}, "paddingX": map[string]any{"$value": px(12)}, "radius": map[string]any{"$value": px(baseRadius)}, "borderWidth": map[string]any{"$value": px(1)}, "surfaceMode": map[string]any{"$type": "string", "$value": surfaceStyle}},
+		"tooltip":       map[string]any{"$type": "dimension", "padding": map[string]any{"$value": px(8)}, "radius": map[string]any{"$value": px(baseRadius)}, "surfaceMode": map[string]any{"$type": "string", "$value": surfaceStyle}, "shadow": map[string]any{"$type": "shadow", "$value": shadow}},
+		"systemMonitor": map[string]any{"$type": "dimension", "gap": map[string]any{"$value": px(groupGap)}, "padding": map[string]any{"$value": px(cardPadding)}, "radius": map[string]any{"$value": px(baseRadius)}, "iconSize": map[string]any{"$value": px(28)}},
+		"state":         map[string]any{"$type": "duration", "hoverDuration": map[string]any{"$value": ms(duration)}, "pressDuration": map[string]any{"$value": ms(80)}, "enterDuration": map[string]any{"$value": ms(duration)}, "easing": map[string]any{"$type": "cubicBezier", "$value": []float64{.2, .8, .2, 1}}, "hoverScale": map[string]any{"$type": "number", "$value": 1.02}, "pressScale": map[string]any{"$type": "number", "$value": .96}, "tiltDegrees": map[string]any{"$type": "number", "$value": tiltDegrees}, "spaceTransitionDuration": map[string]any{"$type": "duration", "$value": ms(duration * 5.5)}, "spaceTransitionEasing": map[string]any{"$type": "cubicBezier", "$value": []float64{.22, .61, .36, 1}}},
+		"surface":       map[string]any{"$type": "number", "opacity": map[string]any{"$value": .88}, "blur": map[string]any{"$type": "dimension", "$value": px(16)}, "glow": map[string]any{"$type": "dimension", "$value": px(glow)}},
+		"iconography":   map[string]any{"$type": "dimension", "size": map[string]any{"$value": px(20)}, "containerRadius": map[string]any{"$value": px(baseRadius)}, "strokeWidth": map[string]any{"$type": "number", "$value": 1.8}},
+	}
+	typography := map[string]any{
+		"body": map[string]any{"$type": "fontFamily", "$value": fontBody}, "display": map[string]any{"$type": "fontFamily", "$value": fontDisplay},
+		"bodySize": map[string]any{"$type": "dimension", "$value": px(14)}, "smallSize": map[string]any{"$type": "dimension", "$value": px(12)}, "headingSize": map[string]any{"$type": "dimension", "$value": px(24)},
+		"bodyWeight": map[string]any{"$type": "fontWeight", "$value": 400}, "headingWeight": map[string]any{"$type": "fontWeight", "$value": headingWeight},
+		"bodyLineHeight": map[string]any{"$type": "number", "$value": 1.5}, "headingLineHeight": map[string]any{"$type": "number", "$value": 1.25},
+	}
+	semantic := map[string]any{"color": semanticColors, "typography": typography, "surface": map[string]any{"$type": "color", "canvas": map[string]any{"$value": "{primitive.color.canvas}"}, "panel": map[string]any{"$value": "{primitive.color.surface}"}, "raised": map[string]any{"$value": "{primitive.color.surfaceElevated}"}}, "state": map[string]any{"$type": "color", "focus": map[string]any{"$value": "{primitive.color.focusRing}"}, "success": map[string]any{"$value": "{primitive.color.success}"}, "warning": map[string]any{"$value": "{primitive.color.warning}"}, "danger": map[string]any{"$value": "{primitive.color.danger}"}}}
+	shape := map[string]any{"$type": "dimension", "control": map[string]any{"$value": px(baseRadius)}, "card": map[string]any{"$value": px(baseRadius)}, "dialog": map[string]any{"$value": px(baseRadius)}, "borderWidth": map[string]any{"$value": px(1)}}
+	spacing := map[string]any{"$type": "dimension", "xs": map[string]any{"$value": px(4)}, "sm": map[string]any{"$value": px(8)}, "md": map[string]any{"$value": px(12)}, "lg": map[string]any{"$value": px(groupGap)}, "xl": map[string]any{"$value": px(groupGap * 1.6)}}
+	densityToken := map[string]any{"$type": "string", "$value": density}
+	elevation := map[string]any{"$type": "shadow", "card": map[string]any{"$value": shadow}, "popup": map[string]any{"$value": shadow}}
+	motion := map[string]any{"$type": "duration", "hover": map[string]any{"$value": ms(duration)}, "press": map[string]any{"$value": ms(80)}, "enter": map[string]any{"$value": ms(duration)}, "easing": map[string]any{"$type": "cubicBezier", "$value": []float64{.2, .8, .2, 1}}}
+	background := map[string]any{"$type": "number", "overlayOpacity": map[string]any{"$value": .18}, "texture": map[string]any{"$type": "string", "$value": texture}, "image": map[string]any{"$type": "asset", "$value": ""}}
+	effect := map[string]any{"$type": "number", "glowOpacity": map[string]any{"$value": glow / 32}, "hoverOpacity": map[string]any{"$value": .12}, "focusWidth": map[string]any{"$type": "dimension", "$value": px(2)}, "textShadow": map[string]any{"$type": "shadow", "$value": shadow}}
+	document := map[string]any{"$schema": "https://design-tokens.github.io/community-group/format/2025.10/schema.json", "primitive": map[string]any{"color": primitiveColors}, "semantic": semantic, "component": component, "shape": shape, "spacing": spacing, "density": map[string]any{"scale": densityToken}, "elevation": elevation, "motion": motion, "background": background, "effect": effect}
 	raw, _ := json.Marshal(document)
 	return raw
 }

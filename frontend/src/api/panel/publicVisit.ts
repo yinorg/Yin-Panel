@@ -20,8 +20,7 @@ export function enablePublicVisit() {
 
 // 禁用公开访问代码
 export function disablePublicVisit() {
-  return post<ApiResponse<{}>>({
+  return post<ApiResponse<unknown>>({
     url: '/panel/publicVisit/disable',
   })
 }
-

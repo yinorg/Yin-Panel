@@ -119,8 +119,9 @@ export default defineConfig((env) => {
           chunkFileNames: `${assetsDir}/js/[name].[hash].js`,
           entryFileNames: `${assetsDir}/js/[name].[hash].js`,
           // Improve chunking to reduce large bundle sizes
-          manualChunks: {
-            'vue-vendor': ['vue', 'vue-router', 'pinia'],
+          manualChunks(id) {
+            if (id.includes('/node_modules/vue/') || id.includes('/node_modules/vue-router/') || id.includes('/node_modules/pinia/'))
+              return 'vue-vendor'
           },
         },
       },

@@ -10,6 +10,7 @@ body {
 	font-family: var(--yin-fontBody);
 	font-size: var(--yin-fontBodySize);
 	line-height: var(--yin-lineHeightBody);
+	background-image: var(--yin-background-image, none);
 	padding-bottom: constant(safe-area-inset-bottom);
 	padding-bottom: env(safe-area-inset-bottom);
 }
@@ -56,6 +57,76 @@ body {
 	--yin-homeColumns: 4;
 	--yin-activeColumns: 4;
 	--yin-activeSidebarWidth: 280px;
+	--yin-color-canvas: #ffffff;
+	--yin-color-surface: #f3f6f8;
+	--yin-color-text: #172126;
+	--yin-color-text-muted: #53636a;
+	--yin-shape-control: 4px;
+	--yin-shape-card: 6px;
+	--yin-shape-dialog: 8px;
+	--yin-density-scale: standard;
+	--yin-component-card-padding: 16px;
+	--yin-component-card-radius: var(--yin-radiusCard);
+	--yin-component-card-border-width: 1px;
+	--yin-component-card-border-style: solid;
+	--yin-component-card-surface-mode: solid;
+	--yin-component-card-shadow: var(--yin-shadowCard);
+	--yin-component-app-icon-size: 70px;
+	--yin-component-app-icon-radius: var(--yin-radiusCard);
+	--yin-component-app-icon-gap: 8px;
+	--yin-component-app-icon-surface: var(--yin-surfaceElevated);
+	--yin-component-app-icon-shadow: var(--yin-shadowCard);
+	--yin-component-group-gap: var(--yin-spaceLg);
+	--yin-component-group-section-spacing: var(--yin-spaceLg);
+	--yin-component-group-padding: 16px;
+	--yin-component-search-box-height: 44px;
+	--yin-component-search-box-surface: var(--yin-surfaceElevated);
+	--yin-component-search-box-radius: var(--yin-radiusControl);
+	--yin-component-search-box-border-width: 1px;
+	--yin-component-search-box-surface-mode: solid;
+	--yin-component-search-box-blur: 0px;
+	--yin-component-search-box-shadow: var(--yin-shadowCard);
+	--yin-component-sidebar-padding: 16px;
+	--yin-component-sidebar-radius: var(--yin-radiusCard);
+	--yin-component-sidebar-surface-mode: solid;
+	--yin-component-dialog-padding: 16px;
+	--yin-component-dialog-radius: var(--yin-radiusDialog);
+	--yin-component-dialog-shadow: var(--yin-shadowPopup);
+	--yin-component-menu-padding: 6px;
+	--yin-component-menu-radius: var(--yin-radiusControl);
+	--yin-component-menu-shadow: var(--yin-shadowPopup);
+	--yin-component-button-height: var(--yin-controlHeight);
+	--yin-component-button-padding-x: 14px;
+	--yin-component-button-radius: var(--yin-radiusControl);
+	--yin-component-button-border-width: var(--yin-borderWidth);
+	--yin-component-input-height: var(--yin-controlHeight);
+	--yin-component-input-padding-x: 12px;
+	--yin-component-input-radius: var(--yin-radiusControl);
+	--yin-component-input-border-width: var(--yin-borderWidth);
+	--yin-component-tooltip-padding: 8px;
+	--yin-component-tooltip-radius: var(--yin-radiusControl);
+	--yin-component-tooltip-shadow: var(--yin-shadowPopup);
+	--yin-component-system-monitor-gap: var(--yin-spaceLg);
+	--yin-component-system-monitor-padding: 16px;
+	--yin-component-system-monitor-radius: var(--yin-radiusCard);
+	--yin-component-system-monitor-icon-size: 28px;
+	--yin-component-state-hover-duration: 180ms;
+	--yin-component-state-press-duration: 80ms;
+	--yin-component-state-enter-duration: 180ms;
+	--yin-component-state-easing: cubic-bezier(.2, .8, .2, 1);
+	--yin-component-state-space-transition-duration: 1000ms;
+	--yin-component-state-space-transition-easing: cubic-bezier(.22, .61, .36, 1);
+	--yin-component-state-hover-scale: 1.02;
+	--yin-component-state-press-scale: .96;
+	--yin-component-surface-opacity: .88;
+	--yin-component-surface-blur: 16px;
+	--yin-component-surface-glow: 0px;
+	--yin-component-iconography-size: 20px;
+	--yin-component-iconography-container-radius: var(--yin-radiusControl);
+	--yin-component-iconography-stroke-width: 1.8;
+	--yin-effect-text-shadow: 0 1px 2px #000000;
+	--yin-effect-focus-width: 2px;
+	--yin-effect-glow-opacity: .12;
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -65,10 +136,87 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 :focus-visible {
-	outline: 2px solid var(--yin-focusRing);
+	outline: var(--yin-effect-focus-width) solid var(--yin-focusRing);
 	outline-offset: 2px;
 }
 
 .theme-page { background-color: var(--yin-surface); }
 .markdown-body { color: var(--yin-text); background-color: transparent; }
 .markdown-body pre, .markdown-body code { background-color: var(--yin-surface); border-color: var(--yin-border); }
+
+button, input, select, textarea, [role='button'] {
+	transition-duration: var(--yin-component-state-hover-duration);
+	transition-timing-function: var(--yin-component-state-easing);
+}
+
+.theme-surface {
+	border-radius: var(--yin-component-card-radius);
+	border: var(--yin-component-card-border-width) var(--yin-component-card-border-style) var(--yin-border);
+	background: var(--yin-surfaceElevated);
+	box-shadow: var(--yin-component-card-shadow);
+}
+
+.n-card, .n-modal, .n-dialog, .n-popover, .n-dropdown-menu, .n-tooltip, .theme-page {
+	border-radius: var(--yin-component-card-radius);
+	transition: background-color var(--yin-component-state-hover-duration) var(--yin-component-state-easing), border-color var(--yin-component-state-hover-duration) var(--yin-component-state-easing), box-shadow var(--yin-component-state-hover-duration) var(--yin-component-state-easing);
+}
+.n-card { padding: var(--yin-component-card-padding); box-shadow: var(--yin-component-card-shadow); }
+.n-popover, .n-dropdown-menu, .n-tooltip { box-shadow: var(--yin-component-menu-shadow); }
+.n-button { min-height: var(--yin-component-button-height); border-radius: var(--yin-component-button-radius); }
+.n-input, .n-base-selection { border-radius: var(--yin-component-input-radius); }
+.n-modal, .n-dialog { box-shadow: var(--yin-component-dialog-shadow); }
+
+:root[data-yin-surface='transparent'] .theme-surface { background: transparent; box-shadow: none; }
+:root[data-yin-surface='glass'] .theme-surface,
+:root[data-yin-surface='frosted'] .theme-surface,
+:root[data-yin-surface='glass'] .n-card,
+:root[data-yin-surface='frosted'] .n-card,
+:root[data-yin-surface='glass'] .n-modal,
+:root[data-yin-surface='frosted'] .n-modal,
+:root[data-yin-surface='glass'] .n-popover,
+:root[data-yin-surface='frosted'] .n-popover {
+	background: color-mix(in srgb, var(--yin-surfaceElevated) calc(var(--yin-component-surface-opacity) * 100%), transparent);
+	backdrop-filter: blur(var(--yin-component-surface-blur));
+}
+:root[data-yin-surface='gradient'] .theme-surface,
+:root[data-yin-surface='gradient'] .n-card,
+:root[data-yin-surface='gradient'] .n-modal,
+:root[data-yin-surface='gradient'] .n-popover {
+	background: linear-gradient(135deg, var(--yin-surfaceElevated), color-mix(in srgb, var(--yin-primary) 18%, var(--yin-surfaceElevated)));
+	box-shadow: var(--yin-component-card-shadow), 0 0 var(--yin-component-surface-glow) var(--yin-primary);
+}
+:root[data-yin-search-surface='glass'] .search-container,
+:root[data-yin-search-surface='frosted'] .search-container,
+:root[data-yin-sidebar-surface='glass'] .space-status-bar,
+:root[data-yin-sidebar-surface='frosted'] .space-status-bar,
+:root[data-yin-dialog-surface='glass'] .command-center-panel,
+:root[data-yin-dialog-surface='frosted'] .command-center-panel,
+:root[data-yin-menu-surface='glass'] .n-dropdown-menu,
+:root[data-yin-menu-surface='frosted'] .n-dropdown-menu,
+:root[data-yin-tooltip-surface='glass'] .n-tooltip,
+:root[data-yin-tooltip-surface='frosted'] .n-tooltip {
+	backdrop-filter: blur(var(--yin-component-surface-blur));
+	background: color-mix(in srgb, var(--yin-surfaceElevated) calc(var(--yin-component-surface-opacity) * 100%), transparent);
+}
+:root[data-yin-search-surface='gradient'] .search-container,
+:root[data-yin-dialog-surface='gradient'] .command-center-panel,
+:root[data-yin-menu-surface='gradient'] .n-dropdown-menu {
+	background: linear-gradient(135deg, var(--yin-surfaceElevated), color-mix(in srgb, var(--yin-primary) 18%, var(--yin-surfaceElevated)));
+}
+:root[data-yin-button-surface='glass'] .n-button,
+:root[data-yin-input-surface='glass'] .n-input,
+:root[data-yin-input-surface='frosted'] .n-input {
+	backdrop-filter: blur(var(--yin-component-surface-blur));
+}
+:root[data-yin-texture='grid'] body {
+	background-image: linear-gradient(color-mix(in srgb, var(--yin-border) 24%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--yin-border) 24%, transparent) 1px, transparent 1px);
+	background-size: 28px 28px;
+}
+:root[data-yin-texture='dots'] body {
+	background-image: radial-gradient(color-mix(in srgb, var(--yin-border) 35%, transparent) 1px, transparent 1px);
+	background-size: 18px 18px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	*, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+}

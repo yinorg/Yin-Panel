@@ -11,6 +11,7 @@ const defaultFooterHtml = '<div class="flex justify-center text-slate-300" style
 
 export function defaultStatePanelConfig(): Panel.panelConfig {
   return {
+    homeLayout: 'standard',
     backgroundImageSrc: defaultBackground,
     wallpaperMode: 'theme',
     backgroundBlur: 0,

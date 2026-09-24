@@ -35,7 +35,7 @@ const textColor = computed(() => {
 
 // Card tilt effect variables
 const isHovering = ref(false)
-const cardTransform = ref({ x: 0, y: 0, scale: 1 })
+const cardTransform = ref({ x: 0, y: 0 })
 
 // Handle mouse events
 const handleMouseEnter = () => {
@@ -45,7 +45,7 @@ const handleMouseEnter = () => {
 const handleMouseLeave = () => {
   isHovering.value = false
   // Reset transform on mouse leave
-  cardTransform.value = { x: 0, y: 0, scale: 1 }
+  cardTransform.value = { x: 0, y: 0 }
 }
 
 const handleMouseMove = (e: MouseEvent, element: EventTarget | null) => {
@@ -59,11 +59,10 @@ const handleMouseMove = (e: MouseEvent, element: EventTarget | null) => {
   const x = (e.clientX - centerX) / (rect.width / 2)
   const y = (e.clientY - centerY) / (rect.height / 2)
   
-  // Update transform values (limit tilt to 10 degrees)
+  const tiltDegrees = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--yin-component-state-tilt-degrees')) || 0
   cardTransform.value = {
-    x: y * -10, // Invert Y axis for natural tilt
-    y: x * 10,  // X axis tilt
-    scale: 1.05 // Slight scale up on hover
+    x: y * -tiltDegrees,
+    y: x * tiltDegrees,
   }
   
   // Update glow position
@@ -80,14 +79,12 @@ const handleMouseMove = (e: MouseEvent, element: EventTarget | null) => {
 const cardStyle = computed(() => {
   if (!isHovering.value) {
     return {
-      transform: 'perspective(1000px) rotateX(0deg) rotateY(0deg) scale(1)',
-      transition: 'all 0.5s ease-out'
+      transform: 'perspective(1000px) rotateX(0deg) rotateY(0deg)',
     }
   }
   
   return {
-    transform: `perspective(1000px) rotateX(${cardTransform.value.x}deg) rotateY(${cardTransform.value.y}deg) scale(${cardTransform.value.scale})`,
-    transition: 'transform 0.1s ease-out'
+    transform: `perspective(1000px) rotateX(${cardTransform.value.x}deg) rotateY(${cardTransform.value.y}deg)`,
   }
 })
 </script>
@@ -165,7 +162,7 @@ const cardStyle = computed(() => {
   transform-style: preserve-3d;
   will-change: transform;
   overflow: hidden;
-  border: 1px solid transparent;
+  border: var(--yin-component-card-border-width) var(--yin-component-card-border-style) transparent;
   backface-visibility: hidden;
 }
 
@@ -175,10 +172,10 @@ const cardStyle = computed(() => {
   height: 100%;
   top: 0;
   left: 0;
-  background: radial-gradient(circle at var(--x, 50%) var(--y, 50%), rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0) 60%);
+  background: radial-gradient(circle at var(--x, 50%) var(--y, 50%), color-mix(in srgb, var(--yin-primary) calc(var(--yin-effect-glow-opacity) * 100%), transparent) 0%, transparent 60%);
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.3s ease;
+  transition: opacity var(--yin-component-state-hover-duration) var(--yin-component-state-easing);
 }
 
 .card-container:hover .card-glow {
@@ -186,8 +183,20 @@ const cardStyle = computed(() => {
 }
 
 .app-icon-info:hover, .app-icon-small-icon:hover {
-  box-shadow: 0 20px 30px -10px rgba(0, 0, 0, 0.3);
-  transform: translateY(-5px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: var(--yin-component-app-icon-shadow);
+  transform: translateY(calc(var(--yin-component-surface-glow) * -0.15));
+  border-color: var(--yin-border);
 }
+
+.app-icon-info, .app-icon-small-icon {
+  border-radius: var(--yin-component-app-icon-radius);
+  transition: transform var(--yin-component-state-hover-duration) var(--yin-component-state-easing), box-shadow var(--yin-component-state-hover-duration) var(--yin-component-state-easing), border-color var(--yin-component-state-hover-duration) var(--yin-component-state-easing);
+}
+.app-icon-info:hover, .app-icon-small-icon:hover { scale: var(--yin-component-state-hover-scale); }
+.app-icon-small-icon { width: var(--yin-component-app-icon-size); height: var(--yin-component-app-icon-size); }
+.app-icon-small-title { font-family: var(--yin-fontBody); font-size: var(--yin-fontSmallSize); font-weight: var(--yin-fontBodyWeight); }
+:global(:root[data-yin-density='compact']) .app-icon-small { margin-bottom: 0; }
+:global(:root[data-yin-surface='glass']) .app-icon-small-icon,
+:global(:root[data-yin-surface='frosted']) .app-icon-small-icon { backdrop-filter: blur(var(--yin-component-surface-blur)); }
+:global(:root[data-yin-surface='gradient']) .app-icon-small-icon { box-shadow: 0 0 var(--yin-component-surface-glow) var(--yin-primary); }
 </style>
