@@ -19,9 +19,10 @@ export function getDiskMountpoints<T>() {
   })
 }
 
-export function getEnableStatus<T>() {
+export function getEnableStatus<T>(signal?: AbortSignal) {
   return post<T>({
     url: '/system/monitor/getEnableStatus',
+    signal,
   })
 }
 

@@ -17,8 +17,7 @@ type Capability struct {
 	ReadOnly bool   `json:"readOnly"`
 }
 
-// ActorContextKey contains an Actor set by Core authentication middleware.
-// Extensions must treat it as optional because public requests are unauthenticated.
+// ActorContextKey contains the authenticated Core actor for extension routes.
 const ActorContextKey = "yin-panel.actor"
 
 type Actor struct {
@@ -34,7 +33,11 @@ type Module struct {
 	Capabilities   []Capability
 	Init           func(context.Context, Runtime) error
 	StorageFactory storage.Factory
-	Middleware     []gin.HandlerFunc
+	// Middleware runs after Core JWT authentication on RegisterRoutes.
+	Middleware []gin.HandlerFunc
+	// RegisterRoutes registers authenticated routes. Core authentication and
+	// ActorContextKey are applied before module middleware and handlers. Public
+	// module routes are unsupported until Core exposes a policy-bound registrar.
 	RegisterRoutes func(*gin.RouterGroup)
 }
 

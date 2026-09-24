@@ -3,6 +3,7 @@ import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { ThemeEnvironment, ThemeHomeSnapshot, ThemePermission } from '../api/v1'
 import type { ThemePackage } from '@/utils/theme'
 import { mountThemeSandbox, type ThemeSandboxHandle, type ThemeSandboxStylesheet } from './sandbox'
+import { rewriteThemeStylesheet } from './resources'
 
 const props = defineProps<{
   theme: ThemePackage
@@ -24,6 +25,8 @@ let runtime: ThemeSandboxHandle | undefined
 let disposed = false
 let generation = 0
 let startTask: Promise<void> | undefined
+let activeAssetURLs: string[] = []
+let activeAssets: Record<string, string> = {}
 
 onMounted(() => { queueStart() })
 
@@ -32,7 +35,7 @@ watch(() => props.snapshot, (snapshot) => {
 }, { deep: true })
 
 watch(() => props.environment, (environment) => {
-  runtime?.updateEnvironment({ ...environment, assets: themeAssetURLs(props.theme) })
+  runtime?.updateEnvironment({ ...environment, assets: themeAssetURLs(props.theme, activeAssets) })
   runtime?.emit('environment.changed', environment)
 }, { deep: true })
 
@@ -50,6 +53,9 @@ watch(() => `${props.theme.revision || ''}:${props.permissions.join(',')}`, asyn
   runtime = undefined
   const restartGeneration = ++generation
   await previous?.dispose()
+  revokeAssetURLs(activeAssetURLs)
+  activeAssetURLs = []
+  activeAssets = {}
   await startTask
   if (!disposed && restartGeneration === generation) queueStart()
 })
@@ -64,6 +70,7 @@ function queueStart() {
 
 async function start() {
   const startGeneration = ++generation
+  const createdAssetURLs: string[] = []
   try {
     const manifest = props.theme.manifest
     const scriptPath = manifest.entrypoints?.script
@@ -74,15 +81,25 @@ async function start() {
       throw new Error('Theme API permissions have not been granted')
 
     const script = await loadTextResource(props.theme, scriptPath, 'text/javascript')
+    const assets: Record<string, string> = {}
+    for (const resource of manifest.resources || []) {
+      if (!isThemeMediaResource(resource.mediaType)) continue
+      const bytes = await loadResource(props.theme, resource, 48 * 1024 * 1024)
+      if (resource.mediaType === 'image/svg+xml') {
+        assets[resource.path] = new URL(resource.url!, window.location.origin).href
+        continue
+      }
+      const blob = new Blob([bytes], { type: resource.mediaType })
+      const url = URL.createObjectURL(blob)
+      createdAssetURLs.push(url)
+      assets[resource.path] = url
+    }
     const styles: ThemeSandboxStylesheet[] = []
     for (const stylePath of manifest.entrypoints?.styles || []) {
       const resource = findResource(props.theme, stylePath, 'text/css')
-      styles.push({ href: resource.url!, text: await loadTextResource(props.theme, stylePath, 'text/css') })
+      const source = await loadTextResource(props.theme, stylePath, 'text/css')
+      styles.push({ text: await rewriteThemeStylesheet(source, resource.url!, manifest.resources || [], assets) })
     }
-    const assets = Object.fromEntries((manifest.resources || []).filter(resource => resource.url).map((resource) => {
-      validateResourceURL(resource.url!)
-      return [resource.path, new URL(resource.url!, window.location.origin).href]
-    }))
     const initialSnapshot = scopedSnapshot(props.snapshot)
     runtimeSnapshot = initialSnapshot
     const initialEnvironment = { ...props.environment, assets }
@@ -99,13 +116,16 @@ async function start() {
     })
     if (disposed || startGeneration !== generation) {
       await nextRuntime.dispose()
+      revokeAssetURLs(createdAssetURLs)
       return
     }
     runtime = nextRuntime
+    activeAssetURLs = createdAssetURLs
+    activeAssets = assets
     runtimeSnapshot = initialSnapshot
     publishSnapshot(scopedSnapshot(props.snapshot))
-    if (JSON.stringify(initialEnvironment) !== JSON.stringify({ ...props.environment, assets: themeAssetURLs(props.theme) })) {
-      nextRuntime.updateEnvironment({ ...props.environment, assets: themeAssetURLs(props.theme) })
+    if (JSON.stringify(initialEnvironment) !== JSON.stringify({ ...props.environment, assets: themeAssetURLs(props.theme, activeAssets) })) {
+      nextRuntime.updateEnvironment({ ...props.environment, assets: themeAssetURLs(props.theme, activeAssets) })
       nextRuntime.emit('environment.changed', props.environment)
     }
     const currentSlots = Object.entries(props.slots)
@@ -116,6 +136,7 @@ async function start() {
     emit('ready')
   }
   catch (error) {
+    revokeAssetURLs(createdAssetURLs)
     if (!disposed && startGeneration === generation)
       emit('failed', error instanceof Error ? error : new Error(String(error)))
   }
@@ -137,11 +158,9 @@ function publishSnapshot(next: ThemeHomeSnapshot) {
     runtime.emit('items.changed', { items: next.items })
 }
 
-function themeAssetURLs(theme: ThemePackage) {
-  return Object.fromEntries((theme.manifest.resources || []).filter(resource => resource.url).map((resource) => {
-    validateResourceURL(resource.url!)
-    return [resource.path, new URL(resource.url!, window.location.origin).href]
-  }))
+function themeAssetURLs(theme: ThemePackage, assetURLs: Readonly<Record<string, string>>) {
+  const resources = (theme.manifest.resources || []).filter(resource => isThemeMediaResource(resource.mediaType))
+  return Object.fromEntries(resources.flatMap(resource => assetURLs[resource.path] ? [[resource.path, assetURLs[resource.path]]] : []))
 }
 
 function scopedSnapshot(snapshot: ThemeHomeSnapshot): ThemeHomeSnapshot {
@@ -168,14 +187,28 @@ function findResource(theme: ThemePackage, path: string, mediaType: string) {
 
 async function loadTextResource(theme: ThemePackage, path: string, mediaType: string) {
   const resource = findResource(theme, path, mediaType)
+  const bytes = await loadResource(theme, resource, 900_000)
+  return new TextDecoder('utf-8', { fatal: true }).decode(bytes)
+}
+
+async function loadResource(theme: ThemePackage, resource: NonNullable<ThemePackage['manifest']['resources']>[number], maxBytes: number) {
+  validateResourceURL(resource.url!)
   const response = await fetch(new URL(resource.url!, window.location.origin), { credentials: 'omit', cache: 'no-store', redirect: 'error' })
-  if (!response.ok) throw new Error(`Theme resource request failed: ${path}`)
+  if (!response.ok) throw new Error(`Theme resource request failed: ${resource.path}`)
   const bytes = await response.arrayBuffer()
-  if (bytes.byteLength > 900_000) throw new Error(`Theme entrypoint exceeds the current runtime message limit: ${path}`)
+  if (bytes.byteLength > maxBytes) throw new Error(`Theme resource exceeds the runtime size limit: ${resource.path}`)
   const digest = await crypto.subtle.digest('SHA-256', bytes)
   const actual = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')
-  if (actual.toLowerCase() !== resource.sha256.toLowerCase()) throw new Error(`Theme resource integrity check failed: ${path}`)
-  return new TextDecoder('utf-8', { fatal: true }).decode(bytes)
+  if (actual.toLowerCase() !== resource.sha256.toLowerCase()) throw new Error(`Theme resource integrity check failed: ${resource.path}`)
+  return bytes
+}
+
+function isThemeMediaResource(mediaType: string) {
+  return mediaType.startsWith('image/') || mediaType === 'font/woff2' || mediaType.startsWith('video/')
+}
+
+function revokeAssetURLs(urls: readonly string[]) {
+  for (const url of urls) URL.revokeObjectURL(url)
 }
 
 function validateResourceURL(value: string) {
@@ -188,6 +221,9 @@ onBeforeUnmount(() => {
   disposed = true
   generation += 1
   void runtime?.dispose()
+  revokeAssetURLs(activeAssetURLs)
+  activeAssetURLs = []
+  activeAssets = {}
 })
 </script>
 

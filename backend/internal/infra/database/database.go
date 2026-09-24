@@ -78,7 +78,7 @@ func initDatabase(db *gorm.DB) (err error) {
 	if err := theme.Migrate(db); err != nil {
 		return err
 	}
-	if err := theme.EnsureBuiltin(db); err != nil {
+	if err := theme.EnsureBuiltinV2(db); err != nil {
 		return err
 	}
 	// Backfill email accounts from the legacy username column before the

@@ -34,6 +34,12 @@ const routes: RouteRecordRaw[] = [
   },
 
   {
+    path: '/__yin/theme-recovery',
+    name: 'themeRecovery',
+    component: () => import('../views/theme/recovery/index.vue'),
+  },
+
+  {
     path: '/test',
     name: 'test',
     component: () => import('../views/exception/test/index.vue'),

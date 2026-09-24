@@ -30,10 +30,21 @@ The package exposes data contracts and JSON envelope validators only. It does no
 
 The API lists the authenticated user's accessible Spaces and the current Space's Groups and Items in pages:
 
+Page size defaults to 50 and is limited to 200 records. Cursors are opaque and scoped to the current Theme API context.
+
 ```ts
 const spaces = await api.spaces.list({ limit: 50 })
+const firstSpace = spaces.items[0]
+if (firstSpace) await api.commands.execute('space.select', { spaceId: firstSpace.id })
 const groups = await api.groups.list({ cursor: nextGroupCursor })
-const items = await api.items.list({ groupId: groups.items[0]?.id, limit: 50 })
+const firstGroup = groups.items[0]
+const items = await api.items.list({ groupId: firstGroup?.id, limit: 50 })
+const firstItem = items.items[0]
+if (firstItem) await api.commands.execute('item.open', { itemId: firstItem.id })
 ```
 
 List cursors are opaque to themes. Select a Space with `commands.execute('space.select', { spaceId })`; Core then publishes the new Space snapshot. Item DTOs intentionally omit destination URLs; open an Item through `commands.execute('item.open', { itemId })` so Core retains URL and LAN/WAN policy.
+
+Write commands accept Core-owned Item and Group fields. Item URLs are limited to HTTP and HTTPS; an update may omit unchanged fields. `item.delete` and `group.delete` always use Core confirmation UI. `items.reorder` requires the complete Item ID order for its Group, while `groups.reorder` requires the complete sibling ID order and optional `parentId`.
+
+`editor.open` accepts an optional `groupId` only when that Group is in the active Space. Core validates the current Space again when applying a mutation, and Themes never supply the destination URL used by `item.open`.

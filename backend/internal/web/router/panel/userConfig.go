@@ -83,7 +83,7 @@ func (a *UserConfigRouter) SetConfig(c *gin.Context) {
 				return
 			}
 			if wallpaper.WallpaperKind == "webBundle" {
-				const prefix = "/api/theme/wallpaper/web/"
+				const prefix = "/api/theme/v2/wallpaper/web/"
 				id := strings.TrimSuffix(strings.TrimPrefix(wallpaper.WallpaperSource, prefix), "/index.html")
 				if !strings.HasPrefix(wallpaper.WallpaperSource, prefix) || wallpaper.WallpaperSource != prefix+id+"/index.html" || len(id) != 64 || strings.Trim(id, "0123456789abcdef") != "" {
 					response.ErrorParamFomat(c, "invalid web wallpaper source")

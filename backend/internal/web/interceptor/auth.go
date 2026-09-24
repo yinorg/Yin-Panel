@@ -12,6 +12,7 @@ import (
 	"github.com/yinorg/Yin-Panel/backend/internal/util/publiccode"
 	"github.com/yinorg/Yin-Panel/backend/internal/web/model/base"
 	"github.com/yinorg/Yin-Panel/backend/internal/web/model/response"
+	"github.com/yinorg/Yin-Panel/backend/pkg/extension"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -85,6 +86,7 @@ func Auth(c *gin.Context) {
 	}
 	c.Set("userInfo", userInfo)
 	c.Set("authMethod", authMethod)
+	c.Set(extension.ActorContextKey, extension.Actor{ID: user.ID, Username: user.Name})
 	if publicSpaceID != 0 {
 		c.Set("publicSpaceID", publicSpaceID)
 		if !publicCodeRouteAllowed(c, publicSpaceID) {

@@ -2,7 +2,7 @@
 import { VueDraggable } from 'vue-draggable-plus'
 import { NBackTop, NButton, NButtonGroup, NCard, NDropdown, NInput, NModal, NSkeleton, NSpin, NSpace, useDialog, useMessage } from 'naive-ui'
 import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { createGroup, createSpace, getGroups, getItems, getSpaces, sortSpaces, spaceDisplayName, type Space } from '../../api/panel/space'
+import { createGroup, createItem, createSpace, deleteGroup, deleteItem as deleteSpaceItem, getGroups, getItems, getSpaces, sortGroups, sortItems, sortSpaces, spaceDisplayName, updateGroup, updateItem, type Space } from '../../api/panel/space'
 import Clock from '../../components/deskModule/Clock/index.vue'
 import SearchBox from '../../components/deskModule/SearchBox/index.vue'
 import { replaceOrAppendKeywordToUrl, searchEngineList, type SearchEngine } from '../../components/deskModule/SearchBox/engines'
@@ -10,8 +10,6 @@ import SvgIcon from '../../components/common/SvgIcon/index.vue'
 import AppIcon from './components/AppIcon/index.vue'
 import CommandCenter from './components/CommandCenter/index.vue'
 import WallpaperLayer from './components/WallpaperLayer.vue'
-import { deleteItem, sortItems } from '@/api/panel/space'
-
 import { setTitle } from '@/utils/cmn'
 import { parsePublicCodeFromPath } from '@/utils/request/axios'
 import { usePanelState, useAuthStore } from '@/store'
@@ -24,15 +22,19 @@ import { activeThemePackage, activeThemeSlots } from '@/hooks/useTheme'
 import { getThemeRuntimeGrant, setThemeRuntimeGrant } from '@/api/theme'
 import { createHomeThemeHandlers } from '@/core/home/themeHandlers'
 import { executeHomeThemeRequest } from '@/core/home/themeRequest'
-import { createThemeSettingsStore } from '@/core/home/themeSettingsStore'
+import { createThemePersistence } from '@/core/home/themePersistence'
 import { createHomeCollectionLoader, type HomeCollectionResult } from '@/core/home/collection'
+import { createHomeBootstrap } from '@/core/home/bootstrap'
+import { createHomeSpaceController } from '@/core/home/spaceController'
+import { createHomeMutationService } from '@/core/home/mutations'
 import { createHomeSearchService } from '@/core/home/search'
 import { resolveItemOpenUrl } from '@/core/items/openPolicy'
 import { normalizeMonitorSnapshot } from '@/core/monitor/themeSnapshot'
-import { createThemeHomeSnapshot } from '@/theme/api/homeSnapshot'
+import { createThemeHomeSnapshot } from '@/core/home/themeSnapshot'
 import type { ThemeCollectionStatus, ThemePermission } from '@/theme/api/v1'
 import type { CoreMonitorSnapshot } from '@/core/monitor/themeSnapshot'
 import ThemeHost from '@/theme/runtime/ThemeHost.vue'
+import { isThemeSafeMode } from '@/theme/recovery/safeMode'
 
 const SystemMonitor = defineAsyncComponent(() => import('../../components/deskModule/SystemMonitor/index.vue'))
 const AppStarter = defineAsyncComponent(() => import('./components/AppStarter/index.vue'))
@@ -144,17 +146,28 @@ const homeCollectionLoader = createHomeCollectionLoader<ItemGroup, Panel.ItemInf
   timeoutMs: HOME_REQUEST_TIMEOUT,
   onProgress: applyCollectionProgress,
 })
+const homeBootstrap = createHomeBootstrap({
+  getMonitor: signal => getEnableStatus<{ enabled: boolean; refresh_interval?: number }>(signal),
+  getSpaces: signal => getSpaces<Space[]>(signal),
+  refreshConfig: signal => panelState.updatePanelConfigByCloud(signal),
+  timeoutMs: HOME_REQUEST_TIMEOUT,
+})
+const homeSpaceController = createHomeSpaceController<Space>({
+  getSpaces: signal => getSpaces<Space[]>(signal),
+  sortSpaces: value => sortSpaces(value, authStore.userInfo?.id),
+  getCurrentSpaces: () => spaces.value,
+  readCachedSpaces: () => readSpacesCache(authStore.userInfo?.id, sessionOnlyCache) as Space[] | null,
+  writeCachedSpaces: value => writeSpacesCache(value, authStore.userInfo?.id, sessionOnlyCache),
+  getActiveSpaceId: () => activeSpace.value?.id,
+  setSpaces: value => { spaces.value = value },
+  setActiveSpace: value => { activeSpace.value = value },
+  loadSpace: spaceId => getListForSpace(spaceId),
+  canWrite: () => canWrite.value,
+})
 const homeSearch = createHomeSearchService<Panel.ItemInfo>({
   fetchPage: (spaceId, page, pageSize, signal) => getItems<Panel.ItemInfo[]>(spaceId, undefined, page, pageSize, signal),
   isOnline: () => isOnline.value,
 })
-
-function withHomeTimeout<T>(request: Promise<T>): Promise<T> {
-  return Promise.race([
-    request,
-    new Promise<T>((_, reject) => setTimeout(() => reject(new Error('Home request timed out')), HOME_REQUEST_TIMEOUT)),
-  ])
-}
 
 const collapsedGroups = ref<Set<number>>(new Set())
 const themeRuntimeGrant = ref<{ revision: string; granted: boolean; permissions: ThemePermission[] }>({ revision: '', granted: false, permissions: [] })
@@ -162,6 +175,7 @@ const themeRuntimeGrantLoading = ref(false)
 const themeRuntimeGrantSaving = ref(false)
 const themeRuntimeFailed = ref(false)
 const themeRuntimeFailureMessage = ref('')
+const themeSafeMode = ref(isThemeSafeMode())
 let themeGrantRequestGeneration = 0
 const themeRuntimePackage = computed(() => activeThemePackage.value)
 const themeHomeContribution = computed(() => {
@@ -173,8 +187,8 @@ const themeGrantMatches = computed(() => {
   const revision = themeRuntimePackage.value?.revision || ''
   return !!revision && themeRuntimeGrant.value.revision === revision && themeRuntimeGrant.value.granted && themeRequiredPermissions.value.every(permission => themeRuntimeGrant.value.permissions.includes(permission))
 })
-const themeRuntimeActive = computed(() => homeReady.value && themeHomeContribution.value && themeGrantMatches.value && !themeRuntimeFailed.value && !publicCode)
-const themeRuntimeNeedsConsent = computed(() => homeReady.value && themeHomeContribution.value && !!authStore.token && !publicCode && !themeRuntimeGrantLoading.value && !themeGrantMatches.value)
+const themeRuntimeActive = computed(() => homeReady.value && !themeSafeMode.value && themeHomeContribution.value && themeGrantMatches.value && !themeRuntimeFailed.value && !publicCode)
+const themeRuntimeNeedsConsent = computed(() => homeReady.value && !themeSafeMode.value && themeHomeContribution.value && !!authStore.token && !publicCode && !themeRuntimeGrantLoading.value && !themeGrantMatches.value)
 const themeRuntimeSnapshot = computed(() => createThemeHomeSnapshot({
   version: themeSnapshotVersion.value,
   status: homeCollectionStatus.value,
@@ -335,6 +349,11 @@ async function getList(forceRefresh = false) {
   homeCollectionError.value = result.error
 }
 
+async function getListForSpace(spaceId: number) {
+  if (activeSpace.value?.id !== spaceId) return
+  await getList()
+}
+
 function applyCollectionProgress(result: HomeCollectionResult<ItemGroup, Panel.ItemInfo>) {
   if (activeSpace.value?.id !== result.spaceId) return
   applyGroups(result.groups, result.itemsByGroup, result.spaceId)
@@ -379,8 +398,7 @@ function selectSpace(key: string | number) {
   homeSearchGeneration++
   remoteCommandItems.value = []
   loadedGroups.clear()
-  const selected = spaces.value.find(space => space.id === Number(key))
-  if (selected) { activeSpace.value = selected; getList() }
+  homeSpaceController.select(Number(key))
 }
 function togglePanelSide() {
   if (sideSwitching.value || !activeSpace.value?.pairedSpaceId) return
@@ -570,15 +588,7 @@ async function refreshCurrentSpace() {
 }
 
 function reloadSpaces(selectLatest = false) {
-  if (!canWrite.value) return
-  getSpaces<Space[]>().then(({ data }) => {
-    const nextSpaces = sortSpaces(data || [], authStore.userInfo?.id)
-    const targetSpaceId = selectLatest ? data?.[data.length - 1]?.id : activeSpace.value?.id
-    spaces.value = nextSpaces
-    activeSpace.value = nextSpaces.find(space => space.id === targetSpaceId) || nextSpaces[0] || null
-    writeSpacesCache(spaces.value, authStore.userInfo?.id, sessionOnlyCache)
-    getList()
-  })
+  void homeSpaceController.refresh(selectLatest)
 }
 function handleSpacesChanged() {
   reloadSpaces()
@@ -628,7 +638,7 @@ function handleRightMenuSelect(key: string | number) {
         positiveText: t('common.confirm'),
         negativeText: t('common.cancel'),
         onPositiveClick: () => {
-          deleteItem(activeSpace.value!.id, currentRightSelectItem.value?.id as number).then(({ code, msg }) => {
+          deleteSpaceItem<{ code: number; msg?: string }>(activeSpace.value!.id, currentRightSelectItem.value?.id as number).then(({ code, msg }) => {
             if (code === 0) {
               ms.success(t('common.deleteSuccess'))
               clearCachedSpace(activeSpace.value!.id)
@@ -747,38 +757,30 @@ async function loadHomeData(refresh = false) {
   if (panelState.panelConfig.logoText)
     setTitle(panelState.panelConfig.logoText)
 
-  const useCachedSpaces = () => {
-    const cached = readSpacesCache(authStore.userInfo?.id, sessionOnlyCache) as Space[] | null
-    if (cached?.length) {
-      spaces.value = sortSpaces(cached, authStore.userInfo?.id)
-      activeSpace.value = spaces.value[0]
-      const cache = getCachedSpace(activeSpace.value.id)
-      hasValidCachedHome.value = !!cache
-      cacheUpdatedAt.value = cache?.updatedAt || null
-    }
+  const cachedSpace = homeSpaceController.restoreCached()
+  if (cachedSpace) {
+    const cache = getCachedSpace(cachedSpace.id)
+    hasValidCachedHome.value = !!cache
+    cacheUpdatedAt.value = cache?.updatedAt || null
   }
-  useCachedSpaces()
-  if (activeSpace.value) void getList()
   homeReady.value = true
   performance.mark('home-ready')
 
   if (!isOnline.value) return
-  const monitorRequest = withHomeTimeout(getEnableStatus<{ enabled: boolean; refresh_interval?: number }>()).catch((): { code: number; data: { enabled: boolean; refresh_interval?: number } } => ({ code: -1, data: { enabled: false } }))
-  const configRequest = panelState.updatePanelConfigByCloud()
-  const spacesRequest = withHomeTimeout(getSpaces<Space[]>()).catch(() => ({ data: undefined, failed: true }))
-  const [monitorResult, , spacesResult] = await Promise.all([monitorRequest, configRequest, spacesRequest])
-  if (monitorResult.code === 0) {
-    monitorEnabled.value = monitorResult.data.enabled
-    monitorResultRefreshInterval.value = monitorResult.data.refresh_interval
+  const result = await homeBootstrap.load()
+  if (result.cancelled) return
+  if (result.monitor?.code === 0) {
+    monitorEnabled.value = result.monitor.data.enabled
+    monitorResultRefreshInterval.value = result.monitor.data.refresh_interval
   }
-  if (spacesResult.data?.length) {
+  if (result.spaces?.data?.length) {
     const previousSpaceId = activeSpace.value?.id
-    spaces.value = sortSpaces(spacesResult.data, authStore.userInfo?.id)
+    spaces.value = sortSpaces(result.spaces.data, authStore.userInfo?.id)
     writeSpacesCache(spaces.value, authStore.userInfo?.id, sessionOnlyCache)
     activeSpace.value = spaces.value.find(space => space.id === previousSpaceId) || spaces.value[0]
     void getList()
   }
-  else if ('failed' in spacesResult && spacesResult.failed) {
+  else if (result.spacesFailed) {
     isOnline.value = false
   }
 }
@@ -811,6 +813,8 @@ onUnmounted(() => {
   navigator.serviceWorker?.removeEventListener('controllerchange', updatePwaReady)
   if (sideSwitchTimer) clearTimeout(sideSwitchTimer)
   homeCollectionLoader.cancel()
+  homeBootstrap.cancel()
+  homeSpaceController.cancel()
   homeSearch.cancel()
 })
 
@@ -921,6 +925,29 @@ function createThemeRuntimeError(code: string, message: string) {
   return Object.assign(new Error(message), { code })
 }
 
+const themePersistence = createThemePersistence(localStorage, {
+  userId: () => authStore.userInfo?.id,
+  packageId: () => activeThemePackage.value?.manifest.id,
+  revision: () => activeThemePackage.value?.revision,
+})
+
+const homeMutations = createHomeMutationService({
+  api: {
+    createItem: (spaceId, input) => createItem<{ code: number; msg?: string }>(spaceId, input),
+    updateItem: (spaceId, itemId, input) => updateItem<{ code: number; msg?: string }>(spaceId, itemId, input),
+    deleteItem: (spaceId, itemId) => deleteSpaceItem<{ code: number; msg?: string }>(spaceId, itemId),
+    reorderItems: (spaceId, groupId, itemIds) => sortItems<{ code: number; msg?: string }>(spaceId, groupId, itemIds.map((id, index) => ({ id, sort: index + 1 }))),
+    createGroup: (spaceId, input) => createGroup<{ code: number; msg?: string }>(spaceId, input.title, input.icon, input.parentId),
+    updateGroup: (spaceId, groupId, input) => updateGroup<{ code: number; msg?: string }>(spaceId, groupId, input.title, input.icon, input.parentId),
+    deleteGroup: (spaceId, groupId) => deleteGroup<{ code: number; msg?: string }>(spaceId, groupId),
+    reorderGroups: (spaceId, parentId, groupIds) => sortGroups<{ code: number; msg?: string }>(spaceId, parentId, groupIds.map((id, index) => ({ id, sort: index + 1 }))),
+  },
+  getActiveSpaceId: () => activeSpace.value?.id,
+  canWrite: () => canWrite.value,
+  invalidateSpace: clearCachedSpace,
+  refreshSpace: spaceId => activeSpace.value?.id === spaceId ? getList(true) : undefined,
+})
+
 const homeThemeHandlers = createHomeThemeHandlers({
   getSpaces: () => spaces.value,
   getGroups: () => items.value.filter(group => Number.isSafeInteger(Number(group.id))).map(group => ({
@@ -935,6 +962,20 @@ const homeThemeHandlers = createHomeThemeHandlers({
   selectSpace: spaceId => selectSpace(spaceId),
   openItem: (item) => { openPage(item.openMethod, getItemOpenUrl(item), item.title) },
   openEditor: ({ item, groupId }) => item ? handleEditItem(item) : handleAddItem(groupId),
+  createItem: input => homeMutations.createItem(input),
+  updateItem: (itemId, input) => homeMutations.updateItem(itemId, input),
+  deleteItem: item => confirmThemeDelete(
+    t('common.deleteConfirmByName', { name: item.title }),
+    spaceId => homeMutations.deleteItem(Number(item.id), spaceId),
+  ),
+  reorderItems: (groupId, itemIds) => homeMutations.reorderItems(groupId, itemIds),
+  createGroup: input => homeMutations.createGroup({ title: input.title, icon: input.icon || '', parentId: input.parentId ?? null }),
+  updateGroup: (groupId, input) => homeMutations.updateGroup(groupId, { title: input.title, icon: input.icon || '', parentId: input.parentId ?? null }),
+  deleteGroup: group => confirmThemeDelete(
+    t('spaceManage.deleteWarnText', { name: group.title || '' }),
+    spaceId => homeMutations.deleteGroup(group.id, spaceId),
+  ),
+  reorderGroups: (parentId, groupIds) => homeMutations.reorderGroups(parentId, groupIds),
   openCommandCenter: () => { commandCenterVisible.value = true },
   toggleSide: togglePanelSide,
   refresh: () => getList(true),
@@ -948,33 +989,37 @@ const homeThemeHandlers = createHomeThemeHandlers({
   navigate: (destination) => {
     if (destination.view !== 'home') throw createThemeRuntimeError('UNSUPPORTED_CAPABILITY', 'Core navigation destination is unavailable')
   },
-  getSettings: () => createThemeSettingsStore(localStorage, getThemeSettingsNamespace()).get(),
-  patchSettings: value => createThemeSettingsStore(localStorage, getThemeSettingsNamespace()).patch(value),
-  getStorage: (key) => {
-    const packageId = activeThemePackage.value?.manifest.id || 'unknown'
-    const userId = authStore.userInfo?.id || 'anonymous'
-    const value = localStorage.getItem(`yin-theme-storage:${userId}:${packageId}:${key}`)
-    return value === null ? undefined : JSON.parse(value)
-  },
-  setStorage: (key, value) => {
-    const encoded = JSON.stringify(value)
-    if (encoded === undefined || encoded.length > 65_536) throw createThemeRuntimeError('INVALID_ARGUMENT', 'Theme storage values are limited to 64 KiB')
-    const packageId = activeThemePackage.value?.manifest.id || 'unknown'
-    const userId = authStore.userInfo?.id || 'anonymous'
-    localStorage.setItem(`yin-theme-storage:${userId}:${packageId}:${key}`, encoded)
-  },
-  removeStorage: (key) => {
-    const packageId = activeThemePackage.value?.manifest.id || 'unknown'
-    const userId = authStore.userInfo?.id || 'anonymous'
-    localStorage.removeItem(`yin-theme-storage:${userId}:${packageId}:${key}`)
-  },
+  getSettings: themePersistence.getSettings,
+  patchSettings: themePersistence.patchSettings,
+  getStorage: themePersistence.getStorage,
+  setStorage: themePersistence.setStorage,
+  removeStorage: themePersistence.removeStorage,
 })
 
-function getThemeSettingsNamespace() {
-  const packageId = activeThemePackage.value?.manifest.id || 'unknown'
-  const revision = activeThemePackage.value?.revision || 'uninstalled'
-  const userId = authStore.userInfo?.id || 'anonymous'
-  return `${userId}:${packageId}:${revision}`
+function confirmThemeDelete(message: string, action: (spaceId: number) => Promise<unknown>): Promise<unknown> {
+  if (!canWrite.value || !activeSpace.value) throw createThemeRuntimeError('PERMISSION_DENIED', 'The active Space is read-only')
+  const confirmedSpaceId = activeSpace.value.id
+  return new Promise((resolve, reject) => {
+    let settled = false
+    dialog.warning({
+      title: t('common.warning'),
+      content: message,
+      positiveText: t('common.confirm'),
+      negativeText: t('common.cancel'),
+      onPositiveClick: async () => {
+        settled = true
+        try { resolve(await action(confirmedSpaceId)) }
+        catch (error) { reject(error) }
+      },
+      onNegativeClick: () => {
+        settled = true
+        reject(createThemeRuntimeError('ABORTED', 'Delete was cancelled'))
+      },
+      onClose: () => {
+        if (!settled) reject(createThemeRuntimeError('ABORTED', 'Delete was cancelled'))
+      },
+    })
+  })
 }
 
 async function executeThemeRequest(value: unknown) {
@@ -1076,6 +1121,10 @@ function handleThemeRuntimeFailure(error: Error) {
         <span v-if="cacheUpdatedAt" data-testid="offline-cache-updated">{{ $t('panelHome.cacheUpdatedAt', { time: new Date(cacheUpdatedAt).toLocaleString() }) }}</span>
       </template>
     </div>
+    <div v-if="themeSafeMode && homeReady" class="theme-safe-mode-banner" role="status" data-testid="theme-safe-mode-banner">
+      <span>{{ $t('themeRecovery.active') }}</span>
+      <RouterLink to="/__yin/theme-recovery">{{ $t('themeRecovery.exit') }}</RouterLink>
+    </div>
     <WallpaperLayer v-if="homeReady" />
     <ThemeHost
       v-if="themeRuntimeActive && themeRuntimePackage"
@@ -1117,6 +1166,7 @@ function handleThemeRuntimeFailure(error: Error) {
         </div>
         <div v-if="themeRuntimeFailed" class="theme-runtime-notice theme-runtime-notice--error" role="alert" data-testid="theme-runtime-fallback">
           <span>{{ $t('themePackage.runtimeLoadFailed') }}</span>
+          <RouterLink to="/__yin/theme-recovery">{{ $t('themeRecovery.title') }}</RouterLink>
         </div>
         <!-- 头 -->
         <div class="home-header mx-[auto] w-[80%]">
@@ -1423,6 +1473,8 @@ function handleThemeRuntimeFailure(error: Error) {
 .space-status-button { color: var(--yin-text); min-width: 140px; }
 .space-status-dot { width: 7px; height: 7px; margin-right: 8px; border-radius: 50%; background: var(--yin-success); box-shadow: 0 0 var(--yin-component-surface-glow) var(--yin-success); }
 .offline-status { position: fixed; z-index: 21; top: 14px; right: 18px; display: flex; gap: var(--yin-component-group-gap); color: var(--yin-text); font-size: var(--yin-fontSmallSize); text-shadow: var(--yin-effect-text-shadow); }
+.theme-safe-mode-banner { position: fixed; z-index: 22; top: 48px; right: 18px; display: flex; align-items: center; gap: 12px; max-width: min(440px, calc(100vw - 36px)); padding: 8px 12px; border: 1px solid var(--yin-border); border-radius: var(--yin-component-card-radius); background: var(--yin-surfaceElevated); color: var(--yin-text); font-size: var(--yin-fontSmallSize); }
+.theme-safe-mode-banner a { color: var(--yin-primary); text-decoration: underline; }
 .offline-unavailable { position: fixed; z-index: 31; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(0, 0, 0, 0.48); }
 .theme-home-host { position: absolute; z-index: 1; inset: 0; overflow: hidden; pointer-events: auto; }
 .theme-runtime-notice { display: flex; align-items: center; justify-content: space-between; gap: var(--yin-component-group-gap); margin: var(--yin-component-group-section-spacing) auto; padding: var(--yin-component-card-padding); border: var(--yin-component-button-border-width) solid var(--yin-border); border-radius: var(--yin-component-card-radius); background: var(--yin-surfaceElevated); color: var(--yin-text); }

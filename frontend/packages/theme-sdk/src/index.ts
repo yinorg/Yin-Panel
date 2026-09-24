@@ -1,4 +1,6 @@
 export const THEME_API_VERSION = '1.0.0' as const
+export const THEME_API_DEFAULT_PAGE_SIZE = 50
+export const THEME_API_MAX_PAGE_SIZE = 200
 
 export type ThemePermission =
   | 'spaces.read'

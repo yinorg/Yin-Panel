@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/yinorg/Yin-Panel/backend/internal/biz/repository"
 	"github.com/yinorg/Yin-Panel/backend/internal/constant"
@@ -28,6 +29,14 @@ type SpaceRouter struct{}
 type createSpaceRequest struct {
 	Name string `json:"name" binding:"required,max=100"`
 }
+type groupSortEntry struct {
+	ID   uint `json:"id"`
+	Sort int  `json:"sort"`
+}
+type groupSortRequest struct {
+	ParentID   *uint            `json:"parentId"`
+	SortGroups []groupSortEntry `json:"sortGroups"`
+}
 
 func NewSpaceRouter() *SpaceRouter { return &SpaceRouter{} }
 func (r *SpaceRouter) InitRouter(router *gin.RouterGroup) {
@@ -50,6 +59,7 @@ func (r *SpaceRouter) InitRouter(router *gin.RouterGroup) {
 	g.POST("/:spaceId/bookmarks/import-batch", r.ImportBookmarksBatch)
 	g.POST("/:spaceId/clear", r.ClearSpace)
 	g.POST("/:spaceId/groups", r.CreateGroup)
+	g.POST("/:spaceId/groups/sort", r.SortGroups)
 	g.PUT("/:spaceId/groups/:groupId", r.UpdateGroup)
 	g.POST("/:spaceId/groups/:groupId/update", r.UpdateGroup)
 	g.DELETE("/:spaceId/groups/:groupId", r.DeleteGroup)
@@ -834,6 +844,96 @@ func (r *SpaceRouter) DeleteGroup(c *gin.Context) {
 		return
 	}
 	response.Success(c)
+}
+
+func (r *SpaceRouter) SortGroups(c *gin.Context) {
+	if _, public := c.Get("publicSpaceID"); public {
+		response.ErrorNoAccess(c)
+		return
+	}
+	user, ok := base.GetCurrentUserInfo(c)
+	if !ok {
+		response.Error(c, "not logged in")
+		return
+	}
+	id, err := spaceID(c)
+	if err != nil || !canEditSpace(user.ID, id) {
+		response.ErrorNoAccess(c)
+		return
+	}
+	var req groupSortRequest
+	if c.ShouldBindJSON(&req) != nil || len(req.SortGroups) == 0 {
+		response.ErrorParamFomat(c, "invalid group sort request")
+		return
+	}
+	if req.ParentID != nil && !groupBelongsToSpace(*req.ParentID, id) {
+		response.ErrorParamFomat(c, "invalid parent group")
+		return
+	}
+	query := repository.Db.Where("space_id = ?", id)
+	if req.ParentID == nil {
+		query = query.Where("parent_id IS NULL")
+	} else {
+		query = query.Where("parent_id = ?", *req.ParentID)
+	}
+	var siblings []repository.ItemIconGroup
+	if err := query.Find(&siblings).Error; err != nil {
+		response.ErrorDatabase(c, err.Error())
+		return
+	}
+	if !isGroupSortPermutation(siblings, req.SortGroups) {
+		response.ErrorParamFomat(c, "group sort must include every sibling")
+		return
+	}
+	siblingByID := make(map[uint]repository.ItemIconGroup, len(siblings))
+	for _, sibling := range siblings {
+		siblingByID[sibling.ID] = sibling
+	}
+	if err := repository.Db.Transaction(func(tx *gorm.DB) error {
+		for _, group := range req.SortGroups {
+			if siblingByID[group.ID].Sort == group.Sort {
+				continue
+			}
+			query := tx.Model(&repository.ItemIconGroup{}).Where("id = ? AND space_id = ?", group.ID, id)
+			if req.ParentID == nil {
+				query = query.Where("parent_id IS NULL")
+			} else {
+				query = query.Where("parent_id = ?", *req.ParentID)
+			}
+			result := query.Update("sort", group.Sort)
+			if result.Error != nil {
+				return result.Error
+			}
+			if result.RowsAffected != 1 {
+				return errors.New("group set changed during sort")
+			}
+		}
+		return nil
+	}); err != nil {
+		response.ErrorDatabase(c, err.Error())
+		return
+	}
+	response.Success(c)
+}
+
+func isGroupSortPermutation(siblings []repository.ItemIconGroup, entries []groupSortEntry) bool {
+	if len(siblings) == 0 || len(siblings) != len(entries) {
+		return false
+	}
+	validIDs := make(map[uint]bool, len(siblings))
+	for _, sibling := range siblings {
+		validIDs[sibling.ID] = true
+	}
+	seenIDs := make(map[uint]bool, len(entries))
+	seenSorts := make(map[int]bool, len(entries))
+	for _, entry := range entries {
+		if entry.ID == 0 || entry.Sort < 1 || !validIDs[entry.ID] || seenIDs[entry.ID] || seenSorts[entry.Sort] {
+			return false
+		}
+		seenIDs[entry.ID] = true
+		seenSorts[entry.Sort] = true
+	}
+	return true
 }
 
 func (r *SpaceRouter) Members(c *gin.Context) {

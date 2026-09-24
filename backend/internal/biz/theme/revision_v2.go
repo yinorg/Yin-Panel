@@ -6,14 +6,17 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const InstanceThemeScopeV2 = "instance"
+const ThemeTrialDurationV2 = 30 * time.Second
 
 type PackageRecordV2 struct {
 	ID             string `gorm:"primaryKey;size:128"`
@@ -68,6 +71,12 @@ type ThemeSettingsRecordV2 struct {
 	UpdatedAt     time.Time
 }
 
+type UserThemePreferenceV2 struct {
+	UserID    uint   `gorm:"primaryKey;autoIncrement:false"`
+	Mode      string `gorm:"size:8;not null"`
+	UpdatedAt time.Time
+}
+
 type builtinPaletteV2 struct {
 	id, name    string
 	light, dark map[string]string
@@ -87,7 +96,7 @@ type builtinPaletteV2 struct {
 }
 
 func migrateRevisionV2(db *gorm.DB) error {
-	return db.AutoMigrate(&PackageRecordV2{}, &RevisionRecordV2{}, &AssetRecordV2{}, &ActivationRecordV2{}, &GrantRecordV2{}, &ThemeSettingsRecordV2{})
+	return db.AutoMigrate(&PackageRecordV2{}, &RevisionRecordV2{}, &AssetRecordV2{}, &ActivationRecordV2{}, &GrantRecordV2{}, &ThemeSettingsRecordV2{}, &UserThemePreferenceV2{})
 }
 
 func InstallPackageV2(db *gorm.DB, actorID uint, pkg *PackageV2) error {
@@ -242,7 +251,7 @@ func ActivePackageRevisionV2(db *gorm.DB, scope, fallbackRevisionID string) (Rev
 	if err != nil {
 		return RevisionRecordV2{}, err
 	}
-	if activation.PendingRevisionID != "" && activation.TrialStartedAt != nil && time.Since(*activation.TrialStartedAt) > 2*time.Minute {
+	if activation.PendingRevisionID != "" && activation.TrialStartedAt != nil && time.Since(*activation.TrialStartedAt) > ThemeTrialDurationV2 {
 		if err := RollbackActivationV2(db, scope, fallbackRevisionID); err != nil {
 			return RevisionRecordV2{}, err
 		}
@@ -294,6 +303,88 @@ func ActivatePackageV2(db *gorm.DB, scope, packageID, revisionID string) error {
 	})
 }
 
+func SetUserThemeSelectionV2(db *gorm.DB, userID uint, packageID, revisionID, mode string) error {
+	if userID == 0 || packageID == "" || revisionID == "" {
+		return errors.New("theme selection requires a user, package and revision")
+	}
+	if !validThemeModeV2(mode) {
+		return errors.New("mode must be light, dark, or auto")
+	}
+	return db.Transaction(func(tx *gorm.DB) error {
+		var packageRecord PackageRecordV2
+		if err := tx.First(&packageRecord, "id = ? AND removed = ?", packageID, false).Error; err != nil {
+			return err
+		}
+		var revision RevisionRecordV2
+		if err := tx.First(&revision, "id = ? AND package_id = ?", revisionID, packageID).Error; err != nil {
+			return err
+		}
+		scope := ActivationScopeForUserV2(userID)
+		var activation ActivationRecordV2
+		err := tx.First(&activation, "scope = ?", scope).Error
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			activation = ActivationRecordV2{Scope: scope, PackageID: packageID}
+		}
+		activation.PackageID = packageID
+		activation.ActiveRevisionID = revisionID
+		activation.LastGoodRevisionID = revisionID
+		activation.PendingRevisionID = ""
+		activation.TrialStartedAt = nil
+		activation.UpdatedAt = time.Now()
+		if err := tx.Save(&activation).Error; err != nil {
+			return err
+		}
+		preference := UserThemePreferenceV2{UserID: userID, Mode: mode, UpdatedAt: time.Now()}
+		if err := tx.Save(&preference).Error; err != nil {
+			return err
+		}
+		return tx.Create(&AuditRecord{ActorID: userID, Action: "select", PackageID: packageID}).Error
+	})
+}
+
+func UserThemeModeV2(db *gorm.DB, userID uint) (string, error) {
+	var preference UserThemePreferenceV2
+	err := db.First(&preference, "user_id = ?", userID).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return "auto", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	if !validThemeModeV2(preference.Mode) {
+		return "auto", nil
+	}
+	return preference.Mode, nil
+}
+
+func validThemeModeV2(mode string) bool {
+	return mode == "light" || mode == "dark" || mode == "auto"
+}
+
+func migrateLegacyThemeModesV2(db *gorm.DB) error {
+	var legacy []LegacyPreferenceRecord
+	if err := db.Select("user_id", "mode").Find(&legacy).Error; err != nil {
+		return err
+	}
+	for _, old := range legacy {
+		mode := old.Mode
+		if !validThemeModeV2(mode) {
+			mode = "auto"
+		}
+		preference := UserThemePreferenceV2{UserID: old.UserID, Mode: mode, UpdatedAt: old.UpdatedAt}
+		if preference.UpdatedAt.IsZero() {
+			preference.UpdatedAt = time.Now()
+		}
+		if err := db.Clauses(clause.OnConflict{DoNothing: true}).Create(&preference).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func ActiveRevisionIDV2(db *gorm.DB, scope string) (string, error) {
 	var activation ActivationRecordV2
 	if err := db.First(&activation, "scope = ?", scope).Error; err != nil {
@@ -318,6 +409,28 @@ func GetPackageAssetV2(db *gorm.DB, revisionID, name string) (AssetRecordV2, err
 	var asset AssetRecordV2
 	err := db.First(&asset, "revision_id = ? AND path = ?", revisionID, name).Error
 	return asset, err
+}
+
+func ImplicitBuiltinPermissionsV2(db *gorm.DB, revisionID string) ([]string, bool, error) {
+	revision, err := GetPackageRevisionV2(db, revisionID)
+	if err != nil {
+		return nil, false, err
+	}
+	if !revision.Verified {
+		return nil, false, nil
+	}
+	var manifest PackageManifestV2
+	if err := json.Unmarshal([]byte(revision.ManifestJSON), &manifest); err != nil {
+		return nil, false, err
+	}
+	if !isBuiltinThemeID(manifest.ID) {
+		return nil, false, nil
+	}
+	permissions := make([]string, 0, len(manifest.Permissions.Required))
+	for _, permission := range manifest.Permissions.Required {
+		permissions = append(permissions, permission.Name)
+	}
+	return permissions, true, nil
 }
 
 func InitializeActivationV2(db *gorm.DB, scope, packageID, revisionID string) error {
@@ -468,11 +581,24 @@ func RemovePackageV2(db *gorm.DB, actorID uint, packageID string) error {
 
 func EnsureBuiltinV2(db *gorm.DB) error {
 	for _, builtin := range builtinPackagesV2() {
+		previous, previousErr := LatestPackageRevisionV2(db, builtin.Manifest.ID)
+		if previousErr != nil && !errors.Is(previousErr, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("load built-in theme %s: %w", builtin.Manifest.ID, previousErr)
+		}
 		if err := InstallPackageV2(db, 0, builtin); err != nil {
 			return fmt.Errorf("install built-in theme %s: %w", builtin.Manifest.ID, err)
 		}
+		if previousErr == nil && previous.ID != builtin.Revision {
+			if err := db.Model(&ActivationRecordV2{}).Where("package_id = ? AND active_revision_id = ? AND pending_revision_id = ''", builtin.Manifest.ID, previous.ID).Updates(map[string]any{
+				"active_revision_id":    builtin.Revision,
+				"last_good_revision_id": builtin.Revision,
+				"updated_at":            time.Now(),
+			}).Error; err != nil {
+				return fmt.Errorf("upgrade active built-in theme %s: %w", builtin.Manifest.ID, err)
+			}
+		}
 	}
-	return db.Transaction(func(tx *gorm.DB) error {
+	if err := db.Transaction(func(tx *gorm.DB) error {
 		var activation ActivationRecordV2
 		err := tx.First(&activation, "scope = ?", InstanceThemeScopeV2).Error
 		if err == nil {
@@ -488,7 +614,10 @@ func EnsureBuiltinV2(db *gorm.DB) error {
 		now := time.Now()
 		activation = ActivationRecordV2{Scope: InstanceThemeScopeV2, PackageID: yin.ID, ActiveRevisionID: yin.LatestRevision, LastGoodRevisionID: yin.LatestRevision, UpdatedAt: now}
 		return tx.Create(&activation).Error
-	})
+	}); err != nil {
+		return err
+	}
+	return migrateLegacyThemeModesV2(db)
 }
 
 func builtinPackagesV2() []*PackageV2 {
@@ -501,11 +630,36 @@ func builtinPackagesV2() []*PackageV2 {
 	result := make([]*PackageV2, 0, len(palettes))
 	for _, palette := range palettes {
 		docs := map[string]json.RawMessage{"light": builtinDTCGDocumentV2(palette.light, palette), "dark": builtinDTCGDocumentV2(palette.dark, palette)}
-		manifest := PackageManifestV2{Format: "yin-theme", FormatVersion: PackageFormatVersionV2, ID: palette.id, Name: palette.name, Version: "2.0.0", ThemeAPI: "^1.0.0", Core: ">=0.3.16", Author: "Yin", License: "AGPL-3.0", Tokens: TokenSetV2{Format: "DTCG", Version: DTCGVersion, Docs: map[string]string{"light": "tokens/light.json", "dark": "tokens/dark.json"}}, DefaultScheme: "light"}
+		files := builtinHomeResourcesV2(palette.id)
+		resources := make([]ResourceV2, 0, len(files))
+		for name, asset := range files {
+			sum := sha256.Sum256(asset.Content)
+			resources = append(resources, ResourceV2{Path: name, SHA256: fmt.Sprintf("%x", sum[:]), MediaType: asset.MediaType})
+		}
+		sort.Slice(resources, func(i, j int) bool { return resources[i].Path < resources[j].Path })
+		manifest := PackageManifestV2{
+			Format: "yin-theme", FormatVersion: PackageFormatVersionV2, ID: palette.id, Name: palette.name, Version: "2.3.0", ThemeAPI: "^1.0.0", Core: ">=0.4.0", Author: "Yin", License: "AGPL-3.0",
+			Tokens: TokenSetV2{Format: "DTCG", Version: DTCGVersion, Docs: map[string]string{"light": "tokens/light.json", "dark": "tokens/dark.json"}}, DefaultScheme: "light",
+			Entrypoints: EntrypointsV2{Script: "views/home.mjs", Styles: []string{"styles/home.css"}}, Runtime: RuntimeV2{SupportedModes: []string{"sandbox"}},
+			Contributes: ContributionsV2{Views: []string{"home"}}, Permissions: PermissionsV2{Required: []PermissionV2{{Name: "spaces.read"}, {Name: "groups.read"}, {Name: "items.read"}}}, Resources: resources,
+		}
 		manifestJSON, _ := json.Marshal(manifest)
-		tokenJSON, _ := json.Marshal(docs)
-		sum := sha256.Sum256(append(manifestJSON, tokenJSON...))
-		result = append(result, &PackageV2{Manifest: manifest, Tokens: docs, Files: map[string]ResourceData{}, Verified: true, Revision: fmt.Sprintf("%x", sum[:])})
+		revisionFiles := resourceBytesV2(files)
+		revisionFiles["manifest.json"] = manifestJSON
+		for scheme, document := range docs {
+			revisionFiles[manifest.Tokens.Docs[scheme]] = document
+		}
+		result = append(result, &PackageV2{Manifest: manifest, Tokens: docs, Files: files, Verified: true, Revision: packageRevisionV2(revisionFiles)})
+	}
+	return result
+}
+
+func resourceBytesV2(files map[string]ResourceData) map[string][]byte {
+	result := make(map[string][]byte, len(files))
+	for name, file := range files {
+		if name != "manifest.json" {
+			result[name] = file.Content
+		}
 	}
 	return result
 }

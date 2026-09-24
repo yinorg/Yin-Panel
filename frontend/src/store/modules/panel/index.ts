@@ -27,9 +27,10 @@ export const usePanelState = defineStore('panel', {
     },
 
     // 获取云端（搭建的服务器）的面板配置
-    async updatePanelConfigByCloud() {
+    async updatePanelConfigByCloud(signal?: AbortSignal) {
       try {
-        const res = await getUserConfig<Panel.userConfig>()
+        const res = await getUserConfig<Panel.userConfig>(signal)
+        if (signal?.aborted) return false
         if (res.code !== 0) return false
         const saved = res.data.panel
         this.panelConfig = { ...defaultStatePanelConfig(), ...saved }

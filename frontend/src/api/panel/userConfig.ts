@@ -7,8 +7,9 @@ export function set<T>(req: Panel.userConfig) {
   })
 }
 
-export function getUserConfig<T>() {
+export function getUserConfig<T>(signal?: AbortSignal) {
   return get<T>({
     url: '/panel/userConfig/getConfig',
+    signal,
   })
 }

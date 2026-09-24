@@ -1,4 +1,4 @@
-import type { ThemeCollectionStatus, ThemeGroup, ThemeHomeSnapshot, ThemeItem, ThemeSpace } from './v1'
+import type { ThemeCollectionStatus, ThemeGroup, ThemeHomeSnapshot, ThemeItem, ThemeSpace } from '../../theme/api/v1'
 
 interface SpaceSource {
   id: number

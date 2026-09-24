@@ -1,20 +1,21 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { UploadFileInfo } from 'naive-ui'
 import { NButton, NCard, NColorPicker, NGrid, NGridItem, NInput, NInputGroup, NModal, NPopconfirm, NSelect, NSlider, NSwitch, NUpload, NUploadDragger, useMessage } from 'naive-ui'
 import { set as setUserConfig } from '../../../api/panel/userConfig'
-import { useAuthStore, usePanelState } from '@/store'
+import { useAppStore, useAuthStore, usePanelState } from '@/store'
 import { PanelPanelConfigStyleEnum } from '@/enums'
 import { t } from '@/locales'
 import { getEnableStatus } from '@/api/system/systemMonitor'
 import { getSearchConfig, getSpaces, setSearchConfig, spaceOptions, type Space, type SpaceSearchConfig } from '@/api/panel/space'
 import { readSpaceCache, writeSpaceCache } from '@/utils/spaceCache'
 import { searchEngineList } from '@/components/deskModule/SearchBox/engines'
-import { getThemePackage, getThemePackages, installThemePackage, previewThemePackage, removeThemePackage, setInstanceDefaultTheme, uploadWebWallpaper } from '@/api/theme'
+import { beginThemeTrial, confirmThemeTrial, getThemePackages, getThemeRevision, installThemePackage, previewThemePackage, removeThemePackage, rollbackThemeTrial, uploadWebWallpaper } from '@/api/theme'
 import type { ThemePackage } from '@/utils/theme'
-import { activeThemePackageId } from '@/hooks/useTheme'
+import { activeThemePackageId, refreshMyTheme } from '@/hooks/useTheme'
 
 const authStore = useAuthStore()
+const appStore = useAppStore()
 const panelState = usePanelState()
 const ms = useMessage()
 const monitorEnabled = ref(false)
@@ -23,8 +24,14 @@ const selectedSearchSpaceId = ref<number | null>(null)
 const selectedSearchEngineUrl = ref(searchEngineList[0].url)
 const searchConfigSaving = ref(false)
 const themeFileInput = ref<HTMLInputElement | null>(null)
-const themePackages = ref<Array<{ id: string; name: string; version: string; verified: boolean }>>([])
+const themePackages = ref<Array<{ id: string; name: string; version: string; revision: string; verified: boolean }>>([])
+const themeRevisions = ref<Array<{ id: string; packageId: string; version: string; verified: boolean; createdAt: string }>>([])
 const defaultThemeId = ref('')
+const lastGoodThemeRevision = ref('')
+const pendingThemeRevision = ref('')
+const trialStartedAt = ref<string | null>(null)
+const selectedTrialRevision = ref('')
+const trialNow = ref(Date.now())
 const themeSaving = ref(false)
 const previewFile = ref<File | null>(null)
 const previewToken = ref('')
@@ -55,13 +62,35 @@ watch(() => panelState.panelConfig.wallpaperMode, (mode) => {
 }, { immediate: true })
 const isAdmin = computed(() => authStore.userInfo?.role === 1)
 const themeOptions = computed(() => themePackages.value.map(item => ({ label: `${item.name} (${item.version})`, value: item.id })))
+const trialRevisionOptions = computed(() => themeRevisions.value
+  .filter(revision => revision.packageId === defaultThemeId.value)
+  .map(revision => ({ label: `${revision.version} · ${revision.id.slice(0, 12)}`, value: revision.id })))
+const trialRevisionSelected = computed(() => trialRevisionOptions.value.some(option => option.value === selectedTrialRevision.value))
+const trialSecondsLeft = computed(() => {
+  if (!pendingThemeRevision.value || !trialStartedAt.value) return 0
+  return Math.max(0, 30 - Math.floor((trialNow.value - new Date(trialStartedAt.value).getTime()) / 1000))
+})
+let trialTicker: number | undefined
+onBeforeUnmount(() => {
+  if (trialTicker !== undefined) window.clearInterval(trialTicker)
+})
+watch(defaultThemeId, (packageId) => {
+  selectedTrialRevision.value = themePackages.value.find(item => item.id === packageId)?.revision || ''
+})
 
 async function loadThemePackages() {
   if (!isAdmin.value) return
   const { code, data } = await getThemePackages()
   if (code === 0) {
     themePackages.value = data.packages
+    themeRevisions.value = data.revisions || []
     defaultThemeId.value = data.defaultPackage
+    lastGoodThemeRevision.value = data.lastGoodRevision
+    pendingThemeRevision.value = data.pendingRevision
+    trialStartedAt.value = data.trialStartedAt || null
+    if (!selectedTrialRevision.value || !themeRevisions.value.some(revision => revision.id === selectedTrialRevision.value && revision.packageId === defaultThemeId.value)) {
+      selectedTrialRevision.value = themePackages.value.find(item => item.id === defaultThemeId.value)?.revision || ''
+    }
   }
 }
 
@@ -98,9 +127,10 @@ async function prepareThemePackage(file?: File) {
 }
 
 async function saveDefaultTheme() {
+  if (!selectedTrialRevision.value) return
   themeSaving.value = true
   try {
-    const detail = await getThemePackage(defaultThemeId.value)
+    const detail = await getThemeRevision(selectedTrialRevision.value)
     if (detail.code !== 0) {
       ms.error(t('themeWallpaper.loadFailed'))
       return
@@ -110,16 +140,38 @@ async function saveDefaultTheme() {
       .map(item => new URL(item.source).hostname)
     if (hosts.length && !window.confirm(t('themeWallpaper.confirmExternal', { hosts: [...new Set(hosts)].join(', ') })))
       return
-    const { code, msg } = await setInstanceDefaultTheme(defaultThemeId.value, hosts.length > 0)
+    const { code, msg } = await beginThemeTrial(selectedTrialRevision.value)
     if (code === 0) {
-      ms.success(t('themePackage.saved'))
-      window.location.reload()
+      ms.success(t('themeTrial.started'))
+      await refreshMyTheme(appStore)
+      await loadThemePackages()
     }
     else ms.error(msg)
   }
   finally {
     themeSaving.value = false
   }
+}
+
+async function confirmThemeTrialSelection() {
+  if (!pendingThemeRevision.value) return
+  const { code, msg } = await confirmThemeTrial(pendingThemeRevision.value)
+  if (code === 0) {
+    ms.success(t('themeTrial.confirmed'))
+    await refreshMyTheme(appStore)
+    await loadThemePackages()
+  }
+  else ms.error(msg)
+}
+
+async function rollbackThemeSelection() {
+  const { code, msg } = await rollbackThemeTrial()
+  if (code === 0) {
+    ms.success(t('themeTrial.rolledBack'))
+    await refreshMyTheme(appStore)
+    await loadThemePackages()
+  }
+  else ms.error(msg)
 }
 
 async function deleteTheme(id: string) {
@@ -196,6 +248,7 @@ async function saveDefaultSearchEngine() {
 
 // 获取后端 enableMonitor 配置
 onMounted(async () => {
+  trialTicker = window.setInterval(() => { trialNow.value = Date.now() }, 1000)
   try {
     // 修正类型定义，确保与实际 API 响应结构匹配
     interface EnableStatusResponse {
@@ -318,7 +371,15 @@ function adoptThemeDefaults() {
         <input ref="themeFileInput" type="file" accept=".yin-theme,.zip" class="hidden" @change="prepareThemePackage(($event.target as HTMLInputElement).files?.[0]); ($event.target as HTMLInputElement).value = ''">
         <NButton size="small" @click="themeFileInput?.click()">{{ $t('themePackage.install') }}</NButton>
         <NSelect v-model:value="defaultThemeId" :options="themeOptions" class="min-w-[220px] flex-1" />
-        <NButton size="small" type="primary" :loading="themeSaving" @click="saveDefaultTheme">{{ $t('themePackage.setDefault') }}</NButton>
+        <NButton size="small" type="primary" :loading="themeSaving" :disabled="!trialRevisionSelected" @click="saveDefaultTheme">{{ $t('themeTrial.start') }}</NButton>
+      </div>
+      <div class="mt-3 flex flex-wrap items-center gap-2">
+        <NSelect v-model:value="selectedTrialRevision" :options="trialRevisionOptions" class="min-w-[260px] flex-1" :placeholder="$t('themeTrial.selectRevision')" />
+        <NButton size="small" type="success" :disabled="!pendingThemeRevision || trialSecondsLeft <= 0" @click="confirmThemeTrialSelection">{{ $t('themeTrial.confirm') }}</NButton>
+        <NButton size="small" type="warning" :disabled="!pendingThemeRevision" @click="rollbackThemeSelection">{{ $t('themeTrial.rollback') }}</NButton>
+      </div>
+      <div v-if="pendingThemeRevision" class="mt-2 text-sm" role="status" data-testid="theme-trial-status">
+        {{ $t('themeTrial.pending', { revision: pendingThemeRevision.slice(0, 12), lastGood: lastGoodThemeRevision.slice(0, 12), time: `${Math.floor(trialSecondsLeft / 60)}:${String(trialSecondsLeft % 60).padStart(2, '0')}` }) }}
       </div>
       <div class="mt-3 divide-y">
         <div v-for="item in themePackages" :key="item.id" class="flex items-center justify-between gap-3 py-2">

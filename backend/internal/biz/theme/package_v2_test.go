@@ -60,6 +60,75 @@ func TestDTCG202510AcceptsSharedCSSColor4ConformanceFixture(t *testing.T) {
 	}
 }
 
+func TestDTCG202510MatchesSharedDocumentConformanceCases(t *testing.T) {
+	_, sourceFile, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("could not locate theme package source")
+	}
+	path := filepath.Join(filepath.Dir(sourceFile), "../../../../shared/theme/dtcg-conformance/documents.json")
+	encoded, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fixture struct {
+		Cases []struct {
+			Name     string          `json:"name"`
+			Valid    bool            `json:"valid"`
+			Document json.RawMessage `json:"document"`
+		} `json:"cases"`
+	}
+	if err := json.Unmarshal(encoded, &fixture); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range fixture.Cases {
+		t.Run(tc.Name, func(t *testing.T) {
+			err := validateDTCGDocument202510(tc.Document)
+			if tc.Valid && err != nil {
+				t.Fatalf("valid shared DTCG document was rejected: %v", err)
+			}
+			if !tc.Valid && err == nil {
+				t.Fatal("invalid shared DTCG document was accepted")
+			}
+		})
+	}
+}
+
+func TestDTCG202510MatchesOfficialConformanceCases(t *testing.T) {
+	_, sourceFile, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("could not locate theme package source")
+	}
+	path := filepath.Join(filepath.Dir(sourceFile), "../../../../shared/theme/dtcg-conformance/official-2025.10.json")
+	encoded, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fixture struct {
+		Cases []struct {
+			ID       string          `json:"id"`
+			Valid    bool            `json:"valid"`
+			Document json.RawMessage `json:"document"`
+		} `json:"cases"`
+	}
+	if err := json.Unmarshal(encoded, &fixture); err != nil {
+		t.Fatal(err)
+	}
+	if len(fixture.Cases) != 220 {
+		t.Fatalf("official fixture has %d cases, want 220", len(fixture.Cases))
+	}
+	for _, tc := range fixture.Cases {
+		t.Run(tc.ID, func(t *testing.T) {
+			err := validateDTCGDocument202510(tc.Document)
+			if tc.Valid && err != nil {
+				t.Fatalf("valid official DTCG document was rejected: %v", err)
+			}
+			if !tc.Valid && err == nil {
+				t.Fatal("invalid official DTCG document was accepted")
+			}
+		})
+	}
+}
+
 func TestDTCG202510RejectsUnknownTypesReferencesAndCycles(t *testing.T) {
 	tests := []struct {
 		name string
@@ -127,10 +196,10 @@ func TestPackageManifestV2ValidatesThemeContributions(t *testing.T) {
 func TestPackagePreviewPublicV2ResolvesAssetsThroughOpaqueToken(t *testing.T) {
 	pkg := &PackageV2{Manifest: PackageManifestV2{Resources: []ResourceV2{{Path: "styles/theme.css"}, {Path: "assets/ui font.woff2"}}}}
 	public := PackagePreviewPublicV2(pkg, "preview-token")
-	if got := public.Manifest.Resources[0].URL; got != "/api/theme/preview/preview-token/assets/styles/theme.css" {
+	if got := public.Manifest.Resources[0].URL; got != "/api/theme/v2/preview/preview-token/assets/styles/theme.css" {
 		t.Fatalf("stylesheet preview URL = %q", got)
 	}
-	if got := public.Manifest.Resources[1].URL; got != "/api/theme/preview/preview-token/assets/assets/ui%20font.woff2" {
+	if got := public.Manifest.Resources[1].URL; got != "/api/theme/v2/preview/preview-token/assets/assets/ui%20font.woff2" {
 		t.Fatalf("font preview URL = %q", got)
 	}
 	if pkg.Manifest.Resources[0].URL != "" {

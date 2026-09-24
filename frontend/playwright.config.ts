@@ -6,7 +6,7 @@ export default defineConfig({
   fullyParallel: true,
   reporter: 'line',
   use: {
-    baseURL: 'http://127.0.0.1:4173',
+    baseURL: 'http://127.0.0.1:4174',
     ...devices['Desktop Chrome'],
     trace: 'retain-on-failure',
   },

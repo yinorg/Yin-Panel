@@ -1,5 +1,8 @@
 import { createThemeApiDispatcher } from '../api/dispatcher'
 import { isThemeApiRequest, isThemeEventName, type ThemeEnvironment, type ThemeEventEnvelope, type ThemeEventName, type ThemeHomeSnapshot, type ThemePermission } from '../api/v1'
+import { createThemeRequestGuard } from './requestGuard'
+import { createThemeSandboxDocument } from './sandboxDocument'
+export { createThemeSandboxDocument } from './sandboxDocument'
 
 const MAX_MESSAGE_BYTES = 1_048_576
 const HANDSHAKE_TIMEOUT = 10_000
@@ -118,13 +121,8 @@ const bootstrap = `
         tokenStyle = document.createElement('style');
         tokenStyle.textContent = message.tokens || '';
         document.head.appendChild(tokenStyle);
-        if (message.styles.length && message.styles[0].href) {
-          const base = document.createElement('base');
-          base.href = message.styles[0].href;
-          document.head.appendChild(base);
-        }
         for (const stylesheet of message.styles) {
-          if (!stylesheet || typeof stylesheet.href !== 'string' || typeof stylesheet.text !== 'string') throw new Error('Invalid theme stylesheet');
+          if (!stylesheet || typeof stylesheet.text !== 'string') throw new Error('Invalid theme stylesheet');
           const style = document.createElement('style');
           style.textContent = stylesheet.text;
           document.head.appendChild(style);
@@ -151,23 +149,7 @@ const bootstrap = `
 })();
 `
 
-export function createThemeSandboxDocument(resourceOrigin: string) {
-  let parsedOrigin: URL
-  try {
-    parsedOrigin = new URL(resourceOrigin)
-  }
-  catch {
-    throw new Error('Unsupported theme resource origin')
-  }
-  if (!['http:', 'https:'].includes(parsedOrigin.protocol) || parsedOrigin.username || parsedOrigin.password)
-    throw new Error('Unsupported theme resource origin')
-  const origin = parsedOrigin.origin
-  const policy = `default-src 'none'; script-src 'unsafe-inline' blob:; style-src 'unsafe-inline' ${origin}; img-src data: blob: ${origin}; font-src data: blob: ${origin}; media-src data: blob: ${origin}; connect-src 'none'; object-src 'none'; form-action 'none'; base-uri ${origin}`
-  return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${policy}"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body,#theme-root{box-sizing:border-box;width:100%;height:100%;margin:0}*,*::before,*::after{box-sizing:inherit}body{overflow:auto}</style></head><body><div id="theme-root"></div><script>${bootstrap}</script></body></html>`
-}
-
 export interface ThemeSandboxStylesheet {
-  href: string
   text: string
 }
 
@@ -193,7 +175,7 @@ export interface ThemeSandboxHandle {
 export async function mountThemeSandbox(frame: HTMLIFrameElement, options: ThemeSandboxOptions): Promise<ThemeSandboxHandle> {
   frame.setAttribute('sandbox', 'allow-scripts')
   const connected = waitForFrameLoad(frame)
-  frame.srcdoc = createThemeSandboxDocument(window.location.origin)
+  frame.srcdoc = createThemeSandboxDocument(window.location.origin, bootstrap)
   await connected
 
   const channel = new MessageChannel()
@@ -206,6 +188,7 @@ export async function mountThemeSandbox(frame: HTMLIFrameElement, options: Theme
   let stopped = false
   let connectedOnce = false
   let eventSequence = 0
+  const requestGuard = createThemeRequestGuard()
 
   const dispatcher = createThemeApiDispatcher({
     getContextVersion: () => options.snapshot.version,
@@ -267,6 +250,23 @@ export async function mountThemeSandbox(frame: HTMLIFrameElement, options: Theme
         return
       }
       if (data.type === 'api-request' && isThemeApiRequest(data.request)) {
+        try {
+          if (!requestGuard.remember(data.request.requestId)) {
+            channel.port1.postMessage({
+              type: 'api-response',
+              response: {
+                protocol: 'yin-theme-api', version: 1,
+                requestId: data.request.requestId, contextVersion: data.request.contextVersion,
+                ok: false, error: { code: 'INVALID_ARGUMENT', message: 'Theme request IDs can only be used once' },
+              },
+            })
+            return
+          }
+        }
+        catch (error) {
+          fail(error instanceof Error ? error.message : 'Theme request limit exceeded')
+          return
+        }
         const response = await dispatcher(data.request)
         if (!stopped && response) channel.port1.postMessage(cloneThemeMessage({ type: 'api-response', response }))
       }

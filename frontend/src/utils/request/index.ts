@@ -71,6 +71,8 @@ function http<T = any>(
 
   const failHandler = (error: Response<Error>) => {
     afterRequest?.()
+    if (signal?.aborted)
+      throw error
     message.error(t('common.networkError'), {
       duration: 50000,
       closable: true,

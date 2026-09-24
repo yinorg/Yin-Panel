@@ -1,0 +1,21 @@
+{
+  "name": "@yin-panel/create-theme",
+  "version": "1.0.0",
+  "type": "module",
+  "bin": {
+    "yin-theme": "./bin/yin-theme.mjs"
+  },
+  "scripts": {
+    "test": "node --test tests/*.test.mjs"
+  },
+  "files": [
+    "bin",
+    "README.md"
+  ],
+  "dependencies": {
+    "esbuild": "^0.28.1"
+  },
+  "engines": {
+    "node": ">=22.22.2"
+  }
+}

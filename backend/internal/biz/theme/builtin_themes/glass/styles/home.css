@@ -1,0 +1,5 @@
+.builtin-home { background: radial-gradient(ellipse at 10% 0%, #8ec7ff33, transparent 55%), var(--yin-canvas); backdrop-filter: blur(18px); }
+.home-header { padding: 22px; border: 1px solid var(--yin-border); border-radius: 22px; background: var(--yin-surface); backdrop-filter: blur(18px); box-shadow: 0 18px 50px #18365b33; }
+.home-groups { gap: 28px; padding-top: 30px; }
+.item-button { min-height: 82px; border-radius: 18px; background: var(--yin-surface); backdrop-filter: blur(18px); box-shadow: 0 14px 34px #18365b22; }
+.item-icon { flex-basis: 48px; height: 48px; border-radius: 16px; }

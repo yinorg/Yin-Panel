@@ -3,9 +3,10 @@ import { computed, ref, watch, watchEffect } from 'vue'
 import { darkTheme, useOsTheme } from 'naive-ui'
 import { useAppStore } from '../store'
 import { useAuthStore } from '../store'
-import { getCurrentTheme, getMyTheme, getPreviewTheme } from '../api/theme'
+import { getCurrentTheme, getMyTheme, getPreviewTheme, getThemePackage } from '../api/theme'
 import { parsePublicCodeFromPath } from '../utils/request/axios'
 import { resolveThemeSlots, resolveWallpaper, selectThemeScheme, type ThemePackage } from '../utils/theme'
+import { isThemeSafeMode } from '../theme/recovery/safeMode'
 
 export const activeThemePackage = ref<ThemePackage | null>(null)
 export const activeThemeSlots = ref<Record<string, string>>({})
@@ -38,16 +39,22 @@ async function refreshCurrentTheme() {
 }
 
 function initializeTheme(appStore: ReturnType<typeof useAppStore>, token: string) {
+  if (window.location.pathname === '/__yin/theme-recovery')
+    return Promise.resolve()
   if (!themeLoad) {
     themeLoad = (async () => {
-      if (previewToken) {
+      if (isThemeSafeMode()) {
+        const yin = await getThemePackage('org.yin.default')
+        if (yin.code === 0) activeThemePackage.value = yin.data
+      }
+      else if (previewToken) {
         const preview = await getPreviewTheme(previewToken)
         if (preview.code === 0) activeThemePackage.value = preview.data
       }
       else await refreshCurrentTheme()
     })()
   }
-  if (!previewToken && token && token !== loadedUserToken && !parsePublicCodeFromPath()) {
+  if (!previewToken && token && token !== loadedUserToken && !parsePublicCodeFromPath() && !isThemeSafeMode()) {
     loadedUserToken = token
     themeLoad = themeLoad.then(async () => {
       try {

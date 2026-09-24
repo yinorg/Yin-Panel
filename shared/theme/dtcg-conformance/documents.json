@@ -1,0 +1,136 @@
+{
+  "schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+  "cases": [
+    {
+      "name": "root-extends-and-reference",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "primitive": {
+          "spacing": {
+            "$type": "dimension",
+            "$root": { "$value": { "value": 4, "unit": "px" } },
+            "small": { "$value": { "value": 8, "unit": "px" } }
+          }
+        },
+        "semantic": {
+          "spacing": {
+            "$extends": "{primitive.spacing}",
+            "medium": { "$type": "dimension", "$value": "{primitive.spacing.small}" }
+          }
+        }
+      }
+    },
+    {
+      "name": "standard-composite-token-types-and-extensions",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$extensions": { "com.example.theme": { "profile": "editorial" } },
+        "tokens": {
+          "color": { "$type": "color", "$value": { "colorSpace": "display-p3", "components": [0.2, 0.4, 0.6], "alpha": 0.9 } },
+          "dimension": { "$type": "dimension", "$value": { "value": 12, "unit": "rem" } },
+          "fontFamily": { "$type": "fontFamily", "$value": ["Inter", "system-ui"] },
+          "fontWeight": { "$type": "fontWeight", "$value": "semi-bold" },
+          "duration": { "$type": "duration", "$value": { "value": 180, "unit": "ms" } },
+          "cubicBezier": { "$type": "cubicBezier", "$value": [0.2, 0.8, 0.2, 1] },
+          "number": { "$type": "number", "$value": 1.25 },
+          "strokeStyle": { "$type": "strokeStyle", "$value": { "dashArray": [{ "value": 2, "unit": "px" }, { "value": 1, "unit": "rem" }], "lineCap": "round" } },
+          "border": { "$type": "border", "$value": { "color": { "colorSpace": "srgb", "components": [0.1, 0.2, 0.3] }, "width": { "value": 1, "unit": "px" }, "style": "solid" } },
+          "transition": { "$type": "transition", "$value": { "duration": { "value": 120, "unit": "ms" }, "delay": { "value": 0, "unit": "ms" }, "timingFunction": [0.2, 0.8, 0.2, 1] } },
+          "shadow": { "$type": "shadow", "$value": { "color": { "colorSpace": "srgb", "components": [0.1, 0.2, 0.3] }, "offsetX": { "value": 0, "unit": "px" }, "offsetY": { "value": 2, "unit": "px" }, "blur": { "value": 12, "unit": "px" }, "spread": { "value": 0, "unit": "px" } } },
+          "gradient": { "$type": "gradient", "$value": [{ "color": { "colorSpace": "srgb", "components": [0.1, 0.2, 0.3] }, "position": 0 }, { "color": { "colorSpace": "srgb", "components": [0.8, 0.7, 0.6] }, "position": 1 }] },
+          "typography": { "$type": "typography", "$value": { "fontFamily": ["Inter", "system-ui"], "fontSize": { "value": 16, "unit": "px" }, "fontWeight": 500, "letterSpacing": { "value": 0, "unit": "px" }, "lineHeight": 1.5 } }
+        }
+      }
+    },
+    {
+      "name": "invalid-border-composite-color",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "border": { "$type": "border", "control": { "$value": { "color": "red", "width": { "value": 1, "unit": "px" }, "style": "solid" } } }
+      }
+    },
+    {
+      "name": "invalid-transition-composite-fields",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "transition": { "$type": "transition", "quick": { "$value": { "duration": { "value": 100, "unit": "px" }, "timingFunction": "ease", "property": "" } } }
+      }
+    },
+    {
+      "name": "invalid-shadow-composite-color",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "shadow": { "$type": "shadow", "card": { "$value": { "color": "black", "offsetX": { "value": 0, "unit": "px" }, "offsetY": { "value": 2, "unit": "px" }, "blur": { "value": 8, "unit": "px" }, "spread": { "value": 0, "unit": "px" } } } }
+      }
+    },
+    {
+      "name": "invalid-gradient-stop-color",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "gradient": { "$type": "gradient", "canvas": { "$value": [{ "color": "red", "position": 0 }, { "color": { "colorSpace": "srgb", "components": [1, 1, 1] }, "position": 1 }] } }
+      }
+    },
+    {
+      "name": "invalid-typography-composite-fields",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "typography": { "$type": "typography", "body": { "$value": { "fontFamily": ["Inter"], "fontSize": "16px", "fontWeight": 500, "lineHeight": "1.5" } } }
+      }
+    },
+    {
+      "name": "unknown-reference",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "color": { "$type": "color", "ink": { "$value": "{missing.ink}" } }
+      }
+    },
+    {
+      "name": "reference-cycle",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "number": {
+          "$type": "number",
+          "first": { "$value": "{number.second}" },
+          "second": { "$value": "{number.first}" }
+        }
+      }
+    },
+    {
+      "name": "extension-cycle",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "first": { "$extends": "{second}", "value": { "$type": "number", "$value": 1 } },
+        "second": { "$extends": "{first}" }
+      }
+    },
+    {
+      "name": "nonstandard-token-type",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "asset": { "$type": "asset", "background": { "$value": "background.png" } }
+      }
+    },
+    {
+      "name": "out-of-range-alpha",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "color": {
+          "$type": "color",
+          "ink": { "$value": { "colorSpace": "srgb", "components": [0.1, 0.2, 0.3], "alpha": 1.1 } }
+        }
+      }
+    }
+  ]
+}

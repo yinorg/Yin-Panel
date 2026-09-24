@@ -26,6 +26,14 @@ export interface HomeThemeActionBindings {
   selectSpace: (spaceId: number) => Promise<unknown> | unknown
   openItem: (item: CoreItem) => Promise<unknown> | unknown
   openEditor: (input: { item?: CoreItem; groupId?: number }) => Promise<unknown> | unknown
+  createItem: (input: Record<string, unknown>) => Promise<unknown> | unknown
+  updateItem: (itemId: number, input: Record<string, unknown>) => Promise<unknown> | unknown
+  deleteItem: (item: CoreItem) => Promise<unknown> | unknown
+  reorderItems: (groupId: number, itemIds: number[]) => Promise<unknown> | unknown
+  createGroup: (input: { title: string; icon?: string; parentId?: number | null }) => Promise<unknown> | unknown
+  updateGroup: (groupId: number, input: { title: string; icon?: string; parentId?: number | null }) => Promise<unknown> | unknown
+  deleteGroup: (group: CoreGroup) => Promise<unknown> | unknown
+  reorderGroups: (parentId: number | null, groupIds: number[]) => Promise<unknown> | unknown
   openCommandCenter: () => Promise<unknown> | unknown
   toggleSide: () => Promise<unknown> | unknown
   refresh: () => Promise<unknown> | unknown
@@ -81,14 +89,55 @@ export function createHomeThemeHandlers(bindings: HomeThemeActionBindings): Them
           return bindings.openItem(item)
         }
         case 'item.create':
-        case 'item.update':
-        case 'item.delete':
-        case 'items.reorder':
-        case 'group.create':
-        case 'group.update':
-        case 'group.delete':
-        case 'groups.reorder':
-          throw apiError('UNSUPPORTED_CAPABILITY', 'This home adapter does not expose write operations yet')
+          return bindings.createItem(toItemWriteInput(payload, undefined, bindings.getGroups()))
+        case 'item.update': {
+          const item = findItem(bindings.getGroups(), payload.itemId)
+          if (!item) throw apiError('NOT_FOUND', 'Item is not available in the active Space')
+          return bindings.updateItem(parseCoreId(item.id), toItemWriteInput(payload, item, bindings.getGroups()))
+        }
+        case 'item.delete': {
+          const item = findItem(bindings.getGroups(), payload.itemId)
+          if (!item) throw apiError('NOT_FOUND', 'Item is not available in the active Space')
+          return bindings.deleteItem(item)
+        }
+        case 'items.reorder': {
+          const groupId = parseCoreId(payload.groupId)
+          const group = bindings.getGroups().find(candidate => candidate.id === groupId)
+          const itemIds = parseIdList(payload.itemIds)
+          if (!group || !isPermutation(group.items?.map(item => parseCoreId(item.id)) || [], itemIds))
+            throw apiError('INVALID_ARGUMENT', 'Item order must contain every item in the active group exactly once')
+          return bindings.reorderItems(groupId, itemIds)
+        }
+        case 'group.create': {
+          const title = parseTitle(payload.title, 50)
+          const parentId = parseOptionalParentId(payload.parentId, bindings.getGroups())
+          return bindings.createGroup({ title, icon: parseOptionalString(payload.icon, 240), parentId })
+        }
+        case 'group.update': {
+          const groupId = parseCoreId(payload.groupId)
+          const group = bindings.getGroups().find(candidate => candidate.id === groupId)
+          if (!group) throw apiError('NOT_FOUND', 'Group is not available in the active Space')
+          const title = payload.title === undefined ? group.title || '' : parseTitle(payload.title, 50)
+          const icon = payload.icon === undefined ? group.icon || '' : parseOptionalString(payload.icon, 240)
+          const parentId = payload.parentId === undefined
+            ? group.parentId ?? null
+            : parseOptionalParentId(payload.parentId, bindings.getGroups(), groupId)
+          return bindings.updateGroup(groupId, { title, icon, parentId })
+        }
+        case 'group.delete': {
+          const groupId = parseCoreId(payload.groupId)
+          const group = bindings.getGroups().find(candidate => candidate.id === groupId)
+          if (!group) throw apiError('NOT_FOUND', 'Group is not available in the active Space')
+          return bindings.deleteGroup(group)
+        }
+        case 'groups.reorder': {
+          const parentId = parseOptionalParentId(payload.parentId, bindings.getGroups())
+          const siblings = bindings.getGroups().filter(group => (group.parentId ?? null) === parentId)
+          const groupIds = parseIdList(payload.groupIds)
+          if (!isPermutation(siblings.map(group => group.id), groupIds))
+            throw apiError('INVALID_ARGUMENT', 'Group order must contain every sibling in the active Space exactly once')
+          return bindings.reorderGroups(parentId, groupIds)
+        }
         case 'search.submit': return bindings.submitSearch(typeof payload.query === 'string' ? payload.query : '')
         case 'data.refresh': return bindings.refresh()
         case 'editor.open': {
@@ -96,6 +145,8 @@ export function createHomeThemeHandlers(bindings: HomeThemeActionBindings): Them
           const item = itemId === undefined ? undefined : findItem(bindings.getGroups(), itemId)
           if (itemId !== undefined && !item) throw apiError('NOT_FOUND', 'Item is not available')
           const groupId = payload.groupId === undefined ? undefined : parseCoreId(payload.groupId)
+          if (groupId !== undefined && !bindings.getGroups().some(group => group.id === groupId))
+            throw apiError('NOT_FOUND', 'Group is not available in the active Space')
           return bindings.openEditor({ item, groupId })
         }
         case 'commandCenter.open': return bindings.openCommandCenter()
@@ -177,6 +228,110 @@ function parseCoreId(value: unknown): number {
   const id = typeof value === 'number' ? value : typeof value === 'string' && /^\d+$/.test(value) ? Number(value) : NaN
   if (!Number.isSafeInteger(id) || id <= 0) throw apiError('INVALID_ARGUMENT', 'Expected a positive Core ID')
   return id
+}
+
+function toItemWriteInput(payload: Record<string, unknown>, existing: CoreItem | undefined, groups: readonly CoreGroup[]): Record<string, unknown> {
+  const groupId = payload.groupId === undefined
+    ? existing?.itemIconGroupId
+    : parseCoreId(payload.groupId)
+  if (!groupId || !groups.some(group => group.id === groupId))
+    throw apiError('NOT_FOUND', 'Target group is not available in the active Space')
+  const title = payload.title === undefined && existing ? existing.title : parseTitle(payload.title, 20)
+  const url = payload.url === undefined && existing ? existing.url : parseHttpUrl(payload.url)
+  const icon = payload.icon === undefined ? existing?.icon || { itemType: 4 } : parseItemIcon(payload.icon)
+  return {
+    ...(existing?.id === undefined ? {} : { id: existing.id }),
+    itemIconGroupId: groupId,
+    title,
+    url,
+    lanUrl: payload.lanUrl === undefined && existing ? existing.lanUrl : parseOptionalHttpUrl(payload.lanUrl),
+    mobileUrl: payload.mobileUrl === undefined && existing ? existing.mobileUrl : parseOptionalHttpUrl(payload.mobileUrl),
+    description: payload.description === undefined && existing ? existing.description : parseOptionalString(payload.description, 2000),
+    openMethod: payload.openMethod === undefined ? existing?.openMethod ?? 2 : parseOpenMethod(payload.openMethod),
+    sort: payload.sort === undefined ? existing?.sort ?? 0 : parseSort(payload.sort),
+    icon: icon || null,
+  }
+}
+
+function parseTitle(value: unknown, maxLength: number): string {
+  if (typeof value !== 'string') throw apiError('INVALID_ARGUMENT', 'Title must be a string')
+  const title = value.trim()
+  if (!title || [...title].length > maxLength) throw apiError('INVALID_ARGUMENT', `Title must contain 1 to ${maxLength} characters`)
+  return title
+}
+
+function parseOptionalString(value: unknown, maxLength: number): string {
+  if (value === undefined || value === null) return ''
+  if (typeof value !== 'string' || value.length > maxLength) throw apiError('INVALID_ARGUMENT', 'Text value is invalid or too long')
+  return value
+}
+
+function parseHttpUrl(value: unknown): string {
+  if (typeof value !== 'string' || value.length > 4096) throw apiError('INVALID_ARGUMENT', 'Item URL must be an HTTP or HTTPS URL')
+  try {
+    const url = new URL(value)
+    if (url.protocol === 'http:' || url.protocol === 'https:') return value
+  }
+  catch { /* Invalid URL */ }
+  throw apiError('INVALID_ARGUMENT', 'Item URL must be an HTTP or HTTPS URL')
+}
+
+function parseOptionalHttpUrl(value: unknown): string {
+  if (value === undefined || value === null || value === '') return ''
+  return parseHttpUrl(value)
+}
+
+function parseItemIcon(value: unknown): Panel.ItemIcon | null {
+  if (value === null) return null
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw apiError('INVALID_ARGUMENT', 'Item icon is invalid')
+  const icon = value as Record<string, unknown>
+  if (!Number.isSafeInteger(icon.itemType) || Number(icon.itemType) < 0 || Number(icon.itemType) > 4)
+    throw apiError('INVALID_ARGUMENT', 'Item icon type is invalid')
+  return {
+    itemType: Number(icon.itemType),
+    src: parseOptionalString(icon.src, 2048) || undefined,
+    fileName: parseOptionalString(icon.fileName, 240) || undefined,
+    text: parseOptionalString(icon.text, 80) || undefined,
+    backgroundColor: parseOptionalString(icon.backgroundColor, 80) || undefined,
+  }
+}
+
+function parseOpenMethod(value: unknown): number {
+  if (!Number.isSafeInteger(value) || ![1, 2, 3].includes(Number(value))) throw apiError('INVALID_ARGUMENT', 'Open method is invalid')
+  return Number(value)
+}
+
+function parseSort(value: unknown): number {
+  if (!Number.isSafeInteger(value) || Number(value) < 0) throw apiError('INVALID_ARGUMENT', 'Sort value is invalid')
+  return Number(value)
+}
+
+function parseOptionalParentId(value: unknown, groups: readonly CoreGroup[], selfId?: number): number | null {
+  if (value === undefined || value === null || value === '') return null
+  const parentId = parseCoreId(value)
+  const groupById = new Map(groups.map(group => [group.id, group]))
+  if (parentId === selfId || !groupById.has(parentId)) throw apiError('NOT_FOUND', 'Parent group is not available in the active Space')
+  let current: number | undefined = parentId
+  const visited = new Set<number>()
+  while (current !== undefined) {
+    if (current === selfId || visited.has(current)) throw apiError('INVALID_ARGUMENT', 'Group parent would create a cycle')
+    visited.add(current)
+    const ancestorId: number | null | undefined = groupById.get(current)?.parentId
+    current = ancestorId == null ? undefined : ancestorId
+  }
+  return parentId
+}
+
+function parseIdList(value: unknown): number[] {
+  if (!Array.isArray(value) || value.length > 10000) throw apiError('INVALID_ARGUMENT', 'Expected a bounded ID list')
+  return value.map(parseCoreId)
+}
+
+function isPermutation(expected: readonly number[], actual: readonly number[]): boolean {
+  if (expected.length !== actual.length) return false
+  const values = new Set(expected)
+  if (values.size !== expected.length) return false
+  return actual.length === values.size && new Set(actual).size === actual.length && actual.every(id => values.has(id))
 }
 
 function apiError(code: string, message: string) {

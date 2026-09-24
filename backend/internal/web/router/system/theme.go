@@ -25,28 +25,26 @@ type ThemeRouter struct{}
 func NewThemeRouter() *ThemeRouter { return &ThemeRouter{} }
 
 func (a *ThemeRouter) InitRouter(router *gin.RouterGroup) {
-	router.GET("/theme/current", a.Current)
-	router.GET("/theme/packages", a.PublicListV2)
-	router.GET("/theme/packages/:id", a.PackageByIDV2)
-	router.GET("/theme/preview/:token", a.PreviewPackageV2)
-	router.GET("/theme/preview/:token/assets/*name", a.PreviewAssetV2)
 	router.GET("/theme/v2/current", a.CurrentV2)
-	router.GET("/theme/v2/packages/:revision", a.PackageV2)
+	router.GET("/theme/v2/packages", a.PublicListV2)
+	router.GET("/theme/v2/package/:id", a.PackageByIDV2)
+	router.GET("/theme/v2/revisions/:revision", a.PackageV2)
+	router.GET("/theme/v2/preview/:token", a.PreviewPackageV2)
+	router.GET("/theme/v2/preview/:token/assets/*name", a.PreviewAssetV2)
 	router.GET("/theme/v2/assets/:revision/*name", a.AssetV2)
-	router.GET("/theme/wallpaper/web/:id/:name", a.WebWallpaperAsset)
+	router.GET("/theme/v2/wallpaper/web/:id/:name", a.WebWallpaperAsset)
 	user := router.Group("")
 	user.Use(interceptor.Auth, themeJWTOnly)
-	user.GET("/theme/mine", a.Mine)
-	user.POST("/theme/preference", a.SetPreference)
-	user.POST("/theme/wallpaper/web", a.UploadWebWallpaper)
+	user.GET("/theme/v2/mine", a.Mine)
+	user.GET("/theme/v2/preference", a.Preference)
+	user.POST("/theme/v2/preference", a.SetPreference)
+	user.POST("/theme/v2/wallpaper/web", a.UploadWebWallpaper)
 	user.GET("/theme/v2/grants/:revision", a.ThemeGrantV2)
 	user.POST("/theme/v2/grants/:revision", a.SetThemeGrantV2)
 	user.DELETE("/theme/v2/grants/:revision", a.RevokeThemeGrantV2)
 	admin := router.Group("")
 	admin.Use(interceptor.Auth, themeJWTOnly, interceptor.AdminInterceptor)
-	admin.GET("/theme/admin/packages", a.RevisionsV2)
-	admin.POST("/theme/admin/install", a.Install)
-	admin.POST("/theme/admin/preview", a.Preview)
+	admin.GET("/theme/v2/admin/packages", a.RevisionsV2)
 	admin.POST("/theme/v2/admin/install", a.InstallV2)
 	admin.POST("/theme/v2/admin/preview", a.PreviewV2)
 	admin.GET("/theme/v2/admin/revisions", a.RevisionsV2)
@@ -55,9 +53,7 @@ func (a *ThemeRouter) InitRouter(router *gin.RouterGroup) {
 	admin.POST("/theme/v2/admin/confirm", a.ConfirmTrialV2)
 	admin.POST("/theme/v2/admin/rollback", a.RollbackV2)
 	admin.DELETE("/theme/v2/admin/packages/:id", a.RemoveV2)
-	admin.POST("/theme/admin/default", a.SetDefaultV2)
-	admin.DELETE("/theme/admin/packages/:id", a.RemoveV2)
-	admin.GET("/theme/admin/audit", a.Audit)
+	admin.GET("/theme/v2/admin/audit", a.Audit)
 }
 
 func themeJWTOnly(c *gin.Context) {
@@ -65,10 +61,6 @@ func themeJWTOnly(c *gin.Context) {
 		response.ErrorNoAccess(c)
 		c.Abort()
 	}
-}
-
-func (a *ThemeRouter) Current(c *gin.Context) {
-	a.CurrentV2(c)
 }
 
 func (a *ThemeRouter) CurrentV2(c *gin.Context) {
@@ -105,15 +97,6 @@ func (a *ThemeRouter) CurrentV2(c *gin.Context) {
 	response.SuccessData(c, pkg)
 }
 
-func (a *ThemeRouter) PublicList(c *gin.Context) {
-	list, err := theme.List(repository.Db)
-	if err != nil {
-		response.ErrorDatabase(c, err.Error())
-		return
-	}
-	response.SuccessData(c, list)
-}
-
 func (a *ThemeRouter) PublicListV2(c *gin.Context) {
 	packages, err := theme.ListPackagesV2(repository.Db)
 	if err != nil {
@@ -121,16 +104,6 @@ func (a *ThemeRouter) PublicListV2(c *gin.Context) {
 		return
 	}
 	response.SuccessData(c, packages)
-}
-
-func (a *ThemeRouter) PublicPackage(c *gin.Context) {
-	c.Header("Cache-Control", "no-store")
-	pkg, err := theme.Get(repository.Db, c.Param("id"))
-	if err != nil {
-		c.Status(http.StatusNotFound)
-		return
-	}
-	response.SuccessData(c, pkg)
 }
 
 func (a *ThemeRouter) Mine(c *gin.Context) {
@@ -169,12 +142,12 @@ func (a *ThemeRouter) Mine(c *gin.Context) {
 		response.ErrorDatabase(c, err.Error())
 		return
 	}
-	pref, err := theme.PreferenceFor(repository.Db, user.ID)
+	mode, err := theme.UserThemeModeV2(repository.Db, user.ID)
 	if err != nil {
 		response.ErrorDatabase(c, err.Error())
 		return
 	}
-	response.SuccessData(c, gin.H{"package": pkg, "preference": gin.H{"revision": revision.ID, "packageId": selectedPackageID, "mode": pref.Mode}})
+	response.SuccessData(c, gin.H{"package": pkg, "preference": gin.H{"revision": revision.ID, "packageId": selectedPackageID, "mode": mode}})
 }
 
 func (a *ThemeRouter) SetPreference(c *gin.Context) {
@@ -226,15 +199,25 @@ func (a *ThemeRouter) SetPreference(c *gin.Context) {
 		response.ErrorDataNotFound(c)
 		return
 	}
-	if err := theme.ActivatePackageV2(repository.Db, theme.ActivationScopeForUserV2(user.ID), revision.PackageID, revision.ID); err != nil {
-		response.ErrorParamFomat(c, err.Error())
-		return
-	}
-	if err := theme.SetPreference(repository.Db, user.ID, "", req.Mode); err != nil {
+	if err := theme.SetUserThemeSelectionV2(repository.Db, user.ID, revision.PackageID, revision.ID, req.Mode); err != nil {
 		response.ErrorParamFomat(c, err.Error())
 		return
 	}
 	response.Success(c)
+}
+
+func (a *ThemeRouter) Preference(c *gin.Context) {
+	user, ok := base.GetCurrentUserInfo(c)
+	if !ok || user.ID == 0 {
+		response.ErrorByCode(c, constant.CodeNotLogin)
+		return
+	}
+	mode, err := theme.UserThemeModeV2(repository.Db, user.ID)
+	if err != nil {
+		response.ErrorDatabase(c, err.Error())
+		return
+	}
+	response.SuccessData(c, gin.H{"mode": mode})
 }
 
 func (a *ThemeRouter) ThemeGrantV2(c *gin.Context) {
@@ -245,6 +228,15 @@ func (a *ThemeRouter) ThemeGrantV2(c *gin.Context) {
 	}
 	grant, err := theme.GetGrantV2(repository.Db, user.ID, c.Param("revision"), "sandbox")
 	if errors.Is(err, gorm.ErrRecordNotFound) {
+		permissions, builtin, builtinErr := theme.ImplicitBuiltinPermissionsV2(repository.Db, c.Param("revision"))
+		if builtinErr != nil && !errors.Is(builtinErr, gorm.ErrRecordNotFound) {
+			response.ErrorDatabase(c, builtinErr.Error())
+			return
+		}
+		if builtinErr == nil && builtin {
+			response.SuccessData(c, gin.H{"revision": c.Param("revision"), "executionMode": "sandbox", "granted": true, "permissions": permissions})
+			return
+		}
 		response.SuccessData(c, gin.H{"revision": c.Param("revision"), "executionMode": "sandbox", "granted": false, "permissions": []string{}})
 		return
 	}
@@ -306,29 +298,20 @@ func (a *ThemeRouter) RevokeThemeGrantV2(c *gin.Context) {
 		response.ErrorByCode(c, constant.CodeNotLogin)
 		return
 	}
+	_, builtin, builtinErr := theme.ImplicitBuiltinPermissionsV2(repository.Db, c.Param("revision"))
+	if builtinErr == nil && builtin {
+		if err := theme.SaveGrantV2(repository.Db, theme.GrantRecordV2{UserID: user.ID, RevisionID: c.Param("revision"), ExecutionMode: "sandbox", PermissionsJSON: "[]"}); err != nil {
+			response.ErrorDatabase(c, err.Error())
+			return
+		}
+		response.Success(c)
+		return
+	}
 	if err := theme.RevokeGrantV2(repository.Db, user.ID, c.Param("revision"), "sandbox"); err != nil {
 		response.ErrorDatabase(c, err.Error())
 		return
 	}
 	response.Success(c)
-}
-
-func (a *ThemeRouter) List(c *gin.Context) {
-	list, err := theme.List(repository.Db)
-	if err != nil {
-		response.ErrorDatabase(c, err.Error())
-		return
-	}
-	defaultID, err := theme.DefaultID(repository.Db)
-	if err != nil {
-		response.ErrorDatabase(c, err.Error())
-		return
-	}
-	response.SuccessData(c, gin.H{"packages": list, "defaultPackage": defaultID})
-}
-
-func (a *ThemeRouter) Install(c *gin.Context) {
-	a.installPackageV2(c, false)
 }
 
 func (a *ThemeRouter) InstallV2(c *gin.Context) {
@@ -364,10 +347,6 @@ func (a *ThemeRouter) installPackageV2(c *gin.Context, preview bool) {
 		return
 	}
 	response.SuccessData(c, gin.H{"id": pkg.Manifest.ID, "revision": pkg.Revision, "verified": pkg.Verified, "preview": preview})
-}
-
-func (a *ThemeRouter) Preview(c *gin.Context) {
-	a.previewPackageV2(c)
 }
 
 func (a *ThemeRouter) PreviewV2(c *gin.Context) {
@@ -432,10 +411,6 @@ func (a *ThemeRouter) PreviewAssetV2(c *gin.Context) {
 	c.Data(http.StatusOK, asset.MediaType, asset.Content)
 }
 
-func (a *ThemeRouter) SetDefault(c *gin.Context) {
-	a.SetDefaultV2(c)
-}
-
 func (a *ThemeRouter) SetDefaultV2(c *gin.Context) {
 	var req struct {
 		Revision  string `json:"revision"`
@@ -466,10 +441,6 @@ func (a *ThemeRouter) SetDefaultV2(c *gin.Context) {
 	response.Success(c)
 }
 
-func (a *ThemeRouter) Remove(c *gin.Context) {
-	a.RemoveV2(c)
-}
-
 func (a *ThemeRouter) RemoveV2(c *gin.Context) {
 	user, _ := base.GetCurrentUserInfo(c)
 	if err := theme.RemovePackageV2(repository.Db, user.ID, c.Param("id")); err != nil {
@@ -490,10 +461,6 @@ func (a *ThemeRouter) Audit(c *gin.Context) {
 		return
 	}
 	response.SuccessData(c, rows)
-}
-
-func (a *ThemeRouter) Asset(c *gin.Context) {
-	a.AssetV2(c)
 }
 
 func (a *ThemeRouter) AssetV2(c *gin.Context) {
@@ -534,7 +501,25 @@ func (a *ThemeRouter) RevisionsV2(c *gin.Context) {
 		response.ErrorDatabase(c, defaultErr.Error())
 		return
 	}
-	response.SuccessData(c, gin.H{"packages": packages, "defaultPackage": defaultRevision.PackageID})
+	revisions, err := theme.ListPackageRevisionsV2(repository.Db)
+	if err != nil {
+		response.ErrorDatabase(c, err.Error())
+		return
+	}
+	activation, err := theme.GetActivationV2(repository.Db, theme.InstanceThemeScopeV2)
+	if err != nil {
+		response.ErrorDatabase(c, err.Error())
+		return
+	}
+	revisionSummaries := make([]gin.H, 0, len(revisions))
+	for _, revision := range revisions {
+		revisionSummaries = append(revisionSummaries, gin.H{"id": revision.ID, "packageId": revision.PackageID, "version": revision.Version, "verified": revision.Verified, "createdAt": revision.CreatedAt})
+	}
+	response.SuccessData(c, gin.H{
+		"packages": packages, "revisions": revisionSummaries, "defaultPackage": defaultRevision.PackageID,
+		"activeRevision": activation.ActiveRevisionID, "lastGoodRevision": activation.LastGoodRevisionID,
+		"pendingRevision": activation.PendingRevisionID, "trialStartedAt": activation.TrialStartedAt,
+	})
 }
 
 func (a *ThemeRouter) PackageByIDV2(c *gin.Context) {
@@ -568,7 +553,7 @@ func (a *ThemeRouter) BeginTrialV2(c *gin.Context) {
 		response.ErrorParamFomat(c, err.Error())
 		return
 	}
-	response.SuccessData(c, gin.H{"revision": revision.ID, "expiresInSeconds": 120})
+	response.SuccessData(c, gin.H{"revision": revision.ID, "expiresInSeconds": int(theme.ThemeTrialDurationV2.Seconds())})
 }
 
 func (a *ThemeRouter) ConfirmTrialV2(c *gin.Context) {
@@ -602,30 +587,6 @@ func (a *ThemeRouter) RollbackV2(c *gin.Context) {
 	response.Success(c)
 }
 
-func (a *ThemeRouter) PreviewAsset(c *gin.Context) {
-	name := strings.TrimPrefix(c.Param("name"), "/")
-	if name == "" || path.Clean(name) != name || strings.HasPrefix(name, "../") || strings.Contains(name, "\\") {
-		c.Status(http.StatusNotFound)
-		return
-	}
-	asset, err := theme.PreviewAsset(c.Param("token"), name)
-	if err != nil {
-		c.Status(http.StatusNotFound)
-		return
-	}
-	serveThemeAsset(c, asset.MediaType, asset.Content, name, false)
-}
-
-func (a *ThemeRouter) PreviewPackage(c *gin.Context) {
-	pkg, err := theme.PreviewPackage(c.Param("token"))
-	if err != nil {
-		c.Status(http.StatusNotFound)
-		return
-	}
-	c.Header("Cache-Control", "no-store")
-	response.SuccessData(c, pkg)
-}
-
 func (a *ThemeRouter) UploadWebWallpaper(c *gin.Context) {
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, theme.MaxWebWallpaper+(1<<20))
 	file, _, err := c.Request.FormFile("package")
@@ -651,7 +612,7 @@ func (a *ThemeRouter) UploadWebWallpaper(c *gin.Context) {
 	} else if record.PosterType == "image/webp" {
 		poster = "poster.webp"
 	}
-	root := "/api/theme/wallpaper/web/" + record.ID + "/"
+	root := "/api/theme/v2/wallpaper/web/" + record.ID + "/"
 	response.SuccessData(c, gin.H{"source": root + "index.html", "poster": root + poster})
 }
 
@@ -673,6 +634,9 @@ func serveThemeAsset(c *gin.Context, mediaType string, content []byte, name stri
 	}
 	if mediaType == "text/html" {
 		c.Header("Content-Security-Policy", "sandbox allow-scripts; default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; font-src 'none'; media-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'none'")
+		c.Header("Referrer-Policy", "no-referrer")
+	} else if mediaType == "image/svg+xml" {
+		c.Header("Content-Security-Policy", "sandbox; default-src 'none'; script-src 'none'; style-src 'unsafe-inline'; img-src data: blob:; object-src 'none'; form-action 'none'; base-uri 'none'")
 		c.Header("Referrer-Policy", "no-referrer")
 	}
 	c.Header("Content-Type", mediaType)

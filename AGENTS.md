@@ -8,10 +8,10 @@ For every code-change task, follow this order without asking the user to repeat 
 
 1. Inspect `git status --short` and relevant files.
 2. Make the smallest scoped change while preserving unrelated worktree changes.
-3. For frontend-only changes, run the frontend build only. Do not compile or restart the backend.
-4. For backend changes, build the frontend first only when the backend serves a changed frontend bundle; then format, test, and compile the backend.
-5. If the user asks to update the running local service, use `scripts/deploy-local.sh`, which performs the complete build, replacement, restart, and verification SOP. Do not use an external backup directory as an implicit deployment target.
-6. Report exact checks run and any skipped checks. Do not claim success from an unrun or failed check.
+3. By default, locally deploy every application code, configuration, or asset change with `scripts/deploy-local.sh`. It performs the frontend build, backend tests and compilation, replacement, restart, and HTTP verification. Do not use an external backup directory as an implicit deployment target.
+4. After deployment, report the local URL and verification results, then wait for the user to validate the running change. Do not commit before the user explicitly confirms that validation passed.
+5. Once the user confirms validation passed, automatically commit the approved, reviewed task changes locally on `<username>-dev`; do not ask for a second commit confirmation. Do not push, rebase, or backfill `master` unless explicitly requested.
+6. Respect explicit `不要部署` or `只改文件` requests by skipping deployment. Respect explicit `不要提交` or `暂不提交` requests by leaving the changes uncommitted. Report exact checks run and any skipped checks; do not claim success from an unrun or failed check.
 
 Do not stop at a plan when the user asked to execute. Do not re-ask for paths, build order, or restart procedure already specified here.
 
@@ -29,8 +29,9 @@ Every command must run in the directory stated by its `cd` or tool working-direc
 - For a dirty worktree, inspect the complete tracked diff and every untracked file, classify changes as task-related, existing user work, generated output, or unclear, and report that classification before staging anything. The default is to ask the user how to handle existing code; never stage, commit, stash, reset, discard, delete, or overwrite it without explicit approval.
 - If the user approves including existing code, stage only the reviewed files, keep one coherent feature together, inspect `git diff --cached --stat` and `git diff --cached --check`, then commit. If the user does not approve inclusion, preserve the original worktree and use a clean temporary worktree for the task and integration.
 - If the current local non-`master` branch is the intended development branch and the user requests normalization, rename that local branch to `<username>-dev`; do not recreate it from another commit or push it merely because it was renamed. Keep `<username>-dev` local by default and do not require a remote upstream.
-- Ordinary code-change tasks default to the **local commit** mode: after implementation and required verification, commit the approved changes on `<username>-dev` and stop. Do not automatically rebase, merge, or push.
-- The prompt `本地提交`, `只提交`, or `提交到开发分支` means local commit mode only. The prompt `不要提交`, `只改文件`, or `暂不提交` overrides the default and leaves the changes uncommitted after verification.
+- The default code-change lifecycle is **local deployment, user validation, then automatic local commit**. Deployment success alone is not user validation. Keep the task changes uncommitted while the user checks the running service.
+- The prompt `本地提交`, `只提交`, or `提交到开发分支` authorizes a local commit, but the default lifecycle still requires successful deployment and the user's explicit validation before committing. These prompts do not authorize push, rebase, or backfill. The prompt `不要提交` or `暂不提交` overrides automatic commit and leaves the changes uncommitted after verification.
+- The prompt `不要部署` or `只改文件` overrides default local deployment. Continue to preserve and verify the requested changes, but do not deploy them.
 - The prompt `回灌主分支`, `把代码回灌到 master`, or `走 Git 规范到远程 master` means the **backfill master** mode. Only then fetch the remote, rebase `<username>-dev`, fast-forward merge it into `master`, and push `master`.
 - The prompt `提交并回灌`, `完成 1-2`, or `提交后推送远程` means execute local commit mode followed by backfill master mode.
 - In local commit mode, after staging only the reviewed files, inspect `git diff --cached --stat` and `git diff --cached --check`, commit on `<username>-dev`, and verify the result with `git status --short --branch`, `git branch -vv`, and `git ls-remote --heads origin`. Do not switch to `master` or push as part of this mode.
@@ -134,6 +135,8 @@ For a combined release, run `scripts/deploy-local.sh`. It builds the frontend fi
 The local update SOP intentionally rebuilds and deploys both artifacts every time so the running frontend and backend cannot become version-mismatched.
 
 ## Local Deployment
+
+Local deployment is the default for application code, configuration, and asset changes. After a successful deployment, wait for the user's explicit validation before committing; once validated, commit the reviewed task files locally without asking again. Documentation-only changes that do not affect runtime artifacts do not require a deployment unless the user asks for one.
 
 The service runs from the repository `backend/` directory by default, with that directory as its working directory so `conf.yaml` is found. `YIN_PANEL_RUNTIME_DIR` can explicitly override the target. Never replace its database or uploads with repository copies.
 

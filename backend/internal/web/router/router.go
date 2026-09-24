@@ -6,6 +6,7 @@ import (
 
 	"github.com/yinorg/Yin-Panel/backend/internal/infra/config"
 	"github.com/yinorg/Yin-Panel/backend/internal/infra/zaplog"
+	"github.com/yinorg/Yin-Panel/backend/internal/web/interceptor"
 	"github.com/yinorg/Yin-Panel/backend/internal/web/router/panel"
 	"github.com/yinorg/Yin-Panel/backend/internal/web/router/system"
 	"github.com/yinorg/Yin-Panel/backend/pkg/extension"
@@ -58,6 +59,19 @@ func RouterArray() []IRouter {
 	}
 }
 
+func registerExtensionRoutes(routerGroup *gin.RouterGroup, modules []extension.Module) {
+	for _, module := range modules {
+		if module.RegisterRoutes != nil {
+			authenticated := routerGroup.Group("")
+			middleware := make([]gin.HandlerFunc, 0, 1+len(module.Middleware))
+			middleware = append(middleware, interceptor.Auth)
+			middleware = append(middleware, module.Middleware...)
+			authenticated.Use(middleware...)
+			module.RegisterRoutes(authenticated)
+		}
+	}
+}
+
 func InitRouters(addr string) error {
 	router := gin.Default()
 	rootRouter := router.Group("/")
@@ -67,11 +81,7 @@ func InitRouters(addr string) error {
 	for _, router := range RouterArray() {
 		router.InitRouter(routerGroup)
 	}
-	for _, module := range extension.Modules() {
-		if module.RegisterRoutes != nil {
-			module.RegisterRoutes(routerGroup)
-		}
-	}
+	registerExtensionRoutes(routerGroup, extension.Modules())
 	system.NewFileRouter().InitPublicRouter(rootRouter)
 
 	// WEB文件服务

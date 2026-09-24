@@ -1,21 +1,10 @@
-import { isThemeApiRequest, type ThemeApiRequest, type ThemeCommand, type ThemePermission } from './v1'
+import { isThemeApiRequest, type ThemeApiRequest, type ThemePermission } from './v1'
+import { requiredCommandPermission } from './permissions'
+import { executeThemeApiOperation, isThemeCommand, type ThemeApiOperationHandlers } from './operation'
 
 export type ThemeApiMethod = ThemeApiRequest['method']
 
-export interface ThemeApiHandlers {
-  executeCommand: (command: ThemeCommand, payload: Record<string, unknown>) => Promise<unknown> | unknown
-  searchItems: (query: string, options: { limit: number; cursor?: string }) => Promise<unknown> | unknown
-  listSpaces: (options: { limit: number; cursor?: string }) => Promise<unknown> | unknown
-  listGroups: (options: { limit: number; cursor?: string }) => Promise<unknown> | unknown
-  listItems: (options: { limit: number; cursor?: string; groupId?: string }) => Promise<unknown> | unknown
-  getMonitorSnapshot: () => Promise<unknown> | unknown
-  navigate: (destination: { view: string; spaceId?: string }) => Promise<unknown> | unknown
-  getSettings: () => Promise<Record<string, unknown>> | Record<string, unknown>
-  patchSettings: (value: Record<string, unknown>) => Promise<unknown> | unknown
-  getStorage: (key: string) => Promise<unknown> | unknown
-  setStorage: (key: string, value: unknown) => Promise<unknown> | unknown
-  removeStorage: (key: string) => Promise<unknown> | unknown
-}
+export type ThemeApiHandlers = ThemeApiOperationHandlers
 
 export interface ThemeApiResponse {
   protocol: 'yin-theme-api'
@@ -33,23 +22,6 @@ export interface ThemeApiDispatcherOptions {
   handlers: ThemeApiHandlers
   maxInFlight?: number
   timeoutMs?: number
-}
-
-const commandPermission: Partial<Record<ThemeCommand, ThemePermission>> = {
-  'space.select': 'spaces.read',
-  'space.toggleSide': 'spaces.read',
-  'item.open': 'items.read',
-  'item.create': 'items.write',
-  'item.update': 'items.write',
-  'item.delete': 'items.write',
-  'items.reorder': 'items.write',
-  'group.create': 'groups.write',
-  'group.update': 'groups.write',
-  'group.delete': 'groups.write',
-  'groups.reorder': 'groups.write',
-  'search.submit': 'items.read',
-  'data.refresh': 'groups.read',
-  'editor.open': 'items.write',
 }
 
 function failure(request: Pick<ThemeApiRequest, 'requestId' | 'contextVersion'>, code: string, message: string): ThemeApiResponse {
@@ -75,13 +47,22 @@ export function createThemeApiDispatcher(options: ThemeApiDispatcherOptions) {
 
     inFlight += 1
     let timer: ReturnType<typeof setTimeout> | undefined
+    const operation = executeThemeApiOperation(options.handlers, request)
+    void operation.then(
+      () => { inFlight -= 1 },
+      () => { inFlight -= 1 },
+    )
     try {
       const result = await Promise.race([
-        runHandler(request, options.handlers),
+        operation,
         new Promise<never>((_, reject) => {
           timer = setTimeout(() => reject(Object.assign(new Error('Theme API request timed out'), { code: 'TIMEOUT' })), timeoutMs)
         }),
       ])
+      if (isContextScopedRead(request) && request.contextVersion !== options.getContextVersion())
+        return failure(request, 'ABORTED', 'Theme context changed while the request was in progress')
+      if (permission && !options.getPermissions().has(permission))
+        return failure(request, 'PERMISSION_DENIED', `Theme permission was revoked: ${permission}`)
       return { protocol: 'yin-theme-api', version: 1, requestId: request.requestId, contextVersion: request.contextVersion, ok: true, result }
     }
     catch (error) {
@@ -91,9 +72,18 @@ export function createThemeApiDispatcher(options: ThemeApiDispatcherOptions) {
     }
     finally {
       if (timer) clearTimeout(timer)
-      inFlight -= 1
     }
   }
+}
+
+function isContextScopedRead(request: ThemeApiRequest): boolean {
+  return request.method === 'search.query'
+    || request.method === 'spaces.list'
+    || request.method === 'groups.list'
+    || request.method === 'items.list'
+    || request.method === 'monitor.getSnapshot'
+    || request.method === 'settings.get'
+    || request.method === 'storage.get'
 }
 
 function requiredPermission(request: ThemeApiRequest): ThemePermission | undefined {
@@ -101,8 +91,8 @@ function requiredPermission(request: ThemeApiRequest): ThemePermission | undefin
   if (request.method === 'settings.patch') return 'preferences.write'
   if (request.method === 'commands.execute') {
     const command = request.payload?.command
-    if (typeof command !== 'string') return 'items.read'
-    return commandPermission[command as ThemeCommand]
+    if (typeof command !== 'string' || !isThemeCommand(command)) return 'items.read'
+    return requiredCommandPermission(command)
   }
   if (request.method === 'search.query') return 'items.read'
   if (request.method === 'spaces.list') return 'spaces.read'
@@ -112,69 +102,4 @@ function requiredPermission(request: ThemeApiRequest): ThemePermission | undefin
   if (request.method === 'storage.get' || request.method === 'storage.set' || request.method === 'storage.remove')
     return 'theme.storage'
   return undefined
-}
-
-async function runHandler(request: ThemeApiRequest, handlers: ThemeApiHandlers): Promise<unknown> {
-  const payload = request.payload || {}
-  switch (request.method) {
-    case 'commands.execute': {
-      const command = payload.command
-      if (typeof command !== 'string' || !isThemeCommand(command)) throw Object.assign(new Error('Unknown theme command'), { code: 'INVALID_ARGUMENT' })
-      return handlers.executeCommand(command, payload.arguments && isRecord(payload.arguments) ? payload.arguments : {})
-    }
-    case 'search.query': {
-      if (typeof payload.query !== 'string' || payload.query.length > 200)
-        throw Object.assign(new Error('Search query must be a string of at most 200 characters'), { code: 'INVALID_ARGUMENT' })
-      const limit = payload.limit === undefined ? 50 : payload.limit
-      if (!Number.isSafeInteger(limit) || Number(limit) < 1 || Number(limit) > 100)
-        throw Object.assign(new Error('Search page limit must be between 1 and 100'), { code: 'INVALID_ARGUMENT' })
-      const cursor = payload.cursor
-      if (cursor !== undefined && (typeof cursor !== 'string' || !/^\d{1,12}$/.test(cursor)))
-        throw Object.assign(new Error('Search cursor is invalid'), { code: 'INVALID_ARGUMENT' })
-      return handlers.searchItems(payload.query, { limit: Number(limit), cursor })
-    }
-    case 'spaces.list':
-    case 'groups.list':
-    case 'items.list': {
-      const limit = payload.limit === undefined ? 50 : payload.limit
-      if (!Number.isSafeInteger(limit) || Number(limit) < 1 || Number(limit) > 100)
-        throw Object.assign(new Error('List page limit must be between 1 and 100'), { code: 'INVALID_ARGUMENT' })
-      const cursor = payload.cursor
-      if (cursor !== undefined && (typeof cursor !== 'string' || !/^\d{1,12}$/.test(cursor)))
-        throw Object.assign(new Error('List cursor is invalid'), { code: 'INVALID_ARGUMENT' })
-      if (request.method === 'spaces.list') return handlers.listSpaces({ limit: Number(limit), cursor })
-      if (request.method === 'groups.list') return handlers.listGroups({ limit: Number(limit), cursor })
-      const groupId = payload.groupId
-      if (groupId !== undefined && (typeof groupId !== 'string' || !/^\d{1,16}$/.test(groupId)))
-        throw Object.assign(new Error('Group ID is invalid'), { code: 'INVALID_ARGUMENT' })
-      return handlers.listItems({ limit: Number(limit), cursor, groupId })
-    }
-    case 'monitor.getSnapshot': return handlers.getMonitorSnapshot()
-    case 'navigation.navigate': {
-      if (typeof payload.view !== 'string' || payload.view.length > 100) throw Object.assign(new Error('Invalid navigation destination'), { code: 'INVALID_ARGUMENT' })
-      const spaceId = typeof payload.spaceId === 'string' ? payload.spaceId : undefined
-      return handlers.navigate({ view: payload.view, spaceId })
-    }
-    case 'settings.get': return handlers.getSettings()
-    case 'settings.patch':
-      if (!isRecord(payload.value)) throw Object.assign(new Error('Settings patch must be an object'), { code: 'INVALID_ARGUMENT' })
-      return handlers.patchSettings(payload.value)
-    case 'storage.get':
-    case 'storage.remove':
-    case 'storage.set': {
-      const key = payload.key
-      if (typeof key !== 'string' || key.length < 1 || key.length > 160) throw Object.assign(new Error('Invalid theme storage key'), { code: 'INVALID_ARGUMENT' })
-      if (request.method === 'storage.get') return handlers.getStorage(key)
-      if (request.method === 'storage.remove') return handlers.removeStorage(key)
-      return handlers.setStorage(key, payload.value)
-    }
-  }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && !Array.isArray(value)
-}
-
-function isThemeCommand(value: string): value is ThemeCommand {
-  return ['space.select', 'space.toggleSide', 'item.open', 'item.create', 'item.update', 'item.delete', 'items.reorder', 'group.create', 'group.update', 'group.delete', 'groups.reorder', 'search.submit', 'data.refresh', 'editor.open', 'commandCenter.open', 'ui.openCoreSurface'].includes(value)
 }

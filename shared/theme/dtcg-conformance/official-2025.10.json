@@ -1,0 +1,5197 @@
+{
+  "source": "https://github.com/design-tokens/community-group/tree/882ebd6716abef9a46d8ef5fb12e82009d6cee2e/test-suite/tests/2025.10/format",
+  "schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+  "cases": [
+    {
+      "id": "border-basic",
+      "name": "Basic border composite token",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Basic border with color, width, and style",
+        "border": {
+          "$type": "border",
+          "$value": {
+            "color": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            },
+            "width": {
+              "value": 0,
+              "unit": "px"
+            },
+            "style": "solid"
+          }
+        }
+      }
+    },
+    {
+      "id": "border-custom-dash",
+      "name": "Border with custom dash stroke style",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Border with custom dash array stroke style",
+        "border": {
+          "$type": "border",
+          "$value": {
+            "color": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            },
+            "width": {
+              "value": 0,
+              "unit": "px"
+            },
+            "style": {
+              "dashArray": [
+                {
+                  "value": 8,
+                  "unit": "px"
+                },
+                {
+                  "value": 4,
+                  "unit": "px"
+                }
+              ],
+              "lineCap": "round"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "border-dashed",
+      "name": "Border with dashed stroke style",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Border with dashed stroke style keyword",
+        "border": {
+          "$type": "border",
+          "$value": {
+            "color": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            },
+            "width": {
+              "value": 0,
+              "unit": "px"
+            },
+            "style": "dashed"
+          }
+        }
+      }
+    },
+    {
+      "id": "color-srgb-basic",
+      "name": "Basic sRGB color token",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Basic sRGB color",
+        "color": {
+          "$type": "color",
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [
+              1,
+              0,
+              0.5
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "color-srgb-with-alpha",
+      "name": "sRGB color with alpha transparency",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: sRGB color with alpha transparency",
+        "color": {
+          "$type": "color",
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [
+              0.2,
+              0.4,
+              0.8
+            ],
+            "alpha": 0.5
+          }
+        }
+      }
+    },
+    {
+      "id": "color-srgb-linear",
+      "name": "sRGB linear color space",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Color in srgb-linear color space",
+        "color": {
+          "$type": "color",
+          "$value": {
+            "colorSpace": "srgb-linear",
+            "components": [
+              0.5,
+              0.5,
+              0.5
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "color-hsl-basic",
+      "name": "HSL color space",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Color in HSL color space",
+        "color": {
+          "$type": "color",
+          "$value": {
+            "colorSpace": "hsl",
+            "components": [
+              180,
+              50,
+              50
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "color-hsl-with-none",
+      "name": "HSL color with 'none' keyword",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: HSL color with 'none' keyword for achromatic hue",
+        "color": {
+          "$type": "color",
+          "$value": {
+            "colorSpace": "hsl",
+            "components": [
+              "none",
+              0,
+              100
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "color-hwb-basic",
+      "name": "HWB color space",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Color in HWB color space",
+        "color": {
+          "$type": "color",
+          "$value": {
+            "colorSpace": "hwb",
+            "components": [
+              120,
+              20,
+              30
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "color-lab-basic",
+      "name": "LAB color space",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Color in LAB color space",
+        "color": {
+          "$type": "color",
+          "$value": {
+            "colorSpace": "lab",
+            "components": [
+              60.17,
+              93.54,
+              -60.5
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "color-lch-basic",
+      "name": "LCH color space",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Color in LCH color space",
+        "color": {
+          "$type": "color",
+          "$value": {
+            "colorSpace": "lch",
+            "components": [
+              60.17,
+              111.4,
+              327.11
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "color-oklab-basic",
+      "name": "OKLAB perceptual color space",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Color in OKLAB perceptual color space",
+        "color": {
+          "$type": "color",
+          "$value": {
+            "colorSpace": "oklab",
+            "components": [
+              0.701,
+              0.2746,
+              -0.169
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "color-oklch-basic",
+      "name": "OKLCH color space",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Color in OKLCH color space",
+        "color": {
+          "$type": "color",
+          "$value": {
+            "colorSpace": "oklch",
+            "components": [
+              0.7016,
+              0.3225,
+              328.363
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "color-display-p3",
+      "name": "Display P3 wide gamut color space",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Color in display-p3 wide gamut color space",
+        "color": {
+          "$type": "color",
+          "$value": {
+            "colorSpace": "display-p3",
+            "components": [
+              1,
+              0.5,
+              0
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "color-rec2020",
+      "name": "Rec2020 color space",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Color in rec2020 color space",
+        "color": {
+          "$type": "color",
+          "$value": {
+            "colorSpace": "rec2020",
+            "components": [
+              0.6,
+              0.8,
+              0.4
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "color-prophoto-rgb",
+      "name": "ProPhoto RGB color space",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Color in prophoto-rgb color space",
+        "color": {
+          "$type": "color",
+          "$value": {
+            "colorSpace": "prophoto-rgb",
+            "components": [
+              0.7,
+              0.3,
+              0.9
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "color-a98-rgb",
+      "name": "Adobe RGB 1998 color space",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Color in a98-rgb color space",
+        "color": {
+          "$type": "color",
+          "$value": {
+            "colorSpace": "a98-rgb",
+            "components": [
+              0.8,
+              0.2,
+              0.6
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "color-xyz-d50",
+      "name": "XYZ D50 color space",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Color in xyz-d50 color space",
+        "color": {
+          "$type": "color",
+          "$value": {
+            "colorSpace": "xyz-d50",
+            "components": [
+              0.5791,
+              0.2831,
+              0.728
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "color-xyz-d65",
+      "name": "XYZ D65 color space",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Color in xyz-d65 color space",
+        "color": {
+          "$type": "color",
+          "$value": {
+            "colorSpace": "xyz-d65",
+            "components": [
+              0.5929,
+              0.2848,
+              0.9699
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "color-alpha-fully-transparent",
+      "name": "Color with fully transparent alpha",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Color with fully transparent alpha value of 0",
+        "color": {
+          "$type": "color",
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [
+              0,
+              0,
+              0
+            ],
+            "alpha": 0
+          }
+        }
+      }
+    },
+    {
+      "id": "cubicBezier-basic",
+      "name": "Basic cubic Bezier easing function",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Basic cubic Bezier easing function",
+        "cubicBezier": {
+          "$type": "cubicBezier",
+          "$value": [
+            0.42,
+            0,
+            0.58,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "id": "cubicBezier-extreme-values",
+      "name": "Cubic Bezier with extreme Y values",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Cubic Bezier with Y values outside [0, 1] range",
+        "cubicBezier": {
+          "$type": "cubicBezier",
+          "$value": [
+            0.68,
+            -0.55,
+            0.265,
+            1.55
+          ]
+        }
+      }
+    },
+    {
+      "id": "dimension-px-basic",
+      "name": "Dimension with pixel unit",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Dimension with pixel unit",
+        "dimension": {
+          "$type": "dimension",
+          "$value": {
+            "value": 16,
+            "unit": "px"
+          }
+        }
+      }
+    },
+    {
+      "id": "dimension-rem-basic",
+      "name": "Dimension with rem unit",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Dimension with rem unit",
+        "dimension": {
+          "$type": "dimension",
+          "$value": {
+            "value": 2,
+            "unit": "rem"
+          }
+        }
+      }
+    },
+    {
+      "id": "dimension-fractional-value",
+      "name": "Dimension with fractional value",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Dimension with fractional value",
+        "dimension": {
+          "$type": "dimension",
+          "$value": {
+            "value": 0.5,
+            "unit": "rem"
+          }
+        }
+      }
+    },
+    {
+      "id": "dimension-zero-value",
+      "name": "Dimension with zero value",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Dimension with zero value",
+        "dimension": {
+          "$type": "dimension",
+          "$value": {
+            "value": 0,
+            "unit": "px"
+          }
+        }
+      }
+    },
+    {
+      "id": "dimension-extreme-values",
+      "name": "Dimension with extreme values",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Very large and very small dimension values",
+        "dimensions": {
+          "large": {
+            "$type": "dimension",
+            "$value": {
+              "value": 9999.99,
+              "unit": "px"
+            }
+          },
+          "tiny": {
+            "$type": "dimension",
+            "$value": {
+              "value": 0.001,
+              "unit": "rem"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "duration-milliseconds",
+      "name": "Duration in milliseconds",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Duration in milliseconds",
+        "duration": {
+          "$type": "duration",
+          "$value": {
+            "value": 300,
+            "unit": "ms"
+          }
+        }
+      }
+    },
+    {
+      "id": "duration-seconds",
+      "name": "Duration in seconds",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Duration in seconds",
+        "duration": {
+          "$type": "duration",
+          "$value": {
+            "value": 1.5,
+            "unit": "s"
+          }
+        }
+      }
+    },
+    {
+      "id": "duration-fractional-seconds",
+      "name": "Duration with fractional seconds",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Duration with fractional seconds",
+        "duration": {
+          "$type": "duration",
+          "$value": {
+            "value": 2.5,
+            "unit": "s"
+          }
+        }
+      }
+    },
+    {
+      "id": "duration-zero-ms",
+      "name": "Duration with zero milliseconds",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Duration with zero milliseconds",
+        "duration": {
+          "$type": "duration",
+          "$value": {
+            "value": 0,
+            "unit": "ms"
+          }
+        }
+      }
+    },
+    {
+      "id": "fontFamily-string",
+      "name": "Font family as single string",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Font family as single string",
+        "fontFamily": {
+          "$type": "fontFamily",
+          "$value": "Helvetica Neue"
+        }
+      }
+    },
+    {
+      "id": "fontFamily-array",
+      "name": "Font family as array with fallbacks",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Font family as array with fallbacks",
+        "fontFamily": {
+          "$type": "fontFamily",
+          "$value": [
+            "Arial",
+            "Helvetica",
+            "sans-serif"
+          ]
+        }
+      }
+    },
+    {
+      "id": "fontFamily-single-element",
+      "name": "Font family as single-element array",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Font family as single-element array",
+        "fontFamily": {
+          "$type": "fontFamily",
+          "$value": [
+            "Monaco"
+          ]
+        }
+      }
+    },
+    {
+      "id": "fontWeight-numeric",
+      "name": "Font weight as numeric value",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Font weight as numeric value",
+        "fontWeight": {
+          "$type": "fontWeight",
+          "$value": 700
+        }
+      }
+    },
+    {
+      "id": "fontWeight-string",
+      "name": "Font weight as string keyword",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Font weight as string keyword",
+        "fontWeight": {
+          "$type": "fontWeight",
+          "$value": "bold"
+        }
+      }
+    },
+    {
+      "id": "fontWeight-thin",
+      "name": "Font weight 'thin' keyword",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Font weight 'thin' keyword",
+        "fontWeight": {
+          "$type": "fontWeight",
+          "$value": "thin"
+        }
+      }
+    },
+    {
+      "id": "fontWeight-hairline",
+      "name": "Font weight 'hairline' keyword",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Font weight 'hairline' keyword",
+        "fontWeight": {
+          "$type": "fontWeight",
+          "$value": "hairline"
+        }
+      }
+    },
+    {
+      "id": "fontWeight-extra-bold",
+      "name": "Font weight 'extra-bold' keyword",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Font weight 'extra-bold' keyword",
+        "fontWeight": {
+          "$type": "fontWeight",
+          "$value": "extra-bold"
+        }
+      }
+    },
+    {
+      "id": "fontWeight-black",
+      "name": "Font weight 'black' keyword",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Font weight 'black' keyword",
+        "fontWeight": {
+          "$type": "fontWeight",
+          "$value": "black"
+        }
+      }
+    },
+    {
+      "id": "fontWeight-ultra-black",
+      "name": "Font weight 'ultra-black' keyword",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Font weight 'ultra-black' keyword",
+        "fontWeight": {
+          "$type": "fontWeight",
+          "$value": "ultra-black"
+        }
+      }
+    },
+    {
+      "id": "fontWeight-extreme",
+      "name": "Font weight extreme numeric values",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Minimum and maximum numeric font weight values",
+        "fontWeights": {
+          "min": {
+            "$type": "fontWeight",
+            "$value": 1
+          },
+          "max": {
+            "$type": "fontWeight",
+            "$value": 1000
+          }
+        }
+      }
+    },
+    {
+      "id": "gradient-basic",
+      "name": "Basic gradient with two stops",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Basic gradient with two color stops",
+        "gradient": {
+          "$type": "gradient",
+          "$value": [
+            {
+              "color": {
+                "colorSpace": "srgb",
+                "components": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "position": 0
+            },
+            {
+              "color": {
+                "colorSpace": "srgb",
+                "components": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "position": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "gradient-three-stop",
+      "name": "Gradient with three stops",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Gradient with three color stops",
+        "gradient": {
+          "$type": "gradient",
+          "$value": [
+            {
+              "color": {
+                "colorSpace": "srgb",
+                "components": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "position": 0
+            },
+            {
+              "color": {
+                "colorSpace": "srgb",
+                "components": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "position": 0.5
+            },
+            {
+              "color": {
+                "colorSpace": "srgb",
+                "components": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "position": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "gradient-single-stop",
+      "name": "Gradient with single stop",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Gradient with a single color stop",
+        "gradient": {
+          "$type": "gradient",
+          "$value": [
+            {
+              "color": {
+                "colorSpace": "srgb",
+                "components": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "position": 0.5
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "gradient-missing-start",
+      "name": "Gradient with positions not starting at 0",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Gradient with positions not starting at 0",
+        "gradient": {
+          "$type": "gradient",
+          "$value": [
+            {
+              "color": {
+                "colorSpace": "srgb",
+                "components": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "position": 0.666
+            },
+            {
+              "color": {
+                "colorSpace": "srgb",
+                "components": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "position": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "group-nested-groups",
+      "name": "Nested token groups",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Deeply nested groups with type inheritance",
+        "colors": {
+          "$type": "color",
+          "nested": {
+            "deep": {
+              "veryDeep": {
+                "color": {
+                  "$value": {
+                    "colorSpace": "srgb",
+                    "components": [
+                      0,
+                      0,
+                      0
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "group-empty-group",
+      "name": "Empty token group",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Empty group without any tokens",
+        "empty-group": {}
+      }
+    },
+    {
+      "id": "group-root-token",
+      "name": "Token at root level",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Group with $root token providing a base value",
+        "group": {
+          "$type": "color",
+          "$root": {
+            "$value": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            }
+          },
+          "light": {
+            "$value": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            }
+          },
+          "dark": {
+            "$value": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "group-type-inheritance",
+      "name": "Type inheritance from parent group",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Tokens inherit $type from parent group",
+        "colors": {
+          "$type": "color",
+          "primary": {
+            "$value": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            }
+          },
+          "secondary": {
+            "$value": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "group-extends",
+      "name": "Group with $extends",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Group using $extends to inherit tokens",
+        "base-button": {
+          "$type": "color",
+          "background": {
+            "$value": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            }
+          },
+          "text": {
+            "$value": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            }
+          }
+        },
+        "primary-button": {
+          "$extends": "{base-button}",
+          "background": {
+            "$value": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "group-extends-nested-override",
+      "name": "Group $extends with nested override",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Group $extends with nested overrides",
+        "base-theme": {
+          "$type": "color",
+          "primary": {
+            "$value": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            }
+          },
+          "secondary": {
+            "$value": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            }
+          }
+        },
+        "dark-theme": {
+          "$extends": "{base-theme}",
+          "primary": {
+            "$value": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "group-multi-level-extends",
+      "name": "Multi-level $extends inheritance",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Multi-level $extends inheritance chain",
+        "base-component": {
+          "$type": "color",
+          "background": {
+            "$value": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            }
+          },
+          "text": {
+            "$value": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            }
+          }
+        },
+        "button": {
+          "$extends": "{base-component}",
+          "background": {
+            "$value": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            }
+          }
+        },
+        "primary-button": {
+          "$extends": "{button}",
+          "background": {
+            "$value": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "metadata-deprecated-boolean",
+      "name": "Token with $deprecated as boolean",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Token with $deprecated as boolean",
+        "color": {
+          "$type": "color",
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [
+              0,
+              0,
+              0
+            ]
+          },
+          "$deprecated": true
+        }
+      }
+    },
+    {
+      "id": "metadata-deprecated-string",
+      "name": "Token with $deprecated as string",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Token with $deprecated as string message",
+        "dimension": {
+          "$type": "dimension",
+          "$value": {
+            "value": 0,
+            "unit": "px"
+          },
+          "$deprecated": "Use spacing.base instead"
+        }
+      }
+    },
+    {
+      "id": "metadata-with-extensions",
+      "name": "Token with $extensions",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Token with $extensions for tool-specific metadata",
+        "color": {
+          "$type": "color",
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [
+              0,
+              0,
+              0
+            ]
+          },
+          "$extensions": {
+            "com.example.tool": {
+              "customProperty": "value"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "number-positive",
+      "name": "Positive number",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Positive number value",
+        "number": {
+          "$type": "number",
+          "$value": 1.5
+        }
+      }
+    },
+    {
+      "id": "number-negative",
+      "name": "Negative number",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Negative number value",
+        "number": {
+          "$type": "number",
+          "$value": -5
+        }
+      }
+    },
+    {
+      "id": "number-zero",
+      "name": "Zero number",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Zero number value",
+        "number": {
+          "$type": "number",
+          "$value": 0
+        }
+      }
+    },
+    {
+      "id": "reference-curly-brace-alias",
+      "name": "Curly brace reference (alias)",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Curly brace reference (alias) to another token",
+        "colors": {
+          "$type": "color",
+          "blue": {
+            "$value": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            }
+          }
+        },
+        "semantic": {
+          "primary": {
+            "$type": "color",
+            "$value": "{colors.blue}"
+          }
+        }
+      }
+    },
+    {
+      "id": "reference-json-pointer-basic",
+      "name": "JSON Pointer reference",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: JSON Pointer reference using $ref",
+        "colors": {
+          "$type": "color",
+          "blue": {
+            "$value": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            }
+          }
+        },
+        "semantic": {
+          "primary": {
+            "$type": "color",
+            "$ref": "#/colors/blue/$value"
+          }
+        }
+      }
+    },
+    {
+      "id": "reference-json-pointer-subproperty",
+      "name": "JSON Pointer to token subproperty",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: JSON Pointer to a sub-property within a token value",
+        "colors": {
+          "$type": "color",
+          "color": {
+            "$value": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            }
+          }
+        },
+        "numbers": {
+          "component": {
+            "$type": "number",
+            "$ref": "#/colors/color/$value/components/0"
+          }
+        }
+      }
+    },
+    {
+      "id": "reference-color-components-array-ref",
+      "name": "JSON Pointer to entire color components array",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: JSON Pointer reference to entire color components array",
+        "colors": {
+          "$type": "color",
+          "base": {
+            "$value": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            }
+          },
+          "derived": {
+            "$value": {
+              "colorSpace": "srgb",
+              "components": {
+                "$ref": "#/colors/base/$value/components"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "reference-strokestyle-dasharray-ref",
+      "name": "JSON Pointer to entire strokeStyle dashArray",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: JSON Pointer reference to entire strokeStyle dashArray",
+        "strokeStyles": {
+          "$type": "strokeStyle",
+          "base": {
+            "$value": {
+              "dashArray": [
+                {
+                  "value": 0,
+                  "unit": "px"
+                },
+                {
+                  "value": 0,
+                  "unit": "px"
+                }
+              ],
+              "lineCap": "round"
+            }
+          },
+          "derived": {
+            "$value": {
+              "dashArray": {
+                "$ref": "#/strokeStyles/base/$value/dashArray"
+              },
+              "lineCap": "butt"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "reference-color-components-ref-hsl",
+      "name": "JSON Pointer to entire HSL color components array",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: JSON Pointer reference to entire color components array with HSL color space",
+        "colors": {
+          "$type": "color",
+          "base": {
+            "$value": {
+              "colorSpace": "hsl",
+              "components": [
+                120,
+                50,
+                50
+              ]
+            }
+          },
+          "derived": {
+            "$value": {
+              "colorSpace": "hsl",
+              "components": {
+                "$ref": "#/colors/base/$value/components"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "reference-chained-reference",
+      "name": "Chained reference",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Chained reference (reference to a reference)",
+        "colors": {
+          "$type": "color",
+          "blue": {
+            "$value": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            }
+          }
+        },
+        "semantic": {
+          "primary": {
+            "$type": "color",
+            "$value": "{colors.blue}"
+          }
+        },
+        "aliases": {
+          "brand": {
+            "$type": "color",
+            "$value": "{semantic.primary}"
+          }
+        }
+      }
+    },
+    {
+      "id": "reference-composite-with-refs",
+      "name": "Composite token with references",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Composite token properties referencing other tokens",
+        "colors": {
+          "$type": "color",
+          "black": {
+            "$value": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            }
+          }
+        },
+        "dimensions": {
+          "$type": "dimension",
+          "small": {
+            "$value": {
+              "value": 0,
+              "unit": "px"
+            }
+          }
+        },
+        "shadows": {
+          "$type": "shadow",
+          "default": {
+            "$value": {
+              "color": "{colors.black}",
+              "offsetX": "{dimensions.small}",
+              "offsetY": "{dimensions.small}",
+              "blur": {
+                "value": 0,
+                "unit": "px"
+              },
+              "spread": {
+                "value": 0,
+                "unit": "px"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "reference-composite-subvalue-refs",
+      "name": "Reference to composite subvalue",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: JSON Pointer references to sub-values of composite tokens",
+        "base-shadow": {
+          "$type": "shadow",
+          "$value": {
+            "color": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            },
+            "offsetX": {
+              "value": 0,
+              "unit": "px"
+            },
+            "offsetY": {
+              "value": 0,
+              "unit": "px"
+            },
+            "blur": {
+              "value": 0,
+              "unit": "px"
+            },
+            "spread": {
+              "value": 0,
+              "unit": "px"
+            }
+          }
+        },
+        "shadow-color-only": {
+          "$type": "color",
+          "$ref": "#/base-shadow/$value/color"
+        },
+        "shadow-blur-only": {
+          "$type": "dimension",
+          "$ref": "#/base-shadow/$value/blur"
+        },
+        "shadow-offsetX-value": {
+          "$type": "number",
+          "$ref": "#/base-shadow/$value/offsetX/value"
+        }
+      }
+    },
+    {
+      "id": "reference-nested-composite-refs",
+      "name": "Nested composite references",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: References to deeply nested sub-values within composite tokens",
+        "base-border": {
+          "$type": "border",
+          "$value": {
+            "color": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            },
+            "width": {
+              "value": 0,
+              "unit": "px"
+            },
+            "style": {
+              "dashArray": [
+                {
+                  "value": 0,
+                  "unit": "px"
+                },
+                {
+                  "value": 0,
+                  "unit": "px"
+                }
+              ],
+              "lineCap": "round"
+            }
+          }
+        },
+        "stroke-from-border": {
+          "$type": "strokeStyle",
+          "$ref": "#/base-border/$value/style"
+        },
+        "dimension-from-dash-array": {
+          "$type": "dimension",
+          "$ref": "#/base-border/$value/style/dashArray/0"
+        },
+        "base-transition": {
+          "$type": "transition",
+          "$value": {
+            "duration": {
+              "value": 0,
+              "unit": "ms"
+            },
+            "delay": {
+              "value": 0,
+              "unit": "ms"
+            },
+            "timingFunction": [
+              0,
+              0,
+              1,
+              1
+            ]
+          }
+        },
+        "duration-from-transition": {
+          "$type": "duration",
+          "$ref": "#/base-transition/$value/duration"
+        },
+        "easing-from-transition": {
+          "$type": "cubicBezier",
+          "$ref": "#/base-transition/$value/timingFunction"
+        }
+      }
+    },
+    {
+      "id": "reference-cross-composite-refs",
+      "name": "Cross-composite references",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Composite tokens reusing sub-values from other composite tokens",
+        "base-shadow": {
+          "$type": "shadow",
+          "$value": {
+            "color": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            },
+            "offsetX": {
+              "value": 0,
+              "unit": "px"
+            },
+            "offsetY": {
+              "value": 0,
+              "unit": "px"
+            },
+            "blur": {
+              "value": 0,
+              "unit": "px"
+            },
+            "spread": {
+              "value": 0,
+              "unit": "px"
+            }
+          }
+        },
+        "border-reusing-shadow-color": {
+          "$type": "border",
+          "$value": {
+            "color": {
+              "$ref": "#/base-shadow/$value/color"
+            },
+            "width": {
+              "$ref": "#/base-shadow/$value/spread"
+            },
+            "style": "solid"
+          }
+        },
+        "dimension-from-shadow": {
+          "$type": "dimension",
+          "$ref": "#/base-shadow/$value/offsetY"
+        }
+      }
+    },
+    {
+      "id": "reference-multi-source-composite",
+      "name": "Composite with multiple reference sources",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Composite token assembled from multiple source tokens",
+        "base-gradient": {
+          "$type": "gradient",
+          "$value": [
+            {
+              "color": {
+                "colorSpace": "srgb",
+                "components": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "position": 0
+            },
+            {
+              "color": {
+                "colorSpace": "srgb",
+                "components": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "position": 1
+            }
+          ]
+        },
+        "base-border": {
+          "$type": "border",
+          "$value": {
+            "color": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            },
+            "width": {
+              "value": 0,
+              "unit": "px"
+            },
+            "style": {
+              "dashArray": [
+                {
+                  "value": 0,
+                  "unit": "px"
+                }
+              ],
+              "lineCap": "round"
+            }
+          }
+        },
+        "base-shadow": {
+          "$type": "shadow",
+          "$value": {
+            "color": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            },
+            "offsetX": {
+              "value": 0,
+              "unit": "px"
+            },
+            "offsetY": {
+              "value": 0,
+              "unit": "px"
+            },
+            "blur": {
+              "value": 0,
+              "unit": "px"
+            },
+            "spread": {
+              "value": 0,
+              "unit": "px"
+            }
+          }
+        },
+        "complex-shadow-from-multiple-sources": {
+          "$type": "shadow",
+          "$value": {
+            "color": {
+              "$ref": "#/base-gradient/$value/0/color"
+            },
+            "offsetX": {
+              "$ref": "#/base-border/$value/width"
+            },
+            "offsetY": {
+              "$ref": "#/base-shadow/$value/offsetY"
+            },
+            "blur": {
+              "$ref": "#/base-border/$value/style/dashArray/0"
+            },
+            "spread": {
+              "value": 0,
+              "unit": "px"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "reference-gradient-array-refs",
+      "name": "Gradient with array element references",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: JSON Pointer references to gradient array elements",
+        "base-gradient": {
+          "$type": "gradient",
+          "$value": [
+            {
+              "color": {
+                "colorSpace": "srgb",
+                "components": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "position": 0
+            },
+            {
+              "color": {
+                "colorSpace": "srgb",
+                "components": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "position": 1
+            }
+          ]
+        },
+        "color-from-gradient-start": {
+          "$type": "color",
+          "$ref": "#/base-gradient/$value/0/color"
+        },
+        "color-from-gradient-end": {
+          "$type": "color",
+          "$ref": "#/base-gradient/$value/1/color"
+        },
+        "position-from-gradient": {
+          "$type": "number",
+          "$ref": "#/base-gradient/$value/1/position"
+        }
+      }
+    },
+    {
+      "id": "reference-typography-property-refs",
+      "name": "Typography with property references",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Extracting individual properties from typography via JSON Pointer",
+        "base-typography": {
+          "$type": "typography",
+          "$value": {
+            "fontFamily": "sans-serif",
+            "fontSize": {
+              "value": 0,
+              "unit": "px"
+            },
+            "fontWeight": 400,
+            "letterSpacing": {
+              "value": 0,
+              "unit": "px"
+            },
+            "lineHeight": 0
+          }
+        },
+        "extracted-font-family": {
+          "$type": "fontFamily",
+          "$ref": "#/base-typography/$value/fontFamily"
+        },
+        "extracted-font-size": {
+          "$type": "dimension",
+          "$ref": "#/base-typography/$value/fontSize"
+        },
+        "extracted-line-height": {
+          "$type": "number",
+          "$ref": "#/base-typography/$value/lineHeight"
+        },
+        "typography-inheriting-parts": {
+          "$type": "typography",
+          "$value": {
+            "fontFamily": {
+              "$ref": "#/base-typography/$value/fontFamily"
+            },
+            "fontSize": {
+              "value": 0,
+              "unit": "px"
+            },
+            "fontWeight": 700,
+            "letterSpacing": {
+              "$ref": "#/base-typography/$value/letterSpacing"
+            },
+            "lineHeight": {
+              "$ref": "#/base-typography/$value/lineHeight"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "shadow-basic",
+      "name": "Basic shadow composite token",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Basic shadow with all required properties",
+        "shadow": {
+          "$type": "shadow",
+          "$value": {
+            "color": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            },
+            "offsetX": {
+              "value": 0,
+              "unit": "px"
+            },
+            "offsetY": {
+              "value": 0,
+              "unit": "px"
+            },
+            "blur": {
+              "value": 0,
+              "unit": "px"
+            },
+            "spread": {
+              "value": 0,
+              "unit": "px"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "shadow-array",
+      "name": "Shadow as array (multiple shadows)",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Shadow as array of multiple shadow layers",
+        "shadow": {
+          "$type": "shadow",
+          "$value": [
+            {
+              "color": {
+                "colorSpace": "srgb",
+                "components": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "offsetX": {
+                "value": 0,
+                "unit": "px"
+              },
+              "offsetY": {
+                "value": 0,
+                "unit": "px"
+              },
+              "blur": {
+                "value": 0,
+                "unit": "px"
+              },
+              "spread": {
+                "value": 0,
+                "unit": "px"
+              }
+            },
+            {
+              "color": {
+                "colorSpace": "srgb",
+                "components": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "offsetX": {
+                "value": 0,
+                "unit": "px"
+              },
+              "offsetY": {
+                "value": 0,
+                "unit": "px"
+              },
+              "blur": {
+                "value": 0,
+                "unit": "px"
+              },
+              "spread": {
+                "value": 0,
+                "unit": "px"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "shadow-with-inset",
+      "name": "Shadow with inset property",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Shadow with optional inset property",
+        "shadow": {
+          "$type": "shadow",
+          "$value": {
+            "color": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            },
+            "offsetX": {
+              "value": 0,
+              "unit": "px"
+            },
+            "offsetY": {
+              "value": 0,
+              "unit": "px"
+            },
+            "blur": {
+              "value": 0,
+              "unit": "px"
+            },
+            "spread": {
+              "value": 0,
+              "unit": "px"
+            },
+            "inset": true
+          }
+        }
+      }
+    },
+    {
+      "id": "strokeStyle-solid",
+      "name": "Solid stroke style",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Stroke style 'solid' keyword",
+        "strokeStyle": {
+          "$type": "strokeStyle",
+          "$value": "solid"
+        }
+      }
+    },
+    {
+      "id": "strokeStyle-dashed",
+      "name": "Dashed stroke style",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Stroke style 'dashed' keyword",
+        "strokeStyle": {
+          "$type": "strokeStyle",
+          "$value": "dashed"
+        }
+      }
+    },
+    {
+      "id": "strokeStyle-dotted",
+      "name": "Dotted stroke style",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Stroke style 'dotted' keyword",
+        "strokeStyle": {
+          "$type": "strokeStyle",
+          "$value": "dotted"
+        }
+      }
+    },
+    {
+      "id": "strokeStyle-double",
+      "name": "Double stroke style",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Stroke style 'double' keyword",
+        "strokeStyle": {
+          "$type": "strokeStyle",
+          "$value": "double"
+        }
+      }
+    },
+    {
+      "id": "strokeStyle-groove",
+      "name": "Groove stroke style",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Stroke style 'groove' keyword",
+        "strokeStyle": {
+          "$type": "strokeStyle",
+          "$value": "groove"
+        }
+      }
+    },
+    {
+      "id": "strokeStyle-ridge",
+      "name": "Ridge stroke style",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Stroke style 'ridge' keyword",
+        "strokeStyle": {
+          "$type": "strokeStyle",
+          "$value": "ridge"
+        }
+      }
+    },
+    {
+      "id": "strokeStyle-inset",
+      "name": "Inset stroke style",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Stroke style 'inset' keyword",
+        "strokeStyle": {
+          "$type": "strokeStyle",
+          "$value": "inset"
+        }
+      }
+    },
+    {
+      "id": "strokeStyle-outset",
+      "name": "Outset stroke style",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Stroke style 'outset' keyword",
+        "strokeStyle": {
+          "$type": "strokeStyle",
+          "$value": "outset"
+        }
+      }
+    },
+    {
+      "id": "strokeStyle-custom-dash",
+      "name": "Custom dash stroke style",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Custom dash pattern with round lineCap",
+        "strokeStyle": {
+          "$type": "strokeStyle",
+          "$value": {
+            "dashArray": [
+              {
+                "value": 0,
+                "unit": "px"
+              },
+              {
+                "value": 0,
+                "unit": "px"
+              }
+            ],
+            "lineCap": "round"
+          }
+        }
+      }
+    },
+    {
+      "id": "strokeStyle-custom-dash-butt-cap",
+      "name": "Custom dash with butt line cap",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Custom dash pattern with butt lineCap",
+        "strokeStyle": {
+          "$type": "strokeStyle",
+          "$value": {
+            "dashArray": [
+              {
+                "value": 0,
+                "unit": "px"
+              },
+              {
+                "value": 0,
+                "unit": "px"
+              }
+            ],
+            "lineCap": "butt"
+          }
+        }
+      }
+    },
+    {
+      "id": "strokeStyle-custom-dash-square-cap",
+      "name": "Custom dash with square line cap",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Custom dash pattern with square lineCap",
+        "strokeStyle": {
+          "$type": "strokeStyle",
+          "$value": {
+            "dashArray": [
+              {
+                "value": 0,
+                "unit": "px"
+              },
+              {
+                "value": 0,
+                "unit": "px"
+              }
+            ],
+            "lineCap": "square"
+          }
+        }
+      }
+    },
+    {
+      "id": "transition-basic",
+      "name": "Basic transition composite token",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Basic transition with duration, delay, and timing function",
+        "transition": {
+          "$type": "transition",
+          "$value": {
+            "duration": {
+              "value": 0,
+              "unit": "ms"
+            },
+            "delay": {
+              "value": 0,
+              "unit": "ms"
+            },
+            "timingFunction": [
+              0,
+              0,
+              1,
+              1
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "transition-with-delay",
+      "name": "Transition with non-zero delay",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Transition with non-zero delay",
+        "transition": {
+          "$type": "transition",
+          "$value": {
+            "duration": {
+              "value": 0,
+              "unit": "ms"
+            },
+            "delay": {
+              "value": 500,
+              "unit": "ms"
+            },
+            "timingFunction": [
+              0,
+              0,
+              1,
+              1
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "typography-basic",
+      "name": "Basic typography composite token",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Basic typography with all required properties",
+        "typography": {
+          "$type": "typography",
+          "$value": {
+            "fontFamily": "sans-serif",
+            "fontSize": {
+              "value": 0,
+              "unit": "px"
+            },
+            "fontWeight": 400,
+            "letterSpacing": {
+              "value": 0,
+              "unit": "px"
+            },
+            "lineHeight": 0
+          }
+        }
+      }
+    },
+    {
+      "id": "typography-string-weight",
+      "name": "Typography with string font weight",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Typography with string font weight keyword",
+        "typography": {
+          "$type": "typography",
+          "$value": {
+            "fontFamily": "sans-serif",
+            "fontSize": {
+              "value": 0,
+              "unit": "px"
+            },
+            "fontWeight": "normal",
+            "letterSpacing": {
+              "value": 0,
+              "unit": "px"
+            },
+            "lineHeight": 0
+          }
+        }
+      }
+    },
+    {
+      "id": "typography-rem-fontsize",
+      "name": "Typography with rem font size",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Typography with rem font size",
+        "typography": {
+          "$type": "typography",
+          "$value": {
+            "fontFamily": "sans-serif",
+            "fontSize": {
+              "value": 0.875,
+              "unit": "rem"
+            },
+            "fontWeight": 400,
+            "letterSpacing": {
+              "value": 0,
+              "unit": "px"
+            },
+            "lineHeight": 0
+          }
+        }
+      }
+    },
+    {
+      "id": "typography-negative-letterspacing",
+      "name": "Typography with negative letter spacing",
+      "valid": true,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "POSITIVE: Typography with negative letter spacing",
+        "typography": {
+          "$type": "typography",
+          "$value": {
+            "fontFamily": "sans-serif",
+            "fontSize": {
+              "value": 0,
+              "unit": "px"
+            },
+            "fontWeight": 400,
+            "letterSpacing": {
+              "value": -0.5,
+              "unit": "px"
+            },
+            "lineHeight": 0
+          }
+        }
+      }
+    },
+    {
+      "id": "border-composite-color-wrong-type",
+      "name": "Border with wrong color type",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Border color sub-value has wrong type (string instead of color object)",
+        "invalid-border": {
+          "$type": "border",
+          "$value": {
+            "color": "red",
+            "width": {
+              "value": 0,
+              "unit": "px"
+            },
+            "style": "solid"
+          }
+        }
+      }
+    },
+    {
+      "id": "border-missing-color",
+      "name": "Border missing color property",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Border missing required color property",
+        "invalid-border": {
+          "$type": "border",
+          "$value": {
+            "width": {
+              "value": 0,
+              "unit": "px"
+            },
+            "style": "solid"
+          }
+        }
+      }
+    },
+    {
+      "id": "border-missing-style",
+      "name": "Border missing style property",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Border missing required style property",
+        "invalid-border": {
+          "$type": "border",
+          "$value": {
+            "color": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            },
+            "width": {
+              "value": 0,
+              "unit": "px"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "border-missing-width",
+      "name": "Border missing width property",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Border missing required width property",
+        "invalid-border": {
+          "$type": "border",
+          "$value": {
+            "color": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            },
+            "style": "solid"
+          }
+        }
+      }
+    },
+    {
+      "id": "border-style-wrong-type",
+      "name": "Border with invalid style type",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Border style must be string or strokeStyle object, not number",
+        "invalid-border": {
+          "$type": "border",
+          "$value": {
+            "color": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            },
+            "width": {
+              "value": 0,
+              "unit": "px"
+            },
+            "style": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "border-wrong-color-type",
+      "name": "Border with string instead of color object",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Border color must be a color value, not a string",
+        "invalid-border": {
+          "$type": "border",
+          "$value": {
+            "color": "#ff0000",
+            "width": {
+              "value": 0,
+              "unit": "px"
+            },
+            "style": "solid"
+          }
+        }
+      }
+    },
+    {
+      "id": "color-alpha-out-of-range",
+      "name": "Color with alpha out of valid range",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Alpha must be in range [0, 1], value 1.5 exceeds maximum",
+        "invalid-color": {
+          "$type": "color",
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [
+              0,
+              0,
+              0
+            ],
+            "alpha": 1.5
+          }
+        }
+      }
+    },
+    {
+      "id": "color-component-out-of-range",
+      "name": "Color with component out of valid range",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: sRGB component values must be in range [0, 1], value 2 exceeds maximum",
+        "invalid-color": {
+          "$type": "color",
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [
+              0,
+              0,
+              2
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "color-components-not-array",
+      "name": "Color with components as non-array",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Color components must be an array, not an object",
+        "invalid-color": {
+          "$type": "color",
+          "$value": {
+            "colorSpace": "srgb",
+            "components": {
+              "red": 1,
+              "green": 0,
+              "blue": 0
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "color-hex-not-string",
+      "name": "Color with hex as non-string",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Hex fallback must be a string, not a number",
+        "invalid-color": {
+          "$type": "color",
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [
+              0,
+              0,
+              0
+            ],
+            "hex": 16711680
+          }
+        }
+      }
+    },
+    {
+      "id": "color-hex-with-alpha",
+      "name": "Color hex includes alpha channel",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Hex fallback must not include alpha channel (8-digit format)",
+        "invalid-color": {
+          "$type": "color",
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [
+              0,
+              0,
+              0
+            ],
+            "alpha": 0.5,
+            "hex": "#ff000080"
+          }
+        }
+      }
+    },
+    {
+      "id": "color-hex-wrong-format",
+      "name": "Color with malformed hex value",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Hex fallback must be 6-digit format, not 3-digit",
+        "invalid-color": {
+          "$type": "color",
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [
+              0,
+              0,
+              0
+            ],
+            "hex": "#f00"
+          }
+        }
+      }
+    },
+    {
+      "id": "color-missing-colorSpace",
+      "name": "Color missing colorSpace property",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Color value missing required colorSpace property",
+        "invalid-color": {
+          "$type": "color",
+          "$value": {
+            "components": [
+              0,
+              0,
+              0
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "color-missing-components",
+      "name": "Color missing components array",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Color value missing required components array",
+        "invalid-color": {
+          "$type": "color",
+          "$value": {
+            "colorSpace": "srgb"
+          }
+        }
+      }
+    },
+    {
+      "id": "color-mixed-none-and-invalid",
+      "name": "Color with 'none' and invalid value",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Component must be a number or 'none', not an arbitrary string",
+        "invalid-color": {
+          "$type": "color",
+          "$value": {
+            "colorSpace": "hsl",
+            "components": [
+              "none",
+              "not-a-number",
+              50
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "color-negative-alpha",
+      "name": "Color with negative alpha value",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Alpha cannot be negative",
+        "invalid-color": {
+          "$type": "color",
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [
+              0,
+              0,
+              0
+            ],
+            "alpha": -0.5
+          }
+        }
+      }
+    },
+    {
+      "id": "color-negative-component",
+      "name": "Color with negative component value",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: sRGB component cannot be negative",
+        "invalid-color": {
+          "$type": "color",
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [
+              -0.5,
+              0,
+              0
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "color-unknown-colorSpace",
+      "name": "Color with unsupported color space",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: 'cmyk' is not a supported color space",
+        "invalid-color": {
+          "$type": "color",
+          "$value": {
+            "colorSpace": "cmyk",
+            "components": [
+              0,
+              100,
+              100,
+              0
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "color-wrong-component-count",
+      "name": "Color with wrong number of components",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: sRGB requires exactly 3 components, but has 2",
+        "invalid-color": {
+          "$type": "color",
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [
+              0,
+              0
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "color-hsl-hue-equals-360",
+      "name": "HSL color with hue equal to 360",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: HSL hue must be in range [0, 360), value 360 is excluded",
+        "invalid-color": {
+          "$type": "color",
+          "$value": {
+            "colorSpace": "hsl",
+            "components": [
+              360,
+              50,
+              50
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "color-hsl-negative-lightness",
+      "name": "HSL color with negative lightness",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: HSL lightness cannot be negative",
+        "invalid-color": {
+          "$type": "color",
+          "$value": {
+            "colorSpace": "hsl",
+            "components": [
+              180,
+              50,
+              -10
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "color-hsl-saturation-over-100",
+      "name": "HSL color with saturation over 100",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: HSL saturation must be in range [0, 100], value 150 exceeds maximum",
+        "invalid-color": {
+          "$type": "color",
+          "$value": {
+            "colorSpace": "hsl",
+            "components": [
+              180,
+              150,
+              50
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "color-lab-lightness-over-100",
+      "name": "LAB color with lightness over 100",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: LAB lightness must be in range [0, 100], value 150 exceeds maximum",
+        "invalid-color": {
+          "$type": "color",
+          "$value": {
+            "colorSpace": "lab",
+            "components": [
+              150,
+              0,
+              0
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "color-lch-negative-chroma",
+      "name": "LCH color with negative chroma",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: LCH chroma cannot be negative",
+        "invalid-color": {
+          "$type": "color",
+          "$value": {
+            "colorSpace": "lch",
+            "components": [
+              50,
+              -10,
+              180
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "color-oklab-lightness-over-1",
+      "name": "OKLAB color with lightness over 1",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: OKLAB lightness must be in range [0, 1], value 1.5 exceeds maximum",
+        "invalid-color": {
+          "$type": "color",
+          "$value": {
+            "colorSpace": "oklab",
+            "components": [
+              1.5,
+              0,
+              0
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "color-oklch-hue-equals-360",
+      "name": "OKLCH color with hue equal to 360",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: OKLCH hue must be in range [0, 360), value 360 is excluded",
+        "invalid-color": {
+          "$type": "color",
+          "$value": {
+            "colorSpace": "oklch",
+            "components": [
+              0.5,
+              0.1,
+              360
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "cubicBezier-negative-x",
+      "name": "Cubic Bezier with negative X value",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Cubic Bezier X coordinates cannot be negative",
+        "invalid-cubicBezier": {
+          "$type": "cubicBezier",
+          "$value": [
+            -0.1,
+            0,
+            0.58,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "id": "cubicBezier-string-value",
+      "name": "Cubic Bezier with string value",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Cubic Bezier values must be numbers, not strings",
+        "invalid-cubicBezier": {
+          "$type": "cubicBezier",
+          "$value": [
+            "0.42",
+            "0",
+            "0.58",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "id": "cubicBezier-wrong-length",
+      "name": "Cubic Bezier with wrong array length",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Cubic Bezier must have exactly 4 values",
+        "invalid-cubicBezier": {
+          "$type": "cubicBezier",
+          "$value": [
+            0.42,
+            0,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "id": "cubicBezier-x-out-of-range",
+      "name": "Cubic Bezier with X value out of range",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Cubic Bezier X coordinates must be in range [0, 1], value 1.5 exceeds maximum",
+        "invalid-cubicBezier": {
+          "$type": "cubicBezier",
+          "$value": [
+            1.5,
+            0,
+            0.58,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "id": "dimension-missing-unit",
+      "name": "Dimension missing unit property",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Dimension missing required unit property",
+        "invalid-dimension": {
+          "$type": "dimension",
+          "$value": {
+            "value": 16
+          }
+        }
+      }
+    },
+    {
+      "id": "dimension-missing-value",
+      "name": "Dimension missing value property",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Dimension missing required value property",
+        "invalid-dimension": {
+          "$type": "dimension",
+          "$value": {
+            "unit": "px"
+          }
+        }
+      }
+    },
+    {
+      "id": "dimension-string-value",
+      "name": "Dimension with string instead of number",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Dimension value must be a number, not a string",
+        "invalid-dimension": {
+          "$type": "dimension",
+          "$value": {
+            "value": "16",
+            "unit": "px"
+          }
+        }
+      }
+    },
+    {
+      "id": "dimension-wrong-unit",
+      "name": "Dimension with unsupported unit",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Only 'px' and 'rem' are valid dimension units, 'em' is not supported",
+        "invalid-dimension": {
+          "$type": "dimension",
+          "$value": {
+            "value": 16,
+            "unit": "em"
+          }
+        }
+      }
+    },
+    {
+      "id": "duration-missing-unit",
+      "name": "Duration missing unit property",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Duration missing required unit property",
+        "invalid-duration": {
+          "$type": "duration",
+          "$value": {
+            "value": 200
+          }
+        }
+      }
+    },
+    {
+      "id": "duration-missing-value",
+      "name": "Duration missing value property",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Duration missing required value property",
+        "invalid-duration": {
+          "$type": "duration",
+          "$value": {
+            "unit": "ms"
+          }
+        }
+      }
+    },
+    {
+      "id": "duration-wrong-unit",
+      "name": "Duration with unsupported unit",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Only 'ms' and 's' are valid duration units, 'min' is not supported",
+        "invalid-duration": {
+          "$type": "duration",
+          "$value": {
+            "value": 1,
+            "unit": "min"
+          }
+        }
+      }
+    },
+    {
+      "id": "fontFamily-array-with-number",
+      "name": "Font family array containing number",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Font family array must contain only strings, not numbers",
+        "invalid-fontFamily": {
+          "$type": "fontFamily",
+          "$value": [
+            "Arial",
+            123,
+            "sans-serif"
+          ]
+        }
+      }
+    },
+    {
+      "id": "fontFamily-number",
+      "name": "Font family as number",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Font family must be a string or array of strings, not a number",
+        "invalid-fontFamily": {
+          "$type": "fontFamily",
+          "$value": 123
+        }
+      }
+    },
+    {
+      "id": "fontWeight-out-of-range-high",
+      "name": "Font weight numeric value too high",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Font weight must be in range [1, 1000], value 1001 exceeds maximum",
+        "invalid-fontWeight": {
+          "$type": "fontWeight",
+          "$value": 1001
+        }
+      }
+    },
+    {
+      "id": "fontWeight-out-of-range-low",
+      "name": "Font weight numeric value too low",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Font weight must be in range [1, 1000], value 0 is below minimum",
+        "invalid-fontWeight": {
+          "$type": "fontWeight",
+          "$value": 0
+        }
+      }
+    },
+    {
+      "id": "fontWeight-unknown-string",
+      "name": "Font weight with unsupported string keyword",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: 'super-bold' is not a valid font weight keyword",
+        "invalid-fontWeight": {
+          "$type": "fontWeight",
+          "$value": "super-bold"
+        }
+      }
+    },
+    {
+      "id": "fontWeight-wrong-case",
+      "name": "Font weight keyword with wrong case",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Font weight keywords are case-sensitive, 'BOLD' is not valid",
+        "invalid-fontWeight": {
+          "$type": "fontWeight",
+          "$value": "BOLD"
+        }
+      }
+    },
+    {
+      "id": "gradient-empty-array",
+      "name": "Gradient with empty array",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Gradient value cannot be an empty array",
+        "invalid-gradient": {
+          "$type": "gradient",
+          "$value": []
+        }
+      }
+    },
+    {
+      "id": "gradient-missing-color",
+      "name": "Gradient stop missing color",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Gradient stop missing required color property",
+        "invalid-gradient": {
+          "$type": "gradient",
+          "$value": [
+            {
+              "position": 0
+            },
+            {
+              "color": {
+                "colorSpace": "srgb",
+                "components": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "position": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "gradient-missing-position",
+      "name": "Gradient stop missing position",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Gradient stop missing required position property",
+        "invalid-gradient": {
+          "$type": "gradient",
+          "$value": [
+            {
+              "color": {
+                "colorSpace": "srgb",
+                "components": [
+                  0,
+                  0,
+                  0
+                ]
+              }
+            },
+            {
+              "color": {
+                "colorSpace": "srgb",
+                "components": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "position": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "gradient-position-string",
+      "name": "Gradient stop with string position",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Gradient stop position must be a number, not a string",
+        "invalid-gradient": {
+          "$type": "gradient",
+          "$value": [
+            {
+              "color": {
+                "colorSpace": "srgb",
+                "components": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "position": "0"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "group-both-value-and-children",
+      "name": "Object with both $value and child tokens",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Object cannot be both a token and a group",
+        "invalid-group": {
+          "$type": "color",
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [
+              0,
+              0,
+              0
+            ]
+          },
+          "child-token": {
+            "$value": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "group-circular-extends",
+      "name": "Circular $extends reference",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Groups cannot have circular $extends references",
+        "circular-extends-a": {
+          "$extends": "{circular-extends-b}",
+          "token": {
+            "$type": "color",
+            "$value": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            }
+          }
+        },
+        "circular-extends-b": {
+          "$extends": "{circular-extends-a}",
+          "token": {
+            "$type": "color",
+            "$value": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "group-extends-nonexistent",
+      "name": "Group extends non-existent group",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: $extends references a non-existent group",
+        "invalid-group": {
+          "$extends": "{nonexistent.group}",
+          "token": {
+            "$type": "color",
+            "$value": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "group-extends-token",
+      "name": "Group extends a token instead of group",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: $extends must reference a group, not a token",
+        "colors": {
+          "color": {
+            "$type": "color",
+            "$value": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            }
+          }
+        },
+        "invalid-group": {
+          "$extends": "{colors.color}",
+          "variant": {
+            "$type": "color",
+            "$value": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "metadata-type-not-string",
+      "name": "$type is not a string",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Group $type must be a string, not an array",
+        "invalid-group": {
+          "$type": [
+            "color",
+            "dimension"
+          ],
+          "token": {
+            "$value": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "metadata-deprecated-number",
+      "name": "Token $deprecated as number",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: $deprecated must be a boolean or string, not a number",
+        "invalid-color": {
+          "$type": "color",
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [
+              0,
+              0,
+              0
+            ]
+          },
+          "$deprecated": 1
+        }
+      }
+    },
+    {
+      "id": "metadata-deprecated-object",
+      "name": "Token $deprecated as object",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: $deprecated must be a boolean or string, not an object",
+        "invalid-color": {
+          "$type": "color",
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [
+              0,
+              0,
+              0
+            ]
+          },
+          "$deprecated": {
+            "reason": "old"
+          }
+        }
+      }
+    },
+    {
+      "id": "metadata-description-not-string",
+      "name": "Token $description is not a string",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Token $description must be a string, not a number",
+        "invalid-color": {
+          "$description": 123,
+          "$type": "color",
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [
+              0,
+              0,
+              0
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "metadata-extensions-not-object",
+      "name": "Token $extensions is not an object",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: $extensions must be an object, not an array",
+        "invalid-color": {
+          "$type": "color",
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [
+              0,
+              0,
+              0
+            ]
+          },
+          "$extensions": [
+            "extension1",
+            "extension2"
+          ]
+        }
+      }
+    },
+    {
+      "id": "metadata-unsupported-dollar-property",
+      "name": "Token with unsupported $-prefixed metadata property",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Token has unsupported $-prefixed metadata property",
+        "invalid-color": {
+          "$type": "color",
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [
+              0,
+              0,
+              0
+            ]
+          },
+          "$customProp": "not allowed"
+        }
+      }
+    },
+    {
+      "id": "metadata-token-missing-type",
+      "name": "Token missing $type",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Token has no $type and is not in a group with $type",
+        "invalid-color": {
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [
+              0,
+              0,
+              0
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "metadata-type-unknown",
+      "name": "Token with unsupported $type",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: 'customType' is not a supported token type",
+        "invalid-color": {
+          "$type": "customType",
+          "$value": "some value"
+        }
+      }
+    },
+    {
+      "id": "metadata-value-null",
+      "name": "Token with null $value",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Token $value cannot be null",
+        "invalid-color": {
+          "$type": "color",
+          "$value": null
+        }
+      }
+    },
+    {
+      "id": "number-object",
+      "name": "Number token with object value",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Number value must be a plain number, not an object",
+        "invalid-number": {
+          "$type": "number",
+          "$value": {
+            "value": 1.5
+          }
+        }
+      }
+    },
+    {
+      "id": "number-string",
+      "name": "Number token with string value",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Number value must be a JSON number, not a string",
+        "invalid-number": {
+          "$type": "number",
+          "$value": "1.5"
+        }
+      }
+    },
+    {
+      "id": "reference-circular-reference-chain",
+      "name": "Circular reference chain",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Circular reference chain between tokens",
+        "circular-reference-chain-1": {
+          "$type": "dimension",
+          "$value": "{circular-reference-chain-2}"
+        },
+        "circular-reference-chain-2": {
+          "$type": "dimension",
+          "$value": "{circular-reference-chain-3}"
+        },
+        "circular-reference-chain-3": {
+          "$type": "dimension",
+          "$value": "{circular-reference-chain-1}"
+        }
+      }
+    },
+    {
+      "id": "reference-composite-json-pointer-missing-required",
+      "name": "Composite with JSON pointer missing required property",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Composite token uses $ref but is missing other required properties",
+        "colors": {
+          "color": {
+            "$type": "color",
+            "$value": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            }
+          }
+        },
+        "invalid-shadow": {
+          "$type": "shadow",
+          "$value": {
+            "color": {
+              "$ref": "#/colors/color/$value"
+            },
+            "offsetX": {
+              "value": 0,
+              "unit": "px"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "reference-composite-ref-to-number-for-dimension",
+      "name": "Composite dimension referencing number token",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Border width references a number instead of a dimension",
+        "numbers": {
+          "number": {
+            "$type": "number",
+            "$value": 1.5
+          }
+        },
+        "invalid-border": {
+          "$type": "border",
+          "$value": {
+            "color": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            },
+            "width": {
+              "$ref": "#/numbers/number/$value"
+            },
+            "style": "solid"
+          }
+        }
+      }
+    },
+    {
+      "id": "reference-composite-ref-to-partial-color",
+      "name": "Composite referencing incomplete color",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Shadow color references only components array, not complete color object",
+        "colors": {
+          "color": {
+            "$type": "color",
+            "$value": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            }
+          }
+        },
+        "invalid-shadow": {
+          "$type": "shadow",
+          "$value": {
+            "color": {
+              "$ref": "#/colors/color/$value/components"
+            },
+            "offsetX": {
+              "value": 0,
+              "unit": "px"
+            },
+            "offsetY": {
+              "value": 0,
+              "unit": "px"
+            },
+            "blur": {
+              "value": 0,
+              "unit": "px"
+            },
+            "spread": {
+              "value": 0,
+              "unit": "px"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "reference-composite-ref-wrong-subvalue-type",
+      "name": "Composite reference to wrong subvalue type",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Shadow color references a dimension value instead of a color",
+        "dimensions": {
+          "dimension": {
+            "$type": "dimension",
+            "$value": {
+              "value": 0,
+              "unit": "px"
+            }
+          }
+        },
+        "invalid-shadow": {
+          "$type": "shadow",
+          "$value": {
+            "color": {
+              "$ref": "#/dimensions/dimension/$value"
+            },
+            "offsetX": {
+              "value": 0,
+              "unit": "px"
+            },
+            "offsetY": {
+              "value": 0,
+              "unit": "px"
+            },
+            "blur": {
+              "value": 0,
+              "unit": "px"
+            },
+            "spread": {
+              "value": 0,
+              "unit": "px"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "reference-gradient-ref-to-non-gradient-stop",
+      "name": "Gradient stop referencing non-stop object",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Gradient array element references a non-gradient-stop structure",
+        "colors": {
+          "color": {
+            "$type": "color",
+            "$value": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            }
+          }
+        },
+        "invalid-gradient": {
+          "$type": "gradient",
+          "$value": [
+            {
+              "$ref": "#/colors/color/$value"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "reference-json-pointer-array-as-string",
+      "name": "JSON pointer treating array index as string",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: JSON Pointer uses string property name instead of array index",
+        "colors": {
+          "color": {
+            "$type": "color",
+            "$value": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            }
+          }
+        },
+        "invalid-number": {
+          "$ref": "#/colors/color/$value/components/first",
+          "$type": "number"
+        }
+      }
+    },
+    {
+      "id": "reference-json-pointer-circular-with-ref",
+      "name": "Circular JSON pointer self-reference",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: $ref creates a circular reference back to itself",
+        "invalid-color": {
+          "$ref": "#/invalid-color",
+          "$type": "color"
+        }
+      }
+    },
+    {
+      "id": "reference-json-pointer-double-slash",
+      "name": "JSON pointer with double slash",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: JSON Pointer with double slashes",
+        "invalid-color": {
+          "$ref": "#/colors//primary/$value",
+          "$type": "color"
+        }
+      }
+    },
+    {
+      "id": "reference-json-pointer-empty-path",
+      "name": "JSON pointer with empty path",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: JSON Pointer with only hash, no path",
+        "invalid-color": {
+          "$ref": "#",
+          "$type": "color"
+        }
+      }
+    },
+    {
+      "id": "reference-json-pointer-incomplete-dimension",
+      "name": "JSON pointer to incomplete dimension",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: JSON Pointer references only the numeric value of a dimension, not the complete object",
+        "dimensions": {
+          "dimension": {
+            "$type": "dimension",
+            "$value": {
+              "value": 0,
+              "unit": "px"
+            }
+          }
+        },
+        "invalid-dimension": {
+          "$ref": "#/dimensions/dimension/$value/value",
+          "$type": "dimension"
+        }
+      }
+    },
+    {
+      "id": "reference-json-pointer-malformed-syntax",
+      "name": "Malformed JSON pointer syntax",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Malformed JSON Pointer syntax with double hash",
+        "invalid-color": {
+          "$ref": "##/invalid/path",
+          "$type": "color"
+        }
+      }
+    },
+    {
+      "id": "reference-json-pointer-missing-hash",
+      "name": "JSON pointer missing # prefix",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: JSON Pointer must start with #",
+        "invalid-color": {
+          "$ref": "/colors/primary/$value",
+          "$type": "color"
+        }
+      }
+    },
+    {
+      "id": "reference-json-pointer-missing-value",
+      "name": "JSON pointer to missing value",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: JSON Pointer references token object but not its $value",
+        "colors": {
+          "color": {
+            "$type": "color",
+            "$value": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            }
+          }
+        },
+        "invalid-color": {
+          "$ref": "#/colors/color",
+          "$type": "color"
+        }
+      }
+    },
+    {
+      "id": "reference-json-pointer-mixed-ref-syntax",
+      "name": "Mixed curly brace and JSON pointer syntax",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Mixing JSON Pointer and curly brace reference syntax",
+        "invalid-color": {
+          "$ref": "#/colors/{srgb-color}/$value",
+          "$type": "color"
+        }
+      }
+    },
+    {
+      "id": "reference-json-pointer-negative-array-index",
+      "name": "JSON pointer with negative array index",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: JSON Pointer with negative array index",
+        "colors": {
+          "color": {
+            "$type": "color",
+            "$value": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            }
+          }
+        },
+        "invalid-number": {
+          "$ref": "#/colors/color/$value/components/-1",
+          "$type": "number"
+        }
+      }
+    },
+    {
+      "id": "reference-json-pointer-nonexistent",
+      "name": "JSON pointer to non-existent path",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: JSON Pointer to non-existent path",
+        "invalid-color": {
+          "$ref": "#/does/not/exist",
+          "$type": "color"
+        }
+      }
+    },
+    {
+      "id": "reference-json-pointer-space-in-path",
+      "name": "JSON pointer with unescaped space",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: JSON Pointer with unencoded space in path",
+        "invalid-color": {
+          "$ref": "#/colors/token with spaces/$value",
+          "$type": "color"
+        }
+      }
+    },
+    {
+      "id": "reference-json-pointer-to-description",
+      "name": "JSON pointer to $description metadata",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: JSON Pointer references $description instead of $value",
+        "colors": {
+          "color": {
+            "$description": "A color",
+            "$type": "color",
+            "$value": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            }
+          }
+        },
+        "invalid-color": {
+          "$ref": "#/colors/color/$description",
+          "$type": "color"
+        }
+      }
+    },
+    {
+      "id": "reference-json-pointer-to-group",
+      "name": "JSON pointer to group instead of token",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: JSON Pointer references a group instead of a token value",
+        "colors": {
+          "color": {
+            "$type": "color",
+            "$value": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            }
+          }
+        },
+        "invalid-color": {
+          "$ref": "#/colors",
+          "$type": "color"
+        }
+      }
+    },
+    {
+      "id": "reference-json-pointer-to-metadata",
+      "name": "JSON pointer to metadata property",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: JSON Pointer references $type metadata instead of $value",
+        "colors": {
+          "color": {
+            "$type": "color",
+            "$value": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            }
+          }
+        },
+        "invalid-color": {
+          "$ref": "#/colors/color/$type",
+          "$type": "color"
+        }
+      }
+    },
+    {
+      "id": "reference-json-pointer-trailing-slash",
+      "name": "JSON pointer with trailing slash",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: JSON Pointer with trailing slash",
+        "colors": {
+          "color": {
+            "$type": "color",
+            "$value": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            }
+          }
+        },
+        "invalid-color": {
+          "$ref": "#/colors/color/$value/",
+          "$type": "color"
+        }
+      }
+    },
+    {
+      "id": "reference-json-pointer-type-mismatch",
+      "name": "JSON pointer type mismatch",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: JSON Pointer references a number but token declares type as dimension",
+        "colors": {
+          "color": {
+            "$type": "color",
+            "$value": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            }
+          }
+        },
+        "invalid-dimension": {
+          "$ref": "#/colors/color/$value/components/0",
+          "$type": "dimension"
+        }
+      }
+    },
+    {
+      "id": "reference-json-pointer-wrong-array-index",
+      "name": "JSON pointer with out-of-bounds array index",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: JSON Pointer array index out of bounds",
+        "colors": {
+          "color": {
+            "$type": "color",
+            "$value": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            }
+          }
+        },
+        "invalid-number": {
+          "$ref": "#/colors/color/$value/components/99",
+          "$type": "number"
+        }
+      }
+    },
+    {
+      "id": "reference-json-pointer-wrong-property",
+      "name": "JSON pointer to non-existent property",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: JSON Pointer references non-existent property in composite token",
+        "shadows": {
+          "shadow": {
+            "$type": "shadow",
+            "$value": {
+              "color": {
+                "colorSpace": "srgb",
+                "components": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "offsetX": {
+                "value": 0,
+                "unit": "px"
+              },
+              "offsetY": {
+                "value": 0,
+                "unit": "px"
+              },
+              "blur": {
+                "value": 0,
+                "unit": "px"
+              },
+              "spread": {
+                "value": 0,
+                "unit": "px"
+              }
+            }
+          }
+        },
+        "invalid-dimension": {
+          "$ref": "#/shadows/shadow/$value/radius",
+          "$type": "dimension"
+        }
+      }
+    },
+    {
+      "id": "reference-json-pointer-wrong-separator",
+      "name": "JSON pointer with wrong path separator",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: JSON Pointer uses dot separator instead of slash",
+        "invalid-color": {
+          "$ref": "#/colors.primary.$value",
+          "$type": "color"
+        }
+      }
+    },
+    {
+      "id": "reference-ref-and-value-both-present",
+      "name": "Token with both $ref and $value",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Token cannot have both $ref and $value",
+        "colors": {
+          "color": {
+            "$type": "color",
+            "$value": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            }
+          }
+        },
+        "invalid-color": {
+          "$ref": "#/colors/color/$value",
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [
+              0,
+              0,
+              0
+            ]
+          },
+          "$type": "color"
+        }
+      }
+    },
+    {
+      "id": "reference-empty",
+      "name": "Empty reference string",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Empty curly brace reference",
+        "invalid-color": {
+          "$type": "color",
+          "$value": "{}"
+        }
+      }
+    },
+    {
+      "id": "reference-nonexistent",
+      "name": "Reference to non-existent token",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Reference to non-existent token",
+        "invalid-color": {
+          "$type": "color",
+          "$value": "{nonexistent.token}"
+        }
+      }
+    },
+    {
+      "id": "reference-syntax-missing-brace",
+      "name": "Reference with missing closing brace",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Reference missing closing brace",
+        "invalid-color": {
+          "$type": "color",
+          "$value": "{colors.primary"
+        }
+      }
+    },
+    {
+      "id": "reference-to-wrong-subvalue",
+      "name": "Reference to wrong composite subvalue",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Curly brace references cannot target sub-properties of a token value",
+        "colors": {
+          "color": {
+            "$type": "color",
+            "$value": {
+              "colorSpace": "srgb",
+              "components": [
+                1,
+                0,
+                0
+              ]
+            }
+          }
+        },
+        "invalid-number": {
+          "$type": "number",
+          "$value": "{colors.color.components.0}"
+        }
+      }
+    },
+    {
+      "id": "reference-type-mismatch",
+      "name": "Reference with type mismatch",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Token references a dimension but declares type as color",
+        "dimensions": {
+          "dimension": {
+            "$type": "dimension",
+            "$value": {
+              "value": 0,
+              "unit": "px"
+            }
+          }
+        },
+        "invalid-color": {
+          "$type": "color",
+          "$value": "{dimensions.dimension}"
+        }
+      }
+    },
+    {
+      "id": "reference-with-spaces",
+      "name": "Reference with spaces in path",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Reference with improper spacing inside braces",
+        "invalid-color": {
+          "$type": "color",
+          "$value": "{ colors . color }"
+        }
+      }
+    },
+    {
+      "id": "reference-self-reference",
+      "name": "Token referencing itself",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Token references itself directly",
+        "self-reference": {
+          "$type": "color",
+          "$value": "{self-reference}"
+        }
+      }
+    },
+    {
+      "id": "reference-stroke-dashArray-ref-wrong-type",
+      "name": "Stroke dashArray referencing wrong type",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: StrokeStyle dashArray element references a number instead of a dimension",
+        "numbers": {
+          "number": {
+            "$type": "number",
+            "$value": 1.5
+          }
+        },
+        "invalid-strokeStyle": {
+          "$type": "strokeStyle",
+          "$value": {
+            "dashArray": [
+              {
+                "$ref": "#/numbers/number/$value"
+              }
+            ],
+            "lineCap": "round"
+          }
+        }
+      }
+    },
+    {
+      "id": "reference-dimension-curly-brace-in-subvalue",
+      "name": "Dimension with curly brace reference in sub-value",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Curly brace reference in sub-value of non-composite dimension token",
+        "numbers": {
+          "number": {
+            "$type": "number",
+            "$value": 16
+          }
+        },
+        "invalid-dimension": {
+          "$type": "dimension",
+          "$value": {
+            "value": "{numbers.number}",
+            "unit": "px"
+          }
+        }
+      }
+    },
+    {
+      "id": "reference-color-curly-brace-in-subvalue",
+      "name": "Color with curly brace reference in sub-value",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Curly brace reference in sub-value of non-composite color token",
+        "numbers": {
+          "alpha": {
+            "$type": "number",
+            "$value": 0.5
+          }
+        },
+        "invalid-color": {
+          "$type": "color",
+          "$value": {
+            "colorSpace": "srgb",
+            "components": [
+              0,
+              0,
+              0
+            ],
+            "alpha": "{numbers.alpha}"
+          }
+        }
+      }
+    },
+    {
+      "id": "reference-duration-curly-brace-in-subvalue",
+      "name": "Duration with curly brace reference in sub-value",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Curly brace reference in sub-value of non-composite duration token",
+        "numbers": {
+          "number": {
+            "$type": "number",
+            "$value": 200
+          }
+        },
+        "invalid-duration": {
+          "$type": "duration",
+          "$value": {
+            "value": "{numbers.number}",
+            "unit": "ms"
+          }
+        }
+      }
+    },
+    {
+      "id": "reference-cubicBezier-curly-brace-in-subvalue",
+      "name": "Cubic Bezier with curly brace reference in sub-value",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Curly brace reference in sub-value of non-composite cubicBezier token",
+        "numbers": {
+          "number": {
+            "$type": "number",
+            "$value": 0.5
+          }
+        },
+        "invalid-cubicBezier": {
+          "$type": "cubicBezier",
+          "$value": [
+            "{numbers.number}",
+            0,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "id": "shadow-array-with-non-object",
+      "name": "Shadow array containing non-object",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Shadow array must contain only shadow objects, not strings",
+        "invalid-shadow": {
+          "$type": "shadow",
+          "$value": [
+            {
+              "color": {
+                "colorSpace": "srgb",
+                "components": [
+                  0,
+                  0,
+                  0
+                ]
+              },
+              "offsetX": {
+                "value": 0,
+                "unit": "px"
+              },
+              "offsetY": {
+                "value": 0,
+                "unit": "px"
+              },
+              "blur": {
+                "value": 0,
+                "unit": "px"
+              },
+              "spread": {
+                "value": 0,
+                "unit": "px"
+              }
+            },
+            "not-a-shadow-object"
+          ]
+        }
+      }
+    },
+    {
+      "id": "shadow-missing-blur",
+      "name": "Shadow missing blur property",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Shadow missing required blur property",
+        "invalid-shadow": {
+          "$type": "shadow",
+          "$value": {
+            "color": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            },
+            "offsetX": {
+              "value": 0,
+              "unit": "px"
+            },
+            "offsetY": {
+              "value": 0,
+              "unit": "px"
+            },
+            "spread": {
+              "value": 0,
+              "unit": "px"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "shadow-missing-color",
+      "name": "Shadow missing color property",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Shadow missing required color property",
+        "invalid-shadow": {
+          "$type": "shadow",
+          "$value": {
+            "offsetX": {
+              "value": 0,
+              "unit": "px"
+            },
+            "offsetY": {
+              "value": 0,
+              "unit": "px"
+            },
+            "blur": {
+              "value": 0,
+              "unit": "px"
+            },
+            "spread": {
+              "value": 0,
+              "unit": "px"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "shadow-missing-offsetX",
+      "name": "Shadow missing offsetX property",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Shadow missing required offsetX property",
+        "invalid-shadow": {
+          "$type": "shadow",
+          "$value": {
+            "color": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            },
+            "offsetY": {
+              "value": 0,
+              "unit": "px"
+            },
+            "blur": {
+              "value": 0,
+              "unit": "px"
+            },
+            "spread": {
+              "value": 0,
+              "unit": "px"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "shadow-missing-offsetY",
+      "name": "Shadow missing offsetY property",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Shadow missing required offsetY property",
+        "invalid-shadow": {
+          "$type": "shadow",
+          "$value": {
+            "color": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            },
+            "offsetX": {
+              "value": 0,
+              "unit": "px"
+            },
+            "blur": {
+              "value": 0,
+              "unit": "px"
+            },
+            "spread": {
+              "value": 0,
+              "unit": "px"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "shadow-missing-spread",
+      "name": "Shadow missing spread property",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Shadow missing required spread property",
+        "invalid-shadow": {
+          "$type": "shadow",
+          "$value": {
+            "color": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            },
+            "offsetX": {
+              "value": 0,
+              "unit": "px"
+            },
+            "offsetY": {
+              "value": 0,
+              "unit": "px"
+            },
+            "blur": {
+              "value": 0,
+              "unit": "px"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "shadow-wrong-inset-type",
+      "name": "Shadow with non-boolean inset",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Shadow inset property must be a boolean, not a string",
+        "invalid-shadow": {
+          "$type": "shadow",
+          "$value": {
+            "color": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            },
+            "offsetX": {
+              "value": 0,
+              "unit": "px"
+            },
+            "offsetY": {
+              "value": 0,
+              "unit": "px"
+            },
+            "blur": {
+              "value": 0,
+              "unit": "px"
+            },
+            "spread": {
+              "value": 0,
+              "unit": "px"
+            },
+            "inset": "true"
+          }
+        }
+      }
+    },
+    {
+      "id": "strokeStyle-dashArray-non-dimension",
+      "name": "Stroke dashArray with non-dimension values",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: dashArray elements must be dimension objects, not plain numbers",
+        "invalid-strokeStyle": {
+          "$type": "strokeStyle",
+          "$value": {
+            "dashArray": [
+              5,
+              3
+            ],
+            "lineCap": "round"
+          }
+        }
+      }
+    },
+    {
+      "id": "strokeStyle-empty-dashArray",
+      "name": "Stroke with empty dashArray",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: dashArray cannot be empty",
+        "invalid-strokeStyle": {
+          "$type": "strokeStyle",
+          "$value": {
+            "dashArray": [],
+            "lineCap": "round"
+          }
+        }
+      }
+    },
+    {
+      "id": "strokeStyle-missing-dashArray",
+      "name": "Custom stroke style missing dashArray",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Object stroke style missing required dashArray property",
+        "invalid-strokeStyle": {
+          "$type": "strokeStyle",
+          "$value": {
+            "lineCap": "round"
+          }
+        }
+      }
+    },
+    {
+      "id": "strokeStyle-missing-lineCap",
+      "name": "Custom stroke style missing lineCap",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Object stroke style missing required lineCap property",
+        "invalid-strokeStyle": {
+          "$type": "strokeStyle",
+          "$value": {
+            "dashArray": [
+              {
+                "value": 0,
+                "unit": "px"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "strokeStyle-unknown-string",
+      "name": "Stroke style with unsupported string value",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: 'wavy' is not a valid stroke style string value",
+        "invalid-strokeStyle": {
+          "$type": "strokeStyle",
+          "$value": "wavy"
+        }
+      }
+    },
+    {
+      "id": "strokeStyle-wrong-lineCap",
+      "name": "Stroke style with invalid lineCap value",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: lineCap must be 'round', 'butt', or 'square'",
+        "invalid-strokeStyle": {
+          "$type": "strokeStyle",
+          "$value": {
+            "dashArray": [
+              {
+                "value": 0,
+                "unit": "px"
+              }
+            ],
+            "lineCap": "beveled"
+          }
+        }
+      }
+    },
+    {
+      "id": "token-name-curly-brace",
+      "name": "Token name containing curly brace",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Token names cannot contain curly braces",
+        "group": {
+          "token{invalid}": {
+            "$type": "color",
+            "$value": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "token-name-period",
+      "name": "Token name containing period",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Token names cannot contain periods",
+        "group": {
+          "token.invalid": {
+            "$type": "color",
+            "$value": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "token-name-starts-with-dollar",
+      "name": "Token name starting with $",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Token names must not start with $",
+        "group": {
+          "$invalidName": {
+            "$type": "color",
+            "$value": {
+              "colorSpace": "srgb",
+              "components": [
+                0,
+                0,
+                0
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "transition-missing-delay",
+      "name": "Transition missing delay property",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Transition missing required delay property",
+        "invalid-transition": {
+          "$type": "transition",
+          "$value": {
+            "duration": {
+              "value": 0,
+              "unit": "ms"
+            },
+            "timingFunction": [
+              0,
+              0,
+              1,
+              1
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "transition-missing-duration",
+      "name": "Transition missing duration property",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Transition missing required duration property",
+        "invalid-transition": {
+          "$type": "transition",
+          "$value": {
+            "delay": {
+              "value": 0,
+              "unit": "ms"
+            },
+            "timingFunction": [
+              0,
+              0,
+              1,
+              1
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "transition-missing-timingFunction",
+      "name": "Transition missing timingFunction property",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Transition missing required timingFunction property",
+        "invalid-transition": {
+          "$type": "transition",
+          "$value": {
+            "duration": {
+              "value": 0,
+              "unit": "ms"
+            },
+            "delay": {
+              "value": 0,
+              "unit": "ms"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "typography-composite-dimension-wrong-type",
+      "name": "Typography with wrong dimension property type",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Typography fontSize must be a dimension object, not a plain number",
+        "invalid-typography": {
+          "$type": "typography",
+          "$value": {
+            "fontFamily": "sans-serif",
+            "fontSize": 16,
+            "fontWeight": 400,
+            "letterSpacing": {
+              "value": 0,
+              "unit": "px"
+            },
+            "lineHeight": 1.5
+          }
+        }
+      }
+    },
+    {
+      "id": "typography-lineHeight-wrong-type",
+      "name": "Typography with invalid lineHeight type",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Typography lineHeight must be a number, not a dimension object",
+        "invalid-typography": {
+          "$type": "typography",
+          "$value": {
+            "fontFamily": "sans-serif",
+            "fontSize": {
+              "value": 0,
+              "unit": "px"
+            },
+            "fontWeight": 400,
+            "letterSpacing": {
+              "value": 0,
+              "unit": "px"
+            },
+            "lineHeight": {
+              "value": 0,
+              "unit": "px"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "typography-missing-fontFamily",
+      "name": "Typography missing fontFamily property",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Typography missing required fontFamily property",
+        "invalid-typography": {
+          "$type": "typography",
+          "$value": {
+            "fontSize": {
+              "value": 0,
+              "unit": "px"
+            },
+            "fontWeight": 400,
+            "letterSpacing": {
+              "value": 0,
+              "unit": "px"
+            },
+            "lineHeight": 0
+          }
+        }
+      }
+    },
+    {
+      "id": "typography-missing-fontSize",
+      "name": "Typography missing fontSize property",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Typography missing required fontSize property",
+        "invalid-typography": {
+          "$type": "typography",
+          "$value": {
+            "fontFamily": "sans-serif",
+            "fontWeight": 400,
+            "letterSpacing": {
+              "value": 0,
+              "unit": "px"
+            },
+            "lineHeight": 0
+          }
+        }
+      }
+    },
+    {
+      "id": "typography-missing-fontWeight",
+      "name": "Typography missing fontWeight property",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Typography missing required fontWeight property",
+        "invalid-typography": {
+          "$type": "typography",
+          "$value": {
+            "fontFamily": "sans-serif",
+            "fontSize": {
+              "value": 0,
+              "unit": "px"
+            },
+            "letterSpacing": {
+              "value": 0,
+              "unit": "px"
+            },
+            "lineHeight": 0
+          }
+        }
+      }
+    },
+    {
+      "id": "typography-missing-letterSpacing",
+      "name": "Typography missing letterSpacing property",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Typography missing required letterSpacing property",
+        "invalid-typography": {
+          "$type": "typography",
+          "$value": {
+            "fontFamily": "sans-serif",
+            "fontSize": {
+              "value": 0,
+              "unit": "px"
+            },
+            "fontWeight": 400,
+            "lineHeight": 0
+          }
+        }
+      }
+    },
+    {
+      "id": "typography-missing-lineHeight",
+      "name": "Typography missing lineHeight property",
+      "valid": false,
+      "document": {
+        "$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+        "$description": "NEGATIVE: Typography missing required lineHeight property",
+        "invalid-typography": {
+          "$type": "typography",
+          "$value": {
+            "fontFamily": "sans-serif",
+            "fontSize": {
+              "value": 0,
+              "unit": "px"
+            },
+            "fontWeight": 400,
+            "letterSpacing": {
+              "value": 0,
+              "unit": "px"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

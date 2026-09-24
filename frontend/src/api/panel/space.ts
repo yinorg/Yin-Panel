@@ -44,7 +44,7 @@ export function sortSpaces(spaces: Space[], currentUserId?: number) {
     return aMine - bMine || a.name.localeCompare(b.name) || a.id - b.id
   })
 }
-export function getSpaces<T>() { return get<T>({ url: '/spaces' }) }
+export function getSpaces<T>(signal?: AbortSignal) { return get<T>({ url: '/spaces', signal }) }
 export function getSearchConfig<T>(spaceId: number) { return get<T>({ url: `/spaces/${spaceId}/search-config` }) }
 export function setSearchConfig<T>(spaceId: number, data: SpaceSearchConfig) { return post<T>({ url: `/spaces/${spaceId}/search-config`, data }) }
 export function getPublicConfig<T>(spaceId: number) { return get<T>({ url: `/spaces/${spaceId}/public` }) }
@@ -68,6 +68,7 @@ export function sortItems<T>(spaceId: number, groupId: number, sortItems: any[])
 export function createGroup<T>(spaceId: number, title: string, icon = '', parentId?: number | null) { return post<T>({ url: `/spaces/${spaceId}/groups`, data: { title, icon, parentId: parentId || null } }) }
 export function updateGroup<T>(spaceId: number, groupId: number, title: string, icon = '', parentId?: number | null) { return post<T>({ url: `/spaces/${spaceId}/groups/${groupId}/update`, data: { title, icon, parentId: parentId || null } }) }
 export function deleteGroup<T>(spaceId: number, groupId: number) { return post<T>({ url: `/spaces/${spaceId}/groups/${groupId}/delete` }) }
+export function sortGroups<T>(spaceId: number, parentId: number | null, sortGroups: { id: number; sort: number }[]) { return post<T>({ url: `/spaces/${spaceId}/groups/sort`, data: { parentId, sortGroups } }) }
 export function renameSpace<T>(spaceId: number, name: string) { return post<T>({ url: `/spaces/${spaceId}`, data: { name } }) }
 export function copySpace<T>(spaceId: number, name?: string) { return post<T>({ url: `/spaces/${spaceId}/copy`, data: name ? { name } : {} }) }
 export function transferSpace<T>(spaceId: number, email: string) { return post<T>({ url: `/spaces/${spaceId}/transfer`, data: { email } }) }

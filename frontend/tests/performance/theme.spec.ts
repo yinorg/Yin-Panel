@@ -2,12 +2,13 @@ import { expect, test } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { createThemeApiDispatcher, type ThemeApiHandlers } from '../../src/theme/api/dispatcher'
-import { createThemeHomeSnapshot } from '../../src/theme/api/homeSnapshot'
+import { createThemeHomeSnapshot } from '../../src/core/home/themeSnapshot'
 import { isThemeApiRequest } from '../../src/theme/api/v1'
 import { THEME_API_VERSION as publicThemeApiVersion, isThemeApiRequest as isPublicThemeApiRequest } from '../../packages/theme-sdk/src/index'
 import { createHomeThemeHandlers } from '../../src/core/home/themeHandlers'
 import { createThemeSandboxDocument } from '../../src/theme/runtime/sandbox'
-import { normalizeThemePackageV2, resolvePanelValue, resolveThemeSlots, resolveWallpaper, selectThemeScheme, semanticSlots, type ThemePackage, type ThemePackageV2 } from '../../src/utils/theme'
+import type { ThemePermission } from '../../src/theme/api/v1'
+import { normalizeThemePackageV2, resolvePanelValue, resolveThemeSlots, resolveWallpaper, selectThemeScheme, semanticSlots, validateDTCGDocument202510, type ThemePackage, type ThemePackageV2 } from '../../src/utils/theme'
 
 const palettes: Record<string, Record<string, string>> = {
   light: { canvas: '#ffffff', surface: '#f3f6f8', surfaceElevated: '#ffffff', text: '#172126', textMuted: '#53636a', border: '#d5dfe2', primary: '#075b68', onPrimary: '#ffffff', secondary: '#8b4412', success: '#176b45', warning: '#805200', danger: '#a12627', focusRing: '#075b68' },
@@ -27,7 +28,7 @@ function makePackage(schemes = ['light', 'dark']): ThemePackage {
     }
     colors.focusRing.$value = '{semantic.color.primary}'
     return [scheme, {
-      $schema: 'https://design-tokens.github.io/community-group/format/2025.10/schema.json',
+      $schema: 'https://www.designtokens.org/schemas/2025.10/format.json',
       primitive: { color: colors },
       semantic: { color: structuredClone(colors) },
     }]
@@ -111,7 +112,7 @@ test('resolves grouped DTCG semantic and component tokens without controlling la
   const palette = pkg.documents.light.semantic.color
   palette.focusRing.$value = '{primitive.color.primary}'
   pkg.documents.light = {
-    $schema: 'https://design-tokens.github.io/community-group/format/2025.10/schema.json',
+    $schema: 'https://www.designtokens.org/schemas/2025.10/format.json',
     primitive: { color: pkg.documents.light.primitive.color },
     semantic: { color: palette, typography: {
       body: { $type: 'fontFamily', $value: ['Inter', 'system-ui'] },
@@ -150,7 +151,7 @@ test('resolves grouped DTCG semantic and component tokens without controlling la
 test('resolves DTCG group root tokens and inherited tokens with local overrides', () => {
   const pkg = makePackage(['light'])
   pkg.documents.light = {
-    $schema: 'https://design-tokens.github.io/community-group/format/2025.10/schema.json',
+    $schema: 'https://www.designtokens.org/schemas/2025.10/format.json',
     primitive: {
       shape: {
         $type: 'dimension',
@@ -187,6 +188,19 @@ test('maps DTCG 2025.10 wide-gamut, polar, and alpha colors to browser-supported
   expect(await page.evaluate(values => values.map(value => CSS.supports('color', value)), [slots['primitive-color-p3-accent'], slots['primitive-color-hsl-accent']])).toEqual([true, true])
 })
 
+test('matches the shared DTCG 2025.10 document acceptance fixture', () => {
+  const fixture = JSON.parse(readFileSync(resolve(process.cwd(), '../shared/theme/dtcg-conformance/documents.json'), 'utf8'))
+  for (const entry of fixture.cases) {
+    const pkg = makePackage(['light'])
+    pkg.documents.light = entry.document
+    if (entry.valid) {
+      expect(() => validateDTCGDocument202510(entry.document), entry.name).not.toThrow()
+      expect(() => resolveThemeSlots(pkg, 'light'), entry.name).not.toThrow()
+    }
+    else expect(() => validateDTCGDocument202510(entry.document), entry.name).toThrow()
+  }
+})
+
 test('current package DTCG semantic tokens map to runtime slots', () => {
   const color = (hex: string) => ({
     $type: 'color',
@@ -213,8 +227,8 @@ test('current package DTCG semantic tokens map to runtime slots', () => {
       resources: [],
     },
     tokens: {
-      light: { $schema: 'https://design-tokens.github.io/community-group/format/2025.10/schema.json', semantic: { ...colors, shape: { cardRadius: { $type: 'dimension', $value: { value: 8, unit: 'px' } } } } },
-      dark: { $schema: 'https://design-tokens.github.io/community-group/format/2025.10/schema.json', semantic: colors },
+      light: { $schema: 'https://www.designtokens.org/schemas/2025.10/format.json', semantic: { ...colors, shape: { cardRadius: { $type: 'dimension', $value: { value: 8, unit: 'px' } } } } },
+      dark: { $schema: 'https://www.designtokens.org/schemas/2025.10/format.json', semantic: colors },
     },
     revision: 'revision', verified: true,
   }
@@ -268,6 +282,34 @@ test('theme sandbox CSP permits only packaged runtime resources and blocks netwo
   expect(() => createThemeSandboxDocument('javascript:alert(1)')).toThrow(/unsupported/i)
 })
 
+test('SVG theme assets cannot execute scripts after navigation inside the sandbox frame', async ({ page }) => {
+  await page.route('**/active-theme.svg', route => route.fulfill({
+    status: 200,
+    contentType: 'image/svg+xml',
+    headers: {
+      'X-Content-Type-Options': 'nosniff',
+      'Content-Security-Policy': "sandbox; default-src 'none'; script-src 'none'; style-src 'unsafe-inline'; img-src data: blob:; object-src 'none'; form-action 'none'; base-uri 'none'",
+    },
+    body: '<svg xmlns="http://www.w3.org/2000/svg"><script>parent.postMessage("svg-script-ran", "*")</script><text>Icon</text></svg>',
+  }))
+  await page.goto('/')
+  await page.evaluate(() => {
+    ;(window as Window & { __svgScriptMessages?: number }).__svgScriptMessages = 0
+    window.addEventListener('message', (event) => {
+      if (event.data === 'svg-script-ran') {
+        const state = window as Window & { __svgScriptMessages?: number }
+        state.__svgScriptMessages = (state.__svgScriptMessages || 0) + 1
+      }
+    })
+    const frame = document.createElement('iframe')
+    frame.setAttribute('sandbox', 'allow-scripts')
+    frame.src = '/active-theme.svg'
+    document.body.append(frame)
+  })
+  await page.waitForTimeout(100)
+  expect(await page.evaluate(() => (window as Window & { __svgScriptMessages?: number }).__svgScriptMessages)).toBe(0)
+})
+
 test('Theme home DTO uses string IDs and excludes Core-only item URLs', () => {
   const sourceGroup = {
     id: 21,
@@ -297,6 +339,7 @@ test('Theme home DTO uses string IDs and excludes Core-only item URLs', () => {
 test('Core Home command adapter resolves IDs from live data and ignores theme-provided URLs', async () => {
   const item = { id: 31, itemIconGroupId: 21, title: 'Console', icon: null, url: 'https://internal.test', openMethod: 3 }
   let opened: Panel.ItemInfo | undefined
+  let deletedItemId = 0
   const handlers = createHomeThemeHandlers({
     getSpaces: () => [{ id: 12 }],
     getGroups: () => [{ id: 21, items: [item] }],
@@ -304,6 +347,14 @@ test('Core Home command adapter resolves IDs from live data and ignores theme-pr
     selectSpace: () => undefined,
     openItem: (value) => { opened = value },
     openEditor: () => undefined,
+    createItem: () => undefined,
+    updateItem: () => undefined,
+    deleteItem: (value) => { deletedItemId = Number(value.id) },
+    reorderItems: () => undefined,
+    createGroup: () => undefined,
+    updateGroup: () => undefined,
+    deleteGroup: () => undefined,
+    reorderGroups: () => undefined,
     openCommandCenter: () => undefined,
     toggleSide: () => undefined,
     refresh: () => undefined,
@@ -333,7 +384,8 @@ test('Core Home command adapter resolves IDs from live data and ignores theme-pr
     items: [{ id: '31', groupId: '21', title: 'Console', capabilities: ['item.open'] }],
   })
   await expect(handlers.executeCommand('item.open', { itemId: '999' })).rejects.toMatchObject({ code: 'NOT_FOUND' })
-  await expect(handlers.executeCommand('item.delete', { itemId: '31' })).rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' })
+  await handlers.executeCommand('item.delete', { itemId: '31', url: 'https://attacker.test' })
+  expect(deletedItemId).toBe(31)
 })
 
 test('Theme API v1 dispatcher enforces permission and rejects stale contexts', async () => {
@@ -364,7 +416,9 @@ test('Theme API v1 dispatcher enforces permission and rejects stale contexts', a
   expect(search).toMatchObject({ ok: true, result: { query: 'needle', items: [{ id: 'needle' }], total: 1, paging: { limit: 50 } } })
   const invalidSearch = await dispatch({ ...base, method: 'search.query', payload: { query: 'x'.repeat(201) } })
   expect(invalidSearch).toMatchObject({ ok: false, error: { code: 'INVALID_ARGUMENT' } })
-  const oversizedPage = await dispatch({ ...base, method: 'search.query', payload: { query: 'needle', limit: 101 } })
+  const maxPage = await dispatch({ ...base, method: 'search.query', payload: { query: 'needle', limit: 200 } })
+  expect(maxPage).toMatchObject({ ok: true, result: { paging: { limit: 200 } } })
+  const oversizedPage = await dispatch({ ...base, method: 'search.query', payload: { query: 'needle', limit: 201 } })
   expect(oversizedPage).toMatchObject({ ok: false, error: { code: 'INVALID_ARGUMENT' } })
   const itemListDeniedDispatch = createThemeApiDispatcher({ getContextVersion: () => contextVersion, getPermissions: () => new Set(['spaces.read']), handlers })
   const itemListDenied = await itemListDeniedDispatch({ ...base, method: 'items.list', payload: { limit: 1 } })
@@ -375,6 +429,10 @@ test('Theme API v1 dispatcher enforces permission and rejects stale contexts', a
   const spaceListDispatch = createThemeApiDispatcher({ getContextVersion: () => contextVersion, getPermissions: () => new Set(['spaces.read']), handlers })
   const spaceList = await spaceListDispatch({ ...base, method: 'spaces.list', payload: { limit: 25 } })
   expect(spaceList).toMatchObject({ ok: true, result: { items: [], total: 0, limit: 25 } })
+  const maxSpaceList = await spaceListDispatch({ ...base, method: 'spaces.list', payload: { limit: 200 } })
+  expect(maxSpaceList).toMatchObject({ ok: true, result: { items: [], total: 0, limit: 200 } })
+  const oversizedSpaceList = await spaceListDispatch({ ...base, method: 'spaces.list', payload: { limit: 201 } })
+  expect(oversizedSpaceList).toMatchObject({ ok: false, error: { code: 'INVALID_ARGUMENT' } })
   const groupsDenied = await itemListDispatch({ ...base, method: 'groups.list', payload: undefined })
   expect(groupsDenied).toMatchObject({ ok: false, error: { code: 'PERMISSION_DENIED' } })
   const invalidGroupFilter = await itemListDispatch({ ...base, method: 'items.list', payload: { groupId: '../other-space' } })
@@ -421,10 +479,44 @@ test('Theme API v1 dispatcher enforces permission and rejects stale contexts', a
   const monitorDispatch = createThemeApiDispatcher({ getContextVersion: () => contextVersion, getPermissions: () => new Set(['monitor.read']), handlers })
   const monitorAllowed = await monitorDispatch({ ...base, contextVersion, method: 'monitor.getSnapshot', payload: undefined })
   expect(monitorAllowed).toMatchObject({ ok: true, result: { capturedAt: '2026-09-24T00:00:00.000Z' } })
+
+  const boundedDispatch = createThemeApiDispatcher({
+    getContextVersion: () => contextVersion,
+    getPermissions: () => new Set(['items.read']),
+    handlers: { ...handlers, listItems: () => new Promise(() => {}) },
+    maxInFlight: 1,
+    timeoutMs: 5,
+  })
+  const timedOut = await boundedDispatch({ ...base, contextVersion, method: 'items.list', payload: undefined })
+  expect(timedOut).toMatchObject({ ok: false, error: { code: 'TIMEOUT' } })
+  const stillInFlight = await boundedDispatch({ ...base, requestId: 'request-124', contextVersion, method: 'items.list', payload: undefined })
+  expect(stillInFlight).toMatchObject({ ok: false, error: { code: 'RATE_LIMITED' } })
+
+  let finishLateRead: ((value: unknown) => void) | undefined
+  let currentPermissions = new Set<ThemePermission>(['items.read'])
+  const lateReadDispatch = createThemeApiDispatcher({
+    getContextVersion: () => contextVersion,
+    getPermissions: () => currentPermissions,
+    handlers: { ...handlers, listItems: () => new Promise(resolve => { finishLateRead = resolve }) },
+  })
+  const lateRead = lateReadDispatch({ ...base, contextVersion, method: 'items.list', payload: undefined })
+  contextVersion += 1
+  finishLateRead?.({ items: [{ id: 'from-old-space' }] })
+  expect(await lateRead).toMatchObject({ ok: false, error: { code: 'ABORTED' } })
+
+  const latePermissionDispatch = createThemeApiDispatcher({
+    getContextVersion: () => contextVersion,
+    getPermissions: () => currentPermissions,
+    handlers: { ...handlers, listItems: () => new Promise(resolve => { finishLateRead = resolve }) },
+  })
+  const latePermissionRead = latePermissionDispatch({ ...base, contextVersion, method: 'items.list', payload: undefined })
+  currentPermissions = new Set()
+  finishLateRead?.({ items: [{ id: 'after-revocation' }] })
+  expect(await latePermissionRead).toMatchObject({ ok: false, error: { code: 'PERMISSION_DENIED' } })
 })
 
 test('sandbox Theme API forwards search through its isolated MessageChannel runtime', async ({ page }) => {
-  await page.goto('http://127.0.0.1:4174/')
+  await page.goto('/')
   await page.evaluate(async () => {
     const sandboxPath = '/src/theme/runtime/sandbox.ts'
     const { mountThemeSandbox } = await import(sandboxPath)
@@ -470,4 +562,35 @@ test('sandbox Theme API forwards search through its isolated MessageChannel runt
   await page.evaluate(async () => {
     await (window as Window & { __testThemeRuntime?: { dispose: () => Promise<void> } }).__testThemeRuntime?.dispose()
   })
+})
+
+test('theme recovery bypasses active package loading and restores Yin without changing color mode', async ({ page }) => {
+  let currentThemeRequests = 0
+  let mineRequests = 0
+  let savedPreference: Record<string, string> | undefined
+  await page.route('**/api/theme/v2/current', route => {
+    currentThemeRequests++
+    return route.fulfill({ json: { code: 0, data: {} } })
+  })
+  await page.route('**/api/theme/v2/mine', route => {
+    mineRequests++
+    return route.fulfill({ status: 500, json: { code: -1 } })
+  })
+  await page.route('**/api/theme/v2/preference', async (route) => {
+    if (route.request().method() === 'GET') {
+      await route.fulfill({ json: { code: 0, data: { mode: 'dark' } } })
+      return
+    }
+    savedPreference = route.request().postDataJSON()
+    await route.fulfill({ json: { code: 0 } })
+  })
+
+  await page.goto('/__yin/theme-recovery')
+  await expect(page.getByTestId('theme-recovery')).toBeVisible()
+  expect(currentThemeRequests).toBe(0)
+  expect(mineRequests).toBe(0)
+  await page.getByTestId('theme-recovery-restore-yin').click()
+  await expect.poll(() => savedPreference).toEqual({ packageId: 'org.yin.default', mode: 'dark' })
+  await expect(page).toHaveURL(/\/$/)
+  expect(await page.evaluate(() => sessionStorage.getItem('yin-theme-safe-mode'))).toBe('1')
 })

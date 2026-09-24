@@ -4,11 +4,14 @@ set -Eeuo pipefail
 repo_root="$(git rev-parse --show-toplevel)"
 env_file="${YIN_PANEL_ENV_FILE:-$repo_root/.env.local}"
 if [[ -f "$env_file" ]]; then
+	set +x
     set -a
     # shellcheck disable=SC1090
     source "$env_file"
     set +a
 fi
+
+export -n SUDO_PASSWORD SUDO_PASSWD 2>/dev/null || true
 
 port="${YIN_PANEL_PORT:-3002}"
 run_dir="${YIN_PANEL_RUNTIME_DIR:-$repo_root/backend}"
@@ -33,7 +36,15 @@ command -v setsid >/dev/null 2>&1 || die "setsid is required"
 [[ -f "$repo_root/backend/go.mod" ]] || die "backend/go.mod is missing"
 [[ -f "$run_dir/conf.yaml" ]] || die "runtime config is missing: $run_dir/conf.yaml"
 
-sudo -v
+sudo_password="${SUDO_PASSWORD:-${SUDO_PASSWD:-}}"
+if [[ -n "$sudo_password" ]]; then
+    sudo -S -v <<< "$sudo_password"
+    sudo_status=$?
+    unset sudo_password SUDO_PASSWORD SUDO_PASSWD
+    [[ "$sudo_status" -eq 0 ]] || exit "$sudo_status"
+else
+    sudo -v
+fi
 
 build_dir="$(mktemp -d /tmp/yin-panel-build.XXXXXX)"
 trap 'rm -rf "$build_dir"' EXIT

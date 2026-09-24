@@ -274,7 +274,7 @@ func PackagePreviewPublicV2(pkg *PackageV2, token string) PublicPackageV2 {
 		for j := range segments {
 			segments[j] = url.PathEscape(segments[j])
 		}
-		result.Manifest.Resources[i].URL = "/api/theme/preview/" + url.PathEscape(token) + "/assets/" + strings.Join(segments, "/")
+		result.Manifest.Resources[i].URL = "/api/theme/v2/preview/" + url.PathEscape(token) + "/assets/" + strings.Join(segments, "/")
 	}
 	return result
 }
