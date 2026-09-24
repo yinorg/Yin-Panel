@@ -10,10 +10,18 @@ export default defineConfig({
     ...devices['Desktop Chrome'],
     trace: 'retain-on-failure',
   },
-  webServer: {
-    command: 'npm run preview -- --host 127.0.0.1 --port 4173',
-    port: 4173,
-    reuseExistingServer: true,
-    timeout: 30_000,
-  },
+  webServer: [
+    {
+      command: 'npm run preview -- --host 127.0.0.1 --port 4173',
+      port: 4173,
+      reuseExistingServer: true,
+      timeout: 30_000,
+    },
+    {
+      command: 'npm run dev -- --host 127.0.0.1 --port 4174 --strictPort',
+      port: 4174,
+      reuseExistingServer: true,
+      timeout: 30_000,
+    },
+  ],
 })

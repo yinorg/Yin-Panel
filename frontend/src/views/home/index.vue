@@ -17,14 +17,21 @@ import { parsePublicCodeFromPath } from '@/utils/request/axios'
 import { usePanelState, useAuthStore } from '@/store'
 import { PanelPanelConfigStyleEnum, PanelStateNetworkModeEnum } from '@/enums'
 import { t } from '@/locales'
-import { getEnableStatus } from '@/api/system/systemMonitor'
-import { clearSpaceCache, createSpaceCache, readSpaceCache, readSpacesCache, writeSpaceCache, writeSpacesCache } from '@/utils/spaceCache'
+import { getEnableStatus, getSnapshot } from '@/api/system/systemMonitor'
+import { clearSpaceCache, readSpaceCache, readSpacesCache, writeSpaceCache, writeSpacesCache } from '@/utils/spaceCache'
 import { resolvePanelValue } from '@/utils/theme'
 import { activeThemePackage, activeThemeSlots } from '@/hooks/useTheme'
 import { getThemeRuntimeGrant, setThemeRuntimeGrant } from '@/api/theme'
 import { createHomeThemeHandlers } from '@/core/home/themeHandlers'
+import { executeHomeThemeRequest } from '@/core/home/themeRequest'
+import { createThemeSettingsStore } from '@/core/home/themeSettingsStore'
+import { createHomeCollectionLoader, type HomeCollectionResult } from '@/core/home/collection'
+import { createHomeSearchService } from '@/core/home/search'
+import { resolveItemOpenUrl } from '@/core/items/openPolicy'
+import { normalizeMonitorSnapshot } from '@/core/monitor/themeSnapshot'
 import { createThemeHomeSnapshot } from '@/theme/api/homeSnapshot'
-import type { ThemeCollectionStatus, ThemeCommand, ThemePermission } from '@/theme/api/v1'
+import type { ThemeCollectionStatus, ThemePermission } from '@/theme/api/v1'
+import type { CoreMonitorSnapshot } from '@/core/monitor/themeSnapshot'
 import ThemeHost from '@/theme/runtime/ThemeHost.vue'
 
 const SystemMonitor = defineAsyncComponent(() => import('../../components/deskModule/SystemMonitor/index.vue'))
@@ -97,6 +104,13 @@ const creatingSpace = ref(false)
 const monitorEnabled = ref(false)
 const monitorResultRefreshInterval = ref<number | undefined>()
 const isOnline = ref(typeof navigator === 'undefined' ? true : navigator.onLine)
+const runtimeViewport = ref({ width: window.innerWidth, height: window.innerHeight })
+const runtimeLanguage = ref(document.documentElement.lang || navigator.language)
+const runtimeColorScheme = ref(document.documentElement.classList.contains('dark') ? 'dark' as const : 'light' as const)
+const reducedMotionMedia = window.matchMedia('(prefers-reduced-motion: reduce)')
+const colorSchemeMedia = window.matchMedia('(prefers-color-scheme: dark)')
+const runtimeReducedMotion = ref(reducedMotionMedia.matches)
+let runtimeEnvironmentObserver: MutationObserver | undefined
 const pwaReady = ref(false)
 const cacheUpdatedAt = ref<number | null>(null)
 const hasValidCachedHome = ref(false)
@@ -109,6 +123,7 @@ let sideSwitchTimer: ReturnType<typeof setTimeout> | undefined
 const commandCenterVisible = ref(false)
 const commandCenterQuery = ref('')
 const commandCenterSelectedIndex = ref(-1)
+const remoteCommandItems = ref<Panel.ItemInfo[]>([])
 const commandCenterSearchEngine = ref<SearchEngine>(searchEngineList[0])
 const groupCreateVisible = ref(false)
 const groupName = ref('')
@@ -116,9 +131,31 @@ const creatingGroup = ref(false)
 
 const items = ref<ItemGroup[]>([])
 const filterItems = ref<ItemGroup[]>([])
+const collectionSpaceId = ref<number | null>(null)
 const loadedGroups = new Set<number>()
-let groupLoadGeneration = 0
+let homeSearchGeneration = 0
 const HOME_REQUEST_TIMEOUT = 3000
+const homeCollectionLoader = createHomeCollectionLoader<ItemGroup, Panel.ItemInfo>({
+  getGroups: (spaceId, signal) => getGroups<ItemGroup[]>(spaceId, signal),
+  getItems: (spaceId, groupId, page, pageSize, signal) => getItems<Panel.ItemInfo[]>(spaceId, groupId, page, pageSize, signal),
+  readCache: getCachedSpace,
+  writeCache: saveCachedSpace,
+  isOnline: () => isOnline.value,
+  timeoutMs: HOME_REQUEST_TIMEOUT,
+  onProgress: applyCollectionProgress,
+})
+const homeSearch = createHomeSearchService<Panel.ItemInfo>({
+  fetchPage: (spaceId, page, pageSize, signal) => getItems<Panel.ItemInfo[]>(spaceId, undefined, page, pageSize, signal),
+  isOnline: () => isOnline.value,
+})
+
+function withHomeTimeout<T>(request: Promise<T>): Promise<T> {
+  return Promise.race([
+    request,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error('Home request timed out')), HOME_REQUEST_TIMEOUT)),
+  ])
+}
+
 const collapsedGroups = ref<Set<number>>(new Set())
 const themeRuntimeGrant = ref<{ revision: string; granted: boolean; permissions: ThemePermission[] }>({ revision: '', granted: false, permissions: [] })
 const themeRuntimeGrantLoading = ref(false)
@@ -153,11 +190,11 @@ const themeRuntimeSnapshot = computed(() => createThemeHomeSnapshot({
 }))
 const themeRuntimeEnvironment = computed(() => ({
   coreVersion: import.meta.env.VITE_APP_VERSION || '0.0.0',
-  language: document.documentElement.lang || navigator.language,
-  colorScheme: document.documentElement.classList.contains('dark') ? 'dark' as const : 'light' as const,
-  reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+  language: runtimeLanguage.value,
+  colorScheme: runtimeColorScheme.value,
+  reducedMotion: runtimeReducedMotion.value,
   online: isOnline.value,
-  viewport: { width: window.innerWidth, height: window.innerHeight },
+  viewport: runtimeViewport.value,
 }))
 const themeRuntimePermissions = computed(() => themeGrantMatches.value ? themeRuntimeGrant.value.permissions : [])
 const themeRuntimeSlots = computed(() => activeThemeSlots.value)
@@ -227,12 +264,10 @@ function openPage(openMethod: number, url: string, title?: string) {
 }
 
 function getItemOpenUrl(item: Panel.ItemInfo, forceWan = false): string {
-  const isLan = panelState.networkMode === PanelStateNetworkModeEnum.lan
-  if (!forceWan && isLan)
-    return item.lanUrl || item.url
   const userAgent = typeof navigator === 'undefined' ? '' : navigator.userAgent
   const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|Tablet/i.test(userAgent)
-  return isMobile && item.mobileUrl ? item.mobileUrl : item.url
+  const networkMode = panelState.networkMode === PanelStateNetworkModeEnum.lan ? 'lan' : 'wan'
+  return resolveItemOpenUrl(item, { networkMode, isMobile, forceWan })
 }
 
 function handleItemClick(itemGroupIndex: number, item: Panel.ItemInfo) {
@@ -267,17 +302,8 @@ async function handleFloatingButtonClick(event: MouseEvent, action: () => unknow
   }
 }
 
-// 获取组数据
-function withHomeTimeout<T>(request: Promise<T>): Promise<T> {
-  return Promise.race([
-    request,
-    new Promise<T>((_, reject) => setTimeout(() => reject(new Error('Home request timed out')), HOME_REQUEST_TIMEOUT)),
-  ])
-}
-
 async function getList(forceRefresh = false) {
   if (forceRefresh && !canWrite.value) return
-  const generation = ++groupLoadGeneration
   themeSnapshotVersion.value++
   homeCollectionStatus.value = 'loading'
   homeCollectionError.value = undefined
@@ -285,87 +311,37 @@ async function getList(forceRefresh = false) {
   if (!activeSpace.value) {
     items.value = []
     filterItems.value = []
+    collectionSpaceId.value = null
     homeCollectionStatus.value = 'empty'
     return
   }
 
-  const spaceId = activeSpace.value.id
-  let groups: ItemGroup[] | undefined
-  const cachedSpace = getCachedSpace(spaceId)
-  const cache = cachedSpace || createSpaceCache()
-  if (!forceRefresh && cachedSpace) {
-    groups = cache.groups
+  const targetSpaceId = activeSpace.value.id
+  if (collectionSpaceId.value !== targetSpaceId) {
+    items.value = []
+    filterItems.value = []
+    collectionSpaceId.value = targetSpaceId
   }
-  if (!groups || forceRefresh) {
-    if (!isOnline.value) {
-      homeCollectionStatus.value = cachedSpace ? 'stale' : 'error'
-      if (!cachedSpace) homeCollectionError.value = { code: 'OFFLINE', message: 'Home data is unavailable offline' }
-      return
-    }
-    const { data } = await withHomeTimeout(getGroups<ItemGroup[]>(spaceId)).catch(() => ({ data: undefined }))
-    if (data) {
-      groups = data
-      cache.groups = groups
-    }
-    else if (cache.groups.length) {
-      groups = cache.groups
-      isOnline.value = false
-    }
-    else {
-      homeCollectionStatus.value = 'error'
-      homeCollectionError.value = { code: 'LOAD_FAILED', message: 'Could not load bookmark groups' }
-      return
-    }
-  }
-
-  const itemsByGroup = new Map<number, Panel.ItemInfo[]>()
-  const pendingGroups = groups.filter(group => forceRefresh || !cache.items[String(group.id)])
-  groups.forEach((group) => {
-    const cachedItems = cache.items[String(group.id)]
-    if (cachedItems) itemsByGroup.set(Number(group.id), cachedItems)
-  })
-  if (!groups) return
-  const resolvedGroups = groups
-  let nextGroup = 0
-  let failedGroups = 0
-  const loadNextGroups = async () => {
-    while (nextGroup < pendingGroups.length) {
-      const group = pendingGroups[nextGroup++]
-      let groupItems: Panel.ItemInfo[] = []
-      try {
-        const { data } = await withHomeTimeout(getItems<Panel.ItemInfo[]>(spaceId, Number(group.id), 1, 100))
-        if (data) {
-          groupItems = data
-          cache.items[String(group.id)] = groupItems
-          itemsByGroup.set(Number(group.id), groupItems)
-        }
-      }
-      catch {
-        failedGroups++
-      }
-      if (generation === groupLoadGeneration && activeSpace.value?.id === spaceId)
-        applyGroups(resolvedGroups, itemsByGroup)
-    }
-  }
-  applyGroups(resolvedGroups, itemsByGroup)
-  if (!isOnline.value) {
-    homeCollectionStatus.value = 'stale'
-    return
-  }
-  await Promise.all(Array.from({ length: Math.min(2, pendingGroups.length) }, loadNextGroups))
-
-  if (generation === groupLoadGeneration && activeSpace.value?.id === spaceId) {
-    saveCachedSpace(spaceId, cache)
-    cacheUpdatedAt.value = cache.updatedAt || Date.now()
-    hasValidCachedHome.value = !!getCachedSpace(spaceId)
-    applyGroups(resolvedGroups, itemsByGroup)
-    const itemCount = Array.from(itemsByGroup.values()).reduce((count, groupItems) => count + groupItems.length, 0)
-    homeCollectionStatus.value = failedGroups ? (itemCount ? 'stale' : 'error') : itemCount ? 'ready' : 'empty'
-    if (failedGroups) homeCollectionError.value = { code: 'PARTIAL_LOAD', message: 'Some bookmark items could not be loaded' }
-  }
+  if (forceRefresh) homeSearch.invalidate(targetSpaceId)
+  const result = await homeCollectionLoader.load(targetSpaceId, forceRefresh)
+  if (result.cancelled || activeSpace.value?.id !== result.spaceId) return
+  applyCollectionProgress(result)
+  cacheUpdatedAt.value = result.cache.updatedAt || Date.now()
+  hasValidCachedHome.value = !!getCachedSpace(result.spaceId)
+  const itemCount = Array.from(result.itemsByGroup.values()).reduce((count, groupItems) => count + groupItems.length, 0)
+  homeCollectionStatus.value = result.error?.code === 'LOAD_FAILED' || (result.failedGroups > 0 && !itemCount)
+    ? 'error'
+    : result.stale ? 'stale' : itemCount ? 'ready' : 'empty'
+  homeCollectionError.value = result.error
 }
 
-function applyGroups(data: ItemGroup[], itemsByGroup = new Map<number, Panel.ItemInfo[]>()) {
+function applyCollectionProgress(result: HomeCollectionResult<ItemGroup, Panel.ItemInfo>) {
+  if (activeSpace.value?.id !== result.spaceId) return
+  applyGroups(result.groups, result.itemsByGroup, result.spaceId)
+}
+
+function applyGroups(data: ItemGroup[], itemsByGroup = new Map<number, Panel.ItemInfo[]>(), spaceId = activeSpace.value?.id) {
+    collectionSpaceId.value = spaceId ?? null
     const byParent = new Map<number, ItemGroup[]>()
     data.forEach(group => { const key = group.parentId || 0; const list = byParent.get(key) || []; list.push({ ...group, items: itemsByGroup.get(Number(group.id)) || [] }); byParent.set(key, list) })
     const flattened: ItemGroup[] = []
@@ -398,7 +374,10 @@ function groupHidden(index: number) {
 
 function toggleGroup(id: number) { const next = new Set(collapsedGroups.value); next.has(id) ? next.delete(id) : next.add(id); collapsedGroups.value = next }
 function selectSpace(key: string | number) {
-  groupLoadGeneration++
+  homeCollectionLoader.cancel()
+  homeSearch.invalidate()
+  homeSearchGeneration++
+  remoteCommandItems.value = []
   loadedGroups.clear()
   const selected = spaces.value.find(space => space.id === Number(key))
   if (selected) { activeSpace.value = selected; getList() }
@@ -410,6 +389,11 @@ function togglePanelSide() {
     ? spaces.value.find(space => space.id === yin.pairId)
     : { ...yin, id: yin.pairedSpaceId!, name: `${yin.name}-B`, side: 'yang' as const, pairId: yin.id, pairedSpaceId: yin.id }
   if (!target) return
+  homeCollectionLoader.cancel()
+  homeSearch.invalidate()
+  homeSearchGeneration++
+  remoteCommandItems.value = []
+  loadedGroups.clear()
   activeSpace.value = target
   getList()
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
@@ -444,7 +428,7 @@ const commandCenterItems = computed(() => {
   const query = commandCenterQuery.value.trim().toLowerCase()
   if (commandCenterQuery.value.startsWith('/') || !query) return []
   const seen = new Set<number>()
-  return allCommandItems.value.filter((item) => {
+  return [...remoteCommandItems.value, ...allCommandItems.value].filter((item) => {
     if (item.id !== undefined && seen.has(Number(item.id))) return false
     if (item.id !== undefined) seen.add(Number(item.id))
     return [item.title, item.url, item.description].some(value => value?.toLowerCase().includes(query))
@@ -452,7 +436,7 @@ const commandCenterItems = computed(() => {
 })
 
 function openCommandCenter(query: string) {
-  commandCenterQuery.value = query
+  updateCommandCenterQuery(query)
   commandCenterSelectedIndex.value = query.startsWith('/') ? 0 : -1
   commandCenterVisible.value = true
 }
@@ -460,6 +444,7 @@ function openCommandCenter(query: string) {
 function closeCommandCenter() {
   commandCenterVisible.value = false
   commandCenterQuery.value = ''
+  remoteCommandItems.value = []
   commandCenterSelectedIndex.value = 0
 }
 
@@ -480,7 +465,7 @@ function submitCommandCenterSearch(keyword: string) {
 
 function findCommandItem(query: string) {
   const keyword = query.trim().toLowerCase()
-  return allCommandItems.value.find(item => !keyword || [item.title, item.url, item.description].some(value => value?.toLowerCase().includes(keyword)))
+  return [...remoteCommandItems.value, ...allCommandItems.value].find(item => !keyword || [item.title, item.url, item.description].some(value => value?.toLowerCase().includes(keyword)))
 }
 
 function executeCommand(command: string) {
@@ -513,6 +498,17 @@ function updateCommandCenterQuery(query: string) {
   const wasCommandQuery = commandCenterQuery.value.startsWith('/')
   const isCommandQuery = query.startsWith('/')
   commandCenterQuery.value = query
+  if (!query.trim() || query.startsWith('/')) {
+    remoteCommandItems.value = []
+  }
+  else if (activeSpace.value) {
+    const spaceId = activeSpace.value.id
+    const keyword = query.trim()
+    void homeSearch.query(spaceId, keyword).then((matches) => {
+      if (activeSpace.value?.id === spaceId && commandCenterQuery.value === query)
+        remoteCommandItems.value = matches
+    }).catch(() => {})
+  }
   if (wasCommandQuery !== isCommandQuery)
     commandCenterSelectedIndex.value = isCommandQuery ? 0 : -1
 }
@@ -791,6 +787,12 @@ onMounted(() => {
   window.addEventListener('keydown', handleGlobalKeydown)
   window.addEventListener('online', handleOnline)
   window.addEventListener('offline', handleOffline)
+  window.addEventListener('resize', syncThemeEnvironment)
+  colorSchemeMedia.addEventListener('change', syncThemeEnvironment)
+  reducedMotionMedia.addEventListener('change', syncThemeEnvironment)
+  runtimeEnvironmentObserver = new MutationObserver(syncThemeEnvironment)
+  runtimeEnvironmentObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'lang'] })
+  syncThemeEnvironment()
   void updatePwaReady()
   navigator.serviceWorker?.addEventListener('controllerchange', updatePwaReady)
   if (publicCode && !publicAccessReady.value) return
@@ -802,10 +804,22 @@ onUnmounted(() => {
   window.removeEventListener('keydown', handleGlobalKeydown)
   window.removeEventListener('online', handleOnline)
   window.removeEventListener('offline', handleOffline)
+  window.removeEventListener('resize', syncThemeEnvironment)
+  colorSchemeMedia.removeEventListener('change', syncThemeEnvironment)
+  reducedMotionMedia.removeEventListener('change', syncThemeEnvironment)
+  runtimeEnvironmentObserver?.disconnect()
   navigator.serviceWorker?.removeEventListener('controllerchange', updatePwaReady)
   if (sideSwitchTimer) clearTimeout(sideSwitchTimer)
-  groupLoadGeneration++
+  homeCollectionLoader.cancel()
+  homeSearch.cancel()
 })
+
+function syncThemeEnvironment() {
+  runtimeViewport.value = { width: window.innerWidth, height: window.innerHeight }
+  runtimeLanguage.value = document.documentElement.lang || navigator.language
+  runtimeColorScheme.value = document.documentElement.classList.contains('dark') ? 'dark' : 'light'
+  runtimeReducedMotion.value = reducedMotionMedia.matches
+}
 
 function handleOnline() {
   isOnline.value = true
@@ -828,9 +842,9 @@ async function updatePwaReady() {
 
 // 前端搜索过滤
 function itemFrontEndSearch(keyword?: string) {
-  keyword = keyword?.trim()
+  keyword = keyword?.trim() || ''
   if (keyword !== '' && panelState.panelConfig.searchBoxSearchIcon) {
-    const filteredData = ref<ItemGroup[]>([])
+    const filteredData: ItemGroup[] = []
     for (let i = 0; i < items.value.length; i++) {
       const element = items.value[i].items?.filter((item: Panel.ItemInfo) => {
         return (
@@ -840,11 +854,32 @@ function itemFrontEndSearch(keyword?: string) {
         )
       })
       if (element && element.length > 0)
-        filteredData.value.push({ items: element, hoverStatus: false })
+        filteredData.push({ ...items.value[i], items: element })
     }
-    filterItems.value = filteredData.value
+    filterItems.value = filteredData
+    const query = keyword
+    const spaceId = activeSpace.value?.id
+    if (!spaceId) return
+    const searchGeneration = ++homeSearchGeneration
+    void homeSearch.query(spaceId, query).then((matches) => {
+      if (searchGeneration !== homeSearchGeneration || activeSpace.value?.id !== spaceId) return
+      const groupMap = new Map(items.value.map(group => [Number(group.id), group]))
+      const grouped = new Map<number, Panel.ItemInfo[]>()
+      for (const item of matches) {
+        const groupId = Number(item.itemIconGroupId)
+        if (!Number.isSafeInteger(groupId)) continue
+        const groupItems = grouped.get(groupId) || []
+        groupItems.push(item)
+        grouped.set(groupId, groupItems)
+      }
+      filterItems.value = [...grouped.entries()].flatMap(([groupId, groupItems]) => {
+        const group = groupMap.get(groupId)
+        return group ? [{ ...group, items: groupItems }] : []
+      })
+    }).catch(() => {})
   }
   else {
+    homeSearchGeneration++
     filterItems.value = items.value
   }
 }
@@ -888,19 +923,33 @@ function createThemeRuntimeError(code: string, message: string) {
 
 const homeThemeHandlers = createHomeThemeHandlers({
   getSpaces: () => spaces.value,
-  getGroups: () => items.value.filter(group => Number.isSafeInteger(Number(group.id))).map(group => ({ id: Number(group.id), items: group.items || [] })),
+  getGroups: () => items.value.filter(group => Number.isSafeInteger(Number(group.id))).map(group => ({
+    id: Number(group.id),
+    parentId: group.parentId,
+    title: group.title,
+    icon: group.icon,
+    sort: group.sort,
+    items: group.items || [],
+  })),
+  getActiveSpaceId: () => activeSpace.value?.id,
   selectSpace: spaceId => selectSpace(spaceId),
   openItem: (item) => { openPage(item.openMethod, getItemOpenUrl(item), item.title) },
   openEditor: ({ item, groupId }) => item ? handleEditItem(item) : handleAddItem(groupId),
   openCommandCenter: () => { commandCenterVisible.value = true },
   toggleSide: togglePanelSide,
-  refresh: refreshCurrentSpace,
+  refresh: () => getList(true),
+  searchItems: query => activeSpace.value ? homeSearch.query(activeSpace.value.id, query) : [],
+  getMonitorSnapshot: async () => {
+    const result = await getSnapshot<CoreMonitorSnapshot>()
+    if (result.code !== 0) throw createThemeRuntimeError('UNSUPPORTED_CAPABILITY', 'Monitor data is unavailable')
+    return normalizeMonitorSnapshot(result.data)
+  },
   submitSearch: query => itemFrontEndSearch(query),
   navigate: (destination) => {
     if (destination.view !== 'home') throw createThemeRuntimeError('UNSUPPORTED_CAPABILITY', 'Core navigation destination is unavailable')
   },
-  getSettings: () => ({}),
-  patchSettings: () => { throw createThemeRuntimeError('UNSUPPORTED_CAPABILITY', 'Theme settings are not available yet') },
+  getSettings: () => createThemeSettingsStore(localStorage, getThemeSettingsNamespace()).get(),
+  patchSettings: value => createThemeSettingsStore(localStorage, getThemeSettingsNamespace()).patch(value),
   getStorage: (key) => {
     const packageId = activeThemePackage.value?.manifest.id || 'unknown'
     const userId = authStore.userInfo?.id || 'anonymous'
@@ -921,19 +970,15 @@ const homeThemeHandlers = createHomeThemeHandlers({
   },
 })
 
+function getThemeSettingsNamespace() {
+  const packageId = activeThemePackage.value?.manifest.id || 'unknown'
+  const revision = activeThemePackage.value?.revision || 'uninstalled'
+  const userId = authStore.userInfo?.id || 'anonymous'
+  return `${userId}:${packageId}:${revision}`
+}
+
 async function executeThemeRequest(value: unknown) {
-  if (!value || typeof value !== 'object') throw createThemeRuntimeError('INVALID_ARGUMENT', 'Invalid Theme API request')
-  const request = value as Record<string, any>
-  if (request.method === 'commands.execute' && typeof request.command === 'string')
-    return homeThemeHandlers.executeCommand(request.command as ThemeCommand, request.payload || {})
-  if (request.method === 'navigation.navigate' && request.destination)
-    return homeThemeHandlers.navigate(request.destination)
-  if (request.method === 'settings.get') return homeThemeHandlers.getSettings()
-  if (request.method === 'settings.patch') return homeThemeHandlers.patchSettings(request.value || {})
-  if (request.method === 'storage.get' && typeof request.key === 'string') return homeThemeHandlers.getStorage(request.key)
-  if (request.method === 'storage.set' && typeof request.key === 'string') return homeThemeHandlers.setStorage(request.key, request.value)
-  if (request.method === 'storage.remove' && typeof request.key === 'string') return homeThemeHandlers.removeStorage(request.key)
-  throw createThemeRuntimeError('UNSUPPORTED_CAPABILITY', 'Theme API operation is unavailable')
+  return executeHomeThemeRequest(homeThemeHandlers, value)
 }
 
 async function grantThemeRuntimePermissions() {

@@ -1,7 +1,10 @@
 import { expect, test } from '@playwright/test'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { createThemeApiDispatcher, type ThemeApiHandlers } from '../../src/theme/api/dispatcher'
 import { createThemeHomeSnapshot } from '../../src/theme/api/homeSnapshot'
 import { isThemeApiRequest } from '../../src/theme/api/v1'
+import { THEME_API_VERSION as publicThemeApiVersion, isThemeApiRequest as isPublicThemeApiRequest } from '../../packages/theme-sdk/src/index'
 import { createHomeThemeHandlers } from '../../src/core/home/themeHandlers'
 import { createThemeSandboxDocument } from '../../src/theme/runtime/sandbox'
 import { normalizeThemePackageV2, resolvePanelValue, resolveThemeSlots, resolveWallpaper, selectThemeScheme, semanticSlots, type ThemePackage, type ThemePackageV2 } from '../../src/utils/theme'
@@ -144,6 +147,46 @@ test('resolves grouped DTCG semantic and component tokens without controlling la
   expect(slots.layoutTemplate).toBeUndefined()
 })
 
+test('resolves DTCG group root tokens and inherited tokens with local overrides', () => {
+  const pkg = makePackage(['light'])
+  pkg.documents.light = {
+    $schema: 'https://design-tokens.github.io/community-group/format/2025.10/schema.json',
+    primitive: {
+      shape: {
+        $type: 'dimension',
+        $root: { $value: { value: 4, unit: 'px' } },
+        small: { $value: { value: 8, unit: 'px' } },
+        radius: { $value: { value: 16, unit: 'px' } },
+      },
+    },
+    semantic: {
+      shape: {
+        $extends: '{primitive.shape}',
+        radius: { $value: { value: 12, unit: 'px' } },
+      },
+    },
+  }
+
+  expect(resolveThemeSlots(pkg, 'light')).toMatchObject({
+    'shape': '4px',
+    'shape-small': '8px',
+    'shape-radius': '12px',
+  })
+})
+
+test('maps DTCG 2025.10 wide-gamut, polar, and alpha colors to browser-supported CSS Color 4', async ({ page }) => {
+  const document = JSON.parse(readFileSync(resolve(process.cwd(), '../shared/theme/dtcg-conformance/color-spaces.json'), 'utf8'))
+  const pkg = makePackage(['light'])
+  pkg.documents.light = document
+
+  const slots = resolveThemeSlots(pkg, 'light')
+  expect(slots).toMatchObject({
+    'primitive-color-p3-accent': 'color(display-p3 1 0.2 0 / 0.75)',
+    'primitive-color-hsl-accent': 'hsl(210 60% 40%)',
+  })
+  expect(await page.evaluate(values => values.map(value => CSS.supports('color', value)), [slots['primitive-color-p3-accent'], slots['primitive-color-hsl-accent']])).toEqual([true, true])
+})
+
 test('current package DTCG semantic tokens map to runtime slots', () => {
   const color = (hex: string) => ({
     $type: 'color',
@@ -209,6 +252,8 @@ test('wallpaper uses the selected scheme and versioned assets', () => {
 
 test('Theme API v1 validates protocol envelopes and bounds payload size', () => {
   const valid = { protocol: 'yin-theme-api', version: 1, requestId: 'request-123', contextVersion: 4, method: 'commands.execute', payload: { command: 'item.open' } }
+  expect(publicThemeApiVersion).toBe('1.0.0')
+  expect(isPublicThemeApiRequest(valid)).toBe(true)
   expect(isThemeApiRequest(valid)).toBe(true)
   expect(isThemeApiRequest({ ...valid, version: 2 })).toBe(false)
   expect(isThemeApiRequest({ ...valid, payload: { value: 'x'.repeat(1_048_577) } })).toBe(false)
@@ -250,17 +295,20 @@ test('Theme home DTO uses string IDs and excludes Core-only item URLs', () => {
 })
 
 test('Core Home command adapter resolves IDs from live data and ignores theme-provided URLs', async () => {
-  const item = { id: 31, title: 'Console', icon: null, url: 'https://internal.test', openMethod: 3 }
+  const item = { id: 31, itemIconGroupId: 21, title: 'Console', icon: null, url: 'https://internal.test', openMethod: 3 }
   let opened: Panel.ItemInfo | undefined
   const handlers = createHomeThemeHandlers({
     getSpaces: () => [{ id: 12 }],
     getGroups: () => [{ id: 21, items: [item] }],
+    getActiveSpaceId: () => 12,
     selectSpace: () => undefined,
     openItem: (value) => { opened = value },
     openEditor: () => undefined,
     openCommandCenter: () => undefined,
     toggleSide: () => undefined,
     refresh: () => undefined,
+    searchItems: () => [item],
+    getMonitorSnapshot: () => ({}),
     submitSearch: () => undefined,
     navigate: () => undefined,
     getSettings: () => ({}),
@@ -271,6 +319,19 @@ test('Core Home command adapter resolves IDs from live data and ignores theme-pr
   })
   await handlers.executeCommand('item.open', { itemId: '31', url: 'https://attacker.test' })
   expect(opened).toBe(item)
+  await expect(handlers.searchItems('Console', { limit: 1 })).resolves.toMatchObject({
+    query: 'Console',
+    total: 1,
+    items: [{ id: '31', groupId: '21', title: 'Console', capabilities: ['item.open'] }],
+  })
+  expect(handlers.listSpaces({ limit: 1 })).toMatchObject({
+    total: 1,
+    items: [{ id: '12', capabilities: ['space.select'] }],
+  })
+  expect(handlers.listItems({ limit: 1 })).toMatchObject({
+    total: 1,
+    items: [{ id: '31', groupId: '21', title: 'Console', capabilities: ['item.open'] }],
+  })
   await expect(handlers.executeCommand('item.open', { itemId: '999' })).rejects.toMatchObject({ code: 'NOT_FOUND' })
   await expect(handlers.executeCommand('item.delete', { itemId: '31' })).rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' })
 })
@@ -280,6 +341,11 @@ test('Theme API v1 dispatcher enforces permission and rejects stale contexts', a
   let openedItem = ''
   const handlers: ThemeApiHandlers = {
     executeCommand: (_command, payload) => { openedItem = String(payload.itemId); return { opened: openedItem } },
+    searchItems: (query, paging) => ({ query, items: [{ id: query }], total: 1, paging }),
+    listSpaces: paging => ({ items: [], total: 0, ...paging }),
+    listGroups: paging => ({ items: [], total: 0, ...paging }),
+    listItems: paging => ({ items: [], total: 0, ...paging }),
+    getMonitorSnapshot: () => ({ capturedAt: '2026-09-24T00:00:00.000Z' }),
     navigate: () => undefined,
     getSettings: () => ({}),
     patchSettings: () => undefined,
@@ -294,11 +360,114 @@ test('Theme API v1 dispatcher enforces permission and rejects stale contexts', a
   expect(opened).toMatchObject({ ok: true, result: { opened: '42' } })
   expect(openedItem).toBe('42')
 
+  const search = await dispatch({ ...base, method: 'search.query', payload: { query: 'needle' } })
+  expect(search).toMatchObject({ ok: true, result: { query: 'needle', items: [{ id: 'needle' }], total: 1, paging: { limit: 50 } } })
+  const invalidSearch = await dispatch({ ...base, method: 'search.query', payload: { query: 'x'.repeat(201) } })
+  expect(invalidSearch).toMatchObject({ ok: false, error: { code: 'INVALID_ARGUMENT' } })
+  const oversizedPage = await dispatch({ ...base, method: 'search.query', payload: { query: 'needle', limit: 101 } })
+  expect(oversizedPage).toMatchObject({ ok: false, error: { code: 'INVALID_ARGUMENT' } })
+  const itemListDeniedDispatch = createThemeApiDispatcher({ getContextVersion: () => contextVersion, getPermissions: () => new Set(['spaces.read']), handlers })
+  const itemListDenied = await itemListDeniedDispatch({ ...base, method: 'items.list', payload: { limit: 1 } })
+  expect(itemListDenied).toMatchObject({ ok: false, error: { code: 'PERMISSION_DENIED' } })
+  const itemListDispatch = createThemeApiDispatcher({ getContextVersion: () => contextVersion, getPermissions: () => new Set(['items.read']), handlers })
+  const itemList = await itemListDispatch({ ...base, method: 'items.list', payload: { limit: 1 } })
+  expect(itemList).toMatchObject({ ok: true, result: { items: [], total: 0 } })
+  const spaceListDispatch = createThemeApiDispatcher({ getContextVersion: () => contextVersion, getPermissions: () => new Set(['spaces.read']), handlers })
+  const spaceList = await spaceListDispatch({ ...base, method: 'spaces.list', payload: { limit: 25 } })
+  expect(spaceList).toMatchObject({ ok: true, result: { items: [], total: 0, limit: 25 } })
+  const groupsDenied = await itemListDispatch({ ...base, method: 'groups.list', payload: undefined })
+  expect(groupsDenied).toMatchObject({ ok: false, error: { code: 'PERMISSION_DENIED' } })
+  const invalidGroupFilter = await itemListDispatch({ ...base, method: 'items.list', payload: { groupId: '../other-space' } })
+  expect(invalidGroupFilter).toMatchObject({ ok: false, error: { code: 'INVALID_ARGUMENT' } })
+
   const denied = await dispatch({ ...base, payload: { command: 'item.delete', arguments: { itemId: '42' } } })
   expect(denied).toMatchObject({ ok: false, error: { code: 'PERMISSION_DENIED' } })
+
+  const settingsDenied = await dispatch({ ...base, method: 'settings.get', payload: undefined })
+  expect(settingsDenied).toMatchObject({ ok: false, error: { code: 'PERMISSION_DENIED' } })
 
   contextVersion += 1
   const stale = await dispatch(base)
   expect(stale).toMatchObject({ ok: false, error: { code: 'ABORTED' } })
   expect(openedItem).toBe('42')
+
+  contextVersion = 8
+  const contextChangingDispatch = createThemeApiDispatcher({
+    getContextVersion: () => contextVersion,
+    getPermissions: () => new Set(['items.read', 'groups.read']),
+    handlers: {
+      ...handlers,
+      executeCommand: async () => {
+        await Promise.resolve()
+        contextVersion += 1
+        return { refreshed: true }
+      },
+    },
+  })
+  const completedAction = await contextChangingDispatch({ ...base, contextVersion, payload: { command: 'data.refresh' } })
+  expect(completedAction).toMatchObject({ ok: true, result: { refreshed: true } })
+
+  const preferencesDispatch = createThemeApiDispatcher({ getContextVersion: () => contextVersion, getPermissions: () => new Set(['preferences.read']), handlers })
+  const settingsAllowed = await preferencesDispatch({ ...base, contextVersion, method: 'settings.get', payload: undefined })
+  expect(settingsAllowed).toMatchObject({ ok: true, result: {} })
+  const settingsWriteDenied = await preferencesDispatch({ ...base, contextVersion, method: 'settings.patch', payload: { value: { layout: 'grid' } } })
+  expect(settingsWriteDenied).toMatchObject({ ok: false, error: { code: 'PERMISSION_DENIED' } })
+  const preferencesWriteDispatch = createThemeApiDispatcher({ getContextVersion: () => contextVersion, getPermissions: () => new Set(['preferences.write']), handlers })
+  const settingsWriteAllowed = await preferencesWriteDispatch({ ...base, contextVersion, method: 'settings.patch', payload: { value: { layout: 'grid' } } })
+  expect(settingsWriteAllowed).toMatchObject({ ok: true })
+
+  const monitorDenied = await dispatch({ ...base, contextVersion, method: 'monitor.getSnapshot', payload: undefined })
+  expect(monitorDenied).toMatchObject({ ok: false, error: { code: 'PERMISSION_DENIED' } })
+  const monitorDispatch = createThemeApiDispatcher({ getContextVersion: () => contextVersion, getPermissions: () => new Set(['monitor.read']), handlers })
+  const monitorAllowed = await monitorDispatch({ ...base, contextVersion, method: 'monitor.getSnapshot', payload: undefined })
+  expect(monitorAllowed).toMatchObject({ ok: true, result: { capturedAt: '2026-09-24T00:00:00.000Z' } })
+})
+
+test('sandbox Theme API forwards search through its isolated MessageChannel runtime', async ({ page }) => {
+  await page.goto('http://127.0.0.1:4174/')
+  await page.evaluate(async () => {
+    const sandboxPath = '/src/theme/runtime/sandbox.ts'
+    const { mountThemeSandbox } = await import(sandboxPath)
+    const frame = document.createElement('iframe')
+    document.body.appendChild(frame)
+    const script = `export default {
+      apiVersion: '1.0.0',
+      setup(api) {
+        return { views: { home(root) {
+          root.textContent = 'sandbox ready'
+          Promise.all([
+            api.search.query('needle', { limit: 1 }),
+            api.spaces.list({ limit: 25 }),
+            api.groups.list(),
+            api.items.list(),
+          ]).then(results => {
+            root.setAttribute('data-result', results.map(result => result.method + ':' + result.total).join('|'))
+          }).catch(error => root.setAttribute('data-error', error.code))
+          return { unmount() { root.replaceChildren() } }
+        } } }
+      }
+    }`
+    const runtime = await mountThemeSandbox(frame, {
+      script,
+      styles: [],
+      tokens: '',
+      snapshot: { version: 1, status: 'ready', spaces: [], groups: [], items: [] },
+      environment: {
+        coreVersion: '0.4.0', language: 'en', colorScheme: 'light', reducedMotion: false,
+        online: true, viewport: { width: 1280, height: 800 }, assets: {},
+      },
+      permissions: new Set(['items.read', 'spaces.read', 'groups.read']),
+      execute: (request: unknown) => {
+        const method = (request as { method: string }).method
+        return { method, items: [], total: method === 'spaces.list' ? 3 : 0 }
+      },
+      onError: (error: Error) => { document.documentElement.dataset.themeError = error.message },
+    })
+    ;(window as Window & { __testThemeRuntime?: { dispose: () => Promise<void> } }).__testThemeRuntime = runtime
+  })
+  const themedRoot = page.frameLocator('iframe').locator('#theme-root')
+  await expect(themedRoot).toHaveAttribute('data-result', 'search.query:0|spaces.list:3|groups.list:0|items.list:0')
+  await page.evaluate(async () => {
+    await (window as Window & { __testThemeRuntime?: { dispose: () => Promise<void> } }).__testThemeRuntime?.dispose()
+  })
 })

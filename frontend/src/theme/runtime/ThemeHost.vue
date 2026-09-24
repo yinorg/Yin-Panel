@@ -11,7 +11,7 @@ const props = defineProps<{
   permissions: ThemePermission[]
   slots: Record<string, string>
   title: string
-  execute(request: unknown): Promise<unknown>
+  execute: (request: unknown) => Promise<unknown>
 }>()
 
 const emit = defineEmits<{
@@ -23,11 +23,17 @@ const frame = ref<HTMLIFrameElement>()
 let runtime: ThemeSandboxHandle | undefined
 let disposed = false
 let generation = 0
+let startTask: Promise<void> | undefined
 
-onMounted(() => { void start() })
+onMounted(() => { queueStart() })
 
 watch(() => props.snapshot, (snapshot) => {
-  runtime?.update(scopedSnapshot(snapshot))
+  publishSnapshot(scopedSnapshot(snapshot))
+}, { deep: true })
+
+watch(() => props.environment, (environment) => {
+  runtime?.updateEnvironment({ ...environment, assets: themeAssetURLs(props.theme) })
+  runtime?.emit('environment.changed', environment)
 }, { deep: true })
 
 watch(() => props.slots, (slots) => {
@@ -39,13 +45,22 @@ watch(() => props.slots, (slots) => {
 }, { deep: true })
 
 watch(() => `${props.theme.revision || ''}:${props.permissions.join(',')}`, async () => {
-  if (!runtime || disposed) return
+  if (disposed) return
   const previous = runtime
   runtime = undefined
-  generation += 1
-  await previous.dispose()
-  if (!disposed) void start()
+  const restartGeneration = ++generation
+  await previous?.dispose()
+  await startTask
+  if (!disposed && restartGeneration === generation) queueStart()
 })
+
+function queueStart() {
+  const task = start()
+  startTask = task
+  void task.finally(() => {
+    if (startTask === task) startTask = undefined
+  })
+}
 
 async function start() {
   const startGeneration = ++generation
@@ -68,13 +83,16 @@ async function start() {
       validateResourceURL(resource.url!)
       return [resource.path, new URL(resource.url!, window.location.origin).href]
     }))
+    const initialSnapshot = scopedSnapshot(props.snapshot)
+    runtimeSnapshot = initialSnapshot
+    const initialEnvironment = { ...props.environment, assets }
     const tokens = `:root{${Object.entries(props.slots).filter(([name]) => /^[a-z0-9-]+$/.test(name)).map(([name, value]) => `--yin-${name}:${value}`).join(';')}}`
     const nextRuntime = await mountThemeSandbox(frame.value!, {
       script,
       styles,
       tokens,
-      snapshot: scopedSnapshot(props.snapshot),
-      environment: { ...props.environment, assets },
+      snapshot: initialSnapshot,
+      environment: initialEnvironment,
       permissions: new Set(props.permissions),
       execute: props.execute,
       onError: (error) => emit('failed', error),
@@ -84,12 +102,46 @@ async function start() {
       return
     }
     runtime = nextRuntime
+    runtimeSnapshot = initialSnapshot
+    publishSnapshot(scopedSnapshot(props.snapshot))
+    if (JSON.stringify(initialEnvironment) !== JSON.stringify({ ...props.environment, assets: themeAssetURLs(props.theme) })) {
+      nextRuntime.updateEnvironment({ ...props.environment, assets: themeAssetURLs(props.theme) })
+      nextRuntime.emit('environment.changed', props.environment)
+    }
+    const currentSlots = Object.entries(props.slots)
+      .filter(([name]) => /^[a-z0-9-]+$/.test(name))
+      .map(([name, value]) => `--yin-${name}:${value}`)
+      .join(';')
+    nextRuntime.updateTokens(`:root{${currentSlots}}`)
     emit('ready')
   }
   catch (error) {
     if (!disposed && startGeneration === generation)
       emit('failed', error instanceof Error ? error : new Error(String(error)))
   }
+}
+
+let runtimeSnapshot: ThemeHomeSnapshot | undefined
+
+function publishSnapshot(next: ThemeHomeSnapshot) {
+  const previous = runtimeSnapshot
+  runtimeSnapshot = next
+  runtime?.update(next)
+  if (!runtime || !previous || previous.version === next.version && JSON.stringify(previous) === JSON.stringify(next)) return
+  runtime.emit('state.updated', { status: next.status, version: next.version })
+  if (previous.activeSpaceId !== next.activeSpaceId || JSON.stringify(previous.spaces) !== JSON.stringify(next.spaces))
+    runtime.emit('space.changed', { activeSpaceId: next.activeSpaceId, spaces: next.spaces })
+  if (JSON.stringify(previous.groups) !== JSON.stringify(next.groups))
+    runtime.emit('groups.changed', { groups: next.groups })
+  if (JSON.stringify(previous.items) !== JSON.stringify(next.items))
+    runtime.emit('items.changed', { items: next.items })
+}
+
+function themeAssetURLs(theme: ThemePackage) {
+  return Object.fromEntries((theme.manifest.resources || []).filter(resource => resource.url).map((resource) => {
+    validateResourceURL(resource.url!)
+    return [resource.path, new URL(resource.url!, window.location.origin).href]
+  }))
 }
 
 function scopedSnapshot(snapshot: ThemeHomeSnapshot): ThemeHomeSnapshot {

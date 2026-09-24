@@ -278,8 +278,15 @@ func validateDTCGValue(typeName string, value any) error {
 				}
 			}
 		}
-		if alpha, ok := object["alpha"]; ok && !finiteDTCGNumber(alpha) {
-			return invalid()
+		if alpha, ok := object["alpha"]; ok {
+			if !finiteDTCGNumber(alpha) {
+				return invalid()
+			}
+			number, _ := alpha.(json.Number)
+			value, _ := number.Float64()
+			if value < 0 || value > 1 {
+				return invalid()
+			}
 		}
 	case "dimension", "duration":
 		object, ok := value.(map[string]any)

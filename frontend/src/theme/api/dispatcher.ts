@@ -3,13 +3,18 @@ import { isThemeApiRequest, type ThemeApiRequest, type ThemeCommand, type ThemeP
 export type ThemeApiMethod = ThemeApiRequest['method']
 
 export interface ThemeApiHandlers {
-  executeCommand(command: ThemeCommand, payload: Record<string, unknown>): Promise<unknown> | unknown
-  navigate(destination: { view: string; spaceId?: string }): Promise<unknown> | unknown
-  getSettings(): Promise<Record<string, unknown>> | Record<string, unknown>
-  patchSettings(value: Record<string, unknown>): Promise<unknown> | unknown
-  getStorage(key: string): Promise<unknown> | unknown
-  setStorage(key: string, value: unknown): Promise<unknown> | unknown
-  removeStorage(key: string): Promise<unknown> | unknown
+  executeCommand: (command: ThemeCommand, payload: Record<string, unknown>) => Promise<unknown> | unknown
+  searchItems: (query: string, options: { limit: number; cursor?: string }) => Promise<unknown> | unknown
+  listSpaces: (options: { limit: number; cursor?: string }) => Promise<unknown> | unknown
+  listGroups: (options: { limit: number; cursor?: string }) => Promise<unknown> | unknown
+  listItems: (options: { limit: number; cursor?: string; groupId?: string }) => Promise<unknown> | unknown
+  getMonitorSnapshot: () => Promise<unknown> | unknown
+  navigate: (destination: { view: string; spaceId?: string }) => Promise<unknown> | unknown
+  getSettings: () => Promise<Record<string, unknown>> | Record<string, unknown>
+  patchSettings: (value: Record<string, unknown>) => Promise<unknown> | unknown
+  getStorage: (key: string) => Promise<unknown> | unknown
+  setStorage: (key: string, value: unknown) => Promise<unknown> | unknown
+  removeStorage: (key: string) => Promise<unknown> | unknown
 }
 
 export interface ThemeApiResponse {
@@ -23,8 +28,8 @@ export interface ThemeApiResponse {
 }
 
 export interface ThemeApiDispatcherOptions {
-  getContextVersion(): number
-  getPermissions(): ReadonlySet<ThemePermission>
+  getContextVersion: () => number
+  getPermissions: () => ReadonlySet<ThemePermission>
   handlers: ThemeApiHandlers
   maxInFlight?: number
   timeoutMs?: number
@@ -77,8 +82,6 @@ export function createThemeApiDispatcher(options: ThemeApiDispatcherOptions) {
           timer = setTimeout(() => reject(Object.assign(new Error('Theme API request timed out'), { code: 'TIMEOUT' })), timeoutMs)
         }),
       ])
-      if (request.contextVersion !== options.getContextVersion())
-        return failure(request, 'ABORTED', 'Theme context changed while the request was running')
       return { protocol: 'yin-theme-api', version: 1, requestId: request.requestId, contextVersion: request.contextVersion, ok: true, result }
     }
     catch (error) {
@@ -94,11 +97,18 @@ export function createThemeApiDispatcher(options: ThemeApiDispatcherOptions) {
 }
 
 function requiredPermission(request: ThemeApiRequest): ThemePermission | undefined {
+  if (request.method === 'settings.get') return 'preferences.read'
+  if (request.method === 'settings.patch') return 'preferences.write'
   if (request.method === 'commands.execute') {
     const command = request.payload?.command
     if (typeof command !== 'string') return 'items.read'
     return commandPermission[command as ThemeCommand]
   }
+  if (request.method === 'search.query') return 'items.read'
+  if (request.method === 'spaces.list') return 'spaces.read'
+  if (request.method === 'groups.list') return 'groups.read'
+  if (request.method === 'items.list') return 'items.read'
+  if (request.method === 'monitor.getSnapshot') return 'monitor.read'
   if (request.method === 'storage.get' || request.method === 'storage.set' || request.method === 'storage.remove')
     return 'theme.storage'
   return undefined
@@ -112,6 +122,34 @@ async function runHandler(request: ThemeApiRequest, handlers: ThemeApiHandlers):
       if (typeof command !== 'string' || !isThemeCommand(command)) throw Object.assign(new Error('Unknown theme command'), { code: 'INVALID_ARGUMENT' })
       return handlers.executeCommand(command, payload.arguments && isRecord(payload.arguments) ? payload.arguments : {})
     }
+    case 'search.query': {
+      if (typeof payload.query !== 'string' || payload.query.length > 200)
+        throw Object.assign(new Error('Search query must be a string of at most 200 characters'), { code: 'INVALID_ARGUMENT' })
+      const limit = payload.limit === undefined ? 50 : payload.limit
+      if (!Number.isSafeInteger(limit) || Number(limit) < 1 || Number(limit) > 100)
+        throw Object.assign(new Error('Search page limit must be between 1 and 100'), { code: 'INVALID_ARGUMENT' })
+      const cursor = payload.cursor
+      if (cursor !== undefined && (typeof cursor !== 'string' || !/^\d{1,12}$/.test(cursor)))
+        throw Object.assign(new Error('Search cursor is invalid'), { code: 'INVALID_ARGUMENT' })
+      return handlers.searchItems(payload.query, { limit: Number(limit), cursor })
+    }
+    case 'spaces.list':
+    case 'groups.list':
+    case 'items.list': {
+      const limit = payload.limit === undefined ? 50 : payload.limit
+      if (!Number.isSafeInteger(limit) || Number(limit) < 1 || Number(limit) > 100)
+        throw Object.assign(new Error('List page limit must be between 1 and 100'), { code: 'INVALID_ARGUMENT' })
+      const cursor = payload.cursor
+      if (cursor !== undefined && (typeof cursor !== 'string' || !/^\d{1,12}$/.test(cursor)))
+        throw Object.assign(new Error('List cursor is invalid'), { code: 'INVALID_ARGUMENT' })
+      if (request.method === 'spaces.list') return handlers.listSpaces({ limit: Number(limit), cursor })
+      if (request.method === 'groups.list') return handlers.listGroups({ limit: Number(limit), cursor })
+      const groupId = payload.groupId
+      if (groupId !== undefined && (typeof groupId !== 'string' || !/^\d{1,16}$/.test(groupId)))
+        throw Object.assign(new Error('Group ID is invalid'), { code: 'INVALID_ARGUMENT' })
+      return handlers.listItems({ limit: Number(limit), cursor, groupId })
+    }
+    case 'monitor.getSnapshot': return handlers.getMonitorSnapshot()
     case 'navigation.navigate': {
       if (typeof payload.view !== 'string' || payload.view.length > 100) throw Object.assign(new Error('Invalid navigation destination'), { code: 'INVALID_ARGUMENT' })
       const spaceId = typeof payload.spaceId === 'string' ? payload.spaceId : undefined

@@ -7,6 +7,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -42,6 +45,21 @@ func TestDTCG202510ResolvesStandardTypesAliasesRootAndExtends(t *testing.T) {
 	}
 }
 
+func TestDTCG202510AcceptsSharedCSSColor4ConformanceFixture(t *testing.T) {
+	_, sourceFile, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("could not locate theme package source")
+	}
+	path := filepath.Join(filepath.Dir(sourceFile), "../../../../shared/theme/dtcg-conformance/color-spaces.json")
+	document, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := validateDTCGDocument202510(document); err != nil {
+		t.Fatalf("shared DTCG 2025.10 color fixture was rejected: %v", err)
+	}
+}
+
 func TestDTCG202510RejectsUnknownTypesReferencesAndCycles(t *testing.T) {
 	tests := []struct {
 		name string
@@ -49,6 +67,7 @@ func TestDTCG202510RejectsUnknownTypesReferencesAndCycles(t *testing.T) {
 	}{
 		{"missing schema", `{"primitive":{"$type":"number","one":{"$value":1}}}`},
 		{"nonstandard type", `{"$schema":"` + DTCGSchema202510 + `","custom":{"$type":"asset","image":{"$value":"image.png"}}}`},
+		{"color alpha out of range", `{"$schema":"` + DTCGSchema202510 + `","color":{"$type":"color","ink":{"$value":{"colorSpace":"srgb","components":[0.1,0.2,0.3],"alpha":1.1}}}}`},
 		{"unknown reference", `{"$schema":"` + DTCGSchema202510 + `","color":{"$type":"color","ink":{"$value":"{missing.ink}"}}}`},
 		{"reference cycle", `{"$schema":"` + DTCGSchema202510 + `","number":{"$type":"number","a":{"$value":"{number.b}"},"b":{"$value":"{number.a}"}}}`},
 		{"extension cycle", `{"$schema":"` + DTCGSchema202510 + `","a":{"$extends":"{b}"},"b":{"$extends":"{a}"}}`},
@@ -122,9 +141,9 @@ func TestPackagePreviewPublicV2ResolvesAssetsThroughOpaqueToken(t *testing.T) {
 func TestThemeRuntimeGrantMustMatchManifestAndIncludeRequiredPermissions(t *testing.T) {
 	manifest := PackageManifestV2{
 		Runtime:     RuntimeV2{SupportedModes: []string{"sandbox"}},
-		Permissions: PermissionsV2{Required: []PermissionV2{{Name: "items.read"}}, Optional: []PermissionV2{{Name: "theme.storage"}}},
+		Permissions: PermissionsV2{Required: []PermissionV2{{Name: "items.read"}}, Optional: []PermissionV2{{Name: "theme.storage"}, {Name: "preferences.write"}}},
 	}
-	if err := ValidateThemeGrantV2(manifest, "sandbox", []string{"items.read", "theme.storage"}); err != nil {
+	if err := ValidateThemeGrantV2(manifest, "sandbox", []string{"items.read", "theme.storage", "preferences.write"}); err != nil {
 		t.Fatalf("valid sandbox grant rejected: %v", err)
 	}
 	for _, permissions := range [][]string{{}, {"items.read", "network.fetch"}, {"items.read", "items.read"}} {

@@ -53,8 +53,8 @@ export function importBookmarks<T>(spaceId: number, data: any) { return post<T>(
 export function importBookmarksBatch<T>(spaceId: number, data: FormData) { return post<T>({ url: `/spaces/${spaceId}/bookmarks/import-batch`, data }) }
 export function clearSpace<T>(spaceId: number) { return post<T>({ url: `/spaces/${spaceId}/clear` }) }
 export function createSpace<T>(name: string) { return post<T>({ url: '/spaces/teams', data: { name } }) }
-export function getGroups<T>(spaceId: number) { return get<T>({ url: `/spaces/${spaceId}/groups` }) }
-export function getItems<T>(spaceId: number, groupId?: number, page = 1, pageSize = 50) { return get<T>({ url: `/spaces/${spaceId}/items`, data: { groupId, page, pageSize } }) }
+export function getGroups<T>(spaceId: number, signal?: AbortSignal) { return get<T>({ url: `/spaces/${spaceId}/groups`, signal }) }
+export function getItems<T>(spaceId: number, groupId?: number, page = 1, pageSize = 50, signal?: AbortSignal) { return get<T>({ url: `/spaces/${spaceId}/items`, data: { groupId, page, pageSize }, signal }) }
 export function createItem<T>(spaceId: number, data: any) { return post<T>({ url: `/spaces/${spaceId}/items`, data }) }
 export function createItemWithIcon<T>(spaceId: number, item: any, file: File) {
   const data = new FormData()

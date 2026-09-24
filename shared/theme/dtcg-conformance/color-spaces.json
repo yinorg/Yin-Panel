@@ -1,0 +1,22 @@
+{
+  "$schema": "https://design-tokens.github.io/community-group/format/2025.10/schema.json",
+  "primitive": {
+    "color": {
+      "$type": "color",
+      "p3Accent": {
+        "$value": {
+          "colorSpace": "display-p3",
+          "components": [1, 0.2, 0],
+          "alpha": 0.75
+        }
+      },
+      "hslAccent": {
+        "$value": {
+          "colorSpace": "hsl",
+          "components": [210, 0.6, 0.4],
+          "alpha": 1
+        }
+      }
+    }
+  }
+}

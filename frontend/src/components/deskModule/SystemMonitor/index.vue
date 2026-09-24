@@ -10,9 +10,11 @@ import { usePanelState } from '../../../store'
 import { PanelPanelConfigStyleEnum } from '../../../enums'
 import { SvgIcon } from '../../common'
 import { t } from '../../../locales'
-import { getEnableStatus, getSnapshot } from '../../../api/system/systemMonitor'
+import { getDiskStateByPath, getEnableStatus, getSnapshot } from '../../../api/system/systemMonitor'
 import { monitorSnapshotKey, type MonitorSnapshot } from './snapshot'
 import { resolvePanelValue } from '../../../utils/theme'
+import { createSnapshotPoller } from '../../../core/monitor/snapshotPoller'
+import { loadDiskSnapshots } from '../../../core/monitor/diskSnapshots'
 
 interface MonitorGroup extends Panel.ItemIconGroup {
   sortStatus?: boolean
@@ -70,23 +72,28 @@ const cardStyle: CardStyle = {
 
 const monitorDatas = ref<MonitorData[]>([])
 const monitorSnapshot = ref<MonitorSnapshot | null>(null)
-let snapshotTimer: ReturnType<typeof setInterval>
-let snapshotFailures = 0
 const defaultSnapshotInterval = 10000
 provide(monitorSnapshotKey, monitorSnapshot)
 
-async function updateSnapshot() {
-  try {
+const snapshotPoller = createSnapshotPoller<MonitorSnapshot>({
+  fetchSnapshot: async () => {
     const res = await getSnapshot<MonitorSnapshot>()
     if (res.code !== 0) throw new Error('monitor snapshot request failed')
-    snapshotFailures = 0
-    monitorSnapshot.value = res.data
-  }
-  catch {
-    snapshotFailures += 1
-    if (snapshotFailures >= 3) clearInterval(snapshotTimer)
-  }
-}
+    const snapshot = res.data
+    const diskPaths = [...new Set(monitorDatas.value
+      .filter(item => item.monitorType === MonitorType.disk)
+      .map(item => (item.extendParam as { path?: string } | undefined)?.path)
+      .filter((path): path is string => !!path))]
+    snapshot.DISK_INFO = await loadDiskSnapshots(
+      diskPaths,
+      path => getDiskStateByPath<SystemMonitor.DiskInfo>(path),
+      monitorSnapshot.value?.DISK_INFO,
+    )
+    return snapshot
+  },
+  getInterval: getSnapshotInterval,
+  onSnapshot: (snapshot) => { monitorSnapshot.value = snapshot },
+})
 
 function handleClick(index: number, item: MonitorData) {
   if (!props.allowEdit)
@@ -166,13 +173,11 @@ async function getSnapshotInterval() {
   return defaultSnapshotInterval
 }
 
-onMounted(async () => {
-  getData()
-  updateSnapshot()
-  snapshotTimer = setInterval(updateSnapshot, await getSnapshotInterval())
+onMounted(() => {
+  void getData().finally(() => snapshotPoller.start())
 })
 
-onUnmounted(() => clearInterval(snapshotTimer))
+onUnmounted(snapshotPoller.stop)
 
 function handleSaveDone() {
   getData()

@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { inject, onMounted, onUnmounted, ref, watch } from 'vue'
+import { inject, ref, watch } from 'vue'
 import { bytesToSize } from '../../../../utils/cmn'
 import { monitorSnapshotKey } from '../snapshot'
 import SvgIcon from '../../../common/SvgIcon/index.vue'
 
-const props = defineProps<{ refreshInterval: number; textColor: string; progressColor: string; progressRailColor: string; compact?: boolean }>()
+defineProps<{ refreshInterval: number; textColor: string; progressColor: string; progressRailColor: string; compact?: boolean }>()
 const uploadSpeed = ref('0 B/s')
 const downloadSpeed = ref('0 B/s')
 let previousSent = 0
@@ -12,12 +12,6 @@ let previousRecv = 0
 let previousAt = 0
 const snapshot = inject(monitorSnapshotKey)
 watch(() => snapshot?.value?.NETWORK_INFO, updateValue, { immediate: true })
-let timer: ReturnType<typeof setInterval>
-
-async function getData() {
-  if (snapshot) return
-  if (document.hidden) return
-}
 function updateValue(data?: { bytesRecv: number; bytesSent: number }[]) {
   if (!data) return
   const bytesSent = data.reduce((sum, item) => sum + item.bytesSent, 0)
@@ -32,8 +26,6 @@ function updateValue(data?: { bytesRecv: number; bytesSent: number }[]) {
   previousRecv = bytesRecv
   previousAt = now
 }
-onMounted(() => { getData(); timer = setInterval(getData, props.refreshInterval || 5000) })
-onUnmounted(() => clearInterval(timer))
 </script>
 <template>
   <div class="network-speed" :class="{ 'network-speed--compact': compact }" :style="{ color: textColor }" aria-label="Network speed">

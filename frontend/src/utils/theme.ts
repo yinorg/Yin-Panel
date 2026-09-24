@@ -69,6 +69,9 @@ export const semanticSlots = [
   'onPrimary', 'secondary', 'success', 'warning', 'danger', 'focusRing',
 ] as const
 
+const cssColorProfiles = new Set(['srgb', 'srgb-linear', 'display-p3', 'a98-rgb', 'prophoto-rgb', 'rec2020', 'xyz-d50', 'xyz-d65'])
+const cssPolarColorSpaces = new Set(['hsl', 'hwb', 'lab', 'lch', 'oklab', 'oklch'])
+
 export function resolvePanelValue<T>(themeDefault: T, storedValue: T | undefined, useThemeDefaults: boolean): T {
   return useThemeDefaults || storedValue === undefined ? themeDefault : storedValue
 }
@@ -84,18 +87,75 @@ export function resolveThemeTokens(pkg: ThemePackage, scheme: string): Record<st
   if (!document)
     throw new Error(`Theme scheme "${selectedScheme}" is missing`)
 
-  const tokens = new Map<string, { type: string; value: any }>()
-  function visit(value: any, prefix: string[] = [], inheritedType = '') {
+  const tokens = new Map<string, { type: string; value: any; group: string }>()
+  const groups = new Map<string, { type: string; extends?: string }>()
+  function visit(value: any, prefix: string[] = [], inheritedType = '', inheritedGroup = '') {
     if (!value || typeof value !== 'object' || Array.isArray(value))
       return
     const type = typeof value.$type === 'string' ? value.$type : inheritedType
-    if ('$value' in value)
-      tokens.set(prefix.join('.'), { type, value: value.$value })
-    Object.entries(value).forEach(([key, child]) => {
-      if (!key.startsWith('$')) visit(child, [...prefix, key], type)
-    })
+    const name = prefix.join('.')
+    if ('$value' in value) {
+      tokens.set(name, { type, value: value.$value, group: inheritedGroup })
+      return
+    }
+    if (name) {
+      const reference = value.$extends
+      if (reference !== undefined && (typeof reference !== 'string' || !/^\{[^{}]+\}$/.test(reference)))
+        throw new Error(`DTCG group "${name}" has an invalid $extends reference`)
+      groups.set(name, { type, extends: typeof reference === 'string' ? reference.slice(1, -1).replaceAll('/', '.') : undefined })
+    }
+    const group = name || inheritedGroup
+    for (const [key, child] of Object.entries(value)) {
+      if (key === '$root') visit(child, prefix, type, group)
+      else if (!key.startsWith('$')) visit(child, [...prefix, key], type, group)
+    }
   }
   visit(document)
+
+  const expandedGroups = new Map<string, Map<string, { type: string; value: any; group: string }>>()
+  const extending = new Set<string>()
+  function inheritedGroupType(name: string, visited = new Set<string>()): string {
+    if (visited.has(name)) throw new Error(`DTCG group extension cycle at "${name}"`)
+    visited.add(name)
+    const group = groups.get(name)
+    if (!group) return ''
+    if (group.type) return group.type
+    return group.extends ? inheritedGroupType(group.extends, visited) : ''
+  }
+  function expandGroup(name: string) {
+    const cached = expandedGroups.get(name)
+    if (cached) return cached
+    if (extending.has(name)) throw new Error(`DTCG group extension cycle at "${name}"`)
+    const group = groups.get(name)
+    if (!group) throw new Error(`DTCG group "${name}" extends an unknown group`)
+    extending.add(name)
+    const expanded = new Map<string, { type: string; value: any; group: string }>()
+    if (group.extends) {
+      for (const [relative, token] of expandGroup(group.extends))
+        expanded.set(relative, { ...token, type: group.type || token.type, group: name })
+    }
+    for (const [tokenName, token] of tokens) {
+      if (token.group !== name && !token.group.startsWith(`${name}.`)) continue
+      const relative = tokenName === name ? '$root' : tokenName.slice(name.length + 1)
+      expanded.set(relative, { ...token, type: token.type || inheritedGroupType(name) })
+    }
+    extending.delete(name)
+    expandedGroups.set(name, expanded)
+    return expanded
+  }
+  for (const [name, group] of groups) {
+    if (!group.extends) continue
+    for (const [relative, token] of expandGroup(name)) {
+      const tokenName = relative === '$root' ? name : `${name}.${relative}`
+      const existing = tokens.get(tokenName)
+      if (existing) {
+        if (!existing.type && token.type) tokens.set(tokenName, { ...existing, type: token.type })
+      }
+      else {
+        tokens.set(tokenName, { ...token, group: token.group || name })
+      }
+    }
+  }
 
   function resolve(name: string, visiting = new Set<string>()): { type: string; value: any } {
     const token = tokens.get(name)
@@ -190,7 +250,7 @@ export function resolveWallpaper(pkg: ThemePackage, scheme: string) {
 function cssToken(slot: string, type: string, value: any): string {
   if (type === 'color') {
     const color = cssColor(value)
-    if (!/^#[0-9a-f]{6}$/i.test(color)) throw new Error(`Semantic slot "${slot}" has an unsupported color`)
+    if (!color) throw new Error(`Semantic slot "${slot}" has an unsupported color`)
     return color
   }
   if (type === 'dimension') {
@@ -290,13 +350,28 @@ function cssToken(slot: string, type: string, value: any): string {
 
 function cssColor(value: any): string {
   if (typeof value === 'string')
-    return value
-  if (value?.colorSpace !== 'srgb' || !Array.isArray(value.components) || value.components.length !== 3 || (value.alpha !== undefined && value.alpha !== 1))
+    return /^#[0-9a-f]{6}$/i.test(value) ? value : ''
+  const colorSpace = value?.colorSpace
+  if ((!cssColorProfiles.has(colorSpace) && !cssPolarColorSpaces.has(colorSpace)) || !Array.isArray(value.components) || value.components.length !== 3)
     return ''
-  const bytes = value.components.map((component: unknown) => {
-    if (typeof component !== 'number' || component < 0 || component > 1) return -1
-    return Math.round(component * 255)
+  const components = value.components.map((component: unknown) => {
+    if (component === 'none') return 'none'
+    if (typeof component !== 'number' || !Number.isFinite(component)) return ''
+    return String(component)
   })
-  if (bytes.some((component: number) => component < 0)) return ''
-  return `#${bytes.map((component: number) => component.toString(16).padStart(2, '0')).join('')}`
+  if (components.some((component: string) => component === '')) return ''
+  const alpha = value.alpha ?? 1
+  if (typeof alpha !== 'number' || !Number.isFinite(alpha) || alpha < 0 || alpha > 1) return ''
+  if (colorSpace === 'srgb' && alpha === 1 && components.every((component: string) => component !== 'none' && Number(component) >= 0 && Number(component) <= 1)) {
+    const bytes = components.map((component: string) => Math.round(Number(component) * 255))
+    return `#${bytes.map((component: number) => component.toString(16).padStart(2, '0')).join('')}`
+  }
+  const alphaValue = alpha === 1 ? '' : ` / ${alpha}`
+  if (colorSpace === 'hsl' || colorSpace === 'hwb') {
+    const [hue, first, second] = components
+    return `${colorSpace}(${hue} ${first === 'none' ? 'none' : `${Number(first) * 100}%`} ${second === 'none' ? 'none' : `${Number(second) * 100}%`}${alphaValue})`
+  }
+  if (cssPolarColorSpaces.has(colorSpace))
+    return `${colorSpace}(${components.join(' ')}${alphaValue})`
+  return `color(${colorSpace} ${components.join(' ')}${alphaValue})`
 }

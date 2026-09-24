@@ -15,6 +15,8 @@
   "scripts": {
     "check:i18n": "node scripts/check-i18n-keys.mjs",
     "audit:theme-tokens": "node scripts/audit-theme-tokens.mjs",
+    "test:home-services": "node --experimental-strip-types --test tests/unit/*.test.mjs",
+    "build:theme-sdk": "npm --prefix packages/theme-sdk run build",
     "dev": "vite",
     "build": "run-p add-version type-check build-only",
     "add-version": "node ./add-frontend-version.js",

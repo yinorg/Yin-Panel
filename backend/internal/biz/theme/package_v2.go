@@ -404,7 +404,7 @@ func themeCoreRangeSupports(expression, current string) bool {
 }
 
 func validatePermissionNamesV2(p PermissionsV2) error {
-	allowed := map[string]bool{"spaces.read": true, "groups.read": true, "items.read": true, "items.write": true, "groups.write": true, "monitor.read": true, "preferences.read": true, "theme.storage": true, "network.fetch": true, "media.remote": true}
+	allowed := map[string]bool{"spaces.read": true, "groups.read": true, "items.read": true, "items.write": true, "groups.write": true, "monitor.read": true, "preferences.read": true, "preferences.write": true, "theme.storage": true, "network.fetch": true, "media.remote": true}
 	seen := map[string]bool{}
 	for _, group := range []struct {
 		name string
