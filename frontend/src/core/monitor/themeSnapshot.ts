@@ -4,6 +4,7 @@ export interface CoreMonitorSnapshot {
   CPU_INFO?: SystemMonitor.CPUInfo
   MEMORY_INFO?: SystemMonitor.MemoryInfo
   NETWORK_INFO?: SystemMonitor.NetIOCountersInfo[]
+  DISK_INFO?: Record<string, SystemMonitor.DiskInfo>
 }
 
 export function normalizeMonitorSnapshot(source: CoreMonitorSnapshot, capturedAt = new Date().toISOString()): ThemeMonitorSnapshot {

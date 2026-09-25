@@ -3,18 +3,17 @@ import { computed, ref, watch } from 'vue'
 import type { FormInst, FormRules } from 'naive-ui'
 import { NButton, NForm, NFormItem, NGrid, NGridItem, NInput, NInputGroup, NModal, NSelect, useMessage } from 'naive-ui'
 import IconEditor from './IconEditor.vue'
-import { edit } from '../../../../api/panel/itemIcon'
 import { getGroups } from '../../../../api/panel/space'
-import { createItem, createItemWithIcon, updateItem } from '../../../../api/panel/space'
 import { t } from '../../../../locales'
-import { useAuthStore } from '../../../../store'
 import { getAutomaticIconFileByUrl, getAutomaticIconByUrl, getIconByUrl as fetchIconByUrl } from '@/utils/itemIcon'
+import type { HomeItemMutationCommands } from '@/core/home/mutations'
 
 interface Props {
   visible: boolean
   itemInfo: Panel.Info | null
   itemGroupId?: number
   spaceId?: number
+  mutations: HomeItemMutationCommands
 }
 
 const props = defineProps<Props>()
@@ -22,6 +21,7 @@ const emit = defineEmits<Emit>()
 const ms = useMessage()
 const submitLoading = ref(false)
 const getIconLoading = ref([false, false])
+const editingSpaceId = ref<number>()
 const itemIconGroupOptions = ref<{
   label: string
   value: number
@@ -107,21 +107,21 @@ async function editApi() {
       if (!model.value.icon?.src && model.value.icon?.itemType !== 2)
         model.value.icon = createTextIcon(model.value.title)
     }
-    const { code, data, msg } = await (props.spaceId
-      ? (model.value.id ? updateItem<Panel.ItemInfo>(props.spaceId, model.value.id, model.value) : automaticIconFile ? createItemWithIcon<Panel.ItemInfo>(props.spaceId, model.value, automaticIconFile) : createItem<Panel.ItemInfo>(props.spaceId, model.value))
-      : edit<Panel.ItemInfo>(model.value))
-    if (code === 0) {
-      show.value = false
-      model.value = { ...restoreDefault }
-
-      emit('done', data)
-    }
-    else {
-      ms.error(`${t('common.saveFail')}:${msg}`)
-    }
+    if (!editingSpaceId.value)
+      throw new Error('No Space was selected when the editor opened')
+    const input = { ...model.value } as Record<string, unknown>
+    const result = await props.mutations.saveItem(input, {
+      itemId: model.value.id,
+      iconFile: automaticIconFile || undefined,
+      expectedSpaceId: editingSpaceId.value,
+    })
+    show.value = false
+    model.value = { ...restoreDefault }
+    emit('done', result.data as Panel.ItemInfo)
   }
   catch (error) {
-    ms.error(t('common.saveFail'))
+    const detail = error instanceof Error ? error.message : ''
+    ms.error(detail ? `${t('common.saveFail')}:${detail}` : t('common.saveFail'))
   }
   submitLoading.value = false
 }
@@ -137,16 +137,22 @@ async function getPublicLibraryIcon(title: string): Promise<Panel.ItemIcon | nul
     const image = await fetch(`https://api.iconify.design/${name}.svg`)
     if (!image.ok) return null
     const blob = await image.blob()
-    const form = new FormData()
-    form.append('imgfile', new File([blob], `${name.replace('/', '-')}.svg`, { type: 'image/svg+xml' }))
-    const upload = await fetch('/api/file/uploadImg', { method: 'POST', headers: { Authorization: `Bearer ${useAuthStore().token}` }, body: form })
-    if (!upload.ok) return null
-    const response = await upload.json()
-    if (response.code !== 0) return null
-    return { itemType: 2, src: response.data.imageUrl, fileName: response.data.fileName }
+    const file = new File([blob], `${name.replace('/', '-')}.svg`, { type: 'image/svg+xml' })
+    const uploaded = await uploadItemIcon(file)
+    return { itemType: 2, src: uploaded.imageUrl, fileName: uploaded.fileName }
   } catch {
     return null
   }
+}
+
+async function uploadItemIcon(file: File) {
+  if (!editingSpaceId.value)
+    throw new Error('No Space was selected when the editor opened')
+  const result = await props.mutations.uploadItemIcon(file, editingSpaceId.value)
+  const uploaded = result.data as { imageUrl?: string; fileName?: string } | undefined
+  if (!uploaded?.imageUrl || !uploaded.fileName)
+    throw new Error('Core returned an invalid uploaded image')
+  return uploaded as { imageUrl: string; fileName: string }
 }
 
 const handleValidateButtonClick = (e: MouseEvent) => {
@@ -179,20 +185,21 @@ async function getIconByUrl(url: string, loadingIndex: number, showError = true)
 
 watch(() => props.visible, (newValue) => {
   if (newValue === true) {
+    editingSpaceId.value = props.spaceId
     model.value = props.itemInfo ? { ...props.itemInfo } : { ...restoreDefault }
     if (props.itemGroupId)
       model.value.itemIconGroupId = props.itemGroupId
   }
 
-  getGroupListOptions()
+  getGroupListOptions(editingSpaceId.value)
 })
 
-function getGroupListOptions() {
-  if (!props.spaceId) {
+function getGroupListOptions(spaceId?: number) {
+  if (!spaceId) {
     itemIconGroupOptions.value = []
     return
   }
-  getGroups<Panel.ItemIconGroup[]>(props.spaceId).then(({ data }) => {
+  getGroups<Panel.ItemIconGroup[]>(spaceId).then(({ data }) => {
     if (data) {
       itemIconGroupOptions.value = []
 
@@ -233,7 +240,7 @@ function getGroupListOptions() {
         </NGrid>
 
         <NFormItem path="icon" :label="$t('common.icon')">
-          <IconEditor v-model:item-icon="model.icon" />
+          <IconEditor v-model:item-icon="model.icon" :upload-image="uploadItemIcon" />
         </NFormItem>
         <NFormItem path="url" :label="$t('iconItem.url')">
           <!-- <NSelect :style="{ width: '100px' }" :options="urlProtocolOptions" /> -->

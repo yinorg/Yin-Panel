@@ -13,6 +13,7 @@ export type ThemePermission =
   | 'preferences.write'
   | 'theme.storage'
   | 'network.fetch'
+  | 'diagnostics.report'
   | 'media.remote'
 
 export type ThemeCommand =
@@ -43,6 +44,7 @@ export interface ThemeEnvironment {
   reducedMotion: boolean
   online: boolean
   viewport: { width: number; height: number }
+  assets?: Readonly<Record<string, string>>
 }
 
 export interface ThemeSpace {
@@ -160,6 +162,9 @@ export interface ThemeAPI {
     set: (key: string, value: unknown) => Promise<void>
     remove: (key: string) => Promise<void>
   }
+  ui: { openCoreSurface: (surface: string, payload?: Record<string, unknown>) => Promise<void> }
+  network: { fetch: (input: string, init?: { method?: string; headers?: Record<string, string>; body?: string }) => Promise<{ status: number; headers: Record<string, string>; body: unknown }> }
+  diagnostics: { report: (entry: { level: 'info' | 'warn' | 'error'; message: string; data?: Record<string, unknown> }) => Promise<void> }
 }
 
 export interface ThemeMountedView {
@@ -173,10 +178,16 @@ export type ThemeViewFactory = (
   snapshot: ThemeHomeSnapshot,
 ) => ThemeMountedView | Promise<ThemeMountedView>
 
+export type ThemeComponentFactory = (
+  element: HTMLElement,
+  api: ThemeAPI,
+  snapshot: ThemeHomeSnapshot,
+) => ThemeMountedView | Promise<ThemeMountedView>
+
 export interface ThemeDefinition {
   views?: Partial<Record<'home' | 'public-home' | 'theme-settings' | 'theme-page', ThemeViewFactory>>
   regions?: Record<string, ThemeViewFactory>
-  components?: Record<string, unknown>
+  components?: Record<string, ThemeComponentFactory>
   dispose?: () => void | Promise<void>
 }
 
@@ -190,8 +201,105 @@ export interface ThemeApiRequest {
   version: 1
   requestId: string
   contextVersion: number
-  method: 'commands.execute' | 'search.query' | 'spaces.list' | 'groups.list' | 'items.list' | 'monitor.getSnapshot' | 'navigation.navigate' | 'settings.get' | 'settings.patch' | 'storage.get' | 'storage.set' | 'storage.remove'
+  method: 'commands.execute' | 'search.query' | 'spaces.list' | 'groups.list' | 'items.list' | 'monitor.getSnapshot' | 'navigation.navigate' | 'settings.get' | 'settings.patch' | 'storage.get' | 'storage.set' | 'storage.remove' | 'ui.openCoreSurface' | 'network.fetch' | 'diagnostics.report'
   payload?: Record<string, unknown>
+}
+
+export interface ThemeApiClientHost {
+  request: (request: ThemeApiRequest) => Promise<unknown>
+  getSnapshot: () => ThemeHomeSnapshot
+  getEnvironment: () => ThemeEnvironment
+  getNavigation?: () => { view: string; spaceId?: string }
+}
+
+export function createThemeApiClient(host: ThemeApiClientHost) {
+  let snapshot = host.getSnapshot()
+  let environment = host.getEnvironment()
+  let lastEventSequence = 0
+  const listeners = new Map<string, Set<(event: ThemeEventEnvelope) => void>>()
+
+  function request(method: ThemeApiRequest['method'], payload?: Record<string, unknown>) {
+    return host.request({
+      protocol: 'yin-theme-api',
+      version: 1,
+      requestId: crypto.randomUUID(),
+      contextVersion: snapshot.version,
+      method,
+      payload,
+    })
+  }
+
+  function clone<T>(value: T): T {
+    return structuredClone(value)
+  }
+
+  return {
+    api: {
+      environment: { get: () => clone(environment) },
+      state: { getSnapshot: () => clone(snapshot) },
+      events: {
+        subscribe: <T = unknown>(name: ThemeEventName, listener: (event: ThemeEventEnvelope<T>) => void) => {
+          const handlers = listeners.get(name) || new Set()
+          const callback = listener as (event: ThemeEventEnvelope) => void
+          handlers.add(callback)
+          listeners.set(name, handlers)
+          return () => { handlers.delete(callback) }
+        },
+      },
+      commands: { execute: <T>(command: ThemeCommand, payload: Record<string, unknown> = {}) => request('commands.execute', { command, arguments: payload }) as Promise<T> },
+      search: { query: (query: string, options: { limit?: number; cursor?: string } = {}) => request('search.query', { query, ...options }) as Promise<ThemeSearchPage> },
+      spaces: { list: (options: ThemePageOptions = {}) => request('spaces.list', { ...options }) as Promise<ThemePage<ThemeSpace>> },
+      groups: { list: (options: ThemePageOptions = {}) => request('groups.list', { ...options }) as Promise<ThemePage<ThemeGroup>> },
+      items: { list: (options: ThemePageOptions & { groupId?: string } = {}) => request('items.list', { ...options }) as Promise<ThemePage<ThemeItem>> },
+      monitor: { getSnapshot: () => request('monitor.getSnapshot') as Promise<ThemeMonitorSnapshot> },
+      navigation: {
+        get: () => host.getNavigation ? host.getNavigation() : { view: 'home', spaceId: snapshot.activeSpaceId },
+        navigate: (destination: { view: string; spaceId?: string }) => request('navigation.navigate', destination).then(() => undefined),
+      },
+      assets: {
+        resolve: (path: string) => {
+          const url = environment.assets?.[path]
+          if (!url) throw new Error('Theme asset is not declared')
+          return url
+        },
+      },
+      settings: {
+        get: () => request('settings.get') as Promise<Record<string, unknown>>,
+        patch: (value: Record<string, unknown>) => request('settings.patch', { value }).then(() => undefined),
+      },
+      storage: {
+        get: (key: string) => request('storage.get', { key }),
+        set: (key: string, value: unknown) => request('storage.set', { key, value }).then(() => undefined),
+        remove: (key: string) => request('storage.remove', { key }).then(() => undefined),
+      },
+      ui: { openCoreSurface: (surface: string, payload: Record<string, unknown> = {}) => request('ui.openCoreSurface', { surface, payload }).then(() => undefined) },
+      network: { fetch: (input: string, init = {}) => request('network.fetch', { input, init }) as Promise<{ status: number; headers: Record<string, string>; body: unknown }> },
+      diagnostics: { report: (entry: { level: 'info' | 'warn' | 'error'; message: string; data?: Record<string, unknown> }) => request('diagnostics.report', entry).then(() => undefined) },
+    } satisfies ThemeAPI,
+    updateSnapshot(next: ThemeHomeSnapshot) {
+      snapshot = clone(next)
+    },
+    updateEnvironment(next: ThemeEnvironment) {
+      environment = clone(next)
+    },
+    emit(name: ThemeEventName, event: ThemeEventEnvelope) {
+      if (!['state.updated', 'environment.changed', 'session.changed', 'space.changed', 'groups.changed', 'items.changed', 'preferences.changed', 'monitor.updated', 'navigation.changed', 'theme.disposing'].includes(name)
+        || !Number.isSafeInteger(event.contextVersion)
+        || event.contextVersion !== snapshot.version
+        || !Number.isSafeInteger(event.sequence)
+        || event.sequence <= lastEventSequence)
+        return false
+      lastEventSequence = event.sequence
+      for (const listener of listeners.get(name) || []) {
+        try { listener(clone(event)) }
+        catch { /* Theme listeners are isolated from the host runtime. */ }
+      }
+      return true
+    },
+    dispose() {
+      listeners.clear()
+    },
+  }
 }
 
 export function isThemeApiRequest(value: unknown): value is ThemeApiRequest {
@@ -205,7 +313,7 @@ export function isThemeApiRequest(value: unknown): value is ThemeApiRequest {
     && Number.isSafeInteger(request.contextVersion)
     && request.contextVersion! >= 0
     && typeof request.method === 'string'
-    && ['commands.execute', 'search.query', 'spaces.list', 'groups.list', 'items.list', 'monitor.getSnapshot', 'navigation.navigate', 'settings.get', 'settings.patch', 'storage.get', 'storage.set', 'storage.remove'].includes(request.method)
+    && ['commands.execute', 'search.query', 'spaces.list', 'groups.list', 'items.list', 'monitor.getSnapshot', 'navigation.navigate', 'settings.get', 'settings.patch', 'storage.get', 'storage.set', 'storage.remove', 'ui.openCoreSurface', 'network.fetch', 'diagnostics.report'].includes(request.method)
     && (request.payload === undefined || isJsonRecord(request.payload))
 }
 

@@ -18,6 +18,8 @@ import (
 const InstanceThemeScopeV2 = "instance"
 const ThemeTrialDurationV2 = 30 * time.Second
 
+var ErrTrustedRuntimeNotEnabledV2 = errors.New("trusted runtime is not enabled by the instance administrator")
+
 type PackageRecordV2 struct {
 	ID             string `gorm:"primaryKey;size:128"`
 	Name           string `gorm:"size:100;not null"`
@@ -62,6 +64,13 @@ type GrantRecordV2 struct {
 	UpdatedAt       time.Time
 }
 
+type TrustedRuntimePolicyV2 struct {
+	RevisionID string `gorm:"primaryKey;size:64"`
+	Enabled    bool   `gorm:"not null;default:false"`
+	UpdatedBy  uint   `gorm:"not null;default:0"`
+	UpdatedAt  time.Time
+}
+
 type ThemeSettingsRecordV2 struct {
 	UserID        uint   `gorm:"primaryKey;autoIncrement:false"`
 	PackageID     string `gorm:"primaryKey;size:128"`
@@ -96,7 +105,7 @@ type builtinPaletteV2 struct {
 }
 
 func migrateRevisionV2(db *gorm.DB) error {
-	return db.AutoMigrate(&PackageRecordV2{}, &RevisionRecordV2{}, &AssetRecordV2{}, &ActivationRecordV2{}, &GrantRecordV2{}, &ThemeSettingsRecordV2{}, &UserThemePreferenceV2{})
+	return db.AutoMigrate(&PackageRecordV2{}, &RevisionRecordV2{}, &AssetRecordV2{}, &ActivationRecordV2{}, &GrantRecordV2{}, &TrustedRuntimePolicyV2{}, &ThemeSettingsRecordV2{}, &UserThemePreferenceV2{})
 }
 
 func InstallPackageV2(db *gorm.DB, actorID uint, pkg *PackageV2) error {
@@ -534,6 +543,40 @@ func SaveGrantV2(db *gorm.DB, grant GrantRecordV2) error {
 	return db.Save(&grant).Error
 }
 
+func SaveUserGrantV2(db *gorm.DB, grant GrantRecordV2) error {
+	if grant.UserID == 0 || grant.RevisionID == "" || (grant.ExecutionMode != "sandbox" && grant.ExecutionMode != "trusted") {
+		return errors.New("invalid theme runtime grant")
+	}
+	var permissions []string
+	if err := json.Unmarshal([]byte(grant.PermissionsJSON), &permissions); err != nil {
+		return errors.New("invalid theme runtime grant permissions")
+	}
+	return db.Transaction(func(tx *gorm.DB) error {
+		var revision RevisionRecordV2
+		if err := tx.First(&revision, "id = ?", grant.RevisionID).Error; err != nil {
+			return err
+		}
+		var manifest PackageManifestV2
+		if err := json.Unmarshal([]byte(revision.ManifestJSON), &manifest); err != nil {
+			return fmt.Errorf("stored theme manifest is invalid: %w", err)
+		}
+		if err := ValidateThemeGrantV2(manifest, grant.ExecutionMode, permissions); err != nil {
+			return err
+		}
+		if grant.ExecutionMode == "trusted" {
+			var policy TrustedRuntimePolicyV2
+			if err := tx.First(&policy, "revision_id = ? AND enabled = ?", grant.RevisionID, true).Error; err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					return ErrTrustedRuntimeNotEnabledV2
+				}
+				return err
+			}
+		}
+		grant.UpdatedAt = time.Now()
+		return tx.Save(&grant).Error
+	})
+}
+
 func GetGrantV2(db *gorm.DB, userID uint, revisionID, executionMode string) (GrantRecordV2, error) {
 	var grant GrantRecordV2
 	err := db.First(&grant, "user_id = ? AND revision_id = ? AND execution_mode = ?", userID, revisionID, executionMode).Error
@@ -542,6 +585,49 @@ func GetGrantV2(db *gorm.DB, userID uint, revisionID, executionMode string) (Gra
 
 func RevokeGrantV2(db *gorm.DB, userID uint, revisionID, executionMode string) error {
 	return db.Delete(&GrantRecordV2{}, "user_id = ? AND revision_id = ? AND execution_mode = ?", userID, revisionID, executionMode).Error
+}
+
+func GetTrustedRuntimePolicyV2(db *gorm.DB, revisionID string) (TrustedRuntimePolicyV2, error) {
+	var policy TrustedRuntimePolicyV2
+	err := db.First(&policy, "revision_id = ?", revisionID).Error
+	return policy, err
+}
+
+func SetTrustedRuntimePolicyV2(db *gorm.DB, revisionID string, enabled bool, actorID uint) error {
+	if revisionID == "" || actorID == 0 {
+		return errors.New("invalid trusted runtime policy")
+	}
+	return db.Transaction(func(tx *gorm.DB) error {
+		var revision RevisionRecordV2
+		if err := tx.First(&revision, "id = ?", revisionID).Error; err != nil {
+			return err
+		}
+		if enabled {
+			var manifest PackageManifestV2
+			if err := json.Unmarshal([]byte(revision.ManifestJSON), &manifest); err != nil {
+				return fmt.Errorf("stored theme manifest is invalid: %w", err)
+			}
+			if !containsString(manifest.Runtime.SupportedModes, "trusted") {
+				return errors.New("theme does not declare support for the trusted runtime")
+			}
+		}
+		policy := TrustedRuntimePolicyV2{RevisionID: revisionID, Enabled: enabled, UpdatedBy: actorID, UpdatedAt: time.Now()}
+		if err := tx.Save(&policy).Error; err != nil {
+			return err
+		}
+		if !enabled {
+			return tx.Delete(&GrantRecordV2{}, "revision_id = ? AND execution_mode = ?", revisionID, "trusted").Error
+		}
+		return nil
+	})
+}
+
+func TrustedRuntimeEnabledV2(db *gorm.DB, revisionID string) (bool, error) {
+	policy, err := GetTrustedRuntimePolicyV2(db, revisionID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return false, nil
+	}
+	return policy.Enabled, err
 }
 
 func SaveThemeSettingsV2(db *gorm.DB, settings ThemeSettingsRecordV2) error {

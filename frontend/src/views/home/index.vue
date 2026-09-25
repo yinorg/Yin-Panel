@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { VueDraggable } from 'vue-draggable-plus'
-import { NBackTop, NButton, NButtonGroup, NCard, NDropdown, NInput, NModal, NSkeleton, NSpin, NSpace, useDialog, useMessage } from 'naive-ui'
+import { NBackTop, NButton, NButtonGroup, NCard, NCheckbox, NDropdown, NInput, NModal, NRadio, NRadioGroup, NSkeleton, NSpin, NSpace, useDialog, useMessage } from 'naive-ui'
 import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { createGroup, createItem, createSpace, deleteGroup, deleteItem as deleteSpaceItem, getGroups, getItems, getSpaces, sortGroups, sortItems, sortSpaces, spaceDisplayName, updateGroup, updateItem, type Space } from '../../api/panel/space'
+import { useRoute, useRouter } from 'vue-router'
+import { createGroup, createItem, createItemWithIcon, createSpace, deleteGroup, deleteItem as deleteSpaceItem, getGroups, getItems, getSpaces, sortGroups, sortItems, sortSpaces, spaceDisplayName, updateGroup, updateItem, type Space } from '../../api/panel/space'
+import { uploadImage } from '@/api/panel/file'
 import Clock from '../../components/deskModule/Clock/index.vue'
 import SearchBox from '../../components/deskModule/SearchBox/index.vue'
 import { replaceOrAppendKeywordToUrl, searchEngineList, type SearchEngine } from '../../components/deskModule/SearchBox/engines'
@@ -15,7 +17,7 @@ import { parsePublicCodeFromPath } from '@/utils/request/axios'
 import { usePanelState, useAuthStore } from '@/store'
 import { PanelPanelConfigStyleEnum, PanelStateNetworkModeEnum } from '@/enums'
 import { t } from '@/locales'
-import { getEnableStatus, getSnapshot } from '@/api/system/systemMonitor'
+import { getDiskStateByPath, getEnableStatus, getSnapshot } from '@/api/system/systemMonitor'
 import { clearSpaceCache, readSpaceCache, readSpacesCache, writeSpaceCache, writeSpacesCache } from '@/utils/spaceCache'
 import { resolvePanelValue } from '@/utils/theme'
 import { activeThemePackage, activeThemeSlots } from '@/hooks/useTheme'
@@ -23,13 +25,17 @@ import { getThemeRuntimeGrant, setThemeRuntimeGrant } from '@/api/theme'
 import { createHomeThemeHandlers } from '@/core/home/themeHandlers'
 import { executeHomeThemeRequest } from '@/core/home/themeRequest'
 import { createThemePersistence } from '@/core/home/themePersistence'
+import { createThemeSettingsSchemaValidator } from '@/core/home/themeSettingsSchema'
 import { createHomeCollectionLoader, type HomeCollectionResult } from '@/core/home/collection'
 import { createHomeBootstrap } from '@/core/home/bootstrap'
 import { createHomeSpaceController } from '@/core/home/spaceController'
 import { createHomeMutationService } from '@/core/home/mutations'
 import { createHomeSearchService } from '@/core/home/search'
+import { createHomeCommandSearch, filterHomeCommandItems, filterHomeCommands, findHomeCommandItem, getInitialHomeCommandSelection, isHomeCommandWrite, moveHomeCommandSelection, parseHomeCommand } from '@/core/home/commandCenter'
+import { buildHomeGroupTree, getDirectoryGroups, getHomeGroupRoots, getInitiallyCollapsedGroups, isHomeGroupHidden, resolveActiveDirectoryId } from '@/core/home/groupTree'
 import { resolveItemOpenUrl } from '@/core/items/openPolicy'
 import { normalizeMonitorSnapshot } from '@/core/monitor/themeSnapshot'
+import { createMonitorSnapshotController } from '@/core/monitor/snapshotController'
 import { createThemeHomeSnapshot } from '@/core/home/themeSnapshot'
 import type { ThemeCollectionStatus, ThemePermission } from '@/theme/api/v1'
 import type { CoreMonitorSnapshot } from '@/core/monitor/themeSnapshot'
@@ -51,31 +57,20 @@ const ms = useMessage()
 const dialog = useDialog()
 const panelState = usePanelState()
 const authStore = useAuthStore()
+const route = useRoute()
+const router = useRouter()
 const publicCode = parsePublicCodeFromPath()
-const previewThemeDefaults = new URLSearchParams(window.location.search).has('themePreview')
-const useThemeDefaults = computed(() => previewThemeDefaults || !!panelState.panelConfig.useThemeDefaults)
+const previewTheme = new URLSearchParams(window.location.search).has('themePreview')
+const useThemeDefaults = computed(() => previewTheme || !!panelState.panelConfig.useThemeDefaults)
 const useThemeColors = computed(() => useThemeDefaults.value || panelState.panelConfig.wallpaperMode === 'theme')
 const panelIconTextColor = computed(() => resolvePanelValue('var(--yin-text)', panelState.panelConfig.iconTextColor, useThemeDefaults.value))
 const directoryLayout = computed(() => panelState.panelConfig.homeLayout === 'directory')
-const directoryRoots = computed(() => items.value.filter(group => !group.parentId))
+const directoryRoots = computed(() => getHomeGroupRoots(items.value))
 const activeDirectoryId = ref<number | null>(null)
 const directoryItems = computed(() => {
   if (!directoryLayout.value) return filterItems.value
   if (filterItems.value.length !== items.value.length) return filterItems.value
-  const selected = activeDirectoryId.value ?? directoryRoots.value[0]?.id
-  if (!selected) return items.value
-  const visible = new Set<number>([Number(selected)])
-  let changed = true
-  while (changed) {
-    changed = false
-    items.value.forEach(group => {
-      if (group.parentId && visible.has(Number(group.parentId)) && !visible.has(Number(group.id))) {
-        visible.add(Number(group.id))
-        changed = true
-      }
-    })
-  }
-  return items.value.filter(group => visible.has(Number(group.id)))
+  return getDirectoryGroups(items.value, resolveActiveDirectoryId(items.value, activeDirectoryId.value))
 })
 
 const scrollContainerRef = ref<HTMLElement | undefined>(undefined)
@@ -105,6 +100,15 @@ const spaceName = ref('')
 const creatingSpace = ref(false)
 const monitorEnabled = ref(false)
 const monitorResultRefreshInterval = ref<number | undefined>()
+const monitorSnapshotController = createMonitorSnapshotController<CoreMonitorSnapshot, SystemMonitor.DiskInfo>({
+  fetchSnapshot: async () => {
+    const result = await getSnapshot<CoreMonitorSnapshot>()
+    if (result.code !== 0) throw createThemeRuntimeError('UNSUPPORTED_CAPABILITY', 'Monitor data is unavailable')
+    return result.data
+  },
+  fetchDisk: path => getDiskStateByPath<SystemMonitor.DiskInfo>(path),
+  getInterval: async () => Math.max(250, (monitorResultRefreshInterval.value || 10) * 1000),
+})
 const isOnline = ref(typeof navigator === 'undefined' ? true : navigator.onLine)
 const runtimeViewport = ref({ width: window.innerWidth, height: window.innerHeight })
 const runtimeLanguage = ref(document.documentElement.lang || navigator.language)
@@ -168,24 +172,36 @@ const homeSearch = createHomeSearchService<Panel.ItemInfo>({
   fetchPage: (spaceId, page, pageSize, signal) => getItems<Panel.ItemInfo[]>(spaceId, undefined, page, pageSize, signal),
   isOnline: () => isOnline.value,
 })
+const homeCommandSearch = createHomeCommandSearch<Panel.ItemInfo>({
+  getSpaceId: () => activeSpace.value?.id,
+  search: (spaceId, query) => homeSearch.query(spaceId, query),
+})
 
 const collapsedGroups = ref<Set<number>>(new Set())
-const themeRuntimeGrant = ref<{ revision: string; granted: boolean; permissions: ThemePermission[] }>({ revision: '', granted: false, permissions: [] })
+const themeRuntimeGrant = ref<{ revision: string; executionMode: 'sandbox' | 'trusted'; available: boolean; granted: boolean; permissions: ThemePermission[] }>({ revision: '', executionMode: 'sandbox', available: false, granted: false, permissions: [] })
+const trustedRuntimeAvailable = ref(false)
 const themeRuntimeGrantLoading = ref(false)
 const themeRuntimeGrantSaving = ref(false)
+const themeRuntimeConsentVisible = ref(false)
+const selectedThemeExecutionMode = ref<'sandbox' | 'trusted'>('sandbox')
+const trustedRuntimeAcknowledged = ref(false)
 const themeRuntimeFailed = ref(false)
 const themeRuntimeFailureMessage = ref('')
 const themeSafeMode = ref(isThemeSafeMode())
 let themeGrantRequestGeneration = 0
+let trustedPolicyPollTimer: ReturnType<typeof setInterval> | undefined
+let trustedThemeRestoreTimer: ReturnType<typeof setTimeout> | undefined
 const themeRuntimePackage = computed(() => activeThemePackage.value)
+const trustedRouteRevision = computed(() => route.name === 'trustedThemeHome' ? String(route.params.revision || '') : '')
+const themeExecutionMode = computed<'sandbox' | 'trusted'>(() => trustedRouteRevision.value ? 'trusted' : 'sandbox')
 const themeHomeContribution = computed(() => {
   const manifest = themeRuntimePackage.value?.manifest
-  return !!manifest?.entrypoints?.script && !!manifest.contributes?.views?.includes('home') && !!manifest.runtime?.supportedModes?.includes('sandbox')
+  return !!manifest?.entrypoints?.script && !!manifest.contributes?.views?.includes('home') && !!manifest.runtime?.supportedModes?.includes(themeExecutionMode.value)
 })
 const themeRequiredPermissions = computed(() => (themeRuntimePackage.value?.manifest.permissions?.required || []).map(permission => permission.name as ThemePermission))
 const themeGrantMatches = computed(() => {
   const revision = themeRuntimePackage.value?.revision || ''
-  return !!revision && themeRuntimeGrant.value.revision === revision && themeRuntimeGrant.value.granted && themeRequiredPermissions.value.every(permission => themeRuntimeGrant.value.permissions.includes(permission))
+  return !!revision && themeRuntimeGrant.value.revision === revision && themeRuntimeGrant.value.executionMode === themeExecutionMode.value && themeRuntimeGrant.value.granted && themeRequiredPermissions.value.every(permission => themeRuntimeGrant.value.permissions.includes(permission))
 })
 const themeRuntimeActive = computed(() => homeReady.value && !themeSafeMode.value && themeHomeContribution.value && themeGrantMatches.value && !themeRuntimeFailed.value && !publicCode)
 const themeRuntimeNeedsConsent = computed(() => homeReady.value && !themeSafeMode.value && themeHomeContribution.value && !!authStore.token && !publicCode && !themeRuntimeGrantLoading.value && !themeGrantMatches.value)
@@ -208,32 +224,85 @@ const themeRuntimeEnvironment = computed(() => ({
   colorScheme: runtimeColorScheme.value,
   reducedMotion: runtimeReducedMotion.value,
   online: isOnline.value,
-  viewport: runtimeViewport.value,
+  // Runtime boundaries only accept plain structured-clone data. The viewport
+  // source can be reactive, so copy its scalar fields before entering either
+  // the sandbox or trusted transport.
+  viewport: {
+    width: Number(runtimeViewport.value.width),
+    height: Number(runtimeViewport.value.height),
+  },
 }))
 const themeRuntimePermissions = computed(() => themeGrantMatches.value ? themeRuntimeGrant.value.permissions : [])
 const themeRuntimeSlots = computed(() => activeThemeSlots.value)
 
-watch([() => themeRuntimePackage.value?.revision, () => authStore.token], async ([revision, token]) => {
+watch([() => themeRuntimePackage.value?.revision, () => authStore.token, trustedRouteRevision], async ([revision, token, trustedRoute]) => {
+  if (trustedThemeRestoreTimer) clearTimeout(trustedThemeRestoreTimer)
+  trustedThemeRestoreTimer = undefined
   const requestGeneration = ++themeGrantRequestGeneration
   themeRuntimeFailed.value = false
   themeRuntimeFailureMessage.value = ''
-  themeRuntimeGrant.value = { revision: revision || '', granted: false, permissions: [] }
+  const executionMode = trustedRoute ? 'trusted' : 'sandbox'
+  themeRuntimeGrant.value = { revision: revision || '', executionMode, available: false, granted: false, permissions: [] }
+  trustedRuntimeAvailable.value = false
   themeRuntimeGrantLoading.value = false
-  if (!revision || !token || !themeHomeContribution.value || publicCode) return
+  if (trustedRoute && (!token || publicCode || previewTheme)) {
+    window.location.replace('/')
+    return
+  }
+  if (trustedRoute && (!revision || trustedRoute !== revision || !themeHomeContribution.value)) {
+    trustedThemeRestoreTimer = setTimeout(() => {
+      if (trustedRouteRevision.value && (themeRuntimePackage.value?.revision !== trustedRouteRevision.value || !themeHomeContribution.value))
+        window.location.replace('/')
+    }, 10000)
+    return
+  }
+  if (!revision || !token || !themeHomeContribution.value || publicCode || previewTheme) {
+    if (trustedRoute) window.location.replace('/')
+    return
+  }
   themeRuntimeGrantLoading.value = true
   try {
-    const result = await getThemeRuntimeGrant(revision)
-    if (requestGeneration === themeGrantRequestGeneration && result.code === 0 && result.data.revision === revision)
-      themeRuntimeGrant.value = { revision, granted: result.data.granted, permissions: result.data.permissions as ThemePermission[] }
+    const result = await getThemeRuntimeGrant(revision, executionMode)
+    if (requestGeneration === themeGrantRequestGeneration && result.code === 0 && result.data.revision === revision) {
+      themeRuntimeGrant.value = { revision, executionMode, available: result.data.available, granted: result.data.granted, permissions: result.data.permissions as ThemePermission[] }
+      if (executionMode === 'sandbox') {
+        try {
+          const trustedResult = await getThemeRuntimeGrant(revision, 'trusted')
+          if (requestGeneration === themeGrantRequestGeneration && trustedResult.code === 0)
+            trustedRuntimeAvailable.value = trustedResult.data.available
+        }
+        catch { trustedRuntimeAvailable.value = false }
+      }
+      else if (!result.data.granted || !result.data.available) {
+        window.location.replace('/')
+      }
+    }
   }
   catch {
-    if (requestGeneration === themeGrantRequestGeneration)
-      themeRuntimeGrant.value = { revision, granted: false, permissions: [] }
+    if (requestGeneration === themeGrantRequestGeneration) {
+      themeRuntimeGrant.value = { revision, executionMode, available: false, granted: false, permissions: [] }
+      if (trustedRoute) window.location.replace('/')
+    }
   }
   finally {
     if (requestGeneration === themeGrantRequestGeneration)
       themeRuntimeGrantLoading.value = false
   }
+}, { immediate: true })
+watch([trustedRouteRevision, () => authStore.token], ([revision, token]) => {
+  if (trustedPolicyPollTimer) clearInterval(trustedPolicyPollTimer)
+  trustedPolicyPollTimer = undefined
+  if (!revision || !token) return
+  trustedPolicyPollTimer = setInterval(async () => {
+    try {
+      const result = await getThemeRuntimeGrant(revision, 'trusted')
+      if (result.code !== 0 || result.data.revision !== revision || !result.data.available || !result.data.granted)
+        window.location.replace('/')
+    }
+    catch {
+      window.location.replace('/')
+    }
+  }, 5000)
 }, { immediate: true })
 watch(directoryLayout, (enabled) => {
   document.documentElement.dataset.yinLayout = enabled ? 'directory' : 'standard'
@@ -360,41 +429,25 @@ function applyCollectionProgress(result: HomeCollectionResult<ItemGroup, Panel.I
 }
 
 function applyGroups(data: ItemGroup[], itemsByGroup = new Map<number, Panel.ItemInfo[]>(), spaceId = activeSpace.value?.id) {
-    collectionSpaceId.value = spaceId ?? null
-    const byParent = new Map<number, ItemGroup[]>()
-    data.forEach(group => { const key = group.parentId || 0; const list = byParent.get(key) || []; list.push({ ...group, items: itemsByGroup.get(Number(group.id)) || [] }); byParent.set(key, list) })
-    const flattened: ItemGroup[] = []
-    function append(parentId: number, depth: number) { (byParent.get(parentId) || []).forEach(group => { group.depth = depth; flattened.push(group); append(Number(group.id), depth + 1) }) }
-    append(0, 0)
-    items.value = flattened
-    themeSnapshotVersion.value++
-    const initiallyCollapsed = new Set<number>()
-    flattened.forEach(group => {
-      if (!directoryLayout.value && ((byParent.get(Number(group.id)) || []).length || (group.items?.length || 0) > 40))
-        initiallyCollapsed.add(Number(group.id))
-    })
-    collapsedGroups.value = initiallyCollapsed
-    flattened.forEach(group => loadedGroups.add(Number(group.id)))
-    filterItems.value = items.value
-    if (!activeDirectoryId.value || !flattened.some(group => Number(group.id) === activeDirectoryId.value && !group.parentId))
-      activeDirectoryId.value = Number(flattened.find(group => !group.parentId)?.id) || null
+  collectionSpaceId.value = spaceId ?? null
+  const { groups: flattened } = buildHomeGroupTree(data, itemsByGroup)
+  items.value = flattened
+  themeSnapshotVersion.value++
+  collapsedGroups.value = getInitiallyCollapsedGroups(flattened, !directoryLayout.value)
+  flattened.forEach(group => loadedGroups.add(Number(group.id)))
+  filterItems.value = items.value
+  activeDirectoryId.value = resolveActiveDirectoryId(flattened, activeDirectoryId.value)
 }
 
 function groupHidden(index: number) {
-  const group = items.value[index]
-  if (!group?.parentId) return false
-  let parent = items.value.find(item => Number(item.id) === Number(group.parentId))
-  while (parent) {
-    if (collapsedGroups.value.has(Number(parent.id))) return true
-    parent = parent.parentId ? items.value.find(item => Number(item.id) === Number(parent?.parentId)) : undefined
-  }
-  return false
+  return isHomeGroupHidden(items.value, index, collapsedGroups.value)
 }
 
 function toggleGroup(id: number) { const next = new Set(collapsedGroups.value); next.has(id) ? next.delete(id) : next.add(id); collapsedGroups.value = next }
 function selectSpace(key: string | number) {
   homeCollectionLoader.cancel()
   homeSearch.invalidate()
+  homeCommandSearch.invalidate()
   homeSearchGeneration++
   remoteCommandItems.value = []
   loadedGroups.clear()
@@ -409,6 +462,7 @@ function togglePanelSide() {
   if (!target) return
   homeCollectionLoader.cancel()
   homeSearch.invalidate()
+  homeCommandSearch.invalidate()
   homeSearchGeneration++
   remoteCommandItems.value = []
   loadedGroups.clear()
@@ -436,30 +490,21 @@ const commandDefinitions = computed(() => [
 ])
 
 const filteredCommandDefinitions = computed(() => {
-  const query = commandCenterQuery.value.replace(/^\//, '').trim().toLowerCase()
-  return commandDefinitions.value.filter(command => command.key.includes(query) || command.label.toLowerCase().includes(query))
+  return filterHomeCommands(commandDefinitions.value, commandCenterQuery.value)
 })
 
 const allCommandItems = computed(() => items.value.flatMap(group => group.items || []))
 
-const commandCenterItems = computed(() => {
-  const query = commandCenterQuery.value.trim().toLowerCase()
-  if (commandCenterQuery.value.startsWith('/') || !query) return []
-  const seen = new Set<number>()
-  return [...remoteCommandItems.value, ...allCommandItems.value].filter((item) => {
-    if (item.id !== undefined && seen.has(Number(item.id))) return false
-    if (item.id !== undefined) seen.add(Number(item.id))
-    return [item.title, item.url, item.description].some(value => value?.toLowerCase().includes(query))
-  })
-})
+const commandCenterItems = computed(() => filterHomeCommandItems(commandCenterQuery.value, remoteCommandItems.value, allCommandItems.value))
 
 function openCommandCenter(query: string) {
   updateCommandCenterQuery(query)
-  commandCenterSelectedIndex.value = query.startsWith('/') ? 0 : -1
+  commandCenterSelectedIndex.value = getInitialHomeCommandSelection(query)
   commandCenterVisible.value = true
 }
 
 function closeCommandCenter() {
+  homeCommandSearch.invalidate()
   commandCenterVisible.value = false
   commandCenterQuery.value = ''
   remoteCommandItems.value = []
@@ -468,8 +513,7 @@ function closeCommandCenter() {
 
 function moveCommandSelection(offset: number) {
   const length = commandCenterQuery.value.startsWith('/') ? filteredCommandDefinitions.value.length : commandCenterItems.value.length
-  if (!length) return
-  commandCenterSelectedIndex.value = (commandCenterSelectedIndex.value + offset + length) % length
+  commandCenterSelectedIndex.value = moveHomeCommandSelection(commandCenterSelectedIndex.value, offset, length)
 }
 
 function selectCommandItem(index: number) {
@@ -481,22 +525,16 @@ function submitCommandCenterSearch(keyword: string) {
   closeCommandCenter()
 }
 
-function findCommandItem(query: string) {
-  const keyword = query.trim().toLowerCase()
-  return [...remoteCommandItems.value, ...allCommandItems.value].find(item => !keyword || [item.title, item.url, item.description].some(value => value?.toLowerCase().includes(keyword)))
-}
-
 function executeCommand(command: string) {
-  if (!canWrite.value && ['add', 'group', 'space', 'settings', 'edit'].includes(command)) return
-  const parts = commandCenterQuery.value.trim().replace(/^\//, '').split(/\s+/)
-  const keyword = parts.slice(1).join(' ')
+  if (!canWrite.value && isHomeCommandWrite(command)) return
+  const { argument: keyword } = parseHomeCommand(commandCenterQuery.value)
   if (command === 'add') handleAddItem()
   else if (command === 'group') groupCreateVisible.value = true
   else if (command === 'space') createSpaceVisible.value = true
   else if (command === 'settings') settingModalShow.value = true
   else if (command === 'top') scrollToTop()
   else {
-    const item = findCommandItem(keyword)
+    const item = findHomeCommandItem(keyword, remoteCommandItems.value, allCommandItems.value)
     if (!item) return
     if (command === 'open') openPage(item.openMethod, getItemOpenUrl(item), item.title)
     else if (command === 'lan' && item.lanUrl) openPage(item.openMethod, item.lanUrl, item.title)
@@ -517,15 +555,14 @@ function updateCommandCenterQuery(query: string) {
   const isCommandQuery = query.startsWith('/')
   commandCenterQuery.value = query
   if (!query.trim() || query.startsWith('/')) {
+    homeCommandSearch.invalidate()
     remoteCommandItems.value = []
   }
-  else if (activeSpace.value) {
-    const spaceId = activeSpace.value.id
-    const keyword = query.trim()
-    void homeSearch.query(spaceId, keyword).then((matches) => {
-      if (activeSpace.value?.id === spaceId && commandCenterQuery.value === query)
+  else {
+    void homeCommandSearch.search(query).then((matches) => {
+      if (matches !== undefined)
         remoteCommandItems.value = matches
-    }).catch(() => {})
+    })
   }
   if (wasCommandQuery !== isCommandQuery)
     commandCenterSelectedIndex.value = isCommandQuery ? 0 : -1
@@ -558,13 +595,11 @@ function submitCreateGroup() {
   const title = groupName.value.trim()
   if (!title || !activeSpace.value || creatingGroup.value) return
   creatingGroup.value = true
-  createGroup<{ code: number }>(activeSpace.value.id, title).then(({ code }) => {
-    if (code === 0) {
-      groupName.value = ''
-      groupCreateVisible.value = false
-      clearCachedSpace(activeSpace.value!.id)
-      getList(true)
-    }
+  void homeMutations.createGroup({ title, icon: '', parentId: null }).then(() => {
+    groupName.value = ''
+    groupCreateVisible.value = false
+  }).catch((error: unknown) => {
+    ms.error(`${t('common.saveFail')}:${error instanceof Error ? error.message : ''}`)
   }).finally(() => { creatingGroup.value = false })
 }
 
@@ -631,27 +666,27 @@ function handleRightMenuSelect(key: string | number) {
       // 这里有个奇怪的问题，如果不使用{...}的方式 父组件的值会同步修改 标记一下
       handleEditItem({ ...currentRightSelectItem.value } as Panel.ItemInfo)
       break
-    case 'delete':
+    case 'delete': {
+      if (!currentRightSelectItem.value || !activeSpace.value) break
+      const selectedItem = currentRightSelectItem.value
+      const selectedSpaceId = activeSpace.value.id
       dialog.warning({
         title: t('common.warning'),
-        content: t('common.deleteConfirmByName', { name: currentRightSelectItem.value?.title }),
+        content: t('common.deleteConfirmByName', { name: selectedItem.title }),
         positiveText: t('common.confirm'),
         negativeText: t('common.cancel'),
-        onPositiveClick: () => {
-          deleteSpaceItem<{ code: number; msg?: string }>(activeSpace.value!.id, currentRightSelectItem.value?.id as number).then(({ code, msg }) => {
-            if (code === 0) {
-              ms.success(t('common.deleteSuccess'))
-              clearCachedSpace(activeSpace.value!.id)
-              getList(true)
-            }
-            else {
-              ms.error(`${t('common.deleteFail')}:${msg}`)
-            }
-          })
+        onPositiveClick: async () => {
+          try {
+            await homeMutations.deleteItem(Number(selectedItem.id), selectedSpaceId)
+            ms.success(t('common.deleteSuccess'))
+          }
+          catch (error) {
+            ms.error(`${t('common.deleteFail')}:${error instanceof Error ? error.message : ''}`)
+          }
         },
       })
-
       break
+    }
     default:
       break
   }
@@ -676,12 +711,6 @@ function onClickoutside() {
   dropdownShow.value = false
 }
 
-function handleEditSuccess(item: Panel.ItemInfo) {
-  if (!canWrite.value) return
-  if (activeSpace.value) clearCachedSpace(activeSpace.value.id)
-  getList(true)
-}
-
 function handleChangeNetwork(mode: PanelStateNetworkModeEnum) {
   panelState.setNetworkMode(mode)
   if (mode === PanelStateNetworkModeEnum.lan)
@@ -697,29 +726,19 @@ function handleChangeNetwork(mode: PanelStateNetworkModeEnum) {
 //   // console.log(items.value)
 // }
 
-function handleSaveSort(itemGroup: ItemGroup) {
-  if (!canWrite.value) return
-  const saveItems: Common.SortItemRequest[] = []
-  if (itemGroup.items) {
-    for (let i = 0; i < itemGroup.items.length; i++) {
-      const element = itemGroup.items[i]
-      saveItems.push({
-        id: element.id as number,
-        sort: i + 1,
-      })
-    }
-
-    sortItems(activeSpace.value!.id, itemGroup.id as number, saveItems).then(({ code, msg }) => {
-      if (code === 0) {
-        ms.success(t('common.saveSuccess'))
-        itemGroup.sortStatus = false
-        clearCachedSpace(activeSpace.value!.id)
-        getList(true)
-      }
-      else {
-        ms.error(`${t('common.saveFail')}:${msg}`)
-      }
-    })
+async function handleSaveSort(itemGroup: ItemGroup) {
+  if (!canWrite.value || !itemGroup.items) return
+  const groupId = Number(itemGroup.id)
+  if (!Number.isSafeInteger(groupId) || groupId <= 0) return
+  const itemIds = itemGroup.items.map(item => Number(item.id))
+  if (itemIds.some(id => !Number.isSafeInteger(id) || id <= 0)) return
+  try {
+    await homeMutations.reorderItems(groupId, itemIds)
+    itemGroup.sortStatus = false
+    ms.success(t('common.saveSuccess'))
+  }
+  catch (error) {
+    ms.error(`${t('common.saveFail')}:${error instanceof Error ? error.message : ''}`)
   }
 }
 
@@ -802,6 +821,8 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  if (trustedPolicyPollTimer) clearInterval(trustedPolicyPollTimer)
+  if (trustedThemeRestoreTimer) clearTimeout(trustedThemeRestoreTimer)
   delete document.documentElement.dataset.yinLayout
   window.removeEventListener('keydown', handleGlobalKeydown)
   window.removeEventListener('online', handleOnline)
@@ -929,12 +950,19 @@ const themePersistence = createThemePersistence(localStorage, {
   userId: () => authStore.userInfo?.id,
   packageId: () => activeThemePackage.value?.manifest.id,
   revision: () => activeThemePackage.value?.revision,
+  validateSettings: settings => validateActiveThemeSettings(settings),
 })
+const validateThemeSettingsSchema = createThemeSettingsSchemaValidator({ origin: window.location.origin })
+function validateActiveThemeSettings(settings: Record<string, unknown>) {
+  return validateThemeSettingsSchema(activeThemePackage.value || undefined, settings)
+}
 
 const homeMutations = createHomeMutationService({
   api: {
-    createItem: (spaceId, input) => createItem<{ code: number; msg?: string }>(spaceId, input),
-    updateItem: (spaceId, itemId, input) => updateItem<{ code: number; msg?: string }>(spaceId, itemId, input),
+    createItem: (spaceId, input) => createItem<Panel.ItemInfo>(spaceId, input),
+    createItemWithIcon: (spaceId, input, file) => createItemWithIcon<Panel.ItemInfo>(spaceId, input, file),
+    uploadItemIcon: file => uploadImage(file),
+    updateItem: (spaceId, itemId, input) => updateItem<Panel.ItemInfo>(spaceId, itemId, input),
     deleteItem: (spaceId, itemId) => deleteSpaceItem<{ code: number; msg?: string }>(spaceId, itemId),
     reorderItems: (spaceId, groupId, itemIds) => sortItems<{ code: number; msg?: string }>(spaceId, groupId, itemIds.map((id, index) => ({ id, sort: index + 1 }))),
     createGroup: (spaceId, input) => createGroup<{ code: number; msg?: string }>(spaceId, input.title, input.icon, input.parentId),
@@ -962,8 +990,8 @@ const homeThemeHandlers = createHomeThemeHandlers({
   selectSpace: spaceId => selectSpace(spaceId),
   openItem: (item) => { openPage(item.openMethod, getItemOpenUrl(item), item.title) },
   openEditor: ({ item, groupId }) => item ? handleEditItem(item) : handleAddItem(groupId),
-  createItem: input => homeMutations.createItem(input),
-  updateItem: (itemId, input) => homeMutations.updateItem(itemId, input),
+  createItem: async (input) => { await homeMutations.createItem(input) },
+  updateItem: async (itemId, input) => { await homeMutations.updateItem(itemId, input) },
   deleteItem: item => confirmThemeDelete(
     t('common.deleteConfirmByName', { name: item.title }),
     spaceId => homeMutations.deleteItem(Number(item.id), spaceId),
@@ -981,9 +1009,7 @@ const homeThemeHandlers = createHomeThemeHandlers({
   refresh: () => getList(true),
   searchItems: query => activeSpace.value ? homeSearch.query(activeSpace.value.id, query) : [],
   getMonitorSnapshot: async () => {
-    const result = await getSnapshot<CoreMonitorSnapshot>()
-    if (result.code !== 0) throw createThemeRuntimeError('UNSUPPORTED_CAPABILITY', 'Monitor data is unavailable')
-    return normalizeMonitorSnapshot(result.data)
+    return normalizeMonitorSnapshot(await monitorSnapshotController.fetchSnapshot())
   },
   submitSearch: query => itemFrontEndSearch(query),
   navigate: (destination) => {
@@ -994,6 +1020,24 @@ const homeThemeHandlers = createHomeThemeHandlers({
   getStorage: themePersistence.getStorage,
   setStorage: themePersistence.setStorage,
   removeStorage: themePersistence.removeStorage,
+  openCoreSurface: async (surface) => {
+    if (surface === 'theme-settings') {
+      await router.push('/settings/style')
+      return
+    }
+    throw createThemeRuntimeError('UNSUPPORTED_CAPABILITY', 'Core surface is unavailable')
+  },
+  networkFetch: async (input, init) => {
+    const url = new URL(input, window.location.origin)
+    if (url.origin !== window.location.origin || !url.pathname.startsWith('/api/'))
+      throw createThemeRuntimeError('PERMISSION_DENIED', 'Theme network requests must target the Core origin')
+    const method = typeof init.method === 'string' ? init.method.toUpperCase() : 'GET'
+    if (!['GET', 'HEAD'].includes(method)) throw createThemeRuntimeError('PERMISSION_DENIED', 'Theme network broker allows read-only requests')
+    const response = await fetch(url, { method, credentials: 'omit', redirect: 'error' })
+    const body = await response.text()
+    return { status: response.status, headers: Object.fromEntries(response.headers.entries()), body }
+  },
+  reportDiagnostic: async entry => { console[entry.level === 'error' ? 'error' : entry.level === 'warn' ? 'warn' : 'info']('[theme]', entry.message, entry.data || {}) },
 })
 
 function confirmThemeDelete(message: string, action: (spaceId: number) => Promise<unknown>): Promise<unknown> {
@@ -1030,13 +1074,22 @@ async function grantThemeRuntimePermissions() {
   const revision = themeRuntimePackage.value?.revision
   if (!revision || themeRuntimeGrantSaving.value) return
   const permissions = themeRequiredPermissions.value
-  const summary = permissions.length ? permissions.join(', ') : t('themePackage.noRuntimePermissions')
-  if (!window.confirm(t('themePackage.runtimeConfirm', { permissions: summary }))) return
+  const executionMode = selectedThemeExecutionMode.value
+  if (executionMode === 'trusted' && (!trustedRuntimeAvailable.value || !trustedRuntimeAcknowledged.value)) return
+  if (previewTheme) {
+    themeRuntimeGrant.value = { revision, executionMode, available: true, granted: true, permissions }
+    return
+  }
   themeRuntimeGrantSaving.value = true
   try {
-    const result = await setThemeRuntimeGrant(revision, permissions)
+    const result = await setThemeRuntimeGrant(revision, permissions, executionMode)
     if (result.code === 0) {
-      themeRuntimeGrant.value = { revision, granted: true, permissions }
+      if (executionMode === 'trusted') {
+        window.location.assign(`/__yin/theme-trusted/${encodeURIComponent(revision)}`)
+        return
+      }
+      themeRuntimeGrant.value = { revision, executionMode, available: true, granted: true, permissions }
+      themeRuntimeConsentVisible.value = false
       themeRuntimeFailed.value = false
       themeRuntimeFailureMessage.value = ''
     }
@@ -1049,7 +1102,14 @@ async function grantThemeRuntimePermissions() {
   }
 }
 
+function openThemeRuntimeConsent() {
+  selectedThemeExecutionMode.value = 'sandbox'
+  trustedRuntimeAcknowledged.value = false
+  themeRuntimeConsentVisible.value = true
+}
+
 function handleThemeRuntimeFailure(error: Error) {
+  console.error('Theme sandbox failed to start:', error)
   themeRuntimeFailed.value = true
   themeRuntimeFailureMessage.value = error.message || t('themePackage.runtimeLoadFailed')
 }
@@ -1126,14 +1186,27 @@ function handleThemeRuntimeFailure(error: Error) {
       <RouterLink to="/__yin/theme-recovery">{{ $t('themeRecovery.exit') }}</RouterLink>
     </div>
     <WallpaperLayer v-if="homeReady" />
+    <div
+      v-if="themeRuntimeActive && monitorEnabled && panelState.panelConfig.systemMonitorShow"
+      class="theme-runtime-monitor-layer"
+      :class="{ 'theme-runtime-monitor-layer--info': panelState.panelConfig.iconStyle === PanelPanelConfigStyleEnum.info }"
+      data-testid="theme-runtime-monitor"
+    >
+      <SystemMonitor
+        :snapshot-controller="monitorSnapshotController"
+        :show-title="panelState.panelConfig.systemMonitorShowTitle"
+        :icon-text-color="panelIconTextColor"
+      />
+    </div>
     <ThemeHost
       v-if="themeRuntimeActive && themeRuntimePackage"
-      :key="`${themeRuntimePackage.revision}:${themeRuntimeGrant.permissions.join(',')}`"
+      :key="`${themeRuntimePackage.revision}:${themeExecutionMode}:${themeRuntimeGrant.permissions.join(',')}`"
       class="theme-home-host"
       :theme="themeRuntimePackage"
       :snapshot="themeRuntimeSnapshot"
       :environment="themeRuntimeEnvironment"
       :permissions="themeRuntimePermissions"
+      :execution-mode="themeExecutionMode"
       :slots="themeRuntimeSlots"
       :title="themeRuntimePackage.manifest.name"
       :execute="executeThemeRequest"
@@ -1160,13 +1233,13 @@ function handleThemeRuntimeFailure(error: Error) {
       >
         <div v-if="themeRuntimeNeedsConsent" class="theme-runtime-notice" role="status" data-testid="theme-runtime-consent">
           <span>{{ themeRuntimeFailureMessage || $t('themePackage.runtimePrompt', { name: themeRuntimePackage?.manifest.name, permissions: themeRequiredPermissions.join(', ') || $t('themePackage.noRuntimePermissions') }) }}</span>
-          <NButton size="small" type="primary" :loading="themeRuntimeGrantSaving" @click="grantThemeRuntimePermissions">
-            {{ $t('themePackage.runtimeEnable') }}
+          <NButton size="small" type="primary" @click="openThemeRuntimeConsent">
+            {{ $t('themeTrustedRuntime.review') }}
           </NButton>
         </div>
         <div v-if="themeRuntimeFailed" class="theme-runtime-notice theme-runtime-notice--error" role="alert" data-testid="theme-runtime-fallback">
           <span>{{ $t('themePackage.runtimeLoadFailed') }}</span>
-          <RouterLink to="/__yin/theme-recovery">{{ $t('themeRecovery.title') }}</RouterLink>
+          <a href="/theme-recovery.html">{{ $t('themeRecovery.title') }}</a>
         </div>
         <!-- 头 -->
         <div class="home-header mx-[auto] w-[80%]">
@@ -1219,8 +1292,8 @@ function handleThemeRuntimeFailure(error: Error) {
             }"
           >
             <SystemMonitor
+              :snapshot-controller="monitorSnapshotController"
               :show-title="panelState.panelConfig.systemMonitorShowTitle"
-              :refresh-interval="monitorResultRefreshInterval"
               :icon-text-color="panelIconTextColor"
             />
           </div>
@@ -1418,7 +1491,7 @@ function handleThemeRuntimeFailure(error: Error) {
       </div>
     </NBackTop>
 
-    <EditItem v-model:visible="editItemInfoShow" :item-info="editItemInfoData" :item-group-id="currentAddItenIconGroupId" :space-id="activeSpace?.id" @done="handleEditSuccess" />
+    <EditItem v-model:visible="editItemInfoShow" :item-info="editItemInfoData" :item-group-id="currentAddItenIconGroupId" :space-id="activeSpace?.id" :mutations="homeMutations" />
 
     <!-- 弹窗 -->
     <NModal
@@ -1448,6 +1521,54 @@ function handleThemeRuntimeFailure(error: Error) {
       </div>
     </NModal>
   </div>
+  <NModal v-model:show="themeRuntimeConsentVisible" preset="card" class="theme-runtime-consent-modal" style="width: min(92vw, 560px)" :title="$t('themeTrustedRuntime.consentTitle')" :mask-closable="false">
+    <div class="theme-runtime-consent-content" data-testid="theme-runtime-consent-dialog">
+      <p class="theme-runtime-consent-package">{{ themeRuntimePackage?.manifest.name }} · {{ themeRuntimePackage?.revision?.slice(0, 12) }}</p>
+      <p>{{ $t('themeTrustedRuntime.consentIntro') }}</p>
+      <NRadioGroup v-model:value="selectedThemeExecutionMode" class="theme-runtime-mode-list" :aria-label="$t('themeTrustedRuntime.modeGroupLabel')">
+        <label class="theme-runtime-mode-option" :class="{ 'theme-runtime-mode-option--selected': selectedThemeExecutionMode === 'sandbox' }">
+          <NRadio value="sandbox" />
+          <span>
+              <strong>{{ $t('themeTrustedRuntime.sandboxMode') }}</strong>
+              <small>{{ $t('themeTrustedRuntime.sandboxDescription') }}</small>
+          </span>
+        </label>
+        <label class="theme-runtime-mode-option" :class="{ 'theme-runtime-mode-option--selected': selectedThemeExecutionMode === 'trusted' }">
+          <NRadio value="trusted" :disabled="!trustedRuntimeAvailable" />
+          <span>
+            <strong>{{ $t('themeTrustedRuntime.trustedMode') }}</strong>
+            <small>{{ trustedRuntimeAvailable ? $t('themeTrustedRuntime.trustedDescription') : $t('themeTrustedRuntime.trustedUnavailable') }}</small>
+          </span>
+        </label>
+      </NRadioGroup>
+      <ul class="theme-runtime-permissions" :aria-label="$t('themeTrustedRuntime.permissionsLabel')">
+        <li v-for="permission in themeRequiredPermissions" :key="permission">{{ permission }}</li>
+        <li v-if="!themeRequiredPermissions.length">{{ $t('themePackage.noRuntimePermissions') }}</li>
+      </ul>
+      <section v-if="selectedThemeExecutionMode === 'trusted'" class="theme-runtime-risk" role="alert" data-testid="theme-trusted-risk">
+        <h3>{{ $t('themeTrustedRuntime.warningTitle') }}</h3>
+        <p>{{ $t('themeTrustedRuntime.warning') }}</p>
+        <p>{{ $t('themeTrustedRuntime.serverBoundary') }}</p>
+        <NCheckbox v-model:checked="trustedRuntimeAcknowledged" data-testid="theme-trusted-acknowledgement">
+          {{ $t('themeTrustedRuntime.acknowledge') }}
+        </NCheckbox>
+      </section>
+    </div>
+    <template #footer>
+      <div class="theme-runtime-consent-actions">
+        <NButton quaternary @click="themeRuntimeConsentVisible = false">{{ $t('common.cancel') }}</NButton>
+        <NButton
+          type="primary"
+          :loading="themeRuntimeGrantSaving"
+          :disabled="selectedThemeExecutionMode === 'trusted' && (!trustedRuntimeAvailable || !trustedRuntimeAcknowledged)"
+          data-testid="theme-runtime-consent-confirm"
+          @click="grantThemeRuntimePermissions"
+        >
+          {{ $t(selectedThemeExecutionMode === 'trusted' ? 'themeTrustedRuntime.trustedEnable' : 'themePackage.runtimeEnable') }}
+        </NButton>
+      </div>
+    </template>
+  </NModal>
   <NModal v-model:show="createSpaceVisible" preset="dialog" :title="$t('spaceManage.createSpace')" :positive-text="$t('common.confirm')" :negative-text="$t('common.cancel')" :loading="creatingSpace" @positive-click="submitCreateSpace">
     <div data-testid="create-space-modal"><NInput v-model:value="spaceName" :placeholder="$t('spaceManage.newSpaceName')" maxlength="100" show-count @keyup.enter="submitCreateSpace" /></div>
   </NModal>
@@ -1477,8 +1598,26 @@ function handleThemeRuntimeFailure(error: Error) {
 .theme-safe-mode-banner a { color: var(--yin-primary); text-decoration: underline; }
 .offline-unavailable { position: fixed; z-index: 31; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(0, 0, 0, 0.48); }
 .theme-home-host { position: absolute; z-index: 1; inset: 0; overflow: hidden; pointer-events: auto; }
+.theme-runtime-monitor-layer { position: fixed; z-index: 5; top: 72px; left: var(--yin-pageGutter); right: var(--yin-pageGutter); max-height: 220px; overflow: auto; pointer-events: none; }
+.theme-runtime-monitor-layer > * { pointer-events: auto; }
+.theme-runtime-monitor-layer--info { max-height: 260px; }
 .theme-runtime-notice { display: flex; align-items: center; justify-content: space-between; gap: var(--yin-component-group-gap); margin: var(--yin-component-group-section-spacing) auto; padding: var(--yin-component-card-padding); border: var(--yin-component-button-border-width) solid var(--yin-border); border-radius: var(--yin-component-card-radius); background: var(--yin-surfaceElevated); color: var(--yin-text); }
 .theme-runtime-notice--error { border-color: var(--yin-danger); }
+.theme-runtime-consent-content { display: grid; gap: var(--yin-spaceMd); color: var(--yin-text); line-height: var(--yin-lineHeightBody); }
+.theme-runtime-consent-content > p { margin: 0; }
+.theme-runtime-consent-package { color: var(--yin-textMuted); font-size: var(--yin-fontSmallSize); overflow-wrap: anywhere; }
+.theme-runtime-mode-list { display: grid; gap: var(--yin-spaceSm); }
+.theme-runtime-mode-option { display: flex; min-height: 56px; align-items: flex-start; gap: var(--yin-spaceSm); padding: var(--yin-spaceMd); border: var(--yin-borderWidth) solid var(--yin-border); border-radius: var(--yin-component-card-radius); background: var(--yin-surface); cursor: pointer; }
+.theme-runtime-mode-option--selected { border-color: var(--yin-focusRing); box-shadow: inset 0 0 0 var(--yin-effect-focus-width) var(--yin-focusRing); }
+.theme-runtime-mode-option > span { display: grid; gap: var(--yin-spaceXs); }
+.theme-runtime-mode-option small { color: var(--yin-textMuted); font-size: var(--yin-fontSmallSize); }
+.theme-runtime-permissions { display: flex; flex-wrap: wrap; gap: var(--yin-spaceXs); margin: 0; padding: 0; list-style: none; }
+.theme-runtime-permissions li { max-width: 100%; padding: var(--yin-spaceXs) var(--yin-spaceSm); border-radius: var(--yin-component-button-radius); background: var(--yin-surface); color: var(--yin-text); font: var(--yin-fontSmallSize)/var(--yin-lineHeightBody) ui-monospace, monospace; overflow-wrap: anywhere; }
+.theme-runtime-risk { display: grid; gap: var(--yin-spaceSm); padding: var(--yin-spaceMd); border-inline-start: var(--yin-effect-focus-width) solid var(--yin-danger); background: color-mix(in srgb, var(--yin-danger) 8%, var(--yin-surfaceElevated)); }
+.theme-runtime-risk h3, .theme-runtime-risk p { margin: 0; }
+.theme-runtime-risk h3 { font-size: var(--yin-fontBodySize); }
+.theme-runtime-consent-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: var(--yin-spaceSm); }
+.theme-runtime-consent-actions :deep(.n-button) { min-height: max(var(--yin-component-button-height), 44px); }
 </style>
 
 <style>

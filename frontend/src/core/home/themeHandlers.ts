@@ -46,6 +46,9 @@ export interface HomeThemeActionBindings {
   getStorage: (key: string) => Promise<unknown> | unknown
   setStorage: (key: string, value: unknown) => Promise<unknown> | unknown
   removeStorage: (key: string) => Promise<unknown> | unknown
+  openCoreSurface?: (surface: string, payload: Record<string, unknown>) => Promise<unknown> | unknown
+  networkFetch?: (input: string, init: Record<string, unknown>) => Promise<unknown> | unknown
+  reportDiagnostic?: (entry: Record<string, unknown>) => Promise<unknown> | unknown
 }
 
 export function createHomeThemeHandlers(bindings: HomeThemeActionBindings): ThemeApiHandlers {
@@ -207,6 +210,9 @@ export function createHomeThemeHandlers(bindings: HomeThemeActionBindings): Them
     getStorage: bindings.getStorage,
     setStorage: bindings.setStorage,
     removeStorage: bindings.removeStorage,
+    openCoreSurface: bindings.openCoreSurface,
+    networkFetch: bindings.networkFetch,
+    reportDiagnostic: bindings.reportDiagnostic,
   }
 }
 

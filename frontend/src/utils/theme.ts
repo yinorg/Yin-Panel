@@ -12,6 +12,7 @@ export interface ThemeManifest {
   runtime?: { supportedModes?: string[] }
   contributes?: { views?: string[]; regions?: string[]; components?: string[] }
   permissions?: { required?: Array<{ name: string; origins?: string[] }>; optional?: Array<{ name: string; origins?: string[] }> }
+  settings?: { schema: string; schemaVersion: number }
   wallpapers?: Record<string, { kind: 'image' | 'video' | 'webBundle' | 'externalUrl' | 'imageUrl'; source: string; poster?: string; overlayOpacity?: number }>
 }
 
@@ -34,6 +35,7 @@ export interface ThemePackageV2 {
     runtime?: { supportedModes?: string[] }
     contributes?: { views?: string[]; regions?: string[]; components?: string[] }
     permissions?: { required?: Array<{ name: string; origins?: string[] }>; optional?: Array<{ name: string; origins?: string[] }> }
+    settings?: { schema: string; schemaVersion: number }
     tokens: { format: 'DTCG'; version: string; documents: Record<string, string> }
     resources: Array<{ path: string; sha256: string; mediaType: string; url?: string }>
   }
@@ -59,6 +61,7 @@ export function normalizeThemePackageV2(pkg: ThemePackageV2): ThemePackage {
       runtime: pkg.manifest.runtime,
       contributes: pkg.manifest.contributes,
       permissions: pkg.manifest.permissions,
+      settings: pkg.manifest.settings,
       schemes: Object.keys(pkg.manifest.tokens.documents),
       documents: pkg.manifest.tokens.documents,
       resources: pkg.manifest.resources || [],

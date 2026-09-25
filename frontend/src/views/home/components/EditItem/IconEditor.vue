@@ -1,18 +1,18 @@
 <script setup lang="ts">
-import { NButton, NColorPicker, NInput, NRadio, NUpload } from 'naive-ui'
-import type { UploadFileInfo } from 'naive-ui'
+import { NButton, NColorPicker, NInput, NRadio, NUpload, useMessage } from 'naive-ui'
+import type { UploadCustomRequestOptions } from 'naive-ui'
 import { computed } from 'vue'
 import { ItemIcon } from '../../../../components/common'
-import { useAuthStore } from '../../../../store'
-import { apiRespErrMsg } from '../../../../utils/request/apiMessage'
+import { t } from '../../../../locales'
 
 const props = defineProps<{
   itemIcon: Panel.ItemIcon | null
+  uploadImage: (file: File) => Promise<{ imageUrl: string; fileName: string }>
 }>()
 const emit = defineEmits<{
   (e: 'update:itemIcon', visible: Panel.ItemIcon): void // 定义修改父组件（prop内）的值的事件
 }>()
-const authStore = useAuthStore()
+const message = useMessage()
 
 // 默认图标背景色
 const defautSwatchesBackground = [
@@ -60,25 +60,22 @@ function handleResetBackgroundColor() {
   handleChange()
 }
 
-const handleUploadFinish = ({
-  file,
-  event,
-}: {
-  file: UploadFileInfo
-  event?: ProgressEvent
-}) => {
-  const res = JSON.parse((event?.target as XMLHttpRequest).response)
-  if (res.code === 0) {
-    itemIconInfo.value.src = res.data.imageUrl
-    itemIconInfo.value.fileName = res.data.fileName
+async function handleUpload({ file, onFinish, onError }: UploadCustomRequestOptions) {
+  if (!file.file) {
+    onError()
+    return
+  }
+  try {
+    const uploaded = await props.uploadImage(file.file)
+    itemIconInfo.value.src = uploaded.imageUrl
+    itemIconInfo.value.fileName = uploaded.fileName
     emit('update:itemIcon', itemIconInfo.value || null)
+    onFinish()
   }
-  else {
-    apiRespErrMsg(res)
-    // ms.error(`${t('common.uploadFail')}:${res.msg}`)
+  catch {
+    message.error(t('common.uploadFail'))
+    onError()
   }
-
-  return file
 }
 </script>
 
@@ -144,13 +141,8 @@ const handleUploadFinish = ({
           <div v-if="itemIconInfo.itemType === 2">
             <NInput v-model:value="itemIconInfo.src" class="mb-[5px] w-full" size="small" type="text" :placeholder="$t('iconItem.inputIconUrlOrUpload')" @input="handleChange" />
             <NUpload
-              action="/api/file/uploadImg"
+              :custom-request="handleUpload"
               :show-file-list="false"
-              name="imgfile"
-              :headers="{
-                Authorization: `Bearer ${authStore.token}`,
-              }"
-              @finish="handleUploadFinish"
             >
               <NButton size="small">
                 {{ $t('iconItem.selectUpload') }}

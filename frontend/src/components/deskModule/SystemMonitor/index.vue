@@ -10,11 +10,9 @@ import { usePanelState } from '../../../store'
 import { PanelPanelConfigStyleEnum } from '../../../enums'
 import { SvgIcon } from '../../common'
 import { t } from '../../../locales'
-import { getDiskStateByPath, getEnableStatus, getSnapshot } from '../../../api/system/systemMonitor'
 import { monitorSnapshotKey, type MonitorSnapshot } from './snapshot'
 import { resolvePanelValue } from '../../../utils/theme'
-import { createSnapshotPoller } from '../../../core/monitor/snapshotPoller'
-import { loadDiskSnapshots } from '../../../core/monitor/diskSnapshots'
+import type { MonitorSnapshotController } from '../../../core/monitor/snapshotController'
 
 interface MonitorGroup extends Panel.ItemIconGroup {
   sortStatus?: boolean
@@ -25,8 +23,8 @@ interface MonitorGroup extends Panel.ItemIconGroup {
 const props = defineProps<{
   allowEdit?: boolean
   showTitle?: boolean
-  refreshInterval?: number
   iconTextColor?: string
+  snapshotController: MonitorSnapshotController<MonitorSnapshot>
 }>()
 const panelState = usePanelState()
 const iconTextColor = computed(() => props.iconTextColor || resolvePanelValue('var(--yin-text)', panelState.panelConfig.iconTextColor, !!panelState.panelConfig.useThemeDefaults))
@@ -72,28 +70,8 @@ const cardStyle: CardStyle = {
 
 const monitorDatas = ref<MonitorData[]>([])
 const monitorSnapshot = ref<MonitorSnapshot | null>(null)
-const defaultSnapshotInterval = 10000
 provide(monitorSnapshotKey, monitorSnapshot)
-
-const snapshotPoller = createSnapshotPoller<MonitorSnapshot>({
-  fetchSnapshot: async () => {
-    const res = await getSnapshot<MonitorSnapshot>()
-    if (res.code !== 0) throw new Error('monitor snapshot request failed')
-    const snapshot = res.data
-    const diskPaths = [...new Set(monitorDatas.value
-      .filter(item => item.monitorType === MonitorType.disk)
-      .map(item => (item.extendParam as { path?: string } | undefined)?.path)
-      .filter((path): path is string => !!path))]
-    snapshot.DISK_INFO = await loadDiskSnapshots(
-      diskPaths,
-      path => getDiskStateByPath<SystemMonitor.DiskInfo>(path),
-      monitorSnapshot.value?.DISK_INFO,
-    )
-    return snapshot
-  },
-  getInterval: getSnapshotInterval,
-  onSnapshot: (snapshot) => { monitorSnapshot.value = snapshot },
-})
+let unsubscribeSnapshot = () => {}
 
 function handleClick(index: number, item: MonitorData) {
   if (!props.allowEdit)
@@ -156,28 +134,20 @@ async function getData() {
     // 生成并保存
     saveAll(monitorDatas.value)
   }
-}
-
-async function getSnapshotInterval() {
-  if (props.refreshInterval && props.refreshInterval > 0)
-    return props.refreshInterval * 1000
-  try {
-    const res = await getEnableStatus<{ refresh_interval?: number }>()
-    if (res.code !== 0) return defaultSnapshotInterval
-    if (res.data.refresh_interval && res.data.refresh_interval > 0)
-      return res.data.refresh_interval * 1000
-  }
-  catch {
-    // Use the default when the optional monitor configuration is unavailable.
-  }
-  return defaultSnapshotInterval
+  props.snapshotController.setDiskPaths(monitorDatas.value
+    .filter(item => item.monitorType === MonitorType.disk)
+    .map(item => (item.extendParam as { path?: string } | undefined)?.path || ''))
 }
 
 onMounted(() => {
-  void getData().finally(() => snapshotPoller.start())
+  unsubscribeSnapshot = props.snapshotController.subscribe((snapshot) => { monitorSnapshot.value = snapshot })
+  void getData().finally(() => props.snapshotController.start())
 })
 
-onUnmounted(snapshotPoller.stop)
+onUnmounted(() => {
+  unsubscribeSnapshot()
+  props.snapshotController.stop()
+})
 
 function handleSaveDone() {
   getData()

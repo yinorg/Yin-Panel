@@ -34,6 +34,11 @@ func TestThemePackageRoutesExposeOnlyV2PackageContract(t *testing.T) {
 		http.MethodPost + " /api/theme/v2/admin/trial",
 		http.MethodPost + " /api/theme/v2/admin/confirm",
 		http.MethodPost + " /api/theme/v2/admin/rollback",
+		http.MethodGet + " /api/theme/v2/admin/trusted/:revision",
+		http.MethodPut + " /api/theme/v2/admin/trusted/:revision",
+		http.MethodGet + " /api/theme/v2/grants/:revision",
+		http.MethodPost + " /api/theme/v2/grants/:revision",
+		http.MethodDelete + " /api/theme/v2/grants/:revision",
 	} {
 		if !routes[route] {
 			t.Errorf("missing V2 Theme API route %q", route)

@@ -20,6 +20,7 @@ import (
 	"sync"
 	"time"
 
+	jsonschema "github.com/santhosh-tekuri/jsonschema/v5"
 	"github.com/yinorg/Yin-Panel/backend/internal/global"
 )
 
@@ -27,6 +28,7 @@ const (
 	PackageFormatVersionV2 = 2
 	ThemeAPIVersionV1      = "1.0.0"
 	MaxPackageV2Files      = 512
+	MaxThemeSettingsSchema = 256 * 1024
 )
 
 type PackageManifestV2 struct {
@@ -199,6 +201,18 @@ func ParsePackageArchiveV2(data []byte, confirmUnverified bool) (*PackageV2, err
 		}
 		pkg.Files[resource.Path] = ResourceData{MediaType: resource.MediaType, Content: content}
 	}
+	if settings := manifest.Settings; settings != nil {
+		schemaResource, ok := pkg.Files[settings.Schema]
+		if settings.SchemaVersion < 1 || !ok || schemaResource.MediaType != "application/schema+json" {
+			return nil, errors.New("theme settings require a declared schema and positive schemaVersion")
+		}
+		if len(schemaResource.Content) > MaxThemeSettingsSchema {
+			return nil, errors.New("theme settings schema exceeds 256 KiB")
+		}
+		if err := validateThemeSettingsSchemaV2(settings.Schema, schemaResource.Content); err != nil {
+			return nil, fmt.Errorf("invalid theme settings schema: %w", err)
+		}
+	}
 	for _, name := range append(append([]string{manifest.Entrypoints.Script}, manifest.Entrypoints.Styles...), settingsPathV2(manifest.Settings)) {
 		if name == "" {
 			continue
@@ -321,8 +335,8 @@ func ValidatePackageManifestV2(m PackageManifestV2, coreVersion string) error {
 			return fmt.Errorf("theme stylesheet %q must be a declared CSS resource", style)
 		}
 	}
-	if settingsPath := settingsPathV2(m.Settings); settingsPath != "" && resourceTypes[settingsPath] != "application/schema+json" {
-		return errors.New("theme settings schema must be a declared schema resource")
+	if settingsPath := settingsPathV2(m.Settings); settingsPath != "" && (m.Settings.SchemaVersion < 1 || resourceTypes[settingsPath] != "application/schema+json") {
+		return errors.New("theme settings schema must be a declared schema resource with a positive schemaVersion")
 	}
 	if err := validatePermissionNamesV2(m.Permissions); err != nil {
 		return err
@@ -334,6 +348,44 @@ func ValidatePackageManifestV2(m PackageManifestV2, coreVersion string) error {
 	}
 	if err := validateContributionsV2(m); err != nil {
 		return err
+	}
+	return nil
+}
+
+func validateThemeSettingsSchemaV2(name string, content []byte) error {
+	var document any
+	if err := json.Unmarshal(content, &document); err != nil {
+		return err
+	}
+	if err := rejectRemoteSchemaRefsV2(document); err != nil {
+		return err
+	}
+	compiler := jsonschema.NewCompiler()
+	resourceURL := "https://theme.invalid/" + name
+	if err := compiler.AddResource(resourceURL, bytes.NewReader(content)); err != nil {
+		return err
+	}
+	_, err := compiler.Compile(resourceURL)
+	return err
+}
+
+func rejectRemoteSchemaRefsV2(value any) error {
+	switch node := value.(type) {
+	case map[string]any:
+		if ref, ok := node["$ref"].(string); ok && !strings.HasPrefix(ref, "#") {
+			return fmt.Errorf("external schema reference %q is not allowed", ref)
+		}
+		for _, child := range node {
+			if err := rejectRemoteSchemaRefsV2(child); err != nil {
+				return err
+			}
+		}
+	case []any:
+		for _, child := range node {
+			if err := rejectRemoteSchemaRefsV2(child); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }
@@ -426,8 +478,8 @@ func validatePermissionNamesV2(p PermissionsV2) error {
 }
 
 func ValidateThemeGrantV2(manifest PackageManifestV2, executionMode string, permissions []string) error {
-	if executionMode != "sandbox" || !containsString(manifest.Runtime.SupportedModes, "sandbox") {
-		return errors.New("theme does not support the sandbox runtime")
+	if (executionMode != "sandbox" && executionMode != "trusted") || !containsString(manifest.Runtime.SupportedModes, executionMode) {
+		return fmt.Errorf("theme does not support the %s runtime", executionMode)
 	}
 	allowed := map[string]bool{}
 	for _, permission := range append(append([]PermissionV2(nil), manifest.Permissions.Required...), manifest.Permissions.Optional...) {

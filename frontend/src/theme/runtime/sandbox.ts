@@ -1,5 +1,6 @@
-import { createThemeApiDispatcher } from '../api/dispatcher'
+import { createThemeApiExecutionDispatcher } from '../api/dispatcher'
 import { isThemeApiRequest, isThemeEventName, type ThemeEnvironment, type ThemeEventEnvelope, type ThemeEventName, type ThemeHomeSnapshot, type ThemePermission } from '../api/v1'
+import { createThemeApiClient } from '../../../packages/theme-sdk/src/index'
 import { createThemeRequestGuard } from './requestGuard'
 import { createThemeSandboxDocument } from './sandboxDocument'
 export { createThemeSandboxDocument } from './sandboxDocument'
@@ -7,8 +8,9 @@ export { createThemeSandboxDocument } from './sandboxDocument'
 const MAX_MESSAGE_BYTES = 1_048_576
 const HANDSHAKE_TIMEOUT = 10_000
 
-const bootstrap = `
+const bootstrap = (apiClientSource: string) => `
 (() => {
+  const createThemeApiClient = (${apiClientSource});
   const connect = (event) => {
     const data = event.data;
     if (event.source !== parent || !data || data.protocol !== 'yin-theme-api' || data.type !== 'connect' || typeof data.nonce !== 'string' || !event.ports || !event.ports[0]) return;
@@ -20,54 +22,24 @@ const bootstrap = `
     let environment;
     let moduleDefinition;
     let mountedView;
+    const mountedRegions = [];
+    const mountedComponents = [];
     let tokenStyle;
     let objectUrl;
-    const listeners = new Map();
     const pending = new Map();
-    let lastEventSequence = 0;
     function reply(message) {
       try {
         if (JSON.stringify(message).length <= 1048576) port.postMessage(message);
       } catch (_) {}
     }
-    function request(method, payload) {
-      const requestId = crypto.randomUUID();
+    function request(request) {
       return new Promise((resolve, reject) => {
-        pending.set(requestId, { resolve, reject });
-        reply({ type: 'api-request', request: { protocol: 'yin-theme-api', version: 1, requestId, contextVersion: snapshot.version, method, payload } });
+        pending.set(request.requestId, { resolve, reject });
+        reply({ type: 'api-request', request });
       });
     }
-    const api = {
-      environment: { get: () => structuredClone(environment) },
-      state: { getSnapshot: () => structuredClone(snapshot) },
-      events: { subscribe: (name, listener) => {
-        if (typeof name !== 'string' || typeof listener !== 'function') throw new TypeError('Invalid theme event subscription');
-        const handlers = listeners.get(name) || new Set();
-        handlers.add(listener); listeners.set(name, handlers);
-        return () => handlers.delete(listener);
-      } },
-      commands: { execute: (command, payload = {}) => request('commands.execute', { command, arguments: payload }) },
-      search: { query: (query, options = {}) => request('search.query', { query, ...options }) },
-      spaces: { list: (options = {}) => request('spaces.list', options) },
-      groups: { list: (options = {}) => request('groups.list', options) },
-      items: { list: (options = {}) => request('items.list', options) },
-      monitor: { getSnapshot: () => request('monitor.getSnapshot') },
-      navigation: {
-        get: () => ({ view: 'home', spaceId: snapshot.activeSpaceId }),
-        navigate: destination => request('navigation.navigate', destination),
-      },
-      assets: { resolve: path => {
-        const url = environment.assets && environment.assets[path];
-        if (!url) throw new Error('Theme asset is not declared');
-        return url;
-      } },
-      settings: { get: () => request('settings.get'), patch: value => request('settings.patch', { value }) },
-      storage: {
-        get: key => request('storage.get', { key }),
-        set: (key, value) => request('storage.set', { key, value }),
-        remove: key => request('storage.remove', { key }),
-      },
-    };
+    const apiClient = createThemeApiClient({ request, getSnapshot: () => snapshot, getEnvironment: () => environment });
+    const api = apiClient.api;
     port.onmessage = async ({ data: message }) => {
       if (!message || typeof message !== 'object' || JSON.stringify(message).length > 1048576) return;
       if (message.type === 'api-response' && message.response && typeof message.response.requestId === 'string') {
@@ -79,28 +51,28 @@ const bootstrap = `
         return;
       }
       if (message.type === 'event' && typeof message.name === 'string') {
-        const event = message.event;
-        if (!event || !Number.isSafeInteger(event.contextVersion) || event.contextVersion !== snapshot.version || !Number.isSafeInteger(event.sequence) || event.sequence <= lastEventSequence) return;
-        lastEventSequence = event.sequence;
-        for (const listener of listeners.get(message.name) || []) {
-          try { listener(structuredClone(event)); } catch (_) {}
-        }
+        apiClient.emit(message.name, message.event);
         return;
       }
       if (message.type === 'update' && message.snapshot && Number.isSafeInteger(message.snapshot.version)) {
         snapshot = message.snapshot;
-        try { await mountedView.update && mountedView.update(structuredClone(snapshot)); }
+        apiClient.updateSnapshot(snapshot);
+        try { await mountedView.update && mountedView.update(structuredClone(snapshot)); for (const region of mountedRegions) await region.update && region.update(structuredClone(snapshot)); for (const component of mountedComponents) await component.update && component.update(structuredClone(snapshot)); }
         catch (error) { reply({ type: 'error', message: String(error && error.message || error).slice(0, 1000) }); }
         return;
       }
       if (message.type === 'environment.update' && message.environment && typeof message.environment === 'object') {
         environment = message.environment;
+        apiClient.updateEnvironment(environment);
         return;
       }
       if (message.type === 'dispose') {
         try {
           for (const operation of pending.values()) operation.reject(Object.assign(new Error('Theme runtime disposed'), { code: 'ABORTED' }));
           pending.clear();
+          apiClient.dispose();
+          for (const region of mountedRegions) if (region && typeof region.unmount === 'function') await region.unmount();
+          for (const component of mountedComponents) if (component && typeof component.unmount === 'function') await component.unmount();
           if (mountedView && typeof mountedView.unmount === 'function') await mountedView.unmount();
           if (moduleDefinition && typeof moduleDefinition.dispose === 'function') await moduleDefinition.dispose();
           if (objectUrl) URL.revokeObjectURL(objectUrl);
@@ -118,6 +90,8 @@ const bootstrap = `
       try {
         snapshot = message.snapshot;
         environment = message.environment;
+        apiClient.updateSnapshot(snapshot);
+        apiClient.updateEnvironment(environment);
         tokenStyle = document.createElement('style');
         tokenStyle.textContent = message.tokens || '';
         document.head.appendChild(tokenStyle);
@@ -138,6 +112,28 @@ const bootstrap = `
         const root = document.getElementById('theme-root');
         mountedView = await view(root, api, structuredClone(snapshot));
         if (!mountedView || typeof mountedView.unmount !== 'function') throw new Error('Theme home view must return an unmount function');
+        for (const region of (message.contributions && message.contributions.regions) || []) {
+          const slot = document.createElement('section');
+          slot.dataset.themeRegion = region;
+          slot.dataset.themeRegionSlot = region;
+          root.append(slot);
+          const factory = moduleDefinition.regions && moduleDefinition.regions[region];
+          if (typeof factory !== 'function') throw new Error('Theme does not register contributed region ' + region);
+          const regionView = await factory(slot, api, structuredClone(snapshot));
+          if (!regionView || typeof regionView.unmount !== 'function') throw new Error('Theme region ' + region + ' must return an unmount function');
+          mountedRegions.push(regionView);
+        }
+        for (const component of (message.contributions && message.contributions.components) || []) {
+          const slot = document.createElement('section');
+          slot.dataset.themeComponent = component;
+          slot.dataset.themeComponentSlot = component;
+          root.append(slot);
+          const factory = moduleDefinition.components && moduleDefinition.components[component];
+          if (typeof factory !== 'function') throw new Error('Theme does not register contributed component ' + component);
+          const componentView = await factory(slot, api, structuredClone(snapshot));
+          if (!componentView || typeof componentView.unmount !== 'function') throw new Error('Theme component ' + component + ' must return an unmount function');
+          mountedComponents.push(componentView);
+        }
         reply({ type: 'ready' });
       } catch (error) {
         reply({ type: 'error', message: String(error && error.message || error).slice(0, 1000) });
@@ -162,6 +158,7 @@ export interface ThemeSandboxOptions {
   permissions: ReadonlySet<ThemePermission>
   execute: (request: unknown) => Promise<unknown>
   onError: (error: Error) => void
+  contributions?: { views?: readonly string[]; regions?: readonly string[]; components?: readonly string[] }
 }
 
 export interface ThemeSandboxHandle {
@@ -175,7 +172,7 @@ export interface ThemeSandboxHandle {
 export async function mountThemeSandbox(frame: HTMLIFrameElement, options: ThemeSandboxOptions): Promise<ThemeSandboxHandle> {
   frame.setAttribute('sandbox', 'allow-scripts')
   const connected = waitForFrameLoad(frame)
-  frame.srcdoc = createThemeSandboxDocument(window.location.origin, bootstrap)
+  frame.srcdoc = createThemeSandboxDocument(window.location.origin, bootstrap(createThemeApiClient.toString()))
   await connected
 
   const channel = new MessageChannel()
@@ -190,23 +187,10 @@ export async function mountThemeSandbox(frame: HTMLIFrameElement, options: Theme
   let eventSequence = 0
   const requestGuard = createThemeRequestGuard()
 
-  const dispatcher = createThemeApiDispatcher({
+  const dispatcher = createThemeApiExecutionDispatcher({
     getContextVersion: () => options.snapshot.version,
     getPermissions: () => options.permissions,
-    handlers: {
-      executeCommand: (command, payload) => options.execute({ method: 'commands.execute', command, payload }),
-      searchItems: (query, paging) => options.execute({ method: 'search.query', query, ...paging }),
-      listSpaces: paging => options.execute({ method: 'spaces.list', ...paging }),
-      listGroups: paging => options.execute({ method: 'groups.list', ...paging }),
-      listItems: paging => options.execute({ method: 'items.list', ...paging }),
-      getMonitorSnapshot: () => options.execute({ method: 'monitor.getSnapshot' }),
-      navigate: destination => options.execute({ method: 'navigation.navigate', destination }),
-      getSettings: () => options.execute({ method: 'settings.get' }) as Promise<Record<string, unknown>>,
-      patchSettings: value => options.execute({ method: 'settings.patch', value }),
-      getStorage: key => options.execute({ method: 'storage.get', key }),
-      setStorage: (key, value) => options.execute({ method: 'storage.set', key, value }),
-      removeStorage: key => options.execute({ method: 'storage.remove', key }),
-    },
+    execute: options.execute,
   })
 
   const fail = (message: string) => {
@@ -232,6 +216,7 @@ export async function mountThemeSandbox(frame: HTMLIFrameElement, options: Theme
           tokens: options.tokens,
           snapshot: options.snapshot,
           environment: { ...options.environment, apiVersion: '1.0.0' },
+          contributions: options.contributions,
         })
         if (!jsonWithinLimit(initMessage)) {
           fail('Theme initialization data exceeds the 1 MiB message limit')

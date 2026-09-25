@@ -9,12 +9,19 @@ export async function rewriteThemeStylesheet(
   stylesheetURL: string,
   resources: readonly ThemeCssResource[],
   assetURLs: Readonly<Record<string, string>>,
+  baseURL?: string,
+  shadowRoot = false,
 ): Promise<string> {
   const { default: cssTree } = await import('css-tree')
-  const stylesheet = new URL(stylesheetURL)
+  const stylesheet = new URL(stylesheetURL, baseURL)
   const tree = cssTree.parse(source, { positions: true, parseValue: true })
 
   cssTree.walk(tree, (node) => {
+    if (shadowRoot && node.type === 'PseudoClassSelector' && node.name?.toLowerCase() === 'root')
+      node.name = 'host'
+    if (shadowRoot && node.type === 'TypeSelector' && ['html', 'body'].includes(node.name?.toLowerCase() || '')) {
+      Object.assign(node, { type: 'PseudoClassSelector', name: 'host', children: null })
+    }
     if (node.type === 'Atrule' && (node.name?.toLowerCase() === 'import' || node.name?.includes('\\')))
       throw new Error('Theme stylesheets cannot use @import or escaped at-rule names')
     if (node.type === 'Function' && (node.name?.includes('\\') || ['image-set', '-webkit-image-set'].includes(node.name?.toLowerCase() || '')))

@@ -1,10 +1,6 @@
 import type { InjectionKey, Ref } from 'vue'
+import type { CoreMonitorSnapshot } from '../../../core/monitor/themeSnapshot'
 
-export interface MonitorSnapshot {
-  CPU_INFO?: SystemMonitor.CPUInfo
-  MEMORY_INFO?: SystemMonitor.MemoryInfo
-  NETWORK_INFO?: { bytesRecv: number; bytesSent: number }[]
-  DISK_INFO?: Record<string, SystemMonitor.DiskInfo>
-}
+export type MonitorSnapshot = CoreMonitorSnapshot
 
 export const monitorSnapshotKey: InjectionKey<Ref<MonitorSnapshot | null>> = Symbol('monitorSnapshot')

@@ -209,7 +209,7 @@ func TestPackagePreviewPublicV2ResolvesAssetsThroughOpaqueToken(t *testing.T) {
 
 func TestThemeRuntimeGrantMustMatchManifestAndIncludeRequiredPermissions(t *testing.T) {
 	manifest := PackageManifestV2{
-		Runtime:     RuntimeV2{SupportedModes: []string{"sandbox"}},
+		Runtime:     RuntimeV2{SupportedModes: []string{"sandbox", "trusted"}},
 		Permissions: PermissionsV2{Required: []PermissionV2{{Name: "items.read"}}, Optional: []PermissionV2{{Name: "theme.storage"}, {Name: "preferences.write"}}},
 	}
 	if err := ValidateThemeGrantV2(manifest, "sandbox", []string{"items.read", "theme.storage", "preferences.write"}); err != nil {
@@ -220,8 +220,12 @@ func TestThemeRuntimeGrantMustMatchManifestAndIncludeRequiredPermissions(t *test
 			t.Errorf("invalid permission grant accepted: %#v", permissions)
 		}
 	}
+	if err := ValidateThemeGrantV2(manifest, "trusted", []string{"items.read"}); err != nil {
+		t.Fatalf("valid trusted grant rejected: %v", err)
+	}
+	manifest.Runtime.SupportedModes = []string{"sandbox"}
 	if err := ValidateThemeGrantV2(manifest, "trusted", []string{"items.read"}); err == nil {
-		t.Fatal("trusted execution grant was accepted by the sandbox grant API")
+		t.Fatal("trusted execution grant was accepted without manifest support")
 	}
 }
 
@@ -291,6 +295,32 @@ func TestPackageArchiveV2RejectsResourceDigestMismatch(t *testing.T) {
 	files := map[string][]byte{"tokens/light.json": []byte(validDTCGDocumentV2()), "tokens/dark.json": []byte(validDTCGDocumentV2()), "styles/theme.css": css}
 	if _, err := ParsePackageArchiveV2(makePackageArchiveV2(t, manifest, files), true); err == nil || !strings.Contains(err.Error(), "digest mismatch") {
 		t.Fatalf("resource digest error = %v", err)
+	}
+}
+
+func TestPackageArchiveV2ValidatesSettingsSchema(t *testing.T) {
+	schema := []byte(`{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"density":{"enum":["compact","comfortable"]}},"additionalProperties":false}`)
+	manifest := PackageManifestV2{
+		Format: "yin-theme", FormatVersion: PackageFormatVersionV2,
+		ID: "community.settings.schema", Name: "Settings schema", Version: "1.0.0",
+		ThemeAPI: "^1.0.0", Core: ">=0.4.0", Author: "Community", License: "MIT",
+		Tokens:        TokenSetV2{Format: "DTCG", Version: DTCGVersion, Docs: map[string]string{"light": "tokens/light.json", "dark": "tokens/dark.json"}},
+		DefaultScheme: "light", Settings: &ThemeSettingsV2{Schema: "settings/schema.json", SchemaVersion: 1},
+		Resources: []ResourceV2{{Path: "settings/schema.json", SHA256: digestV2(schema), MediaType: "application/schema+json"}},
+	}
+	files := map[string][]byte{
+		"tokens/light.json": []byte(validDTCGDocumentV2()), "tokens/dark.json": []byte(validDTCGDocumentV2()),
+		"settings/schema.json": schema,
+	}
+	if _, err := ParsePackageArchiveV2(makePackageArchiveV2(t, manifest, files), true); err != nil {
+		t.Fatalf("valid settings schema was rejected: %v", err)
+	}
+
+	badSchema := []byte(`{"$schema":"https://json-schema.org/draft/2020-12/schema","$ref":"https://example.test/schema.json"}`)
+	manifest.Resources[0].SHA256 = digestV2(badSchema)
+	files["settings/schema.json"] = badSchema
+	if _, err := ParsePackageArchiveV2(makePackageArchiveV2(t, manifest, files), true); err == nil || !strings.Contains(err.Error(), "external schema reference") {
+		t.Fatalf("external schema reference error = %v", err)
 	}
 }
 

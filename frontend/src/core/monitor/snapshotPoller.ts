@@ -11,17 +11,27 @@ export function createSnapshotPoller<Snapshot>(options: SnapshotPollerOptions<Sn
   let stopped = true
   let failures = 0
   let interval: Promise<number> | undefined
+  let generation = 0
+  let inFlight: Promise<Snapshot> | undefined
 
-  async function poll() {
-    if (stopped) return
+  async function poll(run: number) {
+    if (stopped || run !== generation) return
     try {
-      const snapshot = await options.fetchSnapshot()
-      if (stopped) return
+      if (!inFlight) {
+        const request = Promise.resolve().then(options.fetchSnapshot)
+        const trackedRequest = request.finally(() => {
+          if (inFlight === trackedRequest)
+            inFlight = undefined
+        })
+        inFlight = trackedRequest
+      }
+      const snapshot = await inFlight
+      if (stopped || run !== generation) return
       failures = 0
       options.onSnapshot(snapshot)
     }
     catch (error) {
-      if (stopped) return
+      if (stopped || run !== generation) return
       failures++
       options.onFailure?.(error, failures)
       if (failures >= (options.failureLimit ?? 3)) {
@@ -29,20 +39,22 @@ export function createSnapshotPoller<Snapshot>(options: SnapshotPollerOptions<Sn
         return
       }
     }
-    if (stopped) return
+    if (stopped || run !== generation) return
     const delay = interval ? await interval : 10000
-    if (!stopped) timer = setTimeout(poll, delay)
+    if (!stopped && run === generation) timer = setTimeout(() => void poll(run), delay)
   }
 
   function start() {
     if (!stopped) return
     stopped = false
     failures = 0
-    interval = options.getInterval().then(value => Math.max(250, value)).catch(() => 10000)
-    void poll()
+    const run = ++generation
+    interval = Promise.resolve().then(options.getInterval).then(value => Math.max(250, value)).catch(() => 10000)
+    void poll(run)
   }
 
   function stop() {
+    generation++
     stopped = true
     if (timer) clearTimeout(timer)
     timer = undefined

@@ -24,6 +24,31 @@ export interface ThemeApiDispatcherOptions {
   timeoutMs?: number
 }
 
+export function createThemeApiExecutionDispatcher(options: Omit<ThemeApiDispatcherOptions, 'handlers'> & {
+  execute: (request: { method: ThemeApiRequest['method']; [key: string]: unknown }) => Promise<unknown>
+}) {
+  return createThemeApiDispatcher({
+    ...options,
+    handlers: {
+      executeCommand: (command, payload) => options.execute({ method: 'commands.execute', command, payload }),
+      searchItems: (query, paging) => options.execute({ method: 'search.query', query, ...paging }),
+      listSpaces: paging => options.execute({ method: 'spaces.list', ...paging }),
+      listGroups: paging => options.execute({ method: 'groups.list', ...paging }),
+      listItems: paging => options.execute({ method: 'items.list', ...paging }),
+      getMonitorSnapshot: () => options.execute({ method: 'monitor.getSnapshot' }),
+      navigate: destination => options.execute({ method: 'navigation.navigate', destination }),
+      getSettings: () => options.execute({ method: 'settings.get' }) as Promise<Record<string, unknown>>,
+      patchSettings: value => options.execute({ method: 'settings.patch', value }),
+      getStorage: key => options.execute({ method: 'storage.get', key }),
+      setStorage: (key, value) => options.execute({ method: 'storage.set', key, value }),
+      removeStorage: key => options.execute({ method: 'storage.remove', key }),
+      openCoreSurface: (surface, payload) => options.execute({ method: 'ui.openCoreSurface', surface, payload }),
+      networkFetch: (input, init) => options.execute({ method: 'network.fetch', input, init }),
+      reportDiagnostic: entry => options.execute({ method: 'diagnostics.report', ...entry }),
+    },
+  })
+}
+
 function failure(request: Pick<ThemeApiRequest, 'requestId' | 'contextVersion'>, code: string, message: string): ThemeApiResponse {
   return { protocol: 'yin-theme-api', version: 1, requestId: request.requestId, contextVersion: request.contextVersion, ok: false, error: { code, message } }
 }
@@ -101,5 +126,8 @@ function requiredPermission(request: ThemeApiRequest): ThemePermission | undefin
   if (request.method === 'monitor.getSnapshot') return 'monitor.read'
   if (request.method === 'storage.get' || request.method === 'storage.set' || request.method === 'storage.remove')
     return 'theme.storage'
+  if (request.method === 'network.fetch') return 'network.fetch'
+  if (request.method === 'diagnostics.report') return 'diagnostics.report'
+  if (request.method === 'ui.openCoreSurface') return 'preferences.read'
   return undefined
 }

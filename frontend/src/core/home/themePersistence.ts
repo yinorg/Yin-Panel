@@ -7,6 +7,7 @@ export interface ThemePersistenceContext {
   userId: () => string | number | undefined | null
   packageId: () => string | undefined | null
   revision: () => string | undefined | null
+  validateSettings?: (settings: Record<string, unknown>) => Promise<void>
 }
 
 export interface ThemePersistenceStorage extends ThemeSettingsStorage {
@@ -35,11 +36,12 @@ export function createThemePersistence(storage: ThemePersistenceStorage, context
           return {}
         }
       },
-      patch(value: Record<string, unknown>): Record<string, unknown> {
+      async patch(value: Record<string, unknown>): Promise<Record<string, unknown>> {
         const next = { ...this.get(), ...value }
         const encoded = encodeJson(next, 'Theme settings must be JSON serializable')
         if (byteLength(encoded) > maxBytes)
           throw apiError('INVALID_ARGUMENT', `Theme settings are limited to ${maxBytes} bytes`)
+        await context.validateSettings?.(next)
         storage.setItem(key, encoded)
         return next
       },

@@ -73,6 +73,64 @@ func TestRevisionV2InstallIsImmutableAndActivationCanRollback(t *testing.T) {
 	}
 }
 
+func TestTrustedRuntimePolicyRequiresManifestSupportAndRevokesUserGrants(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open("file:theme-trusted-policy-v2?mode=memory&cache=shared"), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := Migrate(db); err != nil {
+		t.Fatal(err)
+	}
+	unsupported := packageFixtureV2("1.0.0", "unsupported")
+	if err := InstallPackageV2(db, 1, unsupported); err != nil {
+		t.Fatal(err)
+	}
+	if err := SetTrustedRuntimePolicyV2(db, unsupported.Revision, true, 1); err == nil {
+		t.Fatal("trusted mode enabled for a package that does not declare it")
+	}
+	if enabled, err := TrustedRuntimeEnabledV2(db, unsupported.Revision); err != nil || enabled {
+		t.Fatalf("unsupported theme trusted policy = %v, err=%v", enabled, err)
+	}
+
+	trusted := packageFixtureV2("2.0.0", "trusted")
+	trusted.Manifest.Runtime.SupportedModes = []string{"sandbox", "trusted"}
+	trusted.Manifest.Permissions.Required = []PermissionV2{{Name: "items.read"}}
+	if err := InstallPackageV2(db, 1, trusted); err != nil {
+		t.Fatal(err)
+	}
+	userGrant := GrantRecordV2{UserID: 43, RevisionID: trusted.Revision, ExecutionMode: "trusted", PermissionsJSON: "[\"items.read\"]"}
+	if err := SaveUserGrantV2(db, userGrant); err == nil {
+		t.Fatal("trusted user grant accepted before administrator enablement")
+	}
+	if err := SaveGrantV2(db, GrantRecordV2{UserID: 42, RevisionID: trusted.Revision, ExecutionMode: "trusted", PermissionsJSON: "[\"items.read\"]"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := SetTrustedRuntimePolicyV2(db, trusted.Revision, true, 1); err != nil {
+		t.Fatalf("enable trusted policy: %v", err)
+	}
+	if enabled, err := TrustedRuntimeEnabledV2(db, trusted.Revision); err != nil || !enabled {
+		t.Fatalf("enabled trusted policy = %v, err=%v", enabled, err)
+	}
+	if _, err := GetGrantV2(db, 42, trusted.Revision, "trusted"); err != nil {
+		t.Fatalf("enable policy removed existing user grant: %v", err)
+	}
+	if err := SaveUserGrantV2(db, userGrant); err != nil {
+		t.Fatalf("trusted user grant rejected after administrator enablement: %v", err)
+	}
+	if err := SetTrustedRuntimePolicyV2(db, trusted.Revision, false, 1); err != nil {
+		t.Fatalf("disable trusted policy: %v", err)
+	}
+	if enabled, err := TrustedRuntimeEnabledV2(db, trusted.Revision); err != nil || enabled {
+		t.Fatalf("disabled trusted policy = %v, err=%v", enabled, err)
+	}
+	if _, err := GetGrantV2(db, 42, trusted.Revision, "trusted"); !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Fatalf("trusted grant survived policy disable: %v", err)
+	}
+	if _, err := GetGrantV2(db, 43, trusted.Revision, "trusted"); !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Fatalf("user grant survived policy disable: %v", err)
+	}
+}
+
 func TestRevisionV2RollbackRequiresInstalledFallback(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open("file:theme-revisions-v2-fallback?mode=memory&cache=shared"), &gorm.Config{})
 	if err != nil {

@@ -11,8 +11,10 @@ require (
 	github.com/go-playground/universal-translator v0.18.1
 	github.com/go-playground/validator/v10 v10.26.0
 	github.com/golang-jwt/jwt/v5 v5.2.2
+	github.com/matoous/go-nanoid/v2 v2.1.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/rclone/rclone v1.69.1
+	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1
 	github.com/shirou/gopsutil/v3 v3.24.5
 	go.uber.org/zap v1.27.0
 	golang.org/x/oauth2 v0.29.0
@@ -69,7 +71,6 @@ require (
 	github.com/klauspost/cpuid/v2 v2.2.8 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/lufia/plan9stats v0.0.0-20231016141302-07b5767bb0ed // indirect
-	github.com/matoous/go-nanoid/v2 v2.1.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-sqlite3 v1.14.22 // indirect

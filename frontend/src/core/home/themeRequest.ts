@@ -31,6 +31,12 @@ function normalizePayload(method: ThemeApiMethod, value: Record<string, unknown>
       return { key: value.key }
     case 'storage.set':
       return { key: value.key, value: value.value }
+    case 'ui.openCoreSurface':
+      return { surface: value.surface, payload: value.payload }
+    case 'network.fetch':
+      return { input: value.input, init: value.init }
+    case 'diagnostics.report':
+      return { level: value.level, message: value.message, data: value.data }
     case 'monitor.getSnapshot':
     case 'settings.get':
       return undefined
@@ -38,7 +44,7 @@ function normalizePayload(method: ThemeApiMethod, value: Record<string, unknown>
 }
 
 function isThemeApiMethod(value: string): value is ThemeApiMethod {
-  return ['commands.execute', 'search.query', 'spaces.list', 'groups.list', 'items.list', 'monitor.getSnapshot', 'navigation.navigate', 'settings.get', 'settings.patch', 'storage.get', 'storage.set', 'storage.remove'].includes(value)
+  return ['commands.execute', 'search.query', 'spaces.list', 'groups.list', 'items.list', 'monitor.getSnapshot', 'navigation.navigate', 'settings.get', 'settings.patch', 'storage.get', 'storage.set', 'storage.remove', 'ui.openCoreSurface', 'network.fetch', 'diagnostics.report'].includes(value)
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

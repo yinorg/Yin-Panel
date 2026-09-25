@@ -26,7 +26,7 @@ const theme: ThemeModule = {
 export default theme
 ```
 
-The package exposes data contracts and JSON envelope validators only. It does not expose Yin Core stores, Vue, Naive UI, or Core DOM structure.
+The package exposes framework-independent data contracts, JSON envelope validators, and the shared `createThemeApiClient(host)` factory. Both isolated and direct runtimes use the same API methods and request envelope; the host supplies a transport plus snapshot and environment readers. The iframe runtime embeds this client factory, while a trusted runtime can use the Core direct dispatcher adapter. Neither transport bypasses Core permission checks. The package does not expose Yin Core stores, Vue, Naive UI, or Core DOM structure.
 
 The API lists the authenticated user's accessible Spaces and the current Space's Groups and Items in pages:
 

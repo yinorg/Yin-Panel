@@ -564,6 +564,87 @@ test('sandbox Theme API forwards search through its isolated MessageChannel runt
   })
 })
 
+test('trusted Theme runtime uses the shared API and cleans up its view and host styles', async ({ page }) => {
+  await page.goto('/')
+  const result = await page.evaluate(async () => {
+    const runtimePath = '/src/theme/runtime/direct.ts'
+    const { mountThemeDirect } = await import(/* @vite-ignore */ runtimePath)
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const runtime = await mountThemeDirect({
+      host,
+      script: `export default {
+        apiVersion: '1.0.0',
+        setup(api) {
+          window.__trustedThemeLifecycle = { unmounted: 0, disposed: 0 }
+          return {
+            views: { home: async (root, api) => {
+              root.textContent = 'trusted ready'
+              root.style.color = getComputedStyle(root).getPropertyValue('--yin-text').trim()
+              const search = await api.search.query('trusted')
+              root.setAttribute('data-search-total', String(search.total))
+              return { unmount() { window.__trustedThemeLifecycle.unmounted++; root.replaceChildren() } }
+            } },
+            dispose() { window.__trustedThemeLifecycle.disposed++ },
+          }
+        },
+      }`,
+      styles: [{ text: '#theme-root { color: var(--yin-text); }' }],
+      tokens: ':root { --yin-text: rgb(12, 34, 56); }',
+      snapshot: { version: 1, status: 'ready', spaces: [], groups: [], items: [] },
+      environment: {
+        coreVersion: '0.4.0', language: 'en', colorScheme: 'light', reducedMotion: false,
+        online: true, viewport: { width: 1280, height: 800 }, assets: {},
+      },
+      permissions: new Set(['items.read']),
+      execute: (request: unknown) => ({ total: (request as { method: string }).method === 'search.query' ? 2 : 0 }),
+      onError: (error: Error) => { document.documentElement.dataset.trustedThemeError = error.message },
+    })
+    const shadow = host.shadowRoot!
+    runtime.updateTokens(':root { --yin-text: rgb(12, 34, 56); }')
+    const themedRoot = shadow.querySelector('#theme-root')!
+    const color = getComputedStyle(themedRoot).color
+    const text = themedRoot.textContent
+    const searchTotal = themedRoot.getAttribute('data-search-total')
+    await runtime.dispose()
+    const lifecycle = (window as Window & { __trustedThemeLifecycle?: { unmounted: number; disposed: number } }).__trustedThemeLifecycle
+    host.remove()
+    return { color, text, searchTotal, cleared: shadow.childElementCount === 0, lifecycle }
+  })
+  expect(result).toEqual({
+    color: 'rgb(12, 34, 56)',
+    text: 'trusted ready',
+    searchTotal: '2',
+    cleared: true,
+    lifecycle: { unmounted: 1, disposed: 1 },
+  })
+  const failedMount = await page.evaluate(async () => {
+    const runtimePath = '/src/theme/runtime/direct.ts'
+    const { mountThemeDirect } = await import(/* @vite-ignore */ runtimePath)
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    let message = ''
+    try {
+      await mountThemeDirect({
+        host,
+        script: `export default { apiVersion: '1.0.0', setup() { throw new Error('setup failed') } }`,
+        styles: [], tokens: '',
+        snapshot: { version: 1, status: 'ready', spaces: [], groups: [], items: [] },
+        environment: {
+          coreVersion: '0.4.0', language: 'en', colorScheme: 'light', reducedMotion: false,
+          online: true, viewport: { width: 1280, height: 800 }, assets: {},
+        },
+        permissions: new Set(), execute: async () => ({}), onError: () => undefined,
+      })
+    }
+    catch (error) { message = error instanceof Error ? error.message : String(error) }
+    const empty = host.shadowRoot?.childElementCount === 0
+    host.remove()
+    return { message, empty }
+  })
+  expect(failedMount).toEqual({ message: 'setup failed', empty: true })
+})
+
 test('theme recovery bypasses active package loading and restores Yin without changing color mode', async ({ page }) => {
   let currentThemeRequests = 0
   let mineRequests = 0

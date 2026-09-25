@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { createServer } from 'node:http'
-import { mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { inflateRawSync } from 'node:zlib'
@@ -98,6 +98,24 @@ test('validation rejects files outside the declared package closure', async () =
     const { directory } = await scaffoldTheme({ name: 'Example Theme', author: 'Author', directory: path.join(temp, 'theme') })
     await writeFile(path.join(directory, 'payload.mjs'), 'globalThis.injected = true')
     await assert.rejects(validateTheme(directory), /undeclared package file: payload.mjs/)
+  }
+  finally { await rm(temp, { recursive: true, force: true }) }
+})
+
+test('validation rejects invalid and externally referenced settings schemas', async () => {
+  const temp = await mkdtemp(path.join(os.tmpdir(), 'yin-theme-create-schema-'))
+  try {
+    const { directory } = await scaffoldTheme({ name: 'Schema Theme', author: 'Author', directory: path.join(temp, 'theme') })
+    const schemaPath = path.join(directory, 'settings/schema.json')
+    const schema = Buffer.from('{"$schema":"https://json-schema.org/draft/2020-12/schema","$ref":"https://example.test/schema.json"}')
+    await mkdir(path.dirname(schemaPath), { recursive: true })
+    await writeFile(schemaPath, schema)
+    const manifestPath = path.join(directory, 'manifest.json')
+    const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
+    manifest.settings = { schema: 'settings/schema.json', schemaVersion: 1 }
+    manifest.resources.push({ path: 'settings/schema.json', sha256: createHash('sha256').update(schema).digest('hex'), mediaType: 'application/schema+json' })
+    await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`)
+    await assert.rejects(validateTheme(directory), /external schema reference is not allowed/)
   }
   finally { await rm(temp, { recursive: true, force: true }) }
 })

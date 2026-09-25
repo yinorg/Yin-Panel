@@ -2,9 +2,9 @@
 
 ## Package and Runtime Boundary
 
-Theme packages contain a manifest, DTCG 2025.10 token documents, and declared static resources. They do not contain JavaScript, Vue components, selectors, layout definitions, or executable templates. Wallpaper metadata remains a constrained manifest resource reference; wallpaper image bytes and fonts remain static assets.
+Theme packages contain a manifest, DTCG 2025.10 token documents, declared CSS/JS entrypoints, optional component/view contributions, and static resources. JavaScript runs through the Theme API permission boundary; components and views mount through stable slots rather than relying on Core DOM selectors. Wallpaper metadata remains a constrained manifest resource reference; wallpaper image bytes and fonts remain static assets.
 
-The runtime validates the package, resolves DTCG references, maps semantic and component tokens to `--yin-*` CSS custom properties, and applies the selected light or dark document. API v3 packages declare `compatibility.engine`, `compatibility.minimum`, and optional `compatibility.maximum`. API v1 and v2 packages remain readable through their semantic bindings; v2 layout slots are ignored. DTCG remains `2025.10` for every API version.
+The runtime validates the package, resolves DTCG references, maps semantic and component tokens to `--yin-*` CSS custom properties, and applies the selected light or dark document. V1 packages declare `formatVersion: 2`, Theme API `1.0.0`, and `compatibility.engine`, `compatibility.minimum`, and optional `compatibility.maximum`. Packages from retired pre-V1 formats are rejected rather than adapted. DTCG remains `2025.10`.
 
 The user configuration owns `homeLayout`, content width, page margins, responsive breakpoints, and grid structure. Theme tokens own visual density values such as card padding, group gaps, icon size, and section spacing. Changing a theme does not write to panel configuration.
 
@@ -48,7 +48,7 @@ The same DTCG document also declares `shape`, `spacing`, `density`, `elevation`,
 | Button / Input | Naive UI heights and radii, plus global motion and focus tokens |
 | SystemMonitor | Group spacing, padding, radius, icon, text, and generated default colors |
 
-Official packages provide both schemes for AppIcon, Card, Group, SearchBox, Sidebar, Dialog, Menu, Button, Input, Tooltip, SystemMonitor, state, surface and iconography. Search option size and gap follow the package density. Optional component tokens remain optional for third party API v1/v2/v3 themes; consumers use the CSS defaults in `global.less` when an extension is absent. Updating built-in package versions causes installed built-ins to refresh without changing the selected theme or panel layout.
+Official packages provide both schemes for AppIcon, Card, Group, SearchBox, Sidebar, Dialog, Menu, Button, Input, Tooltip, SystemMonitor, state, surface and iconography. Search option size and gap follow the package density. Optional component tokens remain optional for third party V1 themes; consumers use the CSS defaults in `global.less` when an extension is absent. Updating built-in package versions causes installed built-ins to refresh without changing the selected theme or panel layout.
 
 ## Official Directions
 

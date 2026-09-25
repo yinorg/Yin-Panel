@@ -17,6 +17,9 @@ export interface ThemeApiOperationHandlers {
   getStorage: (key: string) => Promise<unknown> | unknown
   setStorage: (key: string, value: unknown) => Promise<unknown> | unknown
   removeStorage: (key: string) => Promise<unknown> | unknown
+  openCoreSurface?: (surface: string, payload: Record<string, unknown>) => Promise<unknown> | unknown
+  networkFetch?: (input: string, init: Record<string, unknown>) => Promise<unknown> | unknown
+  reportDiagnostic?: (entry: Record<string, unknown>) => Promise<unknown> | unknown
 }
 
 export async function executeThemeApiOperation(handlers: ThemeApiOperationHandlers, request: Pick<ThemeApiRequest, 'method' | 'payload'>): Promise<unknown> {
@@ -64,6 +67,19 @@ export async function executeThemeApiOperation(handlers: ThemeApiOperationHandle
       if (request.method === 'storage.get') return handlers.getStorage(key)
       if (request.method === 'storage.remove') return handlers.removeStorage(key)
       return handlers.setStorage(key, payload.value)
+    }
+    case 'ui.openCoreSurface': {
+      if (typeof payload.surface !== 'string' || payload.surface.length > 100) throw apiError('INVALID_ARGUMENT', 'Surface is invalid')
+      if (!handlers.openCoreSurface) throw apiError('UNSUPPORTED_CAPABILITY', 'Core surface routing is unavailable')
+      return handlers.openCoreSurface(payload.surface, isRecord(payload.payload) ? payload.payload : {})
+    }
+    case 'network.fetch': {
+      if (!handlers.networkFetch || typeof payload.input !== 'string' || payload.input.length > 2048) throw apiError('UNSUPPORTED_CAPABILITY', 'Network broker is unavailable')
+      return handlers.networkFetch(payload.input, isRecord(payload.init) ? payload.init : {})
+    }
+    case 'diagnostics.report': {
+      if (!handlers.reportDiagnostic || !['info', 'warn', 'error'].includes(String(payload.level)) || typeof payload.message !== 'string') throw apiError('UNSUPPORTED_CAPABILITY', 'Diagnostics are unavailable')
+      return handlers.reportDiagnostic(payload)
     }
   }
 }

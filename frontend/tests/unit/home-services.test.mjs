@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
 import { setTimeout as delay } from 'node:timers/promises'
 // The frontend does not depend on a unit-test framework; use Node's built-in runner.
 // eslint-disable-next-line test/no-import-node-test
@@ -9,13 +10,17 @@ import { createHomeSpaceController } from '../../src/core/home/spaceController.t
 import { createHomeMutationService } from '../../src/core/home/mutations.ts'
 import { createThemeHomeSnapshot } from '../../src/core/home/themeSnapshot.ts'
 import { createHomeSearchService } from '../../src/core/home/search.ts'
+import { createHomeCommandSearch, filterHomeCommandItems, filterHomeCommands, findHomeCommandItem, getInitialHomeCommandSelection, isHomeCommandWrite, moveHomeCommandSelection, parseHomeCommand } from '../../src/core/home/commandCenter.ts'
+import { buildHomeGroupTree, getDirectoryGroups, getHomeGroupRoots, getInitiallyCollapsedGroups, isHomeGroupHidden, resolveActiveDirectoryId } from '../../src/core/home/groupTree.ts'
 import { createHomeThemeHandlers } from '../../src/core/home/themeHandlers.ts'
 import { executeHomeThemeRequest } from '../../src/core/home/themeRequest.ts'
 import { createThemePersistence } from '../../src/core/home/themePersistence.ts'
+import { createThemeSettingsSchemaValidator } from '../../src/core/home/themeSettingsSchema.ts'
 import { createThemeSettingsStore } from '../../src/core/home/themeSettingsStore.ts'
 import { resolveItemOpenUrl } from '../../src/core/items/openPolicy.ts'
 import { createSnapshotPoller } from '../../src/core/monitor/snapshotPoller.ts'
 import { loadDiskSnapshots } from '../../src/core/monitor/diskSnapshots.ts'
+import { createMonitorSnapshotController } from '../../src/core/monitor/snapshotController.ts'
 import { normalizeMonitorSnapshot } from '../../src/core/monitor/themeSnapshot.ts'
 
 test('home bootstrap cancels superseded requests and only returns the latest values', async () => {
@@ -106,8 +111,110 @@ test('home space controller restores cache, selects known Spaces and rejects una
   assert.deepEqual(state.loaded, [4, 7])
 })
 
+test('home group tree preserves hierarchy order and attaches loaded items', () => {
+  const source = [
+    { id: 10, title: 'Root', parentId: null },
+    { id: 12, title: 'Child', parentId: 10 },
+    { id: 11, title: 'Root sibling', parentId: null },
+    { id: 13, title: 'Grandchild', parentId: 12 },
+  ]
+  const { groups, childrenById } = buildHomeGroupTree(source, new Map([[12, [{ id: 120 }]]]))
+  assert.deepEqual(groups.map(group => [group.id, group.depth]), [[10, 0], [12, 1], [13, 2], [11, 0]])
+  assert.deepEqual(groups.find(group => group.id === 12).items, [{ id: 120 }])
+  assert.deepEqual(childrenById.get(10).map(group => group.id), [12])
+})
+
+test('directory selection shows one root and all descendants, and falls back when selection disappears', () => {
+  const groups = [
+    { id: 10, parentId: null },
+    { id: 11, parentId: 10 },
+    { id: 12, parentId: 11 },
+    { id: 20, parentId: null },
+    { id: 21, parentId: 20 },
+  ]
+  assert.deepEqual(getHomeGroupRoots(groups).map(group => group.id), [10, 20])
+  assert.deepEqual(getDirectoryGroups(groups, 20).map(group => group.id), [20, 21])
+  assert.equal(resolveActiveDirectoryId(groups, 20), 20)
+  assert.equal(resolveActiveDirectoryId(groups, 99), 10)
+  assert.equal(resolveActiveDirectoryId([], 99), null)
+})
+
+test('standard group collapse hides descendants and protects against malformed cycles', () => {
+  const groups = [
+    { id: 10, parentId: null, items: [] },
+    { id: 11, parentId: 10, items: [] },
+    { id: 12, parentId: 11, items: Array.from({ length: 41 }, (_, id) => ({ id })) },
+  ]
+  const collapsed = getInitiallyCollapsedGroups(groups, true)
+  assert.deepEqual([...collapsed], [10, 11, 12])
+  assert.equal(isHomeGroupHidden(groups, 1, collapsed), true)
+  assert.equal(isHomeGroupHidden(groups, 0, collapsed), false)
+  assert.deepEqual([...getInitiallyCollapsedGroups(groups, false)], [])
+  assert.equal(isHomeGroupHidden([{ id: 1, parentId: 2 }, { id: 2, parentId: 1 }], 0, new Set()), false)
+})
+
+test('home group tree keeps orphaned and cyclic groups reachable without recursing forever', () => {
+  const { groups } = buildHomeGroupTree([
+    { id: 1, parentId: 99 },
+    { id: 2, parentId: 3 },
+    { id: 3, parentId: 2 },
+  ])
+  assert.deepEqual(groups.map(group => group.id), [1, 2, 3])
+  assert.ok(groups.every(group => Number.isInteger(group.depth)))
+  assert.deepEqual(getHomeGroupRoots(groups).map(group => group.id), [1, 2])
+  assert.deepEqual(getDirectoryGroups(groups, 1).map(group => group.id), [1])
+})
+
+test('home command center filters commands, deduplicates bookmark matches, and parses command arguments', () => {
+  const commands = [
+    { key: 'add', label: 'Add bookmark' },
+    { key: 'open', label: 'Open bookmark' },
+  ]
+  const remote = [{ id: 1, title: 'Alpha', url: 'https://alpha.test' }]
+  const local = [
+    { id: 1, title: 'Alpha local copy', url: 'https://alpha.test' },
+    { id: 2, title: 'Beta bookmark', url: 'https://beta.test' },
+  ]
+  assert.deepEqual(filterHomeCommands(commands, '/ADD'), [commands[0]])
+  assert.deepEqual(filterHomeCommandItems('alpha', remote, local), [remote[0]])
+  assert.deepEqual(filterHomeCommandItems('/open', remote, local), [])
+  assert.equal(findHomeCommandItem('beta', remote, local).id, 2)
+  assert.deepEqual(parseHomeCommand(' /open  alpha  bookmark '), { command: 'open', argument: 'alpha bookmark' })
+  assert.equal(isHomeCommandWrite('edit'), true)
+  assert.equal(isHomeCommandWrite('open'), false)
+})
+
+test('home command center wraps selection and uses query type to choose its initial index', () => {
+  assert.equal(getInitialHomeCommandSelection('/'), 0)
+  assert.equal(getInitialHomeCommandSelection('alpha'), -1)
+  assert.equal(moveHomeCommandSelection(-1, 1, 3), 0)
+  assert.equal(moveHomeCommandSelection(0, -1, 3), 2)
+  assert.equal(moveHomeCommandSelection(4, 1, 0), 4)
+})
+
+test('home command search only publishes the latest query for the still-active Space', async () => {
+  let spaceId = 7
+  const pending = []
+  const service = createHomeCommandSearch({
+    getSpaceId: () => spaceId,
+    search: (id, query) => new Promise(resolve => pending.push({ id, query, resolve })),
+  })
+  const stale = service.search('alpha')
+  const latest = service.search('beta')
+  pending[0].resolve([{ id: 1, title: 'Alpha' }])
+  pending[1].resolve([{ id: 2, title: 'Beta' }])
+  assert.equal(await stale, undefined)
+  assert.deepEqual(await latest, [{ id: 2, title: 'Beta' }])
+
+  const changedSpace = service.search('gamma')
+  spaceId = 9
+  pending[2].resolve([{ id: 3, title: 'Gamma' }])
+  assert.equal(await changedSpace, undefined)
+  assert.deepEqual(await service.search('/open'), [])
+})
+
 test('home mutations require write access and refresh only the Space that was mutated', async () => {
-  let activeSpaceId = 7
+  const activeSpaceId = 7
   let writable = true
   const calls = []
   const service = createHomeMutationService({
@@ -132,6 +239,62 @@ test('home mutations require write access and refresh only the Space that was mu
   writable = false
   await assert.rejects(service.deleteItem(2), error => error.code === 'PERMISSION_DENIED')
   assert.equal(calls.length, 3)
+})
+
+test('item editor mutations preserve the opened Space and return created item data', async () => {
+  let activeSpaceId = 7
+  const calls = []
+  const service = createHomeMutationService({
+    api: {
+      createItem: async (spaceId, input) => { calls.push(['create', spaceId, input]); return { code: 0, data: { id: 12 } } },
+      createItemWithIcon: async (spaceId, input, file) => { calls.push(['createWithIcon', spaceId, input, file]); return { code: 0, data: { id: 13 } } },
+      updateItem: async (spaceId, itemId, input) => { calls.push(['update', spaceId, itemId, input]); return { code: 0, data: { id: itemId } } },
+      deleteItem: async () => ({ code: 0 }), reorderItems: async () => ({ code: 0 }),
+      createGroup: async () => ({ code: 0 }), updateGroup: async () => ({ code: 0 }),
+      deleteGroup: async () => ({ code: 0 }), reorderGroups: async () => ({ code: 0 }),
+    },
+    getActiveSpaceId: () => activeSpaceId,
+    canWrite: () => true,
+    invalidateSpace: id => calls.push(['invalidate', id]),
+    refreshSpace: id => calls.push(['refresh', id]),
+  })
+  const file = { name: 'icon.svg' }
+  const result = await service.saveItem({ title: 'Created' }, { iconFile: file, expectedSpaceId: 7 })
+  assert.deepEqual(result.data, { id: 13 })
+  assert.deepEqual(calls.slice(0, 3), [['createWithIcon', 7, { title: 'Created' }, file], ['invalidate', 7], ['refresh', 7]])
+
+  activeSpaceId = 9
+  await assert.rejects(service.saveItem({ title: 'Updated' }, { itemId: 12, expectedSpaceId: 7 }), error => error.code === 'ABORTED')
+  assert.equal(calls.some(call => call[0] === 'update'), false)
+})
+
+test('item icon uploads require the opened writable Space and reject late responses', async () => {
+  let activeSpaceId = 7
+  let finishUpload
+  let uploads = 0
+  const service = createHomeMutationService({
+    api: {
+      createItem: async () => ({ code: 0 }), createItemWithIcon: async () => ({ code: 0 }), updateItem: async () => ({ code: 0 }),
+      uploadItemIcon: () => {
+        uploads++
+        return new Promise(resolve => { finishUpload = resolve })
+      },
+      deleteItem: async () => ({ code: 0 }), reorderItems: async () => ({ code: 0 }),
+      createGroup: async () => ({ code: 0 }), updateGroup: async () => ({ code: 0 }),
+      deleteGroup: async () => ({ code: 0 }), reorderGroups: async () => ({ code: 0 }),
+    },
+    getActiveSpaceId: () => activeSpaceId,
+    canWrite: () => true,
+    invalidateSpace: () => {},
+    refreshSpace: () => {},
+  })
+
+  const pending = service.uploadItemIcon({ name: 'icon.svg' }, 7)
+  activeSpaceId = 9
+  finishUpload({ code: 0, data: { imageUrl: '/uploads/icon.svg', fileName: 'icon.svg' } })
+  await assert.rejects(pending, error => error.code === 'ABORTED')
+  await assert.rejects(service.uploadItemIcon({ name: 'other.svg' }, 7), error => error.code === 'ABORTED')
+  assert.equal(uploads, 1)
 })
 
 test('home mutations do not refresh a newly selected Space after an older write finishes', async () => {
@@ -464,7 +627,7 @@ test('theme settings are revision scoped and oversized patches leave stored data
   assert.deepEqual(createThemeSettingsStore(storage, 'user-2:theme-a:revision-1').get(), {})
 })
 
-test('theme persistence isolates settings by revision and storage by user and package', () => {
+test('theme persistence isolates settings by revision and storage by user and package', async () => {
   const values = new Map()
   const storage = {
     getItem: key => values.get(key) ?? null,
@@ -478,7 +641,7 @@ test('theme persistence isolates settings by revision and storage by user and pa
     revision: () => identity.revision,
   })
 
-  persistence.patchSettings({ density: 'compact' })
+  await persistence.patchSettings({ density: 'compact' })
   persistence.setStorage('state', { count: 1 })
   identity.revision = 'revision-2'
   assert.deepEqual(persistence.getSettings(), {})
@@ -487,6 +650,86 @@ test('theme persistence isolates settings by revision and storage by user and pa
   assert.equal(persistence.getStorage('state'), undefined)
   identity.userId = 'user-2'
   assert.equal(persistence.getStorage('state'), undefined)
+})
+
+test('theme settings schema rejection leaves prior persisted settings unchanged', async () => {
+  const values = new Map()
+  const storage = {
+    getItem: key => values.get(key) ?? null,
+    setItem: (key, value) => values.set(key, value),
+    removeItem: key => values.delete(key),
+  }
+  const persistence = createThemePersistence(storage, {
+    userId: () => 'user-1', packageId: () => 'theme-a', revision: () => 'revision-1',
+    validateSettings: async settings => {
+      if (!['compact', 'comfortable'].includes(settings.density)) throw Object.assign(new Error('invalid settings'), { code: 'INVALID_ARGUMENT' })
+    },
+  })
+  await persistence.patchSettings({ density: 'compact' })
+  await assert.rejects(persistence.patchSettings({ density: 'loose' }), error => error.code === 'INVALID_ARGUMENT')
+  assert.deepEqual(persistence.getSettings(), { density: 'compact' })
+})
+
+test('theme settings schema service verifies resource digest, compiles once per revision and validates patches', async () => {
+  const Ajv2020 = (await import('ajv/dist/2020.js')).default
+  const bytes = Buffer.from(JSON.stringify({
+    $schema: 'https://json-schema.org/draft/2020-12/schema',
+    $defs: { density: { enum: ['compact', 'comfortable'] } },
+    type: 'object', properties: { density: { $ref: '#/$defs/density' } }, additionalProperties: false,
+  }))
+  const digest = createHash('sha256').update(bytes).digest('hex')
+  let compileCount = 0
+  let fetchOptions
+  const validate = createThemeSettingsSchemaValidator({
+    origin: 'https://yin.test',
+    fetcher: async (_url, options) => {
+      fetchOptions = options
+      return new Response(bytes, { status: 200 })
+    },
+    loadAjv: async () => ({ default: class extends Ajv2020 { constructor(options) { super(options); compileCount++ } } }),
+  })
+  const theme = {
+    revision: 'revision-1',
+    manifest: {
+      settings: { schema: 'settings/schema.json', schemaVersion: 1 },
+      resources: [{ path: 'settings/schema.json', url: '/api/theme/v2/assets/revision/settings/schema.json', mediaType: 'application/schema+json', sha256: digest }],
+    },
+  }
+  await validate(theme, { density: 'compact' })
+  await validate(theme, { density: 'comfortable' })
+  assert.equal(compileCount, 1)
+  assert.deepEqual(fetchOptions, { credentials: 'omit', redirect: 'error', cache: 'force-cache' })
+  await assert.rejects(validate(theme, { density: 'loose' }), error => error.code === 'INVALID_ARGUMENT')
+  await validate({ ...theme, revision: 'revision-2' }, { density: 'compact' })
+  assert.equal(compileCount, 2)
+})
+
+test('theme settings schema service rejects external references, unsafe URLs and bad digests', async () => {
+  const Ajv2020 = (await import('ajv/dist/2020.js')).default
+  const bytes = Buffer.from(JSON.stringify({
+    $schema: 'https://json-schema.org/draft/2020-12/schema',
+    $ref: 'https://example.test/schema.json',
+  }))
+  const digest = createHash('sha256').update(bytes).digest('hex')
+  let fetchCount = 0
+  const validate = createThemeSettingsSchemaValidator({
+    origin: 'https://yin.test',
+    fetcher: async () => { fetchCount++; return new Response(bytes, { status: 200 }) },
+    loadAjv: async () => ({ default: Ajv2020 }),
+  })
+  const base = {
+    revision: 'revision-1',
+    manifest: {
+      settings: { schema: 'settings/schema.json', schemaVersion: 1 },
+      resources: [{ path: 'settings/schema.json', url: '/api/theme/v2/assets/revision/schema.json', mediaType: 'application/schema+json', sha256: digest }],
+    },
+  }
+  await assert.rejects(validate(base, {}), /external documents/)
+  await assert.rejects(validate({ ...base, manifest: { ...base.manifest, resources: [{ ...base.manifest.resources[0], url: 'https://evil.test/api/theme/schema.json' }] } }, {}), error => error.code === 'PERMISSION_DENIED')
+  await assert.rejects(validate({ ...base, manifest: { ...base.manifest, resources: [{ ...base.manifest.resources[0], url: '/api/theme/v2/admin/packages' }] } }, {}), error => error.code === 'PERMISSION_DENIED')
+  await assert.rejects(validate({ ...base, manifest: { ...base.manifest, resources: [{ ...base.manifest.resources[0], url: '/api/theme/v2/assets/revision/schema.json?redirect=https://evil.test' }] } }, {}), error => error.code === 'PERMISSION_DENIED')
+  await assert.rejects(validate({ ...base, manifest: { ...base.manifest, resources: [{ ...base.manifest.resources[0], sha256: '0'.repeat(64) }] } }, {}), /digest/)
+  assert.equal(fetchCount, 2)
 })
 
 test('theme persistence rejects unserializable and oversized data by UTF-8 byte size', () => {
@@ -587,6 +830,7 @@ test('monitor snapshot polling is serial, reads the interval once and stops clea
   })
 
   poller.start()
+  poller.start()
   await delay(300)
   poller.stop()
   const stoppedAt = fetches
@@ -595,6 +839,34 @@ test('monitor snapshot polling is serial, reads the interval once and stops clea
   assert.equal(intervalReads, 1)
   assert.equal(fetches, stoppedAt)
   assert.ok(snapshots >= 2)
+})
+
+test('monitor polling ignores a stopped run and reuses its in-flight request after restart', async () => {
+  let releaseSnapshot
+  let fetches = 0
+  const snapshots = []
+  const poller = createSnapshotPoller({
+    fetchSnapshot: () => {
+      fetches++
+      return new Promise(resolve => { releaseSnapshot = resolve })
+    },
+    getInterval: async () => 10000,
+    onSnapshot: snapshot => snapshots.push(snapshot),
+  })
+
+  poller.start()
+  await Promise.resolve()
+  await Promise.resolve()
+  assert.equal(fetches, 1)
+  poller.stop()
+  poller.start()
+  await Promise.resolve()
+  assert.equal(fetches, 1)
+
+  releaseSnapshot({ sequence: 1 })
+  await delay(0)
+  poller.stop()
+  assert.deepEqual(snapshots, [{ sequence: 1 }])
 })
 
 test('monitor disk snapshots deduplicate paths and retain values after a failed request', async () => {
@@ -614,4 +886,33 @@ test('monitor disk snapshots deduplicate paths and retain values after a failed 
     '/backup': { used: 8 },
     '/data': { used: 12 },
   })
+})
+
+test('monitor snapshot controller deduplicates reads and follows disk configuration changes in flight', async () => {
+  const requested = []
+  let releaseOldDisk
+  let snapshotCalls = 0
+  const controller = createMonitorSnapshotController({
+    fetchSnapshot: async () => { snapshotCalls++; return { CPU_INFO: { model: 'CPU' } } },
+    fetchDisk: async (path) => {
+      requested.push(path)
+      if (path === '/old') return new Promise(resolve => { releaseOldDisk = () => resolve({ code: 0, data: { used: 1 } }) })
+      return { code: 0, data: { used: 2 } }
+    },
+    getInterval: async () => 10000,
+  })
+
+  controller.setDiskPaths(['/old'])
+  const first = controller.fetchSnapshot()
+  const duplicate = controller.fetchSnapshot()
+  await Promise.resolve()
+  await Promise.resolve()
+  assert.equal(snapshotCalls, 1)
+  controller.setDiskPaths(['/new'])
+  releaseOldDisk()
+
+  const [snapshot, sameSnapshot] = await Promise.all([first, duplicate])
+  assert.deepEqual(snapshot, { CPU_INFO: { model: 'CPU' }, DISK_INFO: { '/new': { used: 2 } } })
+  assert.deepEqual(sameSnapshot, snapshot)
+  assert.deepEqual(requested, ['/old', '/new'])
 })

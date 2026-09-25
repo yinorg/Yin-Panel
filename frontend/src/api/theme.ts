@@ -9,7 +9,8 @@ export interface ThemePreference {
 
 export interface ThemeRuntimeGrant {
   revision: string
-  executionMode: 'sandbox'
+  executionMode: 'sandbox' | 'trusted'
+  available: boolean
   granted: boolean
   permissions: string[]
 }
@@ -74,16 +75,24 @@ export function saveThemePreference(preference: ThemePreference) {
   return request.post<{ code: number; msg: string }>('/theme/v2/preference', preference).then(res => res.data)
 }
 
-export function getThemeRuntimeGrant(revision: string) {
-  return request.get<{ code: number; data: ThemeRuntimeGrant }>(`/theme/v2/grants/${encodeURIComponent(revision)}`).then(res => res.data)
+export function getThemeRuntimeGrant(revision: string, executionMode: ThemeRuntimeGrant['executionMode'] = 'sandbox') {
+  return request.get<{ code: number; data: ThemeRuntimeGrant }>(`/theme/v2/grants/${encodeURIComponent(revision)}?executionMode=${executionMode}`).then(res => res.data)
 }
 
-export function setThemeRuntimeGrant(revision: string, permissions: string[]) {
-  return request.post<{ code: number; msg: string }>(`/theme/v2/grants/${encodeURIComponent(revision)}`, { permissions }).then(res => res.data)
+export function setThemeRuntimeGrant(revision: string, permissions: string[], executionMode: ThemeRuntimeGrant['executionMode'] = 'sandbox') {
+  return request.post<{ code: number; msg: string }>(`/theme/v2/grants/${encodeURIComponent(revision)}`, { executionMode, permissions }).then(res => res.data)
 }
 
-export function revokeThemeRuntimeGrant(revision: string) {
-  return request.delete<{ code: number; msg: string }>(`/theme/v2/grants/${encodeURIComponent(revision)}`).then(res => res.data)
+export function revokeThemeRuntimeGrant(revision: string, executionMode: ThemeRuntimeGrant['executionMode'] = 'sandbox') {
+  return request.delete<{ code: number; msg: string }>(`/theme/v2/grants/${encodeURIComponent(revision)}?executionMode=${executionMode}`).then(res => res.data)
+}
+
+export function getTrustedThemeRuntimePolicy(revision: string) {
+  return request.get<{ code: number; data: { revision: string; enabled: boolean } }>(`/theme/v2/admin/trusted/${encodeURIComponent(revision)}`).then(res => res.data)
+}
+
+export function setTrustedThemeRuntimePolicy(revision: string, enabled: boolean) {
+  return request.put<{ code: number; msg: string }>(`/theme/v2/admin/trusted/${encodeURIComponent(revision)}`, { enabled }).then(res => res.data)
 }
 
 export function getThemePackages() {

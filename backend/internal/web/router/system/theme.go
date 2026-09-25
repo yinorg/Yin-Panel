@@ -52,6 +52,8 @@ func (a *ThemeRouter) InitRouter(router *gin.RouterGroup) {
 	admin.POST("/theme/v2/admin/trial", a.BeginTrialV2)
 	admin.POST("/theme/v2/admin/confirm", a.ConfirmTrialV2)
 	admin.POST("/theme/v2/admin/rollback", a.RollbackV2)
+	admin.GET("/theme/v2/admin/trusted/:revision", a.TrustedRuntimePolicyV2)
+	admin.PUT("/theme/v2/admin/trusted/:revision", a.SetTrustedRuntimePolicyV2)
 	admin.DELETE("/theme/v2/admin/packages/:id", a.RemoveV2)
 	admin.GET("/theme/v2/admin/audit", a.Audit)
 }
@@ -226,18 +228,55 @@ func (a *ThemeRouter) ThemeGrantV2(c *gin.Context) {
 		response.ErrorByCode(c, constant.CodeNotLogin)
 		return
 	}
-	grant, err := theme.GetGrantV2(repository.Db, user.ID, c.Param("revision"), "sandbox")
+	executionMode, ok := requestedThemeExecutionMode(c)
+	if !ok {
+		response.ErrorParamFomat(c, "executionMode must be sandbox or trusted")
+		return
+	}
+	revision, err := theme.GetPackageRevisionV2(repository.Db, c.Param("revision"))
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		permissions, builtin, builtinErr := theme.ImplicitBuiltinPermissionsV2(repository.Db, c.Param("revision"))
+		response.ErrorDataNotFound(c)
+		return
+	}
+	if err != nil {
+		response.ErrorDatabase(c, err.Error())
+		return
+	}
+	var manifest theme.PackageManifestV2
+	if err := json.Unmarshal([]byte(revision.ManifestJSON), &manifest); err != nil {
+		response.ErrorDatabase(c, "stored theme manifest is invalid")
+		return
+	}
+	available := false
+	for _, mode := range manifest.Runtime.SupportedModes {
+		if mode == executionMode {
+			available = true
+			break
+		}
+	}
+	if executionMode == "trusted" {
+		enabled, err := theme.TrustedRuntimeEnabledV2(repository.Db, revision.ID)
+		if err != nil {
+			response.ErrorDatabase(c, err.Error())
+			return
+		}
+		available = available && enabled
+	}
+	grant, err := theme.GetGrantV2(repository.Db, user.ID, revision.ID, executionMode)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		permissions, builtin, builtinErr := theme.ImplicitBuiltinPermissionsV2(repository.Db, revision.ID)
 		if builtinErr != nil && !errors.Is(builtinErr, gorm.ErrRecordNotFound) {
 			response.ErrorDatabase(c, builtinErr.Error())
 			return
 		}
 		if builtinErr == nil && builtin {
-			response.SuccessData(c, gin.H{"revision": c.Param("revision"), "executionMode": "sandbox", "granted": true, "permissions": permissions})
+			if executionMode != "sandbox" {
+				permissions = []string{}
+			}
+			response.SuccessData(c, gin.H{"revision": revision.ID, "executionMode": executionMode, "available": available, "granted": executionMode == "sandbox" && available, "permissions": permissions})
 			return
 		}
-		response.SuccessData(c, gin.H{"revision": c.Param("revision"), "executionMode": "sandbox", "granted": false, "permissions": []string{}})
+		response.SuccessData(c, gin.H{"revision": revision.ID, "executionMode": executionMode, "available": available, "granted": false, "permissions": []string{}})
 		return
 	}
 	if err != nil {
@@ -249,7 +288,7 @@ func (a *ThemeRouter) ThemeGrantV2(c *gin.Context) {
 		response.ErrorDatabase(c, "stored theme grant is invalid")
 		return
 	}
-	response.SuccessData(c, gin.H{"revision": grant.RevisionID, "executionMode": grant.ExecutionMode, "granted": true, "permissions": permissions})
+	response.SuccessData(c, gin.H{"revision": grant.RevisionID, "executionMode": grant.ExecutionMode, "available": available, "granted": available, "permissions": permissions})
 }
 
 func (a *ThemeRouter) SetThemeGrantV2(c *gin.Context) {
@@ -259,10 +298,19 @@ func (a *ThemeRouter) SetThemeGrantV2(c *gin.Context) {
 		return
 	}
 	var request struct {
-		Permissions []string `json:"permissions"`
+		ExecutionMode string   `json:"executionMode"`
+		Permissions   []string `json:"permissions"`
 	}
 	if err := c.ShouldBindJSON(&request); err != nil {
 		response.ErrorParamFomat(c, err.Error())
+		return
+	}
+	executionMode := request.ExecutionMode
+	if executionMode == "" {
+		executionMode = "sandbox"
+	}
+	if executionMode != "sandbox" && executionMode != "trusted" {
+		response.ErrorParamFomat(c, "executionMode must be sandbox or trusted")
 		return
 	}
 	revision, err := theme.GetPackageRevisionV2(repository.Db, c.Param("revision"))
@@ -275,7 +323,7 @@ func (a *ThemeRouter) SetThemeGrantV2(c *gin.Context) {
 		response.ErrorDatabase(c, "stored theme manifest is invalid")
 		return
 	}
-	if err := theme.ValidateThemeGrantV2(manifest, "sandbox", request.Permissions); err != nil {
+	if err := theme.ValidateThemeGrantV2(manifest, executionMode, request.Permissions); err != nil {
 		response.ErrorParamFomat(c, err.Error())
 		return
 	}
@@ -284,8 +332,12 @@ func (a *ThemeRouter) SetThemeGrantV2(c *gin.Context) {
 		response.ErrorParamFomat(c, err.Error())
 		return
 	}
-	grant := theme.GrantRecordV2{UserID: user.ID, RevisionID: revision.ID, ExecutionMode: "sandbox", PermissionsJSON: string(permissions)}
-	if err := theme.SaveGrantV2(repository.Db, grant); err != nil {
+	grant := theme.GrantRecordV2{UserID: user.ID, RevisionID: revision.ID, ExecutionMode: executionMode, PermissionsJSON: string(permissions)}
+	if err := theme.SaveUserGrantV2(repository.Db, grant); err != nil {
+		if errors.Is(err, theme.ErrTrustedRuntimeNotEnabledV2) {
+			response.ErrorNoAccess(c)
+			return
+		}
 		response.ErrorDatabase(c, err.Error())
 		return
 	}
@@ -298,8 +350,13 @@ func (a *ThemeRouter) RevokeThemeGrantV2(c *gin.Context) {
 		response.ErrorByCode(c, constant.CodeNotLogin)
 		return
 	}
+	executionMode, ok := requestedThemeExecutionMode(c)
+	if !ok {
+		response.ErrorParamFomat(c, "executionMode must be sandbox or trusted")
+		return
+	}
 	_, builtin, builtinErr := theme.ImplicitBuiltinPermissionsV2(repository.Db, c.Param("revision"))
-	if builtinErr == nil && builtin {
+	if executionMode == "sandbox" && builtinErr == nil && builtin {
 		if err := theme.SaveGrantV2(repository.Db, theme.GrantRecordV2{UserID: user.ID, RevisionID: c.Param("revision"), ExecutionMode: "sandbox", PermissionsJSON: "[]"}); err != nil {
 			response.ErrorDatabase(c, err.Error())
 			return
@@ -307,8 +364,53 @@ func (a *ThemeRouter) RevokeThemeGrantV2(c *gin.Context) {
 		response.Success(c)
 		return
 	}
-	if err := theme.RevokeGrantV2(repository.Db, user.ID, c.Param("revision"), "sandbox"); err != nil {
+	if err := theme.RevokeGrantV2(repository.Db, user.ID, c.Param("revision"), executionMode); err != nil {
 		response.ErrorDatabase(c, err.Error())
+		return
+	}
+	response.Success(c)
+}
+
+func requestedThemeExecutionMode(c *gin.Context) (string, bool) {
+	mode := c.Query("executionMode")
+	if mode == "" {
+		mode = "sandbox"
+	}
+	return mode, mode == "sandbox" || mode == "trusted"
+}
+
+func (a *ThemeRouter) TrustedRuntimePolicyV2(c *gin.Context) {
+	if _, err := theme.GetPackageRevisionV2(repository.Db, c.Param("revision")); err != nil {
+		response.ErrorDataNotFound(c)
+		return
+	}
+	enabled, err := theme.TrustedRuntimeEnabledV2(repository.Db, c.Param("revision"))
+	if err != nil {
+		response.ErrorDatabase(c, err.Error())
+		return
+	}
+	response.SuccessData(c, gin.H{"revision": c.Param("revision"), "enabled": enabled})
+}
+
+func (a *ThemeRouter) SetTrustedRuntimePolicyV2(c *gin.Context) {
+	user, ok := base.GetCurrentUserInfo(c)
+	if !ok || user.ID == 0 || user.Role != 1 {
+		response.ErrorNoAccess(c)
+		return
+	}
+	var request struct {
+		Enabled bool `json:"enabled"`
+	}
+	if err := c.ShouldBindJSON(&request); err != nil {
+		response.ErrorParamFomat(c, err.Error())
+		return
+	}
+	if err := theme.SetTrustedRuntimePolicyV2(repository.Db, c.Param("revision"), request.Enabled, user.ID); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			response.ErrorDataNotFound(c)
+			return
+		}
+		response.ErrorParamFomat(c, err.Error())
 		return
 	}
 	response.Success(c)

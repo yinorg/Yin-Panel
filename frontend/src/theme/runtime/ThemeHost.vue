@@ -3,13 +3,16 @@ import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { ThemeEnvironment, ThemeHomeSnapshot, ThemePermission } from '../api/v1'
 import type { ThemePackage } from '@/utils/theme'
 import { mountThemeSandbox, type ThemeSandboxHandle, type ThemeSandboxStylesheet } from './sandbox'
+import { mountThemeDirect, type ThemeDirectHandle } from './direct'
 import { rewriteThemeStylesheet } from './resources'
+import { sha256Hex } from '@/utils/sha256.js'
 
 const props = defineProps<{
   theme: ThemePackage
   snapshot: ThemeHomeSnapshot
   environment: Omit<ThemeEnvironment, 'apiVersion'>
   permissions: ThemePermission[]
+  executionMode?: 'sandbox' | 'trusted'
   slots: Record<string, string>
   title: string
   execute: (request: unknown) => Promise<unknown>
@@ -21,7 +24,8 @@ const emit = defineEmits<{
 }>()
 
 const frame = ref<HTMLIFrameElement>()
-let runtime: ThemeSandboxHandle | undefined
+const trustedHost = ref<HTMLElement>()
+let runtime: ThemeSandboxHandle | ThemeDirectHandle | undefined
 let disposed = false
 let generation = 0
 let startTask: Promise<void> | undefined
@@ -74,8 +78,8 @@ async function start() {
   try {
     const manifest = props.theme.manifest
     const scriptPath = manifest.entrypoints?.script
-    if (!scriptPath || !manifest.contributes?.views?.includes('home') || !manifest.runtime?.supportedModes?.includes('sandbox'))
-      throw new Error('Theme package does not declare a sandbox home view')
+    if (!scriptPath || !manifest.contributes?.views?.includes('home') || !manifest.runtime?.supportedModes?.includes(props.executionMode || 'sandbox'))
+      throw new Error(`Theme package does not declare a ${props.executionMode || 'sandbox'} home view`)
     const requiredPermissions = manifest.permissions?.required?.map(item => item.name as ThemePermission) || []
     if (requiredPermissions.some(permission => !props.permissions.includes(permission)))
       throw new Error('Theme API permissions have not been granted')
@@ -98,22 +102,36 @@ async function start() {
     for (const stylePath of manifest.entrypoints?.styles || []) {
       const resource = findResource(props.theme, stylePath, 'text/css')
       const source = await loadTextResource(props.theme, stylePath, 'text/css')
-      styles.push({ text: await rewriteThemeStylesheet(source, resource.url!, manifest.resources || [], assets) })
+      styles.push({ text: await rewriteThemeStylesheet(source, resource.url!, manifest.resources || [], assets, window.location.origin, (props.executionMode || 'sandbox') === 'trusted') })
     }
     const initialSnapshot = scopedSnapshot(props.snapshot)
     runtimeSnapshot = initialSnapshot
     const initialEnvironment = { ...props.environment, assets }
     const tokens = `:root{${Object.entries(props.slots).filter(([name]) => /^[a-z0-9-]+$/.test(name)).map(([name, value]) => `--yin-${name}:${value}`).join(';')}}`
-    const nextRuntime = await mountThemeSandbox(frame.value!, {
-      script,
-      styles,
-      tokens,
-      snapshot: initialSnapshot,
-      environment: initialEnvironment,
-      permissions: new Set(props.permissions),
-      execute: props.execute,
-      onError: (error) => emit('failed', error),
-    })
+    const nextRuntime = (props.executionMode || 'sandbox') === 'trusted'
+      ? await mountThemeDirect({
+          host: trustedHost.value!,
+          script,
+          styles,
+          tokens,
+          snapshot: initialSnapshot,
+          environment: initialEnvironment,
+          permissions: new Set(props.permissions),
+          execute: props.execute,
+          onError: error => emit('failed', error),
+          contributions: manifest.contributes,
+        })
+      : await mountThemeSandbox(frame.value!, {
+          script,
+          styles,
+          tokens,
+          snapshot: initialSnapshot,
+          environment: initialEnvironment,
+          permissions: new Set(props.permissions),
+          execute: props.execute,
+          onError: error => emit('failed', error),
+          contributions: manifest.contributes,
+        })
     if (disposed || startGeneration !== generation) {
       await nextRuntime.dispose()
       revokeAssetURLs(createdAssetURLs)
@@ -172,8 +190,29 @@ function scopedSnapshot(snapshot: ThemeHomeSnapshot): ThemeHomeSnapshot {
     ...snapshot,
     spaces: canReadSpaces ? snapshot.spaces : [],
     activeSpaceId: canReadSpaces ? snapshot.activeSpaceId : undefined,
-    groups: canReadGroups ? snapshot.groups.map(group => ({ ...group, spaceId: canReadSpaces ? group.spaceId : '', itemIds: canReadItems ? group.itemIds : [] })) : [],
-    items: canReadItems ? snapshot.items.map(item => ({ ...item, groupId: canReadGroups ? item.groupId : '' })) : [],
+    groups: canReadGroups ? snapshot.groups.map(group => ({
+      id: String(group.id),
+      spaceId: canReadSpaces ? String(group.spaceId) : '',
+      parentId: group.parentId === undefined ? undefined : String(group.parentId),
+      title: String(group.title),
+      icon: group.icon === undefined ? undefined : String(group.icon),
+      itemIds: canReadItems ? group.itemIds.map(id => String(id)) : [],
+    })) : [],
+    items: canReadItems ? snapshot.items.map(item => ({
+      id: String(item.id),
+      groupId: canReadGroups ? String(item.groupId) : '',
+      title: String(item.title),
+      description: item.description === undefined ? undefined : String(item.description),
+      icon: item.icon && typeof item.icon === 'object' ? {
+        itemType: Number((item.icon as { itemType?: unknown }).itemType || 0),
+        src: typeof (item.icon as { src?: unknown }).src === 'string' ? (item.icon as { src: string }).src : undefined,
+        fileName: typeof (item.icon as { fileName?: unknown }).fileName === 'string' ? (item.icon as { fileName: string }).fileName : undefined,
+        text: typeof (item.icon as { text?: unknown }).text === 'string' ? (item.icon as { text: string }).text : undefined,
+        backgroundColor: typeof (item.icon as { backgroundColor?: unknown }).backgroundColor === 'string' ? (item.icon as { backgroundColor: string }).backgroundColor : undefined,
+      } : undefined,
+      sort: Number(item.sort) || 0,
+      capabilities: item.capabilities.map(capability => String(capability)),
+    })) : [],
   }
 }
 
@@ -197,8 +236,7 @@ async function loadResource(theme: ThemePackage, resource: NonNullable<ThemePack
   if (!response.ok) throw new Error(`Theme resource request failed: ${resource.path}`)
   const bytes = await response.arrayBuffer()
   if (bytes.byteLength > maxBytes) throw new Error(`Theme resource exceeds the runtime size limit: ${resource.path}`)
-  const digest = await crypto.subtle.digest('SHA-256', bytes)
-  const actual = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')
+  const actual = await sha256Hex(bytes)
   if (actual.toLowerCase() !== resource.sha256.toLowerCase()) throw new Error(`Theme resource integrity check failed: ${resource.path}`)
   return bytes
 }
@@ -217,6 +255,10 @@ function validateResourceURL(value: string) {
     throw new Error('Theme resources must use a same-origin immutable theme asset URL')
 }
 
+function leaveTrustedRuntime() {
+  window.location.replace('/')
+}
+
 onBeforeUnmount(() => {
   disposed = true
   generation += 1
@@ -228,15 +270,34 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <iframe
-    ref="frame"
-    class="theme-host"
-    sandbox="allow-scripts"
-    referrerpolicy="no-referrer"
-    :title="title"
-    data-testid="theme-home-frame"
-  />
+  <div class="theme-runtime-shell">
+    <template v-if="(executionMode || 'sandbox') === 'trusted'">
+      <div ref="trustedHost" class="theme-host theme-host--trusted" :aria-label="title" data-testid="theme-trusted-host" />
+      <div class="theme-trusted-toolbar" data-testid="theme-trusted-toolbar">
+        <span>{{ title }}</span>
+        <button type="button" @click="leaveTrustedRuntime">{{ $t('themeTrustedRuntime.trustedExit') }}</button>
+      </div>
+    </template>
+    <iframe
+      v-else
+      ref="frame"
+      class="theme-host"
+      sandbox="allow-scripts"
+      referrerpolicy="no-referrer"
+      :title="title"
+      data-testid="theme-home-frame"
+    />
+  </div>
 </template>
+
+<style scoped>
+.theme-runtime-shell { position: absolute; z-index: 1; inset: 0; overflow: hidden; pointer-events: auto; }
+.theme-host--trusted { position: fixed; inset: 0; z-index: 40; }
+.theme-trusted-toolbar { position: fixed; z-index: 50; top: 8px; right: 8px; display: flex; align-items: center; gap: var(--yin-spaceSm); max-width: calc(100vw - 16px); padding: var(--yin-spaceXs) var(--yin-spaceSm); border: var(--yin-borderWidth) solid var(--yin-border); border-radius: var(--yin-component-button-radius); background: var(--yin-surfaceElevated); color: var(--yin-text); font: var(--yin-fontBodyWeight) var(--yin-fontSmallSize)/var(--yin-lineHeightBody) var(--yin-fontBody); box-shadow: var(--yin-shadowPopup); }
+.theme-trusted-toolbar span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.theme-trusted-toolbar button { min-height: 44px; padding: 0 var(--yin-spaceSm); border: 0; border-radius: var(--yin-component-button-radius); background: var(--yin-danger); color: var(--yin-onPrimary); font: inherit; cursor: pointer; }
+.theme-trusted-toolbar button:focus-visible { outline: var(--yin-effect-focus-width) solid var(--yin-focusRing); outline-offset: 2px; }
+</style>
 
 <style scoped>
 .theme-host {

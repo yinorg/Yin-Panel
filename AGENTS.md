@@ -13,6 +13,48 @@ For every code-change task, follow this order without asking the user to repeat 
 5. Once the user confirms validation passed, automatically commit the approved, reviewed task changes locally on `<username>-dev`; do not ask for a second commit confirmation. Do not push, rebase, or backfill `master` unless explicitly requested.
 6. Respect explicit `不要部署` or `只改文件` requests by skipping deployment. Respect explicit `不要提交` or `暂不提交` requests by leaving the changes uncommitted. Report exact checks run and any skipped checks; do not claim success from an unrun or failed check.
 
+### Deployment and commit scope invariant
+
+The source files used for deployment must be exactly the source files approved for the corresponding commit. A successful deployment does not authorize committing only a subset of what was deployed.
+
+- Before deployment, inspect and classify every tracked and untracked change as task-approved, other user work, generated output/cache, secret or machine-local file, or unknown. Do not deploy until the classification is complete.
+- Record a `DEPLOYMENT_MANIFEST` containing every approved tracked and untracked source file, plus an explicit exclusion list and reasons. Generated `backend/web`, binaries, logs, caches, Playwright artifacts, `.env.local`, credentials, and machine-specific files are not commit inputs.
+- Never run `scripts/deploy-local.sh` from a mixed dirty worktree and then commit only selected files. The build would include the uncommitted files that were omitted from the commit.
+- Before committing after user validation, record a `COMMIT_MANIFEST` from the staged files and require `COMMIT_MANIFEST == DEPLOYMENT_MANIFEST`. If the manifests differ, stop and rebuild/redeploy from the corrected scope before committing.
+- If all current relevant changes are explicitly approved, include the complete reviewed set in both manifests. If unrelated or unapproved application changes remain, stop and report the unconfirmed file list; do not deploy until the user confirms the complete scope.
+
+Required pre-deployment review:
+
+```bash
+git status --short --branch
+git diff --stat
+git diff --name-only
+git ls-files --others --exclude-standard
+git diff --check
+```
+
+Required pre-commit review after user validation:
+
+```bash
+git diff --cached --name-only
+git diff --cached --stat
+git diff --cached --check
+```
+
+When a scope mismatch is found, use this recovery sequence:
+
+```text
+STOP deployment/commit
+-> re-inspect tracked and untracked files
+-> reclassify every change
+-> generate one authoritative manifest
+-> wait for explicit confirmation of the complete current scope
+-> redeploy and wait for user validation
+-> commit only after the staged manifest matches the deployment manifest
+```
+
+Do not use `git reset --hard`, `git checkout --`, `git stash`, deletion, or selective guessing to hide unapproved worktree changes.
+
 Do not stop at a plan when the user asked to execute. Do not re-ask for paths, build order, or restart procedure already specified here.
 
 Every command must run in the directory stated by its `cd` or tool working-directory setting. Before running Go commands, verify `go.mod` is present in the current directory. Before running npm commands, verify `package.json` is present. Never infer that a prior tool call's `cd` persists into a later tool call.
@@ -27,7 +69,8 @@ Every command must run in the directory stated by its `cd` or tool working-direc
 - If `<username>-dev` does not exist and no temporary branch was requested, synchronize local `master` with `origin/master` first, then create `<username>-dev` from that commit.
 - Before any `fetch`, `checkout`, branch rename, `rebase`, merge, or push, inspect the current worktree with `git status --short --branch`, `git diff --stat`, and the untracked-file list. If it is dirty, do not switch branches or rewrite refs until the changes have been reviewed.
 - For a dirty worktree, inspect the complete tracked diff and every untracked file, classify changes as task-related, existing user work, generated output, or unclear, and report that classification before staging anything. The default is to ask the user how to handle existing code; never stage, commit, stash, reset, discard, delete, or overwrite it without explicit approval.
-- If the user approves including existing code, stage only the reviewed files, keep one coherent feature together, inspect `git diff --cached --stat` and `git diff --cached --check`, then commit. If the user does not approve inclusion, preserve the original worktree and use a clean temporary worktree for the task and integration.
+- If the user approves including existing code, stage the complete reviewed set together, inspect `git diff --cached --stat` and `git diff --cached --check`, then commit. If the user does not approve inclusion, stop and wait for scope confirmation; do not use another worktree to bypass the decision.
+- The reviewed file set used for deployment and the reviewed file set staged for commit must be the same manifest. A dirty worktree with additional application changes cannot be deployed until all relevant changes are explicitly approved for the same commit.
 - If the current local non-`master` branch is the intended development branch and the user requests normalization, rename that local branch to `<username>-dev`; do not recreate it from another commit or push it merely because it was renamed. Keep `<username>-dev` local by default and do not require a remote upstream.
 - The default code-change lifecycle is **local deployment, user validation, then automatic local commit**. Deployment success alone is not user validation. Keep the task changes uncommitted while the user checks the running service.
 - The prompt `本地提交`, `只提交`, or `提交到开发分支` authorizes a local commit, but the default lifecycle still requires successful deployment and the user's explicit validation before committing. These prompts do not authorize push, rebase, or backfill. The prompt `不要提交` or `暂不提交` overrides automatic commit and leaves the changes uncommitted after verification.
@@ -45,7 +88,7 @@ Every command must run in the directory stated by its `cd` or tool working-direc
   git merge --ff-only <source-branch>
   git push origin master
   ```
-- Rebase only after the source worktree is clean and the user-approved change boundary is committed. If unrelated user changes prevent a checkout or rebase, use a clean temporary worktree for verification and integration instead of using stash, reset, discard, or overwrite commands.
+- Rebase only after the source worktree is clean and the user-approved change boundary is committed. If unrelated user changes prevent a checkout or rebase, stop and report the blocker instead of using another worktree to bypass the scope review.
 - Resolve rebase conflicts only on `<source-branch>`. Never resolve conflicts on `master`, and never use stash, reset, discard, or overwrite commands to hide unrelated user changes.
 - Use `<username>-dev` as `<source-branch>` by default. If the user explicitly requested a temporary task branch, that branch may be used instead. Ordinary merge and `--no-ff` are prohibited; `master` accepts only fast-forward integration.
 - Run the required build, test, and `git diff --check` verification after the final rebase and before the fast-forward merge. If `origin/master` advances or the merge/push fails, return to `<source-branch>`, fetch, rebase, verify, and retry.
@@ -74,6 +117,7 @@ Every command must run in the directory stated by its `cd` or tool working-direc
 - Scenarios that load the browser extension, exercise `chrome_url_overrides`, or verify Core plus extension behavior belong in E2E, even when the reported defect is in extension code.
 - Do not copy Core or extension source into the E2E repository. Load the tested extension through `YIN_PANEL_EXTENSION_DIR` and record the tested source commit in CI or the test run context.
 - When a change spans repositories, keep implementation and fast local tests in their owning repositories; add the cross-repository regression test to E2E.
+- For changes spanning Core and E2E, maintain separate manifests for each repository and verify each repository's deployment/test scope equals its own commit scope. A Core deployment does not imply that E2E changes were committed.
 - Keep Playwright reports, traces, screenshots, videos, and other generated test output ignored and untracked.
 
 All paths outside this repository are machine-specific. Use `git rev-parse --show-toplevel`, `YIN_PANEL_RUNTIME_DIR`, `YIN_PANEL_EXTENSION_DIR`, and `YIN_PANEL_E2E_DIR`; never commit a developer home directory or machine-specific absolute path.
