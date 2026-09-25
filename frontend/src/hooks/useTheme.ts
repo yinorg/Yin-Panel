@@ -19,6 +19,18 @@ const previewMode = new URLSearchParams(window.location.search).get('themePrevie
 let appliedSlots: string[] = []
 let fontStyle: HTMLStyleElement | null = null
 
+function toNaiveDimension(value: string | undefined, fallback: string): string {
+  if (!value) return fallback
+  const normalized = value.trim()
+  if (/^-?(?:\d+|\d*\.\d+)px$/.test(normalized)) return normalized
+  const rem = normalized.match(/^-?(?:\d+|\d*\.\d+)rem$/)
+  if (rem) {
+    const rootSize = Number.parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
+    return `${Number.parseFloat(normalized) * rootSize}px`
+  }
+  return fallback
+}
+
 export async function refreshMyTheme(appStore: ReturnType<typeof useAppStore>) {
   const mine = await getMyTheme()
   if (mine.code === 0) {
@@ -102,6 +114,7 @@ export function useTheme() {
 
   const themeOverrides = computed<GlobalThemeOverrides>(() => {
     const slots = activeThemeSlots.value
+    const controlHeight = toNaiveDimension(slots.controlHeight, '36px')
     return {
       common: {
         bodyColor: slots.canvas,
@@ -121,7 +134,7 @@ export function useTheme() {
         fontFamily: slots.fontBody || 'var(--yin-fontBody)',
         fontSize: slots.fontBodySize || 'var(--yin-fontBodySize)',
         borderRadius: slots.radiusControl || 'var(--yin-radiusControl)',
-        heightMedium: slots.controlHeight || 'var(--yin-controlHeight)',
+        heightMedium: controlHeight,
         boxShadow1: slots.shadowCard || 'var(--yin-shadowCard)',
         boxShadow2: slots.shadowPopup || 'var(--yin-shadowPopup)',
       },
@@ -133,7 +146,24 @@ export function useTheme() {
       Popover: { borderRadius: 'var(--yin-component-menu-radius)' },
       Dropdown: { borderRadius: 'var(--yin-component-menu-radius)' },
       Tooltip: { borderRadius: 'var(--yin-component-tooltip-radius)' },
-      Select: { peers: { InternalSelection: { borderRadius: 'var(--yin-component-input-radius)' } } },
+      Select: {
+        peers: {
+          InternalSelection: { borderRadius: 'var(--yin-component-input-radius)' },
+          InternalSelectMenu: {
+            color: 'var(--yin-surfaceElevated)',
+            borderRadius: 'var(--yin-component-menu-radius)',
+            optionHeightMedium: controlHeight,
+            optionTextColor: 'var(--yin-text)',
+            optionTextColorActive: 'var(--yin-primary)',
+            optionTextColorPressed: 'var(--yin-onPrimary)',
+            optionTextColorDisabled: 'var(--yin-textMuted)',
+            optionColorActive: 'color-mix(in srgb, var(--yin-primary) 14%, var(--yin-surfaceElevated))',
+            optionColorActivePending: 'color-mix(in srgb, var(--yin-primary) 20%, var(--yin-surfaceElevated))',
+            optionColorPending: 'color-mix(in srgb, var(--yin-primary) 8%, var(--yin-surfaceElevated))',
+            optionCheckColor: 'var(--yin-primary)',
+          },
+        },
+      },
       Menu: { borderRadius: 'var(--yin-component-menu-radius)' },
     }
   })
