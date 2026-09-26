@@ -29,6 +29,9 @@ export function createThemeHomeSnapshot(input: {
   status: ThemeCollectionStatus
   spaces: readonly SpaceSource[]
   activeSpaceId?: number
+  activeSpaceSide?: 'yin' | 'yang'
+  activeSpacePairedId?: number
+  activeSpaceCapabilities?: readonly string[]
   groups: readonly GroupSource[]
   canWrite: boolean
   error?: { code: string; message: string }
@@ -76,6 +79,9 @@ export function createThemeHomeSnapshot(input: {
     error: input.error,
     spaces,
     activeSpaceId: input.activeSpaceId === undefined ? undefined : String(input.activeSpaceId),
+    activeSpaceSide: input.activeSpaceSide,
+    activeSpacePairedId: input.activeSpacePairedId === undefined ? undefined : String(input.activeSpacePairedId),
+    activeSpaceCapabilities: input.activeSpaceCapabilities || [],
     groups,
     items,
   }

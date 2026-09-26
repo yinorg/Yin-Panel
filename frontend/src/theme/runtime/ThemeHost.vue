@@ -190,6 +190,9 @@ function scopedSnapshot(snapshot: ThemeHomeSnapshot): ThemeHomeSnapshot {
     ...snapshot,
     spaces: canReadSpaces ? snapshot.spaces : [],
     activeSpaceId: canReadSpaces ? snapshot.activeSpaceId : undefined,
+    activeSpaceSide: canReadSpaces ? snapshot.activeSpaceSide : undefined,
+    activeSpacePairedId: canReadSpaces ? snapshot.activeSpacePairedId : undefined,
+    activeSpaceCapabilities: canReadSpaces ? snapshot.activeSpaceCapabilities : [],
     groups: canReadGroups ? snapshot.groups.map(group => ({
       id: String(group.id),
       spaceId: canReadSpaces ? String(group.spaceId) : '',

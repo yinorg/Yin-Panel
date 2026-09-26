@@ -125,6 +125,7 @@ const homeCollectionStatus = ref<ThemeCollectionStatus>('idle')
 const homeCollectionError = ref<{ code: string; message: string }>()
 const themeSnapshotVersion = ref(0)
 const sideSwitching = ref(false)
+let homeTransitionGeneration = 0
 let sideSwitchTimer: ReturnType<typeof setTimeout> | undefined
 const commandCenterVisible = ref(false)
 const commandCenterQuery = ref('')
@@ -211,6 +212,9 @@ const themeRuntimeSnapshot = computed(() => createThemeHomeSnapshot({
   error: homeCollectionError.value,
   spaces: spaces.value.map(space => ({ ...space, name: spaceDisplayName(space, spaces.value, authStore.userInfo?.id) })),
   activeSpaceId: activeSpace.value?.id,
+  activeSpaceSide: activeSpace.value?.side,
+  activeSpacePairedId: activeSpace.value?.pairedSpaceId,
+  activeSpaceCapabilities: activeSpace.value?.pairedSpaceId ? ['space.toggleSide'] : [],
   groups: items.value.filter(group => Number.isSafeInteger(Number(group.id))).map(group => ({
     ...group,
     id: Number(group.id),
@@ -387,6 +391,7 @@ async function handleFloatingButtonClick(event: MouseEvent, action: () => unknow
 
 async function getList(forceRefresh = false) {
   if (forceRefresh && !canWrite.value) return
+  const transitionGeneration = homeTransitionGeneration
   themeSnapshotVersion.value++
   homeCollectionStatus.value = 'loading'
   homeCollectionError.value = undefined
@@ -407,7 +412,7 @@ async function getList(forceRefresh = false) {
   }
   if (forceRefresh) homeSearch.invalidate(targetSpaceId)
   const result = await homeCollectionLoader.load(targetSpaceId, forceRefresh)
-  if (result.cancelled || activeSpace.value?.id !== result.spaceId) return
+  if (result.cancelled || transitionGeneration !== homeTransitionGeneration || activeSpace.value?.id !== result.spaceId) return
   applyCollectionProgress(result)
   cacheUpdatedAt.value = result.cache.updatedAt || Date.now()
   hasValidCachedHome.value = !!getCachedSpace(result.spaceId)
@@ -445,6 +450,7 @@ function groupHidden(index: number) {
 
 function toggleGroup(id: number) { const next = new Set(collapsedGroups.value); next.has(id) ? next.delete(id) : next.add(id); collapsedGroups.value = next }
 function selectSpace(key: string | number) {
+  homeTransitionGeneration++
   homeCollectionLoader.cancel()
   homeSearch.invalidate()
   homeCommandSearch.invalidate()
@@ -454,11 +460,13 @@ function selectSpace(key: string | number) {
   homeSpaceController.select(Number(key))
 }
 function togglePanelSide() {
-  if (sideSwitching.value || !activeSpace.value?.pairedSpaceId) return
+  if (!activeSpace.value?.pairedSpaceId) return
+  homeTransitionGeneration++
   const yin = activeSpace.value
   const target = yin.side === 'yang'
     ? spaces.value.find(space => space.id === yin.pairId)
-    : { ...yin, id: yin.pairedSpaceId!, name: `${yin.name}-B`, side: 'yang' as const, pairId: yin.id, pairedSpaceId: yin.id }
+    : spaces.value.find(space => space.id === yin.pairedSpaceId)
+      || { ...yin, id: yin.pairedSpaceId!, name: `${yin.name}-B`, side: 'yang' as const, pairId: yin.id, pairedSpaceId: yin.id }
   if (!target) return
   homeCollectionLoader.cancel()
   homeSearch.invalidate()
@@ -470,6 +478,7 @@ function togglePanelSide() {
   getList()
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
   sideSwitching.value = true
+  if (sideSwitchTimer) clearTimeout(sideSwitchTimer)
   sideSwitchTimer = setTimeout(() => {
     sideSwitching.value = false
     sideSwitchTimer = undefined
@@ -772,6 +781,7 @@ function getDropdownMenuOptions() {
 }
 
 async function loadHomeData(refresh = false) {
+  const bootstrapGeneration = homeTransitionGeneration
   if (!refresh) homeReady.value = false
   if (panelState.panelConfig.logoText)
     setTitle(panelState.panelConfig.logoText)
@@ -793,10 +803,14 @@ async function loadHomeData(refresh = false) {
     monitorResultRefreshInterval.value = result.monitor.data.refresh_interval
   }
   if (result.spaces?.data?.length) {
+    const userChangedSpace = bootstrapGeneration !== homeTransitionGeneration
     const previousSpaceId = activeSpace.value?.id
     spaces.value = sortSpaces(result.spaces.data, authStore.userInfo?.id)
     writeSpacesCache(spaces.value, authStore.userInfo?.id, sessionOnlyCache)
-    activeSpace.value = spaces.value.find(space => space.id === previousSpaceId) || spaces.value[0]
+    if (!userChangedSpace)
+      activeSpace.value = spaces.value.find(space => space.id === previousSpaceId) || spaces.value[0]
+    else if (activeSpace.value)
+      activeSpace.value = spaces.value.find(space => space.id === activeSpace.value?.id) || activeSpace.value
     void getList()
   }
   else if (result.spacesFailed) {
@@ -1116,7 +1130,7 @@ function handleThemeRuntimeFailure(error: Error) {
 </script>
 
 <template>
-  <div class="w-full h-full sun-main" :class="{ 'side-switching': sideSwitching, 'theme-defaults': useThemeColors }">
+  <div class="w-full h-full sun-main" :class="{ 'side-switching': sideSwitching, 'theme-defaults': useThemeColors }" :data-panel-side="activeSpace?.side || 'yin'">
     <CommandCenter
       :visible="commandCenterVisible"
       :query="commandCenterQuery"
@@ -1191,6 +1205,7 @@ function handleThemeRuntimeFailure(error: Error) {
       class="theme-runtime-monitor-layer"
       :class="{ 'theme-runtime-monitor-layer--info': panelState.panelConfig.iconStyle === PanelPanelConfigStyleEnum.info }"
       data-testid="theme-runtime-monitor"
+      :data-panel-side="activeSpace?.side || 'yin'"
     >
       <SystemMonitor
         :snapshot-controller="monitorSnapshotController"
@@ -1244,7 +1259,7 @@ function handleThemeRuntimeFailure(error: Error) {
         <!-- 头 -->
         <div class="home-header mx-[auto] w-[80%]">
           <div class="home-header-row flex mx-[auto] items-center justify-center text-white">
-            <div class="logo cursor-pointer" data-lcp="brand" @click="togglePanelSide">
+            <div class="logo cursor-pointer" data-lcp="brand" data-testid="core-side-toggle" role="button" tabindex="0" :aria-label="activeSpace?.side === 'yang' ? 'Switch to Yin-Panel' : 'Switch to Yang-Panel'" @click="togglePanelSide" @keydown.enter="togglePanelSide" @keydown.space.prevent="togglePanelSide">
               <span class="text-2xl md:text-6xl font-bold text-shadow">
                 {{ activeSpace?.side === 'yang' ? 'Yang-Panel' : 'Yin-Panel' }}
               </span>
@@ -1599,7 +1614,7 @@ function handleThemeRuntimeFailure(error: Error) {
 .offline-unavailable { position: fixed; z-index: 31; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(0, 0, 0, 0.48); }
 .theme-home-host { position: absolute; z-index: 1; inset: 0; overflow: hidden; pointer-events: auto; }
 .theme-runtime-monitor-layer { position: fixed; z-index: 5; top: 72px; left: var(--yin-pageGutter); right: var(--yin-pageGutter); max-height: 220px; overflow: auto; pointer-events: none; }
-.theme-runtime-monitor-layer > * { pointer-events: auto; }
+.theme-runtime-monitor-layer > * { pointer-events: none; }
 .theme-runtime-monitor-layer--info { max-height: 260px; }
 .theme-runtime-notice { display: flex; align-items: center; justify-content: space-between; gap: var(--yin-component-group-gap); margin: var(--yin-component-group-section-spacing) auto; padding: var(--yin-component-card-padding); border: var(--yin-component-button-border-width) solid var(--yin-border); border-radius: var(--yin-component-card-radius); background: var(--yin-surfaceElevated); color: var(--yin-text); }
 .theme-runtime-notice--error { border-color: var(--yin-danger); }

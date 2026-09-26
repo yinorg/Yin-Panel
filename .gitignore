@@ -53,6 +53,8 @@ coverage/
 /frontend/test-results/
 /blob-report/
 /.nyc_output/
+.frontend-design/
+
 
 # Go build and profiling output
 bin/

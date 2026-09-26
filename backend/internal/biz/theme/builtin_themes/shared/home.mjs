@@ -10,6 +10,7 @@ export default {
   setup(api) {
     let root
     let status
+    let sideSwitching = false
     const run = async action => {
       try { await action() }
       catch (error) { if (status) status.textContent = error?.message || 'Action failed' }
@@ -24,6 +25,23 @@ export default {
         node('h1', 'home-title', 'Home'),
         node('p', 'home-detail', snapshot.status === 'loading' ? 'Loading your items…' : `${(snapshot.items || []).length} items`),
       )
+      if ((snapshot.activeSpaceCapabilities || []).includes('space.toggleSide')) {
+        const side = snapshot.activeSpaceSide === 'yang' ? 'Yin' : 'Yang'
+        const toggle = node('button', 'side-toggle', `Switch to ${side}-Panel`)
+        toggle.type = 'button'
+        toggle.dataset.testid = 'theme-side-toggle'
+        toggle.setAttribute('aria-label', `Switch to ${side}-Panel`)
+        toggle.disabled = sideSwitching
+        toggle.addEventListener('click', async () => {
+          if (sideSwitching) return
+          sideSwitching = true
+          toggle.disabled = true
+          try { await api.commands.execute('space.toggleSide') }
+          catch (error) { if (status) status.textContent = error?.message || 'Unable to switch panel' }
+          finally { sideSwitching = false }
+        })
+        identity.append(toggle)
+      }
       header.append(identity)
       const spaces = node('nav', 'home-spaces')
       spaces.setAttribute('aria-label', 'Spaces')

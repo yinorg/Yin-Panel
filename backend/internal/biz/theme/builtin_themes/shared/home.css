@@ -6,6 +6,10 @@ button { font: inherit; color: inherit; }
 .home-eyebrow { margin: 0 0 8px; color: var(--yin-primary); font-size: 11px; font-weight: 700; letter-spacing: .12em; }
 .home-title { margin: 0; font-size: 32px; line-height: 1.1; }
 .home-detail { margin: 8px 0 0; color: var(--yin-textMuted); }
+.side-toggle { margin-top: 14px; border: 1px solid var(--yin-border); border-radius: var(--yin-radiusControl, 8px); background: var(--yin-surface); padding: 9px 13px; cursor: pointer; }
+.side-toggle:hover { border-color: var(--yin-primary); color: var(--yin-primary); }
+.side-toggle:disabled { cursor: wait; opacity: .6; }
+.side-toggle:focus-visible { outline: 3px solid var(--yin-focusRing, var(--yin-primary)); outline-offset: 3px; }
 .home-spaces { display: flex; gap: 8px; flex-wrap: wrap; }
 .space-button { border: 1px solid var(--yin-border); border-radius: var(--yin-radiusControl, 8px); background: var(--yin-surface); padding: 8px 12px; cursor: pointer; }
 .space-button.is-active { border-color: var(--yin-primary); box-shadow: 0 0 0 1px var(--yin-primary); color: var(--yin-primary); }

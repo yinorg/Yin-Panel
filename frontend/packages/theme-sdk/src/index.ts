@@ -80,6 +80,9 @@ export interface ThemeHomeSnapshot {
   error?: { code: string; message: string }
   spaces: readonly ThemeSpace[]
   activeSpaceId?: string
+  activeSpaceSide?: 'yin' | 'yang'
+  activeSpacePairedId?: string
+  activeSpaceCapabilities?: readonly string[]
   groups: readonly ThemeGroup[]
   items: readonly ThemeItem[]
 }
@@ -218,11 +221,22 @@ export function createThemeApiClient(host: ThemeApiClientHost) {
   let lastEventSequence = 0
   const listeners = new Map<string, Set<(event: ThemeEventEnvelope) => void>>()
 
+  function createRequestId() {
+    const webCrypto = typeof globalThis !== 'undefined' ? globalThis.crypto : undefined
+    if (typeof webCrypto?.randomUUID === 'function') return webCrypto.randomUUID()
+    if (typeof webCrypto?.getRandomValues === 'function') {
+      const bytes = new Uint8Array(16)
+      webCrypto.getRandomValues(bytes)
+      return [...bytes].map(value => value.toString(16).padStart(2, '0')).join('')
+    }
+    return `${Date.now()}-${Math.random().toString(36).slice(2)}`
+  }
+
   function request(method: ThemeApiRequest['method'], payload?: Record<string, unknown>) {
     return host.request({
       protocol: 'yin-theme-api',
       version: 1,
-      requestId: crypto.randomUUID(),
+      requestId: createRequestId(),
       contextVersion: snapshot.version,
       method,
       payload,
