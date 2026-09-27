@@ -717,6 +717,12 @@ func builtinPackagesV2() []*PackageV2 {
 	for _, palette := range palettes {
 		docs := map[string]json.RawMessage{"light": builtinDTCGDocumentV2(palette.light, palette), "dark": builtinDTCGDocumentV2(palette.dark, palette)}
 		files := builtinHomeResourcesV2(palette.id)
+		version := "2.3.1"
+		requiredPermissions := []PermissionV2{{Name: "spaces.read"}, {Name: "groups.read"}, {Name: "items.read"}}
+		if palette.id == "org.yin.default" {
+			version = "2.3.2"
+			requiredPermissions = append(requiredPermissions, PermissionV2{Name: "items.write"}, PermissionV2{Name: "groups.write"})
+		}
 		resources := make([]ResourceV2, 0, len(files))
 		for name, asset := range files {
 			sum := sha256.Sum256(asset.Content)
@@ -724,10 +730,10 @@ func builtinPackagesV2() []*PackageV2 {
 		}
 		sort.Slice(resources, func(i, j int) bool { return resources[i].Path < resources[j].Path })
 		manifest := PackageManifestV2{
-			Format: "yin-theme", FormatVersion: PackageFormatVersionV2, ID: palette.id, Name: palette.name, Version: "2.3.1", ThemeAPI: "^1.0.0", Core: ">=0.4.0", Author: "Yin", License: "AGPL-3.0",
+			Format: "yin-theme", FormatVersion: PackageFormatVersionV2, ID: palette.id, Name: palette.name, Version: version, ThemeAPI: "^1.0.0", Core: ">=0.4.0", Author: "Yin", License: "AGPL-3.0",
 			Tokens: TokenSetV2{Format: "DTCG", Version: DTCGVersion, Docs: map[string]string{"light": "tokens/light.json", "dark": "tokens/dark.json"}}, DefaultScheme: "light",
 			Entrypoints: EntrypointsV2{Script: "views/home.mjs", Styles: []string{"styles/home.css"}}, Runtime: RuntimeV2{SupportedModes: []string{"sandbox"}},
-			Contributes: ContributionsV2{Views: []string{"home"}}, Permissions: PermissionsV2{Required: []PermissionV2{{Name: "spaces.read"}, {Name: "groups.read"}, {Name: "items.read"}}}, Resources: resources,
+			Contributes: ContributionsV2{Views: []string{"home"}}, Permissions: PermissionsV2{Required: requiredPermissions}, Resources: resources,
 		}
 		manifestJSON, _ := json.Marshal(manifest)
 		revisionFiles := resourceBytesV2(files)

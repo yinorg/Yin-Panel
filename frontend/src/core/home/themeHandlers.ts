@@ -1,5 +1,7 @@
 import type { ThemeApiHandlers } from '../../theme/api/dispatcher'
 import type { ThemeCommand, ThemeGroup, ThemeItem, ThemePage, ThemeSearchPage, ThemeSpace } from '../../theme/api/v1'
+// @ts-expect-error Node's strip-types runner requires an explicit source extension.
+import { toThemeItemIcon } from './iconifyResource.ts'
 
 interface CoreSpace {
   id: number
@@ -23,6 +25,7 @@ export interface HomeThemeActionBindings {
   getSpaces: () => readonly CoreSpace[]
   getGroups: () => readonly CoreGroup[]
   getActiveSpaceId: () => number | undefined
+  canWriteGroups?: () => boolean
   selectSpace: (spaceId: number) => Promise<unknown> | unknown
   openItem: (item: CoreItem) => Promise<unknown> | unknown
   openEditor: (input: { item?: CoreItem; groupId?: number }) => Promise<unknown> | unknown
@@ -40,6 +43,11 @@ export interface HomeThemeActionBindings {
   searchItems: (query: string) => Promise<readonly Panel.ItemInfo[]> | readonly Panel.ItemInfo[]
   getMonitorSnapshot: () => Promise<unknown> | unknown
   submitSearch: (query: string) => Promise<unknown> | unknown
+  getSearchConfiguration?: () => {
+    engines: readonly { id: string }[]
+    currentEngineId?: string
+  }
+  submitSearchWithEngine?: (query: string, engineId: string) => Promise<unknown> | unknown
   navigate: (destination: { view: string; spaceId?: string }) => Promise<unknown> | unknown
   getSettings: () => Promise<Record<string, unknown>> | Record<string, unknown>
   patchSettings: (value: Record<string, unknown>) => Promise<unknown> | unknown
@@ -65,13 +73,7 @@ export function createHomeThemeHandlers(bindings: HomeThemeActionBindings): Them
       groupId: String(item.itemIconGroupId),
       title: item.title,
       description: item.description,
-      icon: item.icon ? {
-        itemType: item.icon.itemType,
-        src: item.icon.src,
-        fileName: item.icon.fileName,
-        text: item.icon.text,
-        backgroundColor: item.icon.backgroundColor,
-      } : undefined,
+      icon: toThemeItemIcon(item.icon),
       sort: item.sort ?? 0,
       capabilities: ['item.open'],
     }
@@ -141,7 +143,22 @@ export function createHomeThemeHandlers(bindings: HomeThemeActionBindings): Them
             throw apiError('INVALID_ARGUMENT', 'Group order must contain every sibling in the active Space exactly once')
           return bindings.reorderGroups(parentId, groupIds)
         }
-        case 'search.submit': return bindings.submitSearch(typeof payload.query === 'string' ? payload.query : '')
+        case 'search.submit': {
+          const query = typeof payload.query === 'string' ? payload.query : ''
+          const action = payload.action === undefined ? 'filter' : payload.action
+          if (action === 'filter') return bindings.submitSearch(query)
+          if (action === 'clear') return bindings.submitSearch('')
+          if (action === 'engine') {
+            const engineId = typeof payload.engineId === 'string' ? payload.engineId : ''
+            const configuration = bindings.getSearchConfiguration?.()
+            if (!configuration?.engines.some(engine => engine.id === engineId))
+              throw apiError('INVALID_ARGUMENT', 'Search engine is not available in the active Space')
+            if (!bindings.submitSearchWithEngine)
+              throw apiError('UNSUPPORTED_CAPABILITY', 'External search submission is not available in this adapter')
+            return bindings.submitSearchWithEngine(query, engineId)
+          }
+          throw apiError('INVALID_ARGUMENT', 'Unsupported search action')
+        }
         case 'data.refresh': return bindings.refresh()
         case 'editor.open': {
           const itemId = payload.itemId
@@ -192,6 +209,7 @@ export function createHomeThemeHandlers(bindings: HomeThemeActionBindings): Them
           title: group.title || '',
           icon: group.icon,
           itemIds: (group.items || []).flatMap(item => Number.isSafeInteger(Number(item.id)) ? [String(item.id)] : []),
+          capabilities: bindings.canWriteGroups?.() ? ['groups.write'] : [],
         }]
       })
       return page(values, options)

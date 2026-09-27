@@ -2,7 +2,7 @@ import { get, post } from '../../utils/request'
 import { t } from '../../locales'
 import type { SelectOption } from 'naive-ui'
 
-export interface Space { id: number; type: 'personal' | 'team' | 'shared'; name: string; ownerUserId: number; pairId?: number; side?: 'yin' | 'yang'; pairedSpaceId?: number; publicEnabled?: boolean; publicId?: string; publicMode?: 'direct' | 'code' }
+export interface Space { id: number; type: 'personal' | 'team' | 'shared'; name: string; ownerUserId: number; canEdit?: boolean; pairId?: number; side?: 'yin' | 'yang'; pairedSpaceId?: number; publicEnabled?: boolean; publicId?: string; publicMode?: 'direct' | 'code' }
 export interface SpaceOption extends SelectOption { label: string; value: number }
 export interface SearchEngine { iconSrc: string; title: string; url: string }
 export interface SpaceSearchConfig { currentSearchEngine: SearchEngine }

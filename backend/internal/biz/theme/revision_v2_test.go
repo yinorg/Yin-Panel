@@ -262,6 +262,12 @@ func TestBuiltinPackagesV2AreCompleteDTCGAndRepeatable(t *testing.T) {
 	if len(packages) != 4 {
 		t.Fatalf("expected Yin/Glass/Minimal/Cyber, got %d", len(packages))
 	}
+	expectedPermissions := map[string][]string{
+		"org.yin.default": {"spaces.read", "groups.read", "items.read", "items.write", "groups.write"},
+		"org.yin.glass":   {"spaces.read", "groups.read", "items.read"},
+		"org.yin.minimal": {"spaces.read", "groups.read", "items.read"},
+		"org.yin.cyber":   {"spaces.read", "groups.read", "items.read"},
+	}
 	for _, summary := range packages {
 		pkg, err := PackageRevisionPublicV2(db, summary.Revision)
 		if err != nil {
@@ -285,13 +291,21 @@ func TestBuiltinPackagesV2AreCompleteDTCGAndRepeatable(t *testing.T) {
 			}
 		}
 		permissions, builtin, err := ImplicitBuiltinPermissionsV2(db, summary.Revision)
-		if err != nil || !builtin || len(permissions) != 3 {
-			t.Errorf("%s built-in read permissions = %v, builtin=%v, err=%v", summary.ID, permissions, builtin, err)
+		wantPermissions, knownBuiltin := expectedPermissions[summary.ID]
+		if err != nil || !builtin || !knownBuiltin || strings.Join(permissions, ",") != strings.Join(wantPermissions, ",") {
+			t.Errorf("%s implicit permissions = %v, want %v, builtin=%v, err=%v", summary.ID, permissions, wantPermissions, builtin, err)
+		}
+		wantVersion := "2.3.1"
+		if summary.ID == "org.yin.default" {
+			wantVersion = "2.3.2"
+		}
+		if pkg.Manifest.Version != wantVersion {
+			t.Errorf("%s builtin version = %q, want %q", summary.ID, pkg.Manifest.Version, wantVersion)
 		}
 		switch summary.ID {
 		case "org.yin.default":
-			if !strings.Contains(string(mustPackageAsset(t, db, summary.Revision, "styles/home.css")), ".home-header") {
-				t.Error("Yin home styling is missing its layout rules")
+			if !strings.Contains(string(mustPackageAsset(t, db, summary.Revision, "styles/home.css")), ".yin-masthead") {
+				t.Error("Yin home styling is missing its Yin-only layout rules")
 			}
 		case "org.yin.glass":
 			if !strings.Contains(string(mustPackageAsset(t, db, summary.Revision, "styles/home.css")), "backdrop-filter") {
@@ -322,6 +336,12 @@ func TestBuiltinHomeAssetsLoadFromPackagedThemeSources(t *testing.T) {
 		if !strings.Contains(string(resources["views/home.mjs"].Content), "apiVersion: '1.0.0'") {
 			t.Errorf("%s does not load a Theme API v1 source view", id)
 		}
+		if id == "org.yin.default" && !strings.Contains(string(resources["views/home.mjs"].Content), "yin-theme-root") {
+			t.Error("default Yin does not load its independent home view")
+		}
+		if id != "org.yin.default" && strings.Contains(string(resources["views/home.mjs"].Content), "yin-theme-root") {
+			t.Errorf("%s unexpectedly loads the independent Yin home view", id)
+		}
 		styles[id] = string(resources["styles/home.css"].Content)
 	}
 	if styles[ids[0]] == styles[ids[1]] || styles[ids[0]] == styles[ids[2]] || styles[ids[0]] == styles[ids[3]] {
@@ -334,6 +354,44 @@ func TestBuiltinHomeAssetsLoadFromPackagedThemeSources(t *testing.T) {
 	} {
 		if !strings.Contains(styles[id], marker) {
 			t.Errorf("%s source is missing its visual signature %q", id, marker)
+		}
+	}
+}
+
+func TestBuiltinHomeResourceHashesOnlyChangeForDefaultYin(t *testing.T) {
+	expected := map[string]map[string]string{
+		"org.yin.default": {
+			"views/home.mjs":  "255340692690a192a6c378eec6f05a6a15e2dbb30f1f6b124b81fb5e682d9b24",
+			"styles/home.css": "043ac9738753b4f4caec851f16edf576f28b5e563c992415106d9fdfdd83a15b",
+		},
+		"org.yin.glass": {
+			"views/home.mjs":  "9b05d957b081408a2898c2c318327bda62f974fa34c4e7023b4745647d5967cb",
+			"styles/home.css": "98e5b63ca947731feb830ece304afc3ede49dfdefd0e0fb92d4afd4d6007c76b",
+		},
+		"org.yin.minimal": {
+			"views/home.mjs":  "9b05d957b081408a2898c2c318327bda62f974fa34c4e7023b4745647d5967cb",
+			"styles/home.css": "6a5799840b0045e4b50991219578b53b63e67273e97bfaa99cd11f3556b99ebb",
+		},
+		"org.yin.cyber": {
+			"views/home.mjs":  "9b05d957b081408a2898c2c318327bda62f974fa34c4e7023b4745647d5967cb",
+			"styles/home.css": "e462b98fb35f7c135747203b9553a077cfe7d38c2f82ea84ab8b6291c7695165",
+		},
+	}
+	for id, want := range expected {
+		resources := builtinHomeResourcesV2(id)
+		if len(resources) != len(want) {
+			t.Errorf("%s resource count = %d, want %d", id, len(resources), len(want))
+		}
+		for path, wantHash := range want {
+			resource, ok := resources[path]
+			if !ok {
+				t.Errorf("%s is missing resource %s", id, path)
+				continue
+			}
+			got := sha256.Sum256(resource.Content)
+			if digest := fmt.Sprintf("%x", got); digest != wantHash {
+				t.Errorf("%s %s hash = %s, want %s", id, path, digest, wantHash)
+			}
 		}
 	}
 }
@@ -383,8 +441,11 @@ func TestEnsureBuiltinV2UpgradesOnlyActivationForSelectedBuiltin(t *testing.T) {
 		t.Fatal(err)
 	}
 	latest, err := LatestPackageRevisionV2(db, "org.yin.default")
-	if err != nil || latest.Version != "2.3.1" || activation.ActiveRevisionID != latest.ID {
+	if err != nil || latest.Version != "2.3.2" || activation.ActiveRevisionID != latest.ID {
 		t.Fatalf("selected builtin activation = %+v, latest=%s, err=%v", activation, latest.ID, err)
+	}
+	if latest.ID == old.Revision {
+		t.Fatal("Yin permission update did not create a new immutable revision")
 	}
 	activation, err = GetActivationV2(db, "user:13")
 	if err != nil || activation.ActiveRevisionID != community.Revision {

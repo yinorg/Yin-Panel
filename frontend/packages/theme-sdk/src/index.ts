@@ -34,6 +34,8 @@ export type ThemeCommand =
   | 'commandCenter.open'
   | 'ui.openCoreSurface'
 
+export type ThemeSearchSubmitAction = 'filter' | 'clear' | 'engine'
+
 export type ThemeCollectionStatus = 'idle' | 'loading' | 'ready' | 'empty' | 'error' | 'stale'
 
 export interface ThemeEnvironment {
@@ -62,6 +64,7 @@ export interface ThemeGroup {
   title: string
   icon?: string
   itemIds: readonly string[]
+  capabilities?: readonly string[]
 }
 
 export interface ThemeItem {
@@ -69,9 +72,41 @@ export interface ThemeItem {
   groupId: string
   title: string
   description?: string
-  icon?: unknown
+  icon?: ThemeItemIcon
   sort: number
   capabilities: readonly string[]
+}
+
+export type ThemeItemIcon =
+  | { itemType: 1; text?: string; backgroundColor?: string }
+  | { itemType: 2; src?: string; fileName?: string; backgroundColor?: string }
+  | { itemType: 3; src: string; backgroundColor?: string }
+  | { itemType: 4; backgroundColor?: string }
+
+export interface ThemeSearchEngine {
+  id: string
+  title: string
+  iconSrc: string
+}
+
+export interface ThemeHomePresentation {
+  layout: 'standard' | 'directory'
+  iconStyle: 'icon' | 'info'
+  iconTextColor?: string
+  iconTextInfoHideDescription: boolean
+  iconTextIconHideTitle: boolean
+  logoText: string
+  logoImageSrc?: string
+  clock: { visible: boolean; showSeconds: boolean; color?: string }
+  search: {
+    visible: boolean
+    itemFilterEnabled: boolean
+    engines: readonly ThemeSearchEngine[]
+    currentEngineId?: string
+  }
+  content: { marginTopPercent: number; marginBottomPercent: number; maxWidth: number; maxWidthUnit: 'px' | '%' | 'rem' | 'vw'; marginX: number }
+  footerHtml: string
+  monitor: { visible: boolean; showTitle: boolean; reservedHeight?: number }
 }
 
 export interface ThemeHomeSnapshot {
@@ -85,6 +120,10 @@ export interface ThemeHomeSnapshot {
   activeSpaceCapabilities?: readonly string[]
   groups: readonly ThemeGroup[]
   items: readonly ThemeItem[]
+  /** Core write capabilities granted for this active Space and Theme. */
+  capabilities?: readonly string[]
+  /** Optional for compatibility with snapshots produced before presentation was added. */
+  presentation?: ThemeHomePresentation
 }
 
 export interface ThemeSearchPage {

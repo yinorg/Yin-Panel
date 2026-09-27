@@ -9,6 +9,7 @@ import { createHomeBootstrap } from '../../src/core/home/bootstrap.ts'
 import { createHomeSpaceController } from '../../src/core/home/spaceController.ts'
 import { createHomeMutationService } from '../../src/core/home/mutations.ts'
 import { createThemeHomeSnapshot } from '../../src/core/home/themeSnapshot.ts'
+import { createIconifyResourceResolver, isValidIconifyIdentifier } from '../../src/core/home/iconifyResource.ts'
 import { createHomeSearchService } from '../../src/core/home/search.ts'
 import { createHomeCommandSearch, filterHomeCommandItems, filterHomeCommands, findHomeCommandItem, getInitialHomeCommandSelection, isHomeCommandWrite, moveHomeCommandSelection, parseHomeCommand } from '../../src/core/home/commandCenter.ts'
 import { buildHomeGroupTree, getDirectoryGroups, getHomeGroupRoots, getInitiallyCollapsedGroups, isHomeGroupHidden, resolveActiveDirectoryId } from '../../src/core/home/groupTree.ts'
@@ -376,11 +377,176 @@ test('Core Home snapshot exposes stable DTO IDs and omits internal item URLs', (
   })
 
   assert.deepEqual(snapshot.spaces[0], { id: '10', name: 'Work', side: 'yin', pairedSpaceId: '11', capabilities: ['space.select'] })
-  assert.deepEqual(snapshot.groups[0], { id: '20', spaceId: '10', parentId: undefined, title: 'Tools', icon: undefined, itemIds: ['30'] })
+  assert.deepEqual(snapshot.groups[0], { id: '20', spaceId: '10', parentId: undefined, title: 'Tools', icon: undefined, itemIds: ['30'], capabilities: [] })
   assert.equal(snapshot.items[0].id, '30')
   assert.deepEqual(snapshot.items[0].capabilities, ['item.open'])
   assert.equal('url' in snapshot.items[0], false)
 })
+
+test('Core Home snapshot keeps Item and Group write capabilities independent and read-only by default', () => {
+  const input = {
+    version: 1,
+    status: 'ready',
+    spaces: [],
+    activeSpaceId: 4,
+    groups: [{ id: 8, title: 'Tools', items: [{ id: 12, title: 'Admin' }] }],
+  }
+
+  const itemOnly = createThemeHomeSnapshot({ ...input, activeSpaceCanEdit: true, canWrite: true, canWriteGroups: false })
+  assert.deepEqual(itemOnly.capabilities, ['items.write'])
+  assert.deepEqual(itemOnly.items[0].capabilities, ['item.open', 'item.update', 'item.delete'])
+  assert.deepEqual(itemOnly.groups[0].capabilities, [])
+
+  const groupOnly = createThemeHomeSnapshot({ ...input, activeSpaceCanEdit: true, canWrite: false, canWriteGroups: true })
+  assert.deepEqual(groupOnly.capabilities, ['groups.write'])
+  assert.deepEqual(groupOnly.items[0].capabilities, ['item.open'])
+  assert.deepEqual(groupOnly.groups[0].capabilities, ['groups.write'])
+
+  const readOnly = createThemeHomeSnapshot({ ...input, activeSpaceCanEdit: false, canWrite: true, canWriteGroups: true })
+  assert.equal(readOnly.capabilities, undefined)
+  assert.deepEqual(readOnly.items[0].capabilities, ['item.open'])
+  assert.deepEqual(readOnly.groups[0].capabilities, [])
+})
+
+test('Core Home presentation maps panel configuration, search engines, and safe numeric defaults', () => {
+  const panelConfig = {
+    homeLayout: 'directory', iconStyle: 0, iconTextColor: '#abc', iconTextInfoHideDescription: true,
+    iconTextIconHideTitle: true, logoText: 'Workspace', logoImageSrc: '/logo.svg', clockShowSecond: false,
+    clockColor: '#123456', searchBoxShow: false, searchBoxSearchIcon: false,
+    marginTop: 18, marginBottom: 27, maxWidth: 88, maxWidthUnit: '%', marginX: 24,
+    footerHtml: '<strong>Footer</strong>', systemMonitorShow: true, systemMonitorShowTitle: false,
+  }
+  const engine = { id: 'bing', title: 'Bing', iconSrc: '/bing.svg', url: 'https://search.example/?q=%s' }
+  const snapshot = createThemeHomeSnapshot({
+    version: 4, status: 'ready', spaces: [], groups: [], canWrite: false,
+    monitorReservedHeight: 184,
+    presentation: panelConfig,
+    searchConfiguration: { engines: [engine], currentSearchEngine: engine },
+  })
+  assert.deepEqual(snapshot.presentation, {
+    layout: 'directory', iconStyle: 'info', iconTextColor: '#abc', iconTextInfoHideDescription: true,
+    iconTextIconHideTitle: true, logoText: 'Workspace', logoImageSrc: '/logo.svg',
+    clock: { visible: true, showSeconds: false, color: '#123456' },
+    search: { visible: false, itemFilterEnabled: false, engines: [{ id: 'bing', title: 'Bing', iconSrc: '/bing.svg' }], currentEngineId: 'bing' },
+    content: { marginTopPercent: 18, marginBottomPercent: 27, maxWidth: 88, maxWidthUnit: '%', marginX: 24 },
+    footerHtml: '<strong>Footer</strong>', monitor: { visible: true, showTitle: false, reservedHeight: 184 },
+  })
+  assert.deepEqual(panelConfig, {
+    homeLayout: 'directory', iconStyle: 0, iconTextColor: '#abc', iconTextInfoHideDescription: true,
+    iconTextIconHideTitle: true, logoText: 'Workspace', logoImageSrc: '/logo.svg', clockShowSecond: false,
+    clockColor: '#123456', searchBoxShow: false, searchBoxSearchIcon: false,
+    marginTop: 18, marginBottom: 27, maxWidth: 88, maxWidthUnit: '%', marginX: 24,
+    footerHtml: '<strong>Footer</strong>', systemMonitorShow: true, systemMonitorShowTitle: false,
+  })
+
+  const defaults = createThemeHomeSnapshot({ version: 5, status: 'ready', spaces: [], groups: [], canWrite: false, presentation: { marginTop: NaN, marginBottom: 140, maxWidth: -2, maxWidthUnit: 'invalid', marginX: Infinity } }).presentation
+  assert.equal(defaults.layout, 'standard')
+  assert.equal(defaults.iconStyle, 'icon')
+  assert.deepEqual(defaults.content, { marginTopPercent: 10, marginBottomPercent: 10, maxWidth: 1200, maxWidthUnit: 'px', marginX: 5 })
+})
+
+test('Core Home snapshot preserves text, image, and Iconify item icon representations', () => {
+  const safeIconUri = `data:image/svg+xml;charset=utf-8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M0 0"/></svg>')}`
+  const snapshot = createThemeHomeSnapshot({
+    version: 1, status: 'ready', spaces: [], activeSpaceId: 1, canWrite: false,
+    groups: [{ id: 1, items: [
+      { id: 1, title: 'Text', icon: { itemType: 1, text: 'TX', backgroundColor: '#123456' } },
+      { id: 2, title: 'Image', icon: { itemType: 2, src: '/icons/image.png', fileName: 'image.png' } },
+      { id: 3, title: 'Iconify unresolved', icon: { itemType: 3, text: 'mdi:home' } },
+      { id: 4, title: 'Iconify resolved', icon: { itemType: 3, text: 'mdi:home', resolvedSrc: safeIconUri, backgroundColor: '#654321' } },
+    ] }],
+  })
+  assert.deepEqual(snapshot.items.map(item => item.icon), [
+    { itemType: 1, text: 'TX', backgroundColor: '#123456' },
+    { itemType: 2, src: '/icons/image.png', fileName: 'image.png', backgroundColor: undefined },
+    { itemType: 4, backgroundColor: undefined },
+    { itemType: 3, src: safeIconUri, backgroundColor: '#654321' },
+  ])
+  assert.equal(JSON.stringify(snapshot).includes('mdi:home'), false)
+})
+
+test('Core Iconify resource resolver validates identifiers, sanitizes SVG, caches resources, and ignores stale generations', async () => {
+  assert.equal(isValidIconifyIdentifier('mdi:home-outline'), true)
+  for (const value of ['https://attacker.test/icon.svg', '../path:home', 'mdi:<script>', 'mdi:home?x=1', 'mdi:Home'])
+    assert.equal(isValidIconifyIdentifier(value), false)
+
+  const calls = []
+  const safeTree = makeSvgDocument({
+    name: 'svg', attrs: { xmlns: 'http://www.w3.org/2000/svg', width: '1em', height: '1em', viewBox: '0 0 24 24' },
+    children: [{ name: 'path', attrs: { d: 'M0 0L24 24', fill: 'currentColor' } }],
+  })
+  const resolver = createIconifyResourceResolver({
+    fetch: async (input, init) => {
+      calls.push([input, init])
+      return { ok: true, headers: { get: () => 'image/svg+xml; charset=utf-8' }, text: async () => '<svg>ignored by parser</svg>' }
+    },
+    parseSvg: () => safeTree,
+  })
+  const generation = resolver.beginGeneration()
+  const [resource, duplicate] = await Promise.all([
+    resolver.resolve('mdi:home-outline', generation),
+    resolver.resolve('mdi:home-outline', generation),
+  ])
+  assert.equal(resource, duplicate)
+  assert.match(resource, /^data:image\/svg\+xml;charset=utf-8,/)
+  assert.match(decodeURIComponent(resource), /width="1em" height="1em"/)
+  assert.match(decodeURIComponent(resource), /<path d="M0 0L24 24" fill="currentColor"><\/path>/)
+  assert.doesNotMatch(resource, /api\.iconify\.design/)
+  assert.equal(calls.length, 1)
+  assert.equal(calls[0][0], 'https://api.iconify.design/mdi/home-outline.svg')
+  assert.equal(calls[0][1].credentials, 'omit')
+  assert.equal(calls[0][1].redirect, 'error')
+
+  const nextGeneration = resolver.beginGeneration()
+  assert.equal(await resolver.resolve('mdi:home-outline', nextGeneration), resource)
+  assert.equal(calls.length, 1)
+
+  const malicious = createIconifyResourceResolver({
+    fetch: async () => ({ ok: true, headers: { get: () => 'image/svg+xml' }, text: async () => '<svg/>' }),
+    parseSvg: () => makeSvgDocument({ name: 'svg', attrs: {}, children: [{ name: 'script', attrs: {}, children: [] }] }),
+  })
+  const maliciousGeneration = malicious.beginGeneration()
+  assert.equal(await malicious.resolve('mdi:home', maliciousGeneration), undefined)
+
+  const attributeInjection = createIconifyResourceResolver({
+    fetch: async () => ({ ok: true, headers: { get: () => 'image/svg+xml' }, text: async () => '<svg/>' }),
+    parseSvg: () => makeSvgDocument({ name: 'svg', attrs: { width: 'expression(alert(1))' }, children: [{ name: 'path', attrs: { d: 'M0 0', onload: 'alert(1)' }, children: [] }] }),
+  })
+  const injectionGeneration = attributeInjection.beginGeneration()
+  assert.equal(await attributeInjection.resolve('mdi:alert', injectionGeneration), undefined)
+})
+
+test('Core Iconify resource resolver aborts previous Space work and never publishes late results', async () => {
+  let finishRequest
+  let receivedSignal
+  const resolver = createIconifyResourceResolver({
+    fetch: (_input, init) => {
+      receivedSignal = init.signal
+      return new Promise(resolve => { finishRequest = resolve })
+    },
+    parseSvg: () => makeSvgDocument({ name: 'svg', attrs: {}, children: [{ name: 'path', attrs: { d: 'M0 0' }, children: [] }] }),
+  })
+  const firstGeneration = resolver.beginGeneration()
+  const stale = resolver.resolve('mdi:home', firstGeneration)
+  await Promise.resolve()
+  const currentGeneration = resolver.beginGeneration()
+  assert.equal(receivedSignal.aborted, true)
+  finishRequest({ ok: true, headers: { get: () => 'image/svg+xml' }, text: async () => '<svg/>' })
+  assert.equal(await stale, undefined)
+  assert.equal(resolver.isCurrentGeneration(currentGeneration), true)
+  assert.equal(await resolver.resolve('mdi:home', firstGeneration), undefined)
+})
+
+function makeSvgDocument({ name, attrs, children = [] }) {
+  const makeElement = element => ({
+    nodeType: 1,
+    localName: element.name,
+    namespaceURI: 'http://www.w3.org/2000/svg',
+    attributes: Object.entries(element.attrs).map(([attrName, value]) => ({ name: attrName, value })),
+    childNodes: (element.children || []).map(makeElement),
+  })
+  return { documentElement: makeElement({ name, attrs, children }), doctype: null }
+}
 
 test('home collection loads groups with bounded concurrency and retains partial failure state', async () => {
   let active = 0
@@ -534,7 +700,7 @@ test('ThemeHost Core bridge routes paginated search requests through the Theme A
   assert.equal(spaces.total, 1)
   assert.equal(spaces.items[0].pairedSpaceId, '11')
   const groups = await executeHomeThemeRequest(handlers, { method: 'groups.list' })
-  assert.deepEqual(groups.items[0], { id: '5', spaceId: '10', parentId: undefined, title: 'Bookmarks', icon: undefined, itemIds: ['1', '2'] })
+  assert.deepEqual(groups.items[0], { id: '5', spaceId: '10', parentId: undefined, title: 'Bookmarks', icon: undefined, itemIds: ['1', '2'], capabilities: [] })
   const itemPage = await executeHomeThemeRequest(handlers, { method: 'items.list', groupId: '5', limit: 1 })
   assert.equal(itemPage.total, 2)
   assert.equal(itemPage.items[0].id, '1')
@@ -551,6 +717,38 @@ test('ThemeHost Core bridge routes paginated search requests through the Theme A
   assert.equal(largerPage.total, 2)
   await assert.rejects(
     executeHomeThemeRequest(handlers, { method: 'search.query', query: 'Theme', limit: 201 }),
+    error => error.code === 'INVALID_ARGUMENT',
+  )
+})
+
+test('Theme search.submit filters, clears, and submits only an allowed Space search engine', async () => {
+  const submitted = []
+  const external = []
+  let activeEngines = [{ id: 'bing' }, { id: 'google' }]
+  const handlers = createHomeThemeHandlers({
+    getSpaces: () => [], getGroups: () => [], getActiveSpaceId: () => undefined,
+    selectSpace: () => {}, openItem: () => {}, openEditor: () => {}, createItem: () => {}, updateItem: () => {},
+    deleteItem: () => {}, reorderItems: () => {}, createGroup: () => {}, updateGroup: () => {}, deleteGroup: () => {}, reorderGroups: () => {},
+    openCommandCenter: () => {}, toggleSide: () => {}, refresh: () => {}, searchItems: () => [], getMonitorSnapshot: () => ({}),
+    submitSearch: query => submitted.push(query),
+    getSearchConfiguration: () => ({ engines: activeEngines, currentEngineId: activeEngines[0]?.id }),
+    submitSearchWithEngine: (query, engineId) => external.push([query, engineId]),
+    navigate: () => {}, getSettings: () => ({}), patchSettings: () => {},
+    getStorage: () => undefined, setStorage: () => {}, removeStorage: () => {},
+  })
+
+  await handlers.executeCommand('search.submit', { query: 'icon' })
+  await handlers.executeCommand('search.submit', { action: 'clear', query: 'ignored' })
+  await handlers.executeCommand('search.submit', { action: 'engine', query: 'bookmarks', engineId: 'google' })
+  assert.deepEqual(submitted, ['icon', ''])
+  assert.deepEqual(external, [['bookmarks', 'google']])
+  activeEngines = [{ id: 'duckduckgo' }]
+  await assert.rejects(
+    handlers.executeCommand('search.submit', { action: 'engine', query: 'bookmarks', engineId: 'google' }),
+    error => error.code === 'INVALID_ARGUMENT',
+  )
+  await assert.rejects(
+    handlers.executeCommand('search.submit', { action: 'invalid', query: 'bookmarks' }),
     error => error.code === 'INVALID_ARGUMENT',
   )
 })
@@ -610,6 +808,23 @@ test('Theme write commands stay inside the active Space and validate complete re
   await assert.rejects(handlers.executeCommand('editor.open', { groupId: '999' }), error => error.code === 'NOT_FOUND')
   await handlers.executeCommand('groups.reorder', { groupIds: ['7', '5'] })
   await assert.rejects(handlers.executeCommand('groups.reorder', { groupIds: ['5'] }), error => error.code === 'INVALID_ARGUMENT')
+})
+
+test('Theme groups.list exposes groups.write only when Core write access and the Yin grant are both active', async () => {
+  let canWriteGroups = false
+  const handlers = createHomeThemeHandlers({
+    getSpaces: () => [], getGroups: () => [{ id: 5, title: 'Bookmarks', items: [{ id: 1 }] }], getActiveSpaceId: () => 10,
+    canWriteGroups: () => canWriteGroups,
+    selectSpace: () => {}, openItem: () => {}, openEditor: () => {}, createItem: () => {}, updateItem: () => {},
+    deleteItem: () => {}, reorderItems: () => {}, createGroup: () => {}, updateGroup: () => {}, deleteGroup: () => {}, reorderGroups: () => {},
+    openCommandCenter: () => {}, toggleSide: () => {}, refresh: () => {}, searchItems: () => [], getMonitorSnapshot: () => ({}),
+    submitSearch: () => {}, navigate: () => {}, getSettings: () => ({}), patchSettings: () => {},
+    getStorage: () => undefined, setStorage: () => {}, removeStorage: () => {},
+  })
+
+  assert.deepEqual((await handlers.listGroups({ limit: 50 })).items[0].capabilities, [])
+  canWriteGroups = true
+  assert.deepEqual((await handlers.listGroups({ limit: 50 })).items[0].capabilities, ['groups.write'])
 })
 
 test('theme settings are revision scoped and oversized patches leave stored data unchanged', () => {

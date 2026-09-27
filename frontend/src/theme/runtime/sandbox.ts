@@ -54,6 +54,11 @@ const bootstrap = (apiClientSource: string) => `
         apiClient.emit(message.name, message.event);
         return;
       }
+      if (message.type === 'scroll.toTop') {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        document.scrollingElement?.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
       if (message.type === 'update' && message.snapshot && Number.isSafeInteger(message.snapshot.version)) {
         snapshot = message.snapshot;
         apiClient.updateSnapshot(snapshot);
@@ -166,6 +171,7 @@ export interface ThemeSandboxHandle {
   updateEnvironment: (environment: Omit<ThemeEnvironment, 'apiVersion'> & { assets: Record<string, string> }) => void
   updateTokens: (cssText: string) => void
   emit: (name: ThemeEventName, payload?: unknown) => void
+  scrollToTop: () => void
   dispose: () => Promise<void>
 }
 
@@ -306,6 +312,9 @@ export async function mountThemeSandbox(frame: HTMLIFrameElement, options: Theme
       if (!stopped) channel.port1.postMessage({ type: 'tokens.update', cssText })
     },
     emit: sendEvent,
+    scrollToTop() {
+      if (!stopped) channel.port1.postMessage({ type: 'scroll.toTop' })
+    },
     dispose() {
       if (stopped) return Promise.resolve()
       sendEvent('theme.disposing')

@@ -33,6 +33,7 @@ import { createHomeMutationService } from '@/core/home/mutations'
 import { createHomeSearchService } from '@/core/home/search'
 import { createHomeCommandSearch, filterHomeCommandItems, filterHomeCommands, findHomeCommandItem, getInitialHomeCommandSelection, isHomeCommandWrite, moveHomeCommandSelection, parseHomeCommand } from '@/core/home/commandCenter'
 import { buildHomeGroupTree, getDirectoryGroups, getHomeGroupRoots, getInitiallyCollapsedGroups, isHomeGroupHidden, resolveActiveDirectoryId } from '@/core/home/groupTree'
+import { createIconifyResourceResolver } from '@/core/home/iconifyResource'
 import { resolveItemOpenUrl } from '@/core/items/openPolicy'
 import { normalizeMonitorSnapshot } from '@/core/monitor/themeSnapshot'
 import { createMonitorSnapshotController } from '@/core/monitor/snapshotController'
@@ -109,6 +110,23 @@ const monitorSnapshotController = createMonitorSnapshotController<CoreMonitorSna
   fetchDisk: path => getDiskStateByPath<SystemMonitor.DiskInfo>(path),
   getInterval: async () => Math.max(250, (monitorResultRefreshInterval.value || 10) * 1000),
 })
+const themeMonitorLayerRef = ref<HTMLElement>()
+const themeMonitorReservedHeight = ref(0)
+const themeHostRef = ref<{ scrollToTop: () => void }>()
+let themeMonitorResizeObserver: ResizeObserver | undefined
+let themeMonitorMeasureFrame = 0
+function measureThemeMonitorReservation() {
+  if (themeMonitorMeasureFrame) cancelAnimationFrame(themeMonitorMeasureFrame)
+  themeMonitorMeasureFrame = requestAnimationFrame(() => {
+    themeMonitorMeasureFrame = 0
+    const element = themeMonitorLayerRef.value
+    const nextHeight = themeRuntimeActive.value && monitorEnabled.value && panelState.panelConfig.systemMonitorShow && element?.isConnected
+      ? Math.min(window.innerHeight, Math.max(0, Math.ceil(element.getBoundingClientRect().bottom)))
+      : 0
+    if (themeMonitorReservedHeight.value !== nextHeight)
+      themeMonitorReservedHeight.value = nextHeight
+  })
+}
 const isOnline = ref(typeof navigator === 'undefined' ? true : navigator.onLine)
 const runtimeViewport = ref({ width: window.innerWidth, height: window.innerHeight })
 const runtimeLanguage = ref(document.documentElement.lang || navigator.language)
@@ -132,6 +150,30 @@ const commandCenterQuery = ref('')
 const commandCenterSelectedIndex = ref(-1)
 const remoteCommandItems = ref<Panel.ItemInfo[]>([])
 const commandCenterSearchEngine = ref<SearchEngine>(searchEngineList[0])
+function getThemeSearchEngineId(engine: SearchEngine) {
+  const builtInIndex = searchEngineList.findIndex(candidate => candidate.url === engine.url)
+  return builtInIndex >= 0 ? `built-in-${builtInIndex}` : 'active-custom'
+}
+
+const themeSearchEngineConfiguration = computed(() => {
+  const engines = [...searchEngineList]
+  if (!engines.some(engine => getThemeSearchEngineId(engine) === getThemeSearchEngineId(commandCenterSearchEngine.value)))
+    engines.push(commandCenterSearchEngine.value)
+  return {
+    engines: engines.map(engine => ({
+      id: getThemeSearchEngineId(engine),
+      title: engine.title,
+      iconSrc: engine.iconSrc,
+      url: engine.url,
+    })),
+    currentSearchEngine: {
+      id: getThemeSearchEngineId(commandCenterSearchEngine.value),
+      title: commandCenterSearchEngine.value.title,
+      iconSrc: commandCenterSearchEngine.value.iconSrc,
+      url: commandCenterSearchEngine.value.url,
+    },
+  }
+})
 const groupCreateVisible = ref(false)
 const groupName = ref('')
 const creatingGroup = ref(false)
@@ -206,6 +248,45 @@ const themeGrantMatches = computed(() => {
 })
 const themeRuntimeActive = computed(() => homeReady.value && !themeSafeMode.value && themeHomeContribution.value && themeGrantMatches.value && !themeRuntimeFailed.value && !publicCode)
 const themeRuntimeNeedsConsent = computed(() => homeReady.value && !themeSafeMode.value && themeHomeContribution.value && !!authStore.token && !publicCode && !themeRuntimeGrantLoading.value && !themeGrantMatches.value)
+watch([themeRuntimeActive, monitorEnabled, () => panelState.panelConfig.systemMonitorShow, themeMonitorLayerRef], async ([runtimeActive, enabled, visible]) => {
+  themeMonitorResizeObserver?.disconnect()
+  themeMonitorResizeObserver = undefined
+  await nextTick()
+  if (!runtimeActive || !enabled || !visible) {
+    measureThemeMonitorReservation()
+    return
+  }
+  const element = themeMonitorLayerRef.value
+  if (!element) {
+    measureThemeMonitorReservation()
+    return
+  }
+  if (typeof ResizeObserver !== 'undefined') {
+    themeMonitorResizeObserver = new ResizeObserver(measureThemeMonitorReservation)
+    themeMonitorResizeObserver.observe(element)
+  }
+  measureThemeMonitorReservation()
+}, { flush: 'post', immediate: true })
+const iconifyResourceResolver = createIconifyResourceResolver()
+const resolvedThemeIconResources = ref<Record<string, string>>({})
+watch([themeRuntimeActive, () => [...new Set(items.value.flatMap(group => (group.items || [])
+  .filter(item => item.icon?.itemType === 3 && typeof item.icon.text === 'string')
+  .map(item => item.icon?.text || '')))].sort().join('|')], ([runtimeActive, iconIdentifiers]) => {
+  const generation = iconifyResourceResolver.beginGeneration()
+  if (!runtimeActive) {
+    resolvedThemeIconResources.value = {}
+    return
+  }
+  const identifiers = iconIdentifiers ? iconIdentifiers.split('|') : []
+  void Promise.all(identifiers.map(async identifier => {
+    const resource = await iconifyResourceResolver.resolve(identifier, generation)
+    return resource ? [identifier, resource] as const : undefined
+  })).then((resolved) => {
+    if (!iconifyResourceResolver.isCurrentGeneration(generation)) return
+    resolvedThemeIconResources.value = Object.fromEntries(resolved.filter((entry): entry is readonly [string, string] => !!entry))
+  })
+}, { immediate: true })
+onUnmounted(() => iconifyResourceResolver.cancel())
 const themeRuntimeSnapshot = computed(() => createThemeHomeSnapshot({
   version: themeSnapshotVersion.value,
   status: homeCollectionStatus.value,
@@ -214,13 +295,22 @@ const themeRuntimeSnapshot = computed(() => createThemeHomeSnapshot({
   activeSpaceId: activeSpace.value?.id,
   activeSpaceSide: activeSpace.value?.side,
   activeSpacePairedId: activeSpace.value?.pairedSpaceId,
+  activeSpaceCanEdit: activeSpace.value?.canEdit === true,
   activeSpaceCapabilities: activeSpace.value?.pairedSpaceId ? ['space.toggleSide'] : [],
   groups: items.value.filter(group => Number.isSafeInteger(Number(group.id))).map(group => ({
     ...group,
     id: Number(group.id),
-    items: (group.items || []).filter(item => Number.isSafeInteger(Number(item.id))).map(item => ({ ...item, id: Number(item.id) })),
+    items: (group.items || []).filter(item => Number.isSafeInteger(Number(item.id))).map(item => ({
+      ...item,
+      id: Number(item.id),
+      icon: item.icon ? { ...item.icon, resolvedSrc: item.icon.text ? resolvedThemeIconResources.value[item.icon.text] : undefined } : item.icon,
+    })),
   })),
   canWrite: canWrite.value && themeRuntimePermissions.value.includes('items.write'),
+  canWriteGroups: themeCanWriteGroups.value,
+  presentation: panelState.panelConfig,
+  monitorReservedHeight: themeMonitorReservedHeight.value,
+  searchConfiguration: themeSearchEngineConfiguration.value,
 }))
 const themeRuntimeEnvironment = computed(() => ({
   coreVersion: import.meta.env.VITE_APP_VERSION || '0.0.0',
@@ -237,6 +327,7 @@ const themeRuntimeEnvironment = computed(() => ({
   },
 }))
 const themeRuntimePermissions = computed(() => themeGrantMatches.value ? themeRuntimeGrant.value.permissions : [])
+const themeCanWriteGroups = computed(() => canWrite.value && activeSpace.value?.canEdit === true && themeRuntimePackage.value?.manifest.id === 'org.yin.default' && themeRuntimePermissions.value.includes('groups.write'))
 const themeRuntimeSlots = computed(() => activeThemeSlots.value)
 
 watch([() => themeRuntimePackage.value?.revision, () => authStore.token, trustedRouteRevision], async ([revision, token, trustedRoute]) => {
@@ -373,7 +464,10 @@ function handWindowIframeIdLoad(payload: Event) {
 }
 
 function scrollToTop() {
-  scrollContainerRef.value?.scrollTo({ top: 0, behavior: 'smooth' })
+  if (themeRuntimeActive.value)
+    themeHostRef.value?.scrollToTop()
+  else
+    scrollContainerRef.value?.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
 function handleFloatingButtonMouseDown(event: MouseEvent) {
@@ -823,6 +917,8 @@ onMounted(() => {
   window.addEventListener('online', handleOnline)
   window.addEventListener('offline', handleOffline)
   window.addEventListener('resize', syncThemeEnvironment)
+  window.addEventListener('resize', measureThemeMonitorReservation)
+  window.visualViewport?.addEventListener('resize', measureThemeMonitorReservation)
   colorSchemeMedia.addEventListener('change', syncThemeEnvironment)
   reducedMotionMedia.addEventListener('change', syncThemeEnvironment)
   runtimeEnvironmentObserver = new MutationObserver(syncThemeEnvironment)
@@ -842,6 +938,10 @@ onUnmounted(() => {
   window.removeEventListener('online', handleOnline)
   window.removeEventListener('offline', handleOffline)
   window.removeEventListener('resize', syncThemeEnvironment)
+  window.removeEventListener('resize', measureThemeMonitorReservation)
+  window.visualViewport?.removeEventListener('resize', measureThemeMonitorReservation)
+  themeMonitorResizeObserver?.disconnect()
+  if (themeMonitorMeasureFrame) cancelAnimationFrame(themeMonitorMeasureFrame)
   colorSchemeMedia.removeEventListener('change', syncThemeEnvironment)
   reducedMotionMedia.removeEventListener('change', syncThemeEnvironment)
   runtimeEnvironmentObserver?.disconnect()
@@ -1001,6 +1101,7 @@ const homeThemeHandlers = createHomeThemeHandlers({
     items: group.items || [],
   })),
   getActiveSpaceId: () => activeSpace.value?.id,
+  canWriteGroups: () => themeCanWriteGroups.value,
   selectSpace: spaceId => selectSpace(spaceId),
   openItem: (item) => { openPage(item.openMethod, getItemOpenUrl(item), item.title) },
   openEditor: ({ item, groupId }) => item ? handleEditItem(item) : handleAddItem(groupId),
@@ -1026,6 +1127,15 @@ const homeThemeHandlers = createHomeThemeHandlers({
     return normalizeMonitorSnapshot(await monitorSnapshotController.fetchSnapshot())
   },
   submitSearch: query => itemFrontEndSearch(query),
+  getSearchConfiguration: () => ({
+    engines: themeSearchEngineConfiguration.value.engines.map(engine => ({ id: engine.id })),
+    currentEngineId: themeSearchEngineConfiguration.value.currentSearchEngine.id,
+  }),
+  submitSearchWithEngine: (query, engineId) => {
+    const engine = themeSearchEngineConfiguration.value.engines.find(candidate => candidate.id === engineId)
+    if (!engine) throw createThemeRuntimeError('INVALID_ARGUMENT', 'Search engine is not available in the active Space')
+    window.open(replaceOrAppendKeywordToUrl(engine.url, query))
+  },
   navigate: (destination) => {
     if (destination.view !== 'home') throw createThemeRuntimeError('UNSUPPORTED_CAPABILITY', 'Core navigation destination is unavailable')
   },
@@ -1130,7 +1240,7 @@ function handleThemeRuntimeFailure(error: Error) {
 </script>
 
 <template>
-  <div class="w-full h-full sun-main" :class="{ 'side-switching': sideSwitching, 'theme-defaults': useThemeColors }" :data-panel-side="activeSpace?.side || 'yin'">
+  <div class="w-full h-full sun-main" :class="{ 'side-switching': sideSwitching, 'theme-defaults': useThemeColors, 'theme-runtime-yin': themeRuntimeActive && themeRuntimePackage?.manifest.id === 'org.yin.default' }" :data-panel-side="activeSpace?.side || 'yin'">
     <CommandCenter
       :visible="commandCenterVisible"
       :query="commandCenterQuery"
@@ -1188,7 +1298,7 @@ function handleThemeRuntimeFailure(error: Error) {
         </NButton>
       </NDropdown>
     </div>
-    <div v-if="homeReady" class="offline-status" data-testid="offline-status">
+    <div v-if="homeReady" class="offline-status" :class="{ 'offline-status--theme-hidden': themeRuntimeActive && isOnline }" data-testid="offline-status">
       <span v-if="pwaReady" data-testid="pwa-ready">{{ $t('panelHome.pwaReady') }}</span>
       <template v-if="!isOnline && hasValidCachedHome">
         <span data-testid="offline-readonly">{{ $t('panelHome.offlineReadonly') }}</span>
@@ -1202,8 +1312,9 @@ function handleThemeRuntimeFailure(error: Error) {
     <WallpaperLayer v-if="homeReady" />
     <div
       v-if="themeRuntimeActive && monitorEnabled && panelState.panelConfig.systemMonitorShow"
+      ref="themeMonitorLayerRef"
       class="theme-runtime-monitor-layer"
-      :class="{ 'theme-runtime-monitor-layer--info': panelState.panelConfig.iconStyle === PanelPanelConfigStyleEnum.info }"
+      :class="{ 'theme-runtime-monitor-layer--info': panelState.panelConfig.iconStyle === PanelPanelConfigStyleEnum.info, 'theme-runtime-monitor-layer--yin': themeRuntimePackage?.manifest.id === 'org.yin.default' }"
       data-testid="theme-runtime-monitor"
       :data-panel-side="activeSpace?.side || 'yin'"
     >
@@ -1217,6 +1328,7 @@ function handleThemeRuntimeFailure(error: Error) {
       v-if="themeRuntimeActive && themeRuntimePackage"
       :key="`${themeRuntimePackage.revision}:${themeExecutionMode}:${themeRuntimeGrant.permissions.join(',')}`"
       class="theme-home-host"
+      ref="themeHostRef"
       :theme="themeRuntimePackage"
       :snapshot="themeRuntimeSnapshot"
       :environment="themeRuntimeEnvironment"
@@ -1491,7 +1603,7 @@ function handleThemeRuntimeFailure(error: Error) {
     </Teleport>
 
     <NBackTop
-      v-if="homeReady"
+      v-if="homeReady && !themeRuntimeActive"
       :listen-to="scrollContainerRef"
       :right="10"
       :bottom="10"
@@ -1607,6 +1719,8 @@ function handleThemeRuntimeFailure(error: Error) {
   box-shadow: var(--yin-component-menu-shadow);
 }
 .space-status-button { color: var(--yin-text); min-width: 140px; }
+:global(.sun-main.theme-runtime-yin .space-status-bar) { padding: 2px 12px; border-color: rgb(255 255 255 / 42%); border-radius: 999px; background: rgb(24 28 32 / 68%); backdrop-filter: blur(8px); box-shadow: 0 4px 18px rgb(0 0 0 / 18%); }
+:global(.sun-main.theme-runtime-yin .space-status-button) { min-width: 122px; color: #fff !important; }
 .space-status-dot { width: 7px; height: 7px; margin-right: 8px; border-radius: 50%; background: var(--yin-success); box-shadow: 0 0 var(--yin-component-surface-glow) var(--yin-success); }
 .offline-status { position: fixed; z-index: 21; top: 14px; right: 18px; display: flex; gap: var(--yin-component-group-gap); color: var(--yin-text); font-size: var(--yin-fontSmallSize); text-shadow: var(--yin-effect-text-shadow); }
 .theme-safe-mode-banner { position: fixed; z-index: 22; top: 48px; right: 18px; display: flex; align-items: center; gap: 12px; max-width: min(440px, calc(100vw - 36px)); padding: 8px 12px; border: 1px solid var(--yin-border); border-radius: var(--yin-component-card-radius); background: var(--yin-surfaceElevated); color: var(--yin-text); font-size: var(--yin-fontSmallSize); }
@@ -1616,6 +1730,13 @@ function handleThemeRuntimeFailure(error: Error) {
 .theme-runtime-monitor-layer { position: fixed; z-index: 5; top: 72px; left: var(--yin-pageGutter); right: var(--yin-pageGutter); max-height: 220px; overflow: auto; pointer-events: none; }
 .theme-runtime-monitor-layer > * { pointer-events: none; }
 .theme-runtime-monitor-layer--info { max-height: 260px; }
+.theme-runtime-monitor-layer--yin { top: clamp(169.5px, 23.1vh, 208px); right: auto; left: 50%; width: min(calc(var(--yin-contentMaxWidth, 1200px) - 30px), calc(100vw - 30px)); max-width: none; max-height: 286px; padding-top: 26px; box-sizing: border-box; transform: translateX(-50%); --yin-text: #fff; --yin-textMuted: rgb(255 255 255 / 82%); --yin-primary: #fff; --yin-border: transparent; --yin-component-app-icon-surface: rgb(42 42 42 / 42%); --yin-component-system-monitor-heading-size: 18px; }
+:global(.theme-runtime-monitor-layer--yin .n-progress-graph-circle-rail) { stroke: rgb(255 255 255 / 36%) !important; }
+@media (max-width: 640px) {
+  :global(.theme-runtime-monitor-layer--yin:not(.theme-runtime-monitor-layer--directory)) { top: 169.5px; }
+}
+:global(.sun-main.theme-runtime-yin .wallpaper-media) { transform: scale(1.05); }
+:global(.sun-main.theme-runtime-yin .offline-status--theme-hidden) { display: none; }
 .theme-runtime-notice { display: flex; align-items: center; justify-content: space-between; gap: var(--yin-component-group-gap); margin: var(--yin-component-group-section-spacing) auto; padding: var(--yin-component-card-padding); border: var(--yin-component-button-border-width) solid var(--yin-border); border-radius: var(--yin-component-card-radius); background: var(--yin-surfaceElevated); color: var(--yin-text); }
 .theme-runtime-notice--error { border-color: var(--yin-danger); }
 .theme-runtime-consent-content { display: grid; gap: var(--yin-spaceMd); color: var(--yin-text); line-height: var(--yin-lineHeightBody); }
@@ -1937,7 +2058,8 @@ html {
 
 @media (max-width: 500px) {
   .space-status-bar {
-    top: 8px;
+    top: auto;
+    bottom: 8px;
     left: auto;
     right: 8px;
     transform: none;

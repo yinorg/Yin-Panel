@@ -1083,6 +1083,12 @@ func (r *SpaceRouter) RemoveMember(c *gin.Context) {
 func validSpaceRole(role string) bool {
 	return role == repository.SpaceRoleAdmin || role == repository.SpaceRoleEditor || role == repository.SpaceRoleViewer
 }
+
+type spaceListDTO struct {
+	repository.Space
+	CanEdit bool `json:"canEdit"`
+}
+
 func (r *SpaceRouter) List(c *gin.Context) {
 	user, ok := base.GetCurrentUserInfo(c)
 	if !ok {
@@ -1099,13 +1105,15 @@ func (r *SpaceRouter) List(c *gin.Context) {
 		response.ErrorDatabase(c, err.Error())
 		return
 	}
+	result := make([]spaceListDTO, 0, len(spaces))
 	for i := range spaces {
 		var paired repository.Space
 		if repository.Db.Where("pair_id = ? AND side = ?", spaces[i].ID, "yang").First(&paired).Error == nil {
 			spaces[i].PairedSpaceID = paired.ID
 		}
+		result = append(result, spaceListDTO{Space: spaces[i], CanEdit: canEditSpace(user.ID, spaces[i].ID)})
 	}
-	response.SuccessData(c, spaces)
+	response.SuccessData(c, result)
 }
 
 func (r *SpaceRouter) GetSearchConfig(c *gin.Context) {

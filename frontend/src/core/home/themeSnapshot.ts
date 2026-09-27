@@ -1,4 +1,41 @@
-import type { ThemeCollectionStatus, ThemeGroup, ThemeHomeSnapshot, ThemeItem, ThemeSpace } from '../../theme/api/v1'
+import type { ThemeCollectionStatus, ThemeGroup, ThemeHomePresentation, ThemeHomeSnapshot, ThemeItem, ThemeSearchEngine, ThemeSpace } from '../../theme/api/v1'
+// @ts-expect-error Node's strip-types runner requires an explicit source extension.
+import { toThemeItemIcon } from './iconifyResource.ts'
+
+interface SearchEngineSource {
+  id?: string
+  title?: string
+  iconSrc?: string
+  url?: string
+}
+
+interface PresentationSource {
+  homeLayout?: string
+  iconStyle?: number | string
+  iconTextColor?: string
+  iconTextInfoHideDescription?: boolean
+  iconTextIconHideTitle?: boolean
+  logoText?: string
+  logoImageSrc?: string
+  clockShow?: boolean
+  clockShowSecond?: boolean
+  clockColor?: string
+  searchBoxShow?: boolean
+  searchBoxSearchIcon?: boolean
+  marginTop?: number
+  marginBottom?: number
+  maxWidth?: number
+  maxWidthUnit?: string
+  marginX?: number
+  footerHtml?: string
+  systemMonitorShow?: boolean
+  systemMonitorShowTitle?: boolean
+}
+
+interface SearchConfigurationSource {
+  engines?: readonly SearchEngineSource[]
+  currentSearchEngine?: SearchEngineSource
+}
 
 interface SpaceSource {
   id: number
@@ -20,7 +57,7 @@ interface ItemSource {
   id: number
   title: string
   description?: string
-  icon?: { itemType: number; src?: string; fileName?: string; text?: string; backgroundColor?: string } | null
+  icon?: { itemType: number; src?: string; fileName?: string; text?: string; backgroundColor?: string; resolvedSrc?: string } | null
   sort?: number
 }
 
@@ -31,9 +68,15 @@ export function createThemeHomeSnapshot(input: {
   activeSpaceId?: number
   activeSpaceSide?: 'yin' | 'yang'
   activeSpacePairedId?: number
+  activeSpaceCanEdit?: boolean
   activeSpaceCapabilities?: readonly string[]
   groups: readonly GroupSource[]
   canWrite: boolean
+  canWriteGroups?: boolean
+  /** Viewport height through the bottom edge of Core's fixed monitor layer. */
+  monitorReservedHeight?: number
+  presentation?: PresentationSource
+  searchConfiguration?: SearchConfigurationSource
   error?: { code: string; message: string }
 }): ThemeHomeSnapshot {
   const spaces: ThemeSpace[] = input.spaces.map(space => ({
@@ -54,6 +97,7 @@ export function createThemeHomeSnapshot(input: {
       title: group.title || '',
       icon: group.icon,
       itemIds: (group.items || []).map(item => String(item.id)),
+      capabilities: input.activeSpaceCanEdit === true && input.canWriteGroups ? ['groups.write'] : [],
     })
     for (const item of group.items || []) {
       items.push({
@@ -61,18 +105,17 @@ export function createThemeHomeSnapshot(input: {
         groupId,
         title: item.title,
         description: item.description,
-        icon: item.icon ? {
-          itemType: item.icon.itemType,
-          src: item.icon.src,
-          fileName: item.icon.fileName,
-          text: item.icon.text,
-          backgroundColor: item.icon.backgroundColor,
-        } : undefined,
+        icon: toThemeItemIcon(item.icon),
         sort: item.sort ?? 0,
-        capabilities: input.canWrite ? ['item.open', 'item.update', 'item.delete'] : ['item.open'],
+        capabilities: input.activeSpaceCanEdit === true && input.canWrite ? ['item.open', 'item.update', 'item.delete'] : ['item.open'],
       })
     }
   }
+  const presentation = mapPresentation(input.presentation, input.searchConfiguration, input.monitorReservedHeight)
+  const capabilities = [
+    ...(input.activeSpaceCanEdit === true && input.canWrite ? ['items.write'] : []),
+    ...(input.activeSpaceCanEdit === true && input.canWriteGroups ? ['groups.write'] : []),
+  ]
   return {
     version: input.version,
     status: input.status,
@@ -84,5 +127,91 @@ export function createThemeHomeSnapshot(input: {
     activeSpaceCapabilities: input.activeSpaceCapabilities || [],
     groups,
     items,
+    ...(capabilities.length ? { capabilities } : {}),
+    ...(presentation ? { presentation } : {}),
   }
+}
+
+function mapPresentation(source?: PresentationSource, searchConfiguration?: SearchConfigurationSource, monitorReservedHeight?: number): ThemeHomePresentation | undefined {
+  if (!source && !searchConfiguration) return undefined
+  const defaults = {
+    homeLayout: 'standard',
+    iconStyle: 1,
+    iconTextColor: '#ffffff',
+    iconTextInfoHideDescription: false,
+    iconTextIconHideTitle: false,
+    logoText: 'Yin-Panel',
+    logoImageSrc: '',
+    clockShow: true,
+    clockShowSecond: true,
+    searchBoxShow: true,
+    searchBoxSearchIcon: true,
+    marginTop: 10,
+    marginBottom: 10,
+    maxWidth: 1200,
+    maxWidthUnit: 'px',
+    marginX: 5,
+    footerHtml: '',
+    systemMonitorShow: false,
+    systemMonitorShowTitle: true,
+    ...source,
+  }
+  const engines: ThemeSearchEngine[] = (searchConfiguration?.engines || []).flatMap((engine) => {
+    if (!engine.id || !engine.title || !engine.iconSrc) return []
+    return [{ id: engine.id, title: engine.title, iconSrc: engine.iconSrc }]
+  })
+  const selectedId = searchConfiguration?.currentSearchEngine?.url
+    ? engines.find((engine) => {
+        const source = searchConfiguration.engines?.find(candidate => candidate.id === engine.id)
+        return !!source && source.title === searchConfiguration.currentSearchEngine?.title
+          && source.url === searchConfiguration.currentSearchEngine?.url
+          && source.iconSrc === searchConfiguration.currentSearchEngine?.iconSrc
+      })?.id
+    : undefined
+  const maxWidthUnit = ['px', '%', 'rem', 'vw'].includes(defaults.maxWidthUnit || '')
+    ? defaults.maxWidthUnit as ThemeHomePresentation['content']['maxWidthUnit']
+    : 'px'
+  return {
+    layout: defaults.homeLayout === 'directory' ? 'directory' : 'standard',
+    iconStyle: defaults.iconStyle === 0 || defaults.iconStyle === 'info' ? 'info' : 'icon',
+    iconTextColor: optionalText(defaults.iconTextColor),
+    iconTextInfoHideDescription: defaults.iconTextInfoHideDescription === true,
+    iconTextIconHideTitle: defaults.iconTextIconHideTitle === true,
+    logoText: typeof defaults.logoText === 'string' ? defaults.logoText : 'Yin-Panel',
+    logoImageSrc: optionalText(defaults.logoImageSrc),
+    clock: {
+      visible: defaults.clockShow !== false,
+      showSeconds: defaults.clockShowSecond !== false,
+      color: optionalText(defaults.clockColor),
+    },
+    search: {
+      visible: defaults.searchBoxShow !== false,
+      itemFilterEnabled: defaults.searchBoxSearchIcon !== false,
+      engines,
+      currentEngineId: selectedId && engines.some(engine => engine.id === selectedId) ? selectedId : undefined,
+    },
+    content: {
+      marginTopPercent: boundedFinite(defaults.marginTop, 10, 0, 100),
+      marginBottomPercent: boundedFinite(defaults.marginBottom, 10, 0, 100),
+      maxWidth: boundedFinite(defaults.maxWidth, 1200, 1, 100000),
+      maxWidthUnit,
+      marginX: boundedFinite(defaults.marginX, 5, 0, 10000),
+    },
+    footerHtml: typeof defaults.footerHtml === 'string' ? defaults.footerHtml : '',
+    monitor: {
+      visible: defaults.systemMonitorShow === true,
+      showTitle: defaults.systemMonitorShowTitle !== false,
+      ...(monitorReservedHeight !== undefined ? { reservedHeight: boundedFinite(monitorReservedHeight, 0, 0, 100000) } : {}),
+    },
+  }
+}
+
+function optionalText(value: unknown): string | undefined {
+  return typeof value === 'string' && value.length > 0 ? value : undefined
+}
+
+function boundedFinite(value: unknown, fallback: number, min: number, max: number): number {
+  const number = typeof value === 'number' ? value : Number(value)
+  if (!Number.isFinite(number) || number < min || number > max) return fallback
+  return number
 }

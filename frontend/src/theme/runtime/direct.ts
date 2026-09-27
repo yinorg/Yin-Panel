@@ -23,6 +23,7 @@ export interface ThemeDirectHandle {
   updateEnvironment: (environment: Omit<ThemeEnvironment, 'apiVersion'>) => void
   updateTokens: (cssText: string) => void
   emit: (name: ThemeEventName, payload?: unknown) => void
+  scrollToTop: () => void
   dispose: () => Promise<void>
 }
 
@@ -150,6 +151,11 @@ export async function mountThemeDirect(options: ThemeDirectOptions): Promise<The
     emit(name, payload) {
       if (disposed) return
       apiClient.emit(name, { contextVersion: snapshot.version, sequence: ++eventSequence, payload })
+    },
+    scrollToTop() {
+      if (disposed) return
+      shadow.host.scrollTo({ top: 0, behavior: 'smooth' })
+      shadow.querySelector('#theme-root')?.scrollTo({ top: 0, behavior: 'smooth' })
     },
     async dispose() {
       if (disposed) return

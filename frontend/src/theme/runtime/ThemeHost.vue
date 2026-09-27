@@ -6,6 +6,7 @@ import { mountThemeSandbox, type ThemeSandboxHandle, type ThemeSandboxStylesheet
 import { mountThemeDirect, type ThemeDirectHandle } from './direct'
 import { rewriteThemeStylesheet } from './resources'
 import { sha256Hex } from '@/utils/sha256.js'
+import { toThemeItemIcon } from '@/core/home/iconifyResource'
 
 const props = defineProps<{
   theme: ThemePackage
@@ -31,7 +32,6 @@ let generation = 0
 let startTask: Promise<void> | undefined
 let activeAssetURLs: string[] = []
 let activeAssets: Record<string, string> = {}
-
 onMounted(() => { queueStart() })
 
 watch(() => props.snapshot, (snapshot) => {
@@ -176,6 +176,10 @@ function publishSnapshot(next: ThemeHomeSnapshot) {
     runtime.emit('items.changed', { items: next.items })
 }
 
+function scrollToTop() {
+  runtime?.scrollToTop()
+}
+
 function themeAssetURLs(theme: ThemePackage, assetURLs: Readonly<Record<string, string>>) {
   const resources = (theme.manifest.resources || []).filter(resource => isThemeMediaResource(resource.mediaType))
   return Object.fromEntries(resources.flatMap(resource => assetURLs[resource.path] ? [[resource.path, assetURLs[resource.path]]] : []))
@@ -186,8 +190,12 @@ function scopedSnapshot(snapshot: ThemeHomeSnapshot): ThemeHomeSnapshot {
   const canReadSpaces = permissions.has('spaces.read')
   const canReadGroups = permissions.has('groups.read')
   const canReadItems = permissions.has('items.read')
+  const capabilities = (snapshot.capabilities || []).filter(capability =>
+    capability === 'items.write' ? permissions.has('items.write')
+      : capability === 'groups.write' && permissions.has('groups.write'))
   return {
     ...snapshot,
+    capabilities,
     spaces: canReadSpaces ? snapshot.spaces : [],
     activeSpaceId: canReadSpaces ? snapshot.activeSpaceId : undefined,
     activeSpaceSide: canReadSpaces ? snapshot.activeSpaceSide : undefined,
@@ -200,19 +208,14 @@ function scopedSnapshot(snapshot: ThemeHomeSnapshot): ThemeHomeSnapshot {
       title: String(group.title),
       icon: group.icon === undefined ? undefined : String(group.icon),
       itemIds: canReadItems ? group.itemIds.map(id => String(id)) : [],
+      capabilities: permissions.has('groups.write') && group.capabilities?.includes('groups.write') ? ['groups.write'] : [],
     })) : [],
     items: canReadItems ? snapshot.items.map(item => ({
       id: String(item.id),
       groupId: canReadGroups ? String(item.groupId) : '',
       title: String(item.title),
       description: item.description === undefined ? undefined : String(item.description),
-      icon: item.icon && typeof item.icon === 'object' ? {
-        itemType: Number((item.icon as { itemType?: unknown }).itemType || 0),
-        src: typeof (item.icon as { src?: unknown }).src === 'string' ? (item.icon as { src: string }).src : undefined,
-        fileName: typeof (item.icon as { fileName?: unknown }).fileName === 'string' ? (item.icon as { fileName: string }).fileName : undefined,
-        text: typeof (item.icon as { text?: unknown }).text === 'string' ? (item.icon as { text: string }).text : undefined,
-        backgroundColor: typeof (item.icon as { backgroundColor?: unknown }).backgroundColor === 'string' ? (item.icon as { backgroundColor: string }).backgroundColor : undefined,
-      } : undefined,
+      icon: toThemeItemIcon(item.icon),
       sort: Number(item.sort) || 0,
       capabilities: item.capabilities.map(capability => String(capability)),
     })) : [],
@@ -270,6 +273,8 @@ onBeforeUnmount(() => {
   activeAssetURLs = []
   activeAssets = {}
 })
+
+defineExpose({ scrollToTop })
 </script>
 
 <template>
@@ -294,7 +299,7 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.theme-runtime-shell { position: absolute; z-index: 1; inset: 0; overflow: hidden; pointer-events: auto; }
+.theme-runtime-shell { position: absolute; z-index: 1; inset: 0; overflow: auto; overscroll-behavior: contain; background: transparent; pointer-events: auto; }
 .theme-host--trusted { position: fixed; inset: 0; z-index: 40; }
 .theme-trusted-toolbar { position: fixed; z-index: 50; top: 8px; right: 8px; display: flex; align-items: center; gap: var(--yin-spaceSm); max-width: calc(100vw - 16px); padding: var(--yin-spaceXs) var(--yin-spaceSm); border: var(--yin-borderWidth) solid var(--yin-border); border-radius: var(--yin-component-button-radius); background: var(--yin-surfaceElevated); color: var(--yin-text); font: var(--yin-fontBodyWeight) var(--yin-fontSmallSize)/var(--yin-lineHeightBody) var(--yin-fontBody); box-shadow: var(--yin-shadowPopup); }
 .theme-trusted-toolbar span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -309,6 +314,6 @@ onBeforeUnmount(() => {
   height: 100%;
   min-height: 100%;
   border: 0;
-  background: var(--yin-canvas);
+  background: transparent;
 }
 </style>
