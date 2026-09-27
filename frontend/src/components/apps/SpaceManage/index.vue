@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { NButton, NCard, NInput, NList, NListItem, NModal, NProgress, NSelect, NSpace, useMessage } from 'naive-ui'
-import { addMember, addOIDCGroup, clearSpace, copySpace, createGroup, createSpace, deleteOIDCGroup, getGroups, getMembers, getOIDCGroups, getPublicConfig, getSpaces, renameSpace, resolveSpace, setPublicConfig, spaceOptions, updateGroup, updateMember, type Space, type SpaceMember } from '../../../api/panel/space'
+import { addMember, addOIDCGroup, clearSpace, copySpace, createGroup, createSpace, deleteOIDCGroup, deleteSpace, getGroups, getMembers, getOIDCGroups, getPublicConfig, getSpaces, removeMember, renameSpace, resolveSpace, setPublicConfig, spaceOptions, updateGroup, updateMember, type Space, type SpaceMember } from '../../../api/panel/space'
 import { useAuthStore } from '../../../store'
 import { t } from '../../../locales'
 import { clearSpaceCache } from '@/utils/spaceCache'
@@ -167,6 +167,30 @@ async function addCurrentMember() {
 }
 function openAddMember() { memberEmail.value = ''; memberRole.value = 'viewer'; memberDialogVisible.value = true }
 function changeMember(member: SpaceMember, role: string) { if (selectedSpaceId.value) updateMember(selectedSpaceId.value, member.userId, role).then(() => loadDetails(selectedSpaceId.value!)) }
+// The owner always resolves to the admin role on the Core side, so leaving the
+// space is the only way to give it up, and that deletes the space. A personal
+// space is the user's own default panel and can never be left or deleted.
+function isSpaceOwner(member: SpaceMember) { return member.userId === selected()?.ownerUserId }
+function canLeaveSpace() { return selected()?.type !== 'personal' }
+async function removeCurrentMember(member: SpaceMember) {
+  if (!selectedSpaceId.value) return
+  if (isSpaceOwner(member)) {
+    if (!canLeaveSpace()) return
+    if (!window.confirm(t('spaceManage.leaveSpaceConfirm'))) return
+    const { code } = await deleteSpace(selectedSpaceId.value)
+    if (code !== 0) return
+    message.success(t('spaceManage.leaveSpaceSuccess'))
+    selectedSpaceId.value = null
+    load()
+    emit('spaces-changed')
+    return
+  }
+  if (!window.confirm(t('spaceManage.removeMemberConfirm'))) return
+  const { code } = await removeMember(selectedSpaceId.value, member.userId)
+  if (code !== 0) return
+  message.success(t('spaceManage.removeMemberSuccess'))
+  loadDetails(selectedSpaceId.value)
+}
 async function addRule() {
   if (!selectedSpaceId.value || !oidcGroup.value.trim()) return false
   const { code } = await addOIDCGroup(selectedSpaceId.value, oidcProvider.value, oidcGroup.value.trim(), oidcRole.value)
@@ -229,7 +253,7 @@ onMounted(load)
         </NModal>
         <NCard v-if="selectedSpaceId" :title="$t('spaceManage.members')">
           <template #header-extra><NButton size="tiny" type="primary" @click="openAddMember">{{ $t('spaceManage.addMember') }}</NButton></template>
-          <NList><NListItem v-for="member in members" :key="member.id"><NSpace justify="space-between" class="w-full"><span>{{ member.email || $t('spaceManage.emailMissing') }} ({{ member.source || 'manual' }})</span><NSelect :value="member.role" :options="[{ label: $t('spaceManage.admin'), value: 'admin' }, { label: $t('spaceManage.editor'), value: 'editor' }, { label: $t('spaceManage.viewer'), value: 'viewer' }]" @update:value="role => changeMember(member, role)" /></NSpace></NListItem></NList>
+          <NList><NListItem v-for="member in members" :key="member.id"><NSpace justify="space-between" class="w-full" align="center"><span>{{ member.email || $t('spaceManage.emailMissing') }} ({{ member.source || 'manual' }})</span><NSpace align="center"><NSelect class="w-32" :value="member.role" :disabled="isSpaceOwner(member)" :options="[{ label: $t('spaceManage.admin'), value: 'admin' }, { label: $t('spaceManage.editor'), value: 'editor' }, { label: $t('spaceManage.viewer'), value: 'viewer' }]" @update:value="role => changeMember(member, role)" /><NButton v-if="!isSpaceOwner(member) || canLeaveSpace()" size="tiny" :type="isSpaceOwner(member) ? 'error' : 'default'" :secondary="isSpaceOwner(member)" @click="removeCurrentMember(member)">{{ isSpaceOwner(member) ? $t('spaceManage.leaveSpace') : $t('spaceManage.removeMember') }}</NButton></NSpace></NSpace></NListItem></NList>
         </NCard>
         <NModal v-if="selectedSpaceId" v-model:show="memberDialogVisible" preset="dialog" :title="$t('spaceManage.addMember')" :positive-text="$t('common.confirm')" :negative-text="$t('common.cancel')" @positive-click="addCurrentMember">
           <NSpace vertical>

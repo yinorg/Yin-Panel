@@ -8,5 +8,3 @@
 .item-button { min-height: 56px; border: 0; border-radius: 0; background: transparent; box-shadow: none; padding: 8px 0; }
 .item-button:hover { transform: none; background: color-mix(in srgb, var(--yin-primary) 5%, transparent); }
 .item-icon { flex-basis: 30px; height: 30px; border: 1px solid var(--yin-border); border-radius: 2px; background: transparent; }
-.home-spaces { width: 100%; border-bottom: 1px solid var(--yin-border); }
-.space-button { border: 0; border-radius: 0; background: transparent; }

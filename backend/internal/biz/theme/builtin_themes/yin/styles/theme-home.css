@@ -29,10 +29,15 @@ select {
   color: var(--yin-text, #20282c);
 }
 
+/* The frame is sized to this document's content, so viewport units inside it
+   resolve against the content height instead of the window. Every
+   window-relative length must therefore go through --yin-viewport-height, which
+   the view sets from the real viewport reported by the Core environment.
+   Using vh here would feed the frame height back into its own spacing. */
 .yin-page {
   box-sizing: border-box;
   width: min(var(--yin-content-max-width, 1200px), calc(100% - 2 * var(--yin-margin-x, 5px)));
-  min-height: 100vh;
+  min-height: var(--yin-viewport-height, 100vh);
   margin-inline: auto;
   position: relative;
   padding: calc(var(--yin-content-top, 10vh) + 30px) calc(var(--yin-margin-x, 5px) + 10px) var(--yin-content-bottom, 10vh);
@@ -62,11 +67,27 @@ select {
   align-items: center;
   gap: 0;
   min-width: 0;
+  border-radius: var(--yin-radiusControl, 8px);
   color: inherit;
+  cursor: pointer;
   font-family: var(--yin-fontDisplay, var(--yin-fontBody, Inter, system-ui, sans-serif));
   font-size: 60px;
   font-weight: var(--yin-fontHeadingWeight, 700);
   line-height: 1;
+}
+
+.yin-logo:hover {
+  opacity: .82;
+}
+
+.yin-logo:focus-visible {
+  outline: 3px solid var(--yin-focusRing, var(--yin-primary, #176b80));
+  outline-offset: 4px;
+}
+
+.yin-logo[aria-disabled='true'] {
+  cursor: progress;
+  opacity: .58;
 }
 
 .yin-logo-image {
@@ -101,8 +122,6 @@ select {
   font-weight: 300;
 }
 
-.yin-side-toggle,
-.yin-space-button,
 .directory-folder-button,
 .yin-search-submit {
   min-height: 44px;
@@ -115,8 +134,6 @@ select {
   cursor: pointer;
 }
 
-.yin-side-toggle:hover,
-.yin-space-button:hover,
 .directory-folder-button:hover,
 .yin-search-submit:hover {
   border-color: var(--yin-primary, #176b80);
@@ -124,8 +141,6 @@ select {
   background: rgb(42 42 42 / 62%);
 }
 
-.yin-side-toggle:focus-visible,
-.yin-space-button:focus-visible,
 .directory-folder-button:focus-visible,
 .yin-search-submit:focus-visible,
 .yin-search-input:focus-visible,
@@ -136,38 +151,11 @@ select {
   outline-offset: 3px;
 }
 
-.yin-side-toggle:disabled,
-.yin-space-button:disabled,
 .yin-search-submit:disabled {
   cursor: wait;
   opacity: .58;
 }
 
-.yin-side-toggle {
-  position: absolute;
-  top: 50%;
-  right: 0;
-  transform: translateY(-50%);
-  opacity: 0;
-}
-
-.yin-masthead:hover .yin-side-toggle,
-.yin-masthead:focus-within .yin-side-toggle {
-  opacity: 1;
-}
-
-.yin-spaces {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding-top: 14px;
-}
-
-.yin-page:not(.yin-page--directory) .yin-spaces {
-  display: none;
-}
-
-.yin-space-button.is-active,
 .directory-folder-button.active {
   border-color: var(--yin-primary, #176b80);
   box-shadow: 0 0 0 1px var(--yin-primary, #176b80);
@@ -705,10 +693,6 @@ select {
   .yin-clock { width: 96px; font-size: 24px; line-height: 32px; }
   .yin-clock-date { display: none; }
 
-  .yin-side-toggle {
-    margin-left: auto;
-  }
-
   .yin-search {
     flex-wrap: wrap;
     width: 100%;
@@ -739,10 +723,6 @@ select {
     order: 3;
     flex-basis: 100%;
   }
-}
-
-@media (hover: none) {
-  .yin-side-toggle { opacity: 1; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -20,39 +20,42 @@ export default {
       root.className = 'builtin-home'
       const header = node('header', 'home-header')
       const identity = node('div', 'home-identity')
+      const title = node('h1', 'home-title', 'Home')
       identity.append(
         node('p', 'home-eyebrow', 'YIN PANEL'),
-        node('h1', 'home-title', 'Home'),
+        title,
         node('p', 'home-detail', snapshot.status === 'loading' ? 'Loading your items…' : `${(snapshot.items || []).length} items`),
       )
+      // The brand mark is the side switch, matching the default Yin theme. A
+      // standalone button next to it duplicated the only control in the header
+      // and left two different affordances for one action.
       if ((snapshot.activeSpaceCapabilities || []).includes('space.toggleSide')) {
         const side = snapshot.activeSpaceSide === 'yang' ? 'Yin' : 'Yang'
-        const toggle = node('button', 'side-toggle', `Switch to ${side}-Panel`)
-        toggle.type = 'button'
-        toggle.dataset.testid = 'theme-side-toggle'
-        toggle.setAttribute('aria-label', `Switch to ${side}-Panel`)
-        toggle.disabled = sideSwitching
-        toggle.addEventListener('click', async () => {
+        const toggleSide = async () => {
           if (sideSwitching) return
           sideSwitching = true
-          toggle.disabled = true
+          title.setAttribute('aria-disabled', 'true')
+          title.tabIndex = -1
           try { await api.commands.execute('space.toggleSide') }
           catch (error) { if (status) status.textContent = error?.message || 'Unable to switch panel' }
           finally { sideSwitching = false }
+        }
+        title.dataset.testid = 'theme-side-toggle'
+        title.setAttribute('role', 'button')
+        title.setAttribute('aria-label', `Switch to ${side}-Panel`)
+        title.setAttribute('aria-disabled', sideSwitching ? 'true' : 'false')
+        title.tabIndex = sideSwitching ? -1 : 0
+        title.addEventListener('click', () => { void toggleSide() })
+        title.addEventListener('keydown', event => {
+          if (event.key !== 'Enter' && event.key !== ' ') return
+          event.preventDefault()
+          void toggleSide()
         })
-        identity.append(toggle)
+      }
+      else {
+        title.tabIndex = -1
       }
       header.append(identity)
-      const spaces = node('nav', 'home-spaces')
-      spaces.setAttribute('aria-label', 'Spaces')
-      for (const space of snapshot.spaces || []) {
-        const button = node('button', `space-button${space.id === snapshot.activeSpaceId ? ' is-active' : ''}`, space.name || 'Space')
-        button.type = 'button'
-        button.setAttribute('aria-current', space.id === snapshot.activeSpaceId ? 'page' : 'false')
-        button.addEventListener('click', () => run(() => api.commands.execute('space.select', { spaceId: space.id })))
-        spaces.append(button)
-      }
-      header.append(spaces)
       root.append(header)
       status = node('p', 'home-status')
       status.setAttribute('role', 'status')

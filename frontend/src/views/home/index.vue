@@ -120,8 +120,10 @@ function measureThemeMonitorReservation() {
   themeMonitorMeasureFrame = requestAnimationFrame(() => {
     themeMonitorMeasureFrame = 0
     const element = themeMonitorLayerRef.value
+    // The layer is absolutely positioned inside the scrolling shell, so its
+    // offset box is stable across scrolls while a viewport-relative rect is not.
     const nextHeight = themeRuntimeActive.value && monitorEnabled.value && panelState.panelConfig.systemMonitorShow && element?.isConnected
-      ? Math.min(window.innerHeight, Math.max(0, Math.ceil(element.getBoundingClientRect().bottom)))
+      ? Math.min(window.innerHeight, Math.max(0, Math.ceil(element.offsetTop + element.offsetHeight)))
       : 0
     if (themeMonitorReservedHeight.value !== nextHeight)
       themeMonitorReservedHeight.value = nextHeight
@@ -958,6 +960,9 @@ function syncThemeEnvironment() {
   runtimeLanguage.value = document.documentElement.lang || navigator.language
   runtimeColorScheme.value = document.documentElement.classList.contains('dark') ? 'dark' : 'light'
   runtimeReducedMotion.value = reducedMotionMedia.matches
+  // The theme monitor layer is positioned with viewport units, so its reserved
+  // height must be re-measured whenever the viewport changes.
+  measureThemeMonitorReservation()
 }
 
 function handleOnline() {
@@ -1134,6 +1139,9 @@ const homeThemeHandlers = createHomeThemeHandlers({
   submitSearchWithEngine: (query, engineId) => {
     const engine = themeSearchEngineConfiguration.value.engines.find(candidate => candidate.id === engineId)
     if (!engine) throw createThemeRuntimeError('INVALID_ARGUMENT', 'Search engine is not available in the active Space')
+    // Record the selection in Core so the next theme snapshot reports the new
+    // currentEngineId; otherwise the theme select keeps the previous icon.
+    commandCenterSearchEngine.value = { title: engine.title, iconSrc: engine.iconSrc, url: engine.url }
     window.open(replaceOrAppendKeywordToUrl(engine.url, query))
   },
   navigate: (destination) => {
@@ -1310,20 +1318,6 @@ function handleThemeRuntimeFailure(error: Error) {
       <RouterLink to="/__yin/theme-recovery">{{ $t('themeRecovery.exit') }}</RouterLink>
     </div>
     <WallpaperLayer v-if="homeReady" />
-    <div
-      v-if="themeRuntimeActive && monitorEnabled && panelState.panelConfig.systemMonitorShow"
-      ref="themeMonitorLayerRef"
-      class="theme-runtime-monitor-layer"
-      :class="{ 'theme-runtime-monitor-layer--info': panelState.panelConfig.iconStyle === PanelPanelConfigStyleEnum.info, 'theme-runtime-monitor-layer--yin': themeRuntimePackage?.manifest.id === 'org.yin.default' }"
-      data-testid="theme-runtime-monitor"
-      :data-panel-side="activeSpace?.side || 'yin'"
-    >
-      <SystemMonitor
-        :snapshot-controller="monitorSnapshotController"
-        :show-title="panelState.panelConfig.systemMonitorShowTitle"
-        :icon-text-color="panelIconTextColor"
-      />
-    </div>
     <ThemeHost
       v-if="themeRuntimeActive && themeRuntimePackage"
       :key="`${themeRuntimePackage.revision}:${themeExecutionMode}:${themeRuntimeGrant.permissions.join(',')}`"
@@ -1338,7 +1332,22 @@ function handleThemeRuntimeFailure(error: Error) {
       :title="themeRuntimePackage.manifest.name"
       :execute="executeThemeRequest"
       @failed="handleThemeRuntimeFailure"
-    />
+    >
+      <div
+        v-if="monitorEnabled && panelState.panelConfig.systemMonitorShow"
+        ref="themeMonitorLayerRef"
+        class="theme-runtime-monitor-layer"
+        :class="{ 'theme-runtime-monitor-layer--info': panelState.panelConfig.iconStyle === PanelPanelConfigStyleEnum.info, 'theme-runtime-monitor-layer--yin': themeRuntimePackage?.manifest.id === 'org.yin.default' }"
+        data-testid="theme-runtime-monitor"
+        :data-panel-side="activeSpace?.side || 'yin'"
+      >
+        <SystemMonitor
+          :snapshot-controller="monitorSnapshotController"
+          :show-title="panelState.panelConfig.systemMonitorShowTitle"
+          :icon-text-color="panelIconTextColor"
+        />
+      </div>
+    </ThemeHost>
     <div v-if="offlineUnavailable" class="offline-unavailable" data-testid="offline-unavailable">
       <NCard :title="$t('panelHome.offlineUnavailable')" size="small">
         <NSpace vertical>
@@ -1719,15 +1728,20 @@ function handleThemeRuntimeFailure(error: Error) {
   box-shadow: var(--yin-component-menu-shadow);
 }
 .space-status-button { color: var(--yin-text); min-width: 140px; }
-:global(.sun-main.theme-runtime-yin .space-status-bar) { padding: 2px 12px; border-color: rgb(255 255 255 / 42%); border-radius: 999px; background: rgb(24 28 32 / 68%); backdrop-filter: blur(8px); box-shadow: 0 4px 18px rgb(0 0 0 / 18%); }
-:global(.sun-main.theme-runtime-yin .space-status-button) { min-width: 122px; color: #fff !important; }
+/* These overrides must beat the later scoped `theme-defaults` /
+   `:root[data-yin-layout='directory']` rules in the second style block, which
+   carry a `[data-v-*]` attribute and therefore outrank a plain global
+   selector. Without `!important` the pill keeps the light surface background
+   while its label stays forced white, making it invisible. */
+:global(.sun-main.theme-runtime-yin .space-status-bar) { padding: 2px 12px; border-color: rgb(255 255 255 / 42%) !important; border-radius: 999px; background: rgb(24 28 32 / 68%) !important; backdrop-filter: blur(8px); box-shadow: 0 4px 18px rgb(0 0 0 / 18%); }
+:global(.sun-main.theme-runtime-yin .space-status-button) { min-width: 122px !important; color: #fff !important; }
 .space-status-dot { width: 7px; height: 7px; margin-right: 8px; border-radius: 50%; background: var(--yin-success); box-shadow: 0 0 var(--yin-component-surface-glow) var(--yin-success); }
 .offline-status { position: fixed; z-index: 21; top: 14px; right: 18px; display: flex; gap: var(--yin-component-group-gap); color: var(--yin-text); font-size: var(--yin-fontSmallSize); text-shadow: var(--yin-effect-text-shadow); }
 .theme-safe-mode-banner { position: fixed; z-index: 22; top: 48px; right: 18px; display: flex; align-items: center; gap: 12px; max-width: min(440px, calc(100vw - 36px)); padding: 8px 12px; border: 1px solid var(--yin-border); border-radius: var(--yin-component-card-radius); background: var(--yin-surfaceElevated); color: var(--yin-text); font-size: var(--yin-fontSmallSize); }
 .theme-safe-mode-banner a { color: var(--yin-primary); text-decoration: underline; }
 .offline-unavailable { position: fixed; z-index: 31; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(0, 0, 0, 0.48); }
-.theme-home-host { position: absolute; z-index: 1; inset: 0; overflow: hidden; pointer-events: auto; }
-.theme-runtime-monitor-layer { position: fixed; z-index: 5; top: 72px; left: var(--yin-pageGutter); right: var(--yin-pageGutter); max-height: 220px; overflow: auto; pointer-events: none; }
+.theme-home-host { position: absolute; z-index: 1; inset: 0; overflow: auto; pointer-events: auto; }
+.theme-runtime-monitor-layer { position: absolute; z-index: 5; top: 72px; left: var(--yin-pageGutter); right: var(--yin-pageGutter); max-height: 220px; overflow: auto; pointer-events: none; }
 .theme-runtime-monitor-layer > * { pointer-events: none; }
 .theme-runtime-monitor-layer--info { max-height: 260px; }
 .theme-runtime-monitor-layer--yin { top: clamp(169.5px, 23.1vh, 208px); right: auto; left: 50%; width: min(calc(var(--yin-contentMaxWidth, 1200px) - 30px), calc(100vw - 30px)); max-width: none; max-height: 286px; padding-top: 26px; box-sizing: border-box; transform: translateX(-50%); --yin-text: #fff; --yin-textMuted: rgb(255 255 255 / 82%); --yin-primary: #fff; --yin-border: transparent; --yin-component-app-icon-surface: rgb(42 42 42 / 42%); --yin-component-system-monitor-heading-size: 18px; }

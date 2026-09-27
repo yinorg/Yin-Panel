@@ -25,6 +25,8 @@ const emit = defineEmits<{
 }>()
 
 const frame = ref<HTMLIFrameElement>()
+const shell = ref<HTMLElement>()
+const layoutHeight = ref(0)
 const trustedHost = ref<HTMLElement>()
 let runtime: ThemeSandboxHandle | ThemeDirectHandle | undefined
 let disposed = false
@@ -130,6 +132,7 @@ async function start() {
           permissions: new Set(props.permissions),
           execute: props.execute,
           onError: error => emit('failed', error),
+          onLayoutHeight: height => { layoutHeight.value = height },
           contributions: manifest.contributes,
         })
     if (disposed || startGeneration !== generation) {
@@ -177,7 +180,11 @@ function publishSnapshot(next: ThemeHomeSnapshot) {
 }
 
 function scrollToTop() {
-  runtime?.scrollToTop()
+  if ((props.executionMode || 'sandbox') === 'trusted') {
+    runtime?.scrollToTop()
+    return
+  }
+  shell.value?.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
 function themeAssetURLs(theme: ThemePackage, assetURLs: Readonly<Record<string, string>>) {
@@ -278,7 +285,8 @@ defineExpose({ scrollToTop })
 </script>
 
 <template>
-  <div class="theme-runtime-shell">
+  <div ref="shell" class="theme-runtime-shell">
+    <slot />
     <template v-if="(executionMode || 'sandbox') === 'trusted'">
       <div ref="trustedHost" class="theme-host theme-host--trusted" :aria-label="title" data-testid="theme-trusted-host" />
       <div class="theme-trusted-toolbar" data-testid="theme-trusted-toolbar">
@@ -293,6 +301,7 @@ defineExpose({ scrollToTop })
       sandbox="allow-scripts"
       referrerpolicy="no-referrer"
       :title="title"
+      :style="{ height: layoutHeight ? `${layoutHeight}px` : '100%' }"
       data-testid="theme-home-frame"
     />
   </div>

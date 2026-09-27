@@ -26,11 +26,37 @@ const bootstrap = (apiClientSource: string) => `
     const mountedComponents = [];
     let tokenStyle;
     let objectUrl;
+    let layoutObserver;
+    let layoutReportTimer;
+    let lastLayoutHeight = 0;
     const pending = new Map();
     function reply(message) {
       try {
         if (JSON.stringify(message).length <= 1048576) port.postMessage(message);
       } catch (_) {}
+    }
+    // The Core scrolls the theme page from the parent document, so the sandbox
+    // reports its real content height and the host sizes the iframe to match.
+    // Without this the iframe stays viewport-sized and scrolls internally,
+    // which detaches it from the monitor layer that scrolls with the page.
+    function measureLayoutHeight() {
+      const themeRoot = document.getElementById('theme-root');
+      const height = Math.max(
+        document.documentElement.scrollHeight,
+        document.body ? document.body.scrollHeight : 0,
+        themeRoot ? themeRoot.scrollHeight : 0,
+      );
+      return Math.max(1, Math.ceil(height));
+    }
+    function reportLayoutHeight() {
+      const height = measureLayoutHeight();
+      if (height === lastLayoutHeight) return;
+      lastLayoutHeight = height;
+      reply({ type: 'layout.height', height });
+    }
+    function scheduleLayoutReport() {
+      if (layoutReportTimer) clearTimeout(layoutReportTimer);
+      layoutReportTimer = setTimeout(reportLayoutHeight, 120);
     }
     function request(request) {
       return new Promise((resolve, reject) => {
@@ -73,6 +99,9 @@ const bootstrap = (apiClientSource: string) => `
       }
       if (message.type === 'dispose') {
         try {
+          if (layoutObserver) layoutObserver.disconnect();
+          if (layoutReportTimer) clearTimeout(layoutReportTimer);
+          window.removeEventListener('resize', scheduleLayoutReport);
           for (const operation of pending.values()) operation.reject(Object.assign(new Error('Theme runtime disposed'), { code: 'ABORTED' }));
           pending.clear();
           apiClient.dispose();
@@ -139,6 +168,10 @@ const bootstrap = (apiClientSource: string) => `
           if (!componentView || typeof componentView.unmount !== 'function') throw new Error('Theme component ' + component + ' must return an unmount function');
           mountedComponents.push(componentView);
         }
+        layoutObserver = new MutationObserver(scheduleLayoutReport);
+        layoutObserver.observe(document.body, { childList: true, subtree: true, attributes: true });
+        window.addEventListener('resize', scheduleLayoutReport);
+        reportLayoutHeight();
         reply({ type: 'ready' });
       } catch (error) {
         reply({ type: 'error', message: String(error && error.message || error).slice(0, 1000) });
@@ -163,6 +196,7 @@ export interface ThemeSandboxOptions {
   permissions: ReadonlySet<ThemePermission>
   execute: (request: unknown) => Promise<unknown>
   onError: (error: Error) => void
+  onLayoutHeight?: (height: number) => void
   contributions?: { views?: readonly string[]; regions?: readonly string[]; components?: readonly string[] }
 }
 
@@ -234,6 +268,12 @@ export async function mountThemeSandbox(frame: HTMLIFrameElement, options: Theme
       if (data.type === 'ready' && connectedOnce) {
         if (handshakeTimer) clearTimeout(handshakeTimer)
         resolveReady()
+        return
+      }
+      // The sandbox reports its real content height so the host can size the
+      // frame to it and own the page scroll.
+      if (data.type === 'layout.height' && Number.isFinite(data.height) && data.height > 0) {
+        options.onLayoutHeight?.(Math.ceil(data.height))
         return
       }
       if (data.type === 'error') {

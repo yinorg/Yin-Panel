@@ -9,6 +9,7 @@ import (
 	"github.com/yinorg/Yin-Panel/backend/internal/biz/repository"
 	"github.com/yinorg/Yin-Panel/backend/internal/constant"
 	"github.com/yinorg/Yin-Panel/backend/internal/global"
+	"github.com/yinorg/Yin-Panel/backend/internal/infra/zaplog"
 	"github.com/yinorg/Yin-Panel/backend/internal/web/interceptor"
 	"github.com/yinorg/Yin-Panel/backend/internal/web/model/base"
 	"github.com/yinorg/Yin-Panel/backend/internal/web/model/response"
@@ -79,12 +80,22 @@ func (r *SpaceRouter) InitRouter(router *gin.RouterGroup) {
 	g.DELETE("/:spaceId/oidc-groups/:ruleId", r.DeleteOIDCGroup)
 	g.POST("/:spaceId/members", r.AddMember)
 	g.PUT("/:spaceId/members/:userId", r.UpdateMember)
+	g.POST("/:spaceId/members/:userId", r.UpdateMember)
 	g.DELETE("/:spaceId/members/:userId", r.RemoveMember)
+	g.POST("/:spaceId/members/:userId/delete", r.RemoveMember)
+	g.DELETE("/:spaceId", r.DeleteSpace)
+	g.POST("/:spaceId/delete", r.DeleteSpace)
 }
 
 type memberRequest struct {
 	Email string `json:"email" binding:"required,email"`
 	Role  string `json:"role" binding:"required"`
+}
+
+// memberRoleRequest is the role-only payload the member list sends. It must not
+// reuse memberRequest, whose email binding would reject a role-only update.
+type memberRoleRequest struct {
+	Role string `json:"role" binding:"required"`
 }
 
 type renameRequest struct {
@@ -1037,7 +1048,7 @@ func (r *SpaceRouter) UpdateMember(c *gin.Context) {
 		response.ErrorParamFomat(c, "invalid userId")
 		return
 	}
-	var req memberRequest
+	var req memberRoleRequest
 	if err := c.ShouldBindJSON(&req); err != nil || !validSpaceRole(req.Role) {
 		response.ErrorParamFomat(c, "invalid role")
 		return
@@ -1074,11 +1085,131 @@ func (r *SpaceRouter) RemoveMember(c *gin.Context) {
 		response.ErrorDataNotFound(c)
 		return
 	}
+	// The owner always resolves to the admin role through spaceRole, so
+	// removing that row would not actually revoke access. Leaving the space is
+	// an explicit owner action that deletes the space instead.
+	if uint(uid) == space.OwnerUserID {
+		response.Error(c, "the space owner cannot be removed; leave the space to delete it")
+		return
+	}
 	if err := repository.Db.Where("space_id IN ? AND user_id = ?", pairedIDs(repository.Db, space), uid).Delete(&repository.SpaceMember{}).Error; err != nil {
 		response.ErrorDatabase(c, err.Error())
 		return
 	}
 	response.Success(c)
+}
+
+// DeleteSpace removes the space and its paired Yang space. Only the owner may
+// call it, because it is the irreversible action behind "leaving" a space that
+// would otherwise have no administrator left.
+func (r *SpaceRouter) DeleteSpace(c *gin.Context) {
+	user, ok := base.GetCurrentUserInfo(c)
+	if !ok {
+		response.Error(c, "not logged in")
+		return
+	}
+	id, err := spaceID(c)
+	if err != nil {
+		response.ErrorParamFomat(c, "invalid spaceId")
+		return
+	}
+	var space repository.Space
+	if repository.Db.First(&space, id).Error != nil {
+		response.ErrorDataNotFound(c)
+		return
+	}
+	if space.OwnerUserID != user.ID {
+		response.ErrorNoAccess(c)
+		return
+	}
+	if space.Type == repository.SpaceTypePersonal {
+		response.Error(c, "a personal space cannot be deleted")
+		return
+	}
+	spaceIDs := pairedIDs(repository.Db, space)
+	fileNames, err := deleteSpaceData(spaceIDs)
+	if err != nil {
+		response.ErrorDatabase(c, err.Error())
+		return
+	}
+	// Storage cleanup runs after the rows are gone; a failure here must not
+	// roll back an already committed delete.
+	for _, fileName := range fileNames {
+		if err := global.Storage.Delete(c.Request.Context(), fileName); err != nil {
+			zaplog.Logger.Errorf("Failed to delete space file %s from storage: %v", fileName, err)
+		}
+	}
+	response.Success(c)
+}
+
+// deleteSpaceData removes every row owned by the given spaces and reports the
+// stored file names that are no longer referenced.
+func deleteSpaceData(spaceIDs []uint) ([]string, error) {
+	var fileNames []string
+	err := repository.Db.Transaction(func(tx *gorm.DB) error {
+		var items []repository.ItemIcon
+		if err := tx.Where("space_id IN ?", spaceIDs).Find(&items).Error; err != nil {
+			return err
+		}
+		referenced := make(map[string]struct{}, len(items))
+		for _, item := range items {
+			var info repository.ItemIconIconInfo
+			if err := json.Unmarshal([]byte(item.IconJson), &info); err != nil {
+				// A legacy or hand-edited row must not block the delete.
+				continue
+			}
+			if info.FileName != "" {
+				referenced[info.FileName] = struct{}{}
+			}
+		}
+		if len(referenced) > 0 {
+			var files []repository.File
+			if err := tx.Where("file_name IN ?", keysOf(referenced)).Find(&files).Error; err != nil {
+				return err
+			}
+			for _, file := range files {
+				if _, ok := referenced[file.FileName]; !ok {
+					continue
+				}
+				var stillUsed int64
+				if err := tx.Model(&repository.ItemIcon{}).Where("icon_json LIKE ?", "%\""+file.FileName+"\"%").Count(&stillUsed).Error; err != nil {
+					return err
+				}
+				if stillUsed > 0 {
+					continue
+				}
+				if err := tx.Delete(&repository.File{}, file.ID).Error; err != nil {
+					return err
+				}
+				fileNames = append(fileNames, file.FileName)
+			}
+		}
+		if err := tx.Where("space_id IN ?", spaceIDs).Delete(&repository.ItemIcon{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("space_id IN ?", spaceIDs).Delete(&repository.ItemIconGroup{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("space_id IN ?", spaceIDs).Delete(&repository.SpaceMember{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("space_id IN ?", spaceIDs).Delete(&repository.SpaceOIDCGroup{}).Error; err != nil {
+			return err
+		}
+		return tx.Where("id IN ?", spaceIDs).Delete(&repository.Space{}).Error
+	})
+	if err != nil {
+		return nil, err
+	}
+	return fileNames, nil
+}
+
+func keysOf(values map[string]struct{}) []string {
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	return keys
 }
 func validSpaceRole(role string) bool {
 	return role == repository.SpaceRoleAdmin || role == repository.SpaceRoleEditor || role == repository.SpaceRoleViewer

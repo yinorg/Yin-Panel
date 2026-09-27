@@ -295,9 +295,9 @@ func TestBuiltinPackagesV2AreCompleteDTCGAndRepeatable(t *testing.T) {
 		if err != nil || !builtin || !knownBuiltin || strings.Join(permissions, ",") != strings.Join(wantPermissions, ",") {
 			t.Errorf("%s implicit permissions = %v, want %v, builtin=%v, err=%v", summary.ID, permissions, wantPermissions, builtin, err)
 		}
-		wantVersion := "2.3.1"
+		wantVersion := "2.3.2"
 		if summary.ID == "org.yin.default" {
-			wantVersion = "2.3.2"
+			wantVersion = "2.3.5"
 		}
 		if pkg.Manifest.Version != wantVersion {
 			t.Errorf("%s builtin version = %q, want %q", summary.ID, pkg.Manifest.Version, wantVersion)
@@ -361,20 +361,20 @@ func TestBuiltinHomeAssetsLoadFromPackagedThemeSources(t *testing.T) {
 func TestBuiltinHomeResourceHashesOnlyChangeForDefaultYin(t *testing.T) {
 	expected := map[string]map[string]string{
 		"org.yin.default": {
-			"views/home.mjs":  "255340692690a192a6c378eec6f05a6a15e2dbb30f1f6b124b81fb5e682d9b24",
-			"styles/home.css": "043ac9738753b4f4caec851f16edf576f28b5e563c992415106d9fdfdd83a15b",
+			"views/home.mjs":  "148991d74b7088e9e2e2b31ed649402be73852637d657ec5bb7d78b5fc758ac4",
+			"styles/home.css": "0d73fcf5277744d17dbbb490cc9de540a8569d6a8679bc68fcb9af3859e4df5b",
 		},
 		"org.yin.glass": {
-			"views/home.mjs":  "9b05d957b081408a2898c2c318327bda62f974fa34c4e7023b4745647d5967cb",
-			"styles/home.css": "98e5b63ca947731feb830ece304afc3ede49dfdefd0e0fb92d4afd4d6007c76b",
+			"views/home.mjs":  "6f380f2079ba8f523ad4ce149b9f9faa7b5f7d11a9053e8a336b0624e0b1a091",
+			"styles/home.css": "a46ef90408799b5fafad0f26a59faea0d8c54f29d1f5518f6335b81bf87559cc",
 		},
 		"org.yin.minimal": {
-			"views/home.mjs":  "9b05d957b081408a2898c2c318327bda62f974fa34c4e7023b4745647d5967cb",
-			"styles/home.css": "6a5799840b0045e4b50991219578b53b63e67273e97bfaa99cd11f3556b99ebb",
+			"views/home.mjs":  "6f380f2079ba8f523ad4ce149b9f9faa7b5f7d11a9053e8a336b0624e0b1a091",
+			"styles/home.css": "84f1a6ff276e43d29e1ce6150d449f04e28d9cf0b02ae4b2a5d46e032daea151",
 		},
 		"org.yin.cyber": {
-			"views/home.mjs":  "9b05d957b081408a2898c2c318327bda62f974fa34c4e7023b4745647d5967cb",
-			"styles/home.css": "e462b98fb35f7c135747203b9553a077cfe7d38c2f82ea84ab8b6291c7695165",
+			"views/home.mjs":  "6f380f2079ba8f523ad4ce149b9f9faa7b5f7d11a9053e8a336b0624e0b1a091",
+			"styles/home.css": "a41bcb1a21a82534b76f512ec76b9ca1e42661694ed6fcce56c52056271cc17f",
 		},
 	}
 	for id, want := range expected {
@@ -441,7 +441,7 @@ func TestEnsureBuiltinV2UpgradesOnlyActivationForSelectedBuiltin(t *testing.T) {
 		t.Fatal(err)
 	}
 	latest, err := LatestPackageRevisionV2(db, "org.yin.default")
-	if err != nil || latest.Version != "2.3.2" || activation.ActiveRevisionID != latest.ID {
+	if err != nil || latest.Version != "2.3.5" || activation.ActiveRevisionID != latest.ID {
 		t.Fatalf("selected builtin activation = %+v, latest=%s, err=%v", activation, latest.ID, err)
 	}
 	if latest.ID == old.Revision {

@@ -33,7 +33,6 @@ export default {
     const collapsedGroups = new Set()
     const groupNodes = new Map()
     const itemNodes = new Map()
-    const spaceNodes = new Map()
     const directoryNodes = new Map()
 
     const run = async action => {
@@ -204,8 +203,6 @@ export default {
     let clock
     let clockTime
     let clockDate
-    let sideToggle
-    let spacesNav
     let searchSection
     let searchInput
     let engineSelect
@@ -237,6 +234,31 @@ export default {
       else clock.style.removeProperty('color')
     }
 
+    const canToggleSide = () => (snapshot?.activeSpaceCapabilities || []).includes('space.toggleSide')
+
+    // The frame is sized to this document's content, so `vh` inside it resolves
+    // against the content height. Spacing must therefore use the real viewport
+    // reported by the Core environment, otherwise the frame height feeds back
+    // into its own padding and the layout grows without bound.
+    const viewportHeight = () => {
+      const reported = Number(api.environment?.get?.()?.viewport?.height)
+      return Number.isFinite(reported) && reported > 0 ? reported : window.innerHeight
+    }
+
+    const togglePanelSide = async () => {
+      if (sideSwitching || !canToggleSide()) return
+      sideSwitching = true
+      updateLogo(snapshot?.presentation)
+      try {
+        await api.commands.execute('space.toggleSide')
+      } catch (error) {
+        if (status) status.textContent = error?.message || 'Unable to switch panel'
+      } finally {
+        sideSwitching = false
+        updateLogo(snapshot?.presentation)
+      }
+    }
+
     const createShell = elementRoot => {
       root = elementRoot
       root.replaceChildren()
@@ -249,6 +271,13 @@ export default {
       logoImage.alt = ''
       logoText = element('span', 'yin-logo-text')
       logo.append(logoImage, logoText)
+      logo.dataset.testid = 'theme-side-toggle'
+      logo.addEventListener('click', () => { void togglePanelSide() })
+      logo.addEventListener('keydown', event => {
+        if (event.key !== 'Enter' && event.key !== ' ') return
+        event.preventDefault()
+        void togglePanelSide()
+      })
       logoDivider = element('span', 'yin-logo-divider', '|')
       logoDivider.setAttribute('aria-hidden', 'true')
       clock = element('time', 'yin-clock')
@@ -258,25 +287,6 @@ export default {
       clock.append(clockTime, clockDate)
       identity.append(logo, logoDivider, clock)
       masthead.append(identity)
-      sideToggle = element('button', 'yin-side-toggle')
-      sideToggle.type = 'button'
-      sideToggle.dataset.testid = 'theme-side-toggle'
-      sideToggle.addEventListener('click', async () => {
-        if (sideSwitching) return
-        sideSwitching = true
-        sideToggle.disabled = true
-        try {
-          await api.commands.execute('space.toggleSide')
-        } catch (error) {
-          status.textContent = error?.message || 'Unable to switch panel'
-        } finally {
-          sideSwitching = false
-          sideToggle.disabled = !(snapshot?.activeSpaceCapabilities || []).includes('space.toggleSide')
-        }
-      })
-      masthead.append(sideToggle)
-      spacesNav = element('nav', 'yin-spaces')
-      spacesNav.setAttribute('aria-label', 'Spaces')
       actionBar = element('div', 'yin-actions')
       actionBar.setAttribute('aria-label', 'Bookmark actions')
       addGroupButton = addActionButton(actionBar, 'Add group', 'theme-add-group', 'Add group', () => showGroupDialog('create'))
@@ -300,6 +310,10 @@ export default {
       })
       engineSelect = element('select', 'yin-search-engine')
       engineSelect.setAttribute('aria-label', 'Search engine')
+      engineSelect.addEventListener('change', () => {
+        updateEngineIndicator()
+        submitSearch()
+      })
       searchButton = element('button', 'yin-search-submit', 'Search')
       searchButton.type = 'button'
       searchButton.setAttribute('aria-label', 'Search')
@@ -363,7 +377,7 @@ export default {
       contextMenu.hidden = true
       contextMenu.setAttribute('role', 'menu')
       contextMenu.setAttribute('aria-label', 'Item actions')
-      page.append(masthead, spacesNav, actionBar, searchSection, directoryNav, status, collection, emptyState, footer, groupDialog, contextMenu)
+      page.append(masthead, actionBar, searchSection, directoryNav, status, collection, emptyState, footer, groupDialog, contextMenu)
       page.addEventListener('keydown', event => {
         if (!groupDialog.hidden && event.key === 'Tab') {
           const focusable = [...groupDialog.querySelectorAll('input:not(:disabled), button:not(:disabled)')]
@@ -410,35 +424,31 @@ export default {
       logoImage.hidden = !src
       logoText.hidden = !!src
       if (src && logoImage.src !== src) logoImage.src = src
-      logo.setAttribute('aria-label', logoText.textContent)
+      if (canToggleSide()) {
+        // The brand mark itself is the side switch, matching the Core home.
+        logo.setAttribute('role', 'button')
+        logo.setAttribute('aria-label', `Switch to ${snapshot?.activeSpaceSide === 'yang' ? 'Yin' : 'Yang'}-Panel`)
+        logo.setAttribute('aria-disabled', sideSwitching ? 'true' : 'false')
+        logo.tabIndex = sideSwitching ? -1 : 0
+      } else {
+        logo.removeAttribute('role')
+        logo.removeAttribute('aria-disabled')
+        logo.setAttribute('aria-label', logoText.textContent)
+        logo.tabIndex = -1
+      }
     }
 
-    const updateSpaces = spaces => {
-      const kept = new Set()
-      for (const space of spaces || []) {
-        const key = String(space.id)
-        kept.add(key)
-        let button = spaceNodes.get(key)
-        if (!button) {
-          button = element('button', 'yin-space-button')
-          button.type = 'button'
-          button.addEventListener('click', () => run(() => api.commands.execute('space.select', { spaceId: button.dataset.spaceId })))
-          spaceNodes.set(key, button)
-        }
-        button.dataset.spaceId = key
-        button.textContent = space.name || 'Space'
-        button.disabled = !(space.capabilities || []).includes('space.select')
-        button.classList.toggle('is-active', key === snapshot.activeSpaceId)
-        button.setAttribute('aria-current', key === snapshot.activeSpaceId ? 'page' : 'false')
-        spacesNav.append(button)
-      }
-      for (const [key, button] of spaceNodes) {
-        if (!kept.has(key)) {
-          button.remove()
-          spaceNodes.delete(key)
-        }
-      }
-      spacesNav.hidden = spaceNodes.size < 2
+    // The engine picker must reflect the selection immediately. Waiting for the
+    // Core round trip leaves the previous icon on screen, and the submission
+    // opens a new tab that takes focus away before any snapshot arrives.
+    const updateEngineIndicator = () => {
+      const engines = snapshot?.presentation?.search?.engines || []
+      const currentEngine = engines.find(engine => engine.id === engineSelect.value)
+      engineSelect.style.backgroundImage = currentEngine?.iconSrc
+        ? `url("${currentEngine.iconSrc.replace(/["\\\n\r]/g, '')}")`
+        : 'none'
+      engineSelect.setAttribute('aria-label', currentEngine ? `Search engine: ${currentEngine.title}` : 'Search engine')
+      searchButton.hidden = !engineSelect.value
     }
 
     const updateSearch = presentation => {
@@ -458,10 +468,7 @@ export default {
       engineSelect.value = (search?.engines || []).some(engine => engine.id === oldValue)
         ? oldValue
         : search?.currentEngineId || ''
-      const currentEngine = (search?.engines || []).find(engine => engine.id === engineSelect.value)
-      engineSelect.style.backgroundImage = currentEngine?.iconSrc ? `url("${currentEngine.iconSrc.replace(/["\\\n\r]/g, '')}")` : 'none'
-      engineSelect.setAttribute('aria-label', currentEngine ? `Search engine: ${currentEngine.title}` : 'Search engine')
-      searchButton.hidden = !engineSelect.value
+      updateEngineIndicator()
       searchButton.disabled = snapshot.status === 'loading'
     }
 
@@ -649,6 +656,7 @@ export default {
     const positionCollectionAfterMonitor = () => {
       if (collectionLayoutFrame) cancelAnimationFrame(collectionLayoutFrame)
       collection.style.removeProperty('margin-top')
+      if (directoryNav) directoryNav.style.removeProperty('margin-top')
       collectionLayoutFrame = requestAnimationFrame(() => {
         collectionLayoutFrame = undefined
         const reservedHeight = Number(snapshot?.presentation?.monitor?.reservedHeight)
@@ -656,11 +664,21 @@ export default {
         const isDirectory = snapshot?.presentation?.layout === 'directory'
         const naturalMargin = isDirectory ? 18 : 24
         const mobileStandardGap = !isDirectory && window.matchMedia('(max-width: 640px)').matches
-          ? Math.round(window.innerHeight * 0.187) + 30
+          ? Math.round(viewportHeight() * 0.187) + 30
           : 77
         const desiredTop = reservedHeight + mobileStandardGap
-        const currentTop = collection.getBoundingClientRect().top
-        collection.style.marginTop = `${naturalMargin + Math.max(0, desiredTop - currentTop)}px`
+        // The directory folder picker sits between the search box and the
+        // collection, so it is the element that lands inside the monitor band.
+        // Push the picker below the band and keep the collection at its natural
+        // spacing, otherwise the picker is covered by the monitor.
+        if (isDirectory && directoryNav && !directoryNav.hidden) {
+          const navTop = directoryNav.getBoundingClientRect().top
+          directoryNav.style.marginTop = `${Math.max(0, desiredTop - navTop)}px`
+          collection.style.marginTop = `${naturalMargin}px`
+        } else {
+          const currentTop = collection.getBoundingClientRect().top
+          collection.style.marginTop = `${naturalMargin + Math.max(0, desiredTop - currentTop)}px`
+        }
       })
     }
 
@@ -772,21 +790,17 @@ export default {
       const presentation = snapshot.presentation || {}
       root.dataset.layout = presentation.layout === 'directory' ? 'directory' : 'standard'
       page.classList.toggle('yin-page--directory', presentation.layout === 'directory')
+      page.style.setProperty('--yin-viewport-height', `${viewportHeight()}px`)
       page.style.setProperty('--yin-content-max-width', `${presentation.content?.maxWidth || 1200}${presentation.content?.maxWidthUnit || 'px'}`)
       page.style.setProperty('--yin-margin-x', `${presentation.content?.marginX || 0}px`)
-      page.style.setProperty('--yin-content-top', `${presentation.content?.marginTopPercent || 0}vh`)
-      page.style.setProperty('--yin-content-bottom', `${presentation.content?.marginBottomPercent || 0}vh`)
+      page.style.setProperty('--yin-content-top', `${(viewportHeight() * (presentation.content?.marginTopPercent || 0)) / 100}px`)
+      page.style.setProperty('--yin-content-bottom', `${(viewportHeight() * (presentation.content?.marginBottomPercent || 0)) / 100}px`)
       page.style.setProperty('--yin-icon-text-color', presentation.iconTextColor || '#ffffff')
       const reservedHeight = Number(presentation.monitor?.reservedHeight)
       page.style.setProperty('--yin-monitor-reserved-height', `${Number.isFinite(reservedHeight) && reservedHeight > 0 ? reservedHeight : 0}px`)
       updateLogo(presentation)
       updateClock()
-      sideToggle.hidden = !(snapshot.activeSpaceCapabilities || []).includes('space.toggleSide')
-      sideToggle.textContent = `Switch to ${snapshot.activeSpaceSide === 'yang' ? 'Yin' : 'Yang'}-Panel`
-      sideToggle.setAttribute('aria-label', sideToggle.textContent)
-      sideToggle.disabled = sideSwitching
       addGroupButton.hidden = !canMutateGroup('create')
-      updateSpaces(snapshot.spaces)
       updateSearch(presentation)
       updateFooter(presentation.footerHtml || '')
       renderCollection()
@@ -798,9 +812,14 @@ export default {
         home(elementRoot, _api, initialSnapshot) {
           createShell(elementRoot)
           update(initialSnapshot)
+          // The Core monitor layer is positioned with viewport units, so the
+          // reservation has to be recomputed whenever the viewport changes.
+          const handleViewportResize = () => positionCollectionAfterMonitor()
+          window.addEventListener('resize', handleViewportResize)
           return {
             update,
             unmount() {
+              window.removeEventListener('resize', handleViewportResize)
               if (clockTimer) window.clearInterval(clockTimer)
               if (collectionLayoutFrame) cancelAnimationFrame(collectionLayoutFrame)
               root?.replaceChildren()

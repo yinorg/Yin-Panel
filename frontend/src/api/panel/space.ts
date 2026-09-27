@@ -70,12 +70,13 @@ export function updateGroup<T>(spaceId: number, groupId: number, title: string, 
 export function deleteGroup<T>(spaceId: number, groupId: number) { return post<T>({ url: `/spaces/${spaceId}/groups/${groupId}/delete` }) }
 export function sortGroups<T>(spaceId: number, parentId: number | null, sortGroups: { id: number; sort: number }[]) { return post<T>({ url: `/spaces/${spaceId}/groups/sort`, data: { parentId, sortGroups } }) }
 export function renameSpace<T>(spaceId: number, name: string) { return post<T>({ url: `/spaces/${spaceId}`, data: { name } }) }
+export function deleteSpace<T>(spaceId: number) { return post<T>({ url: `/spaces/${spaceId}/delete` }) }
 export function copySpace<T>(spaceId: number, name?: string) { return post<T>({ url: `/spaces/${spaceId}/copy`, data: name ? { name } : {} }) }
 export function transferSpace<T>(spaceId: number, email: string) { return post<T>({ url: `/spaces/${spaceId}/transfer`, data: { email } }) }
 export function getMembers<T>(spaceId: number) { return get<T>({ url: `/spaces/${spaceId}/members` }) }
 export function addMember<T>(spaceId: number, email: string, role: string) { return post<T>({ url: `/spaces/${spaceId}/members`, data: { email, role } }) }
 export function updateMember<T>(spaceId: number, userId: number, role: string) { return post<T>({ url: `/spaces/${spaceId}/members/${userId}`, data: { role } }) }
-export function removeMember<T>(spaceId: number, userId: number) { return post<T>({ url: `/spaces/${spaceId}/members/${userId}` }) }
+export function removeMember<T>(spaceId: number, userId: number) { return post<T>({ url: `/spaces/${spaceId}/members/${userId}/delete` }) }
 export function getOIDCGroups<T>(spaceId: number) { return get<T>({ url: `/spaces/${spaceId}/oidc-groups` }) }
 export function addOIDCGroup<T>(spaceId: number, provider: string, groupName: string, role: string) { return post<T>({ url: `/spaces/${spaceId}/oidc-groups`, data: { provider, groupName, role } }) }
 export function deleteOIDCGroup<T>(spaceId: number, ruleId: number) { return post<T>({ url: `/spaces/${spaceId}/oidc-groups/${ruleId}` }) }
