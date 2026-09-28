@@ -309,7 +309,7 @@ const themeRuntimeSnapshot = computed(() => createThemeHomeSnapshot({
   activeSpaceId: activeSpace.value?.id,
   activeSpaceSide: activeSpace.value?.side,
   activeSpacePairedId: activeSpace.value?.pairedSpaceId,
-  activeSpaceCanEdit: activeSpace.value?.canEdit === true,
+  activeSpaceCanEdit: activeSpace.value?.canEdit === true && !publicCode,
   activeSpaceCapabilities: activeSpace.value?.pairedSpaceId ? ['space.toggleSide'] : [],
   groups: items.value.filter(group => Number.isSafeInteger(Number(group.id))).map(group => ({
     ...group,
@@ -449,7 +449,11 @@ function getCachedSpace(spaceId: number) { return readSpaceCache(spaceId, authSt
 function saveCachedSpace(spaceId: number, cache: any) { writeSpaceCache(spaceId, cache, authStore.userInfo?.id, sessionOnlyCache) }
 function clearCachedSpace(spaceId: number) { clearSpaceCache(spaceId, authStore.userInfo?.id, sessionOnlyCache) }
 const offlineUnavailable = computed(() => homeReady.value && !isOnline.value && !hasValidCachedHome.value)
-const canWrite = computed(() => isOnline.value && !offlineUnavailable.value)
+// A public link or a viewer membership must never expose write affordances. The
+// server rejects the writes anyway, but the buttons still render and open dead
+// dialogs, so gate them here too.
+const canEditActiveSpace = computed(() => !publicCode && activeSpace.value?.canEdit !== false)
+const canWrite = computed(() => isOnline.value && !offlineUnavailable.value && canEditActiveSpace.value)
 
 function unlockPublicAccess() {
   if (publicAccessCode.value.length < 4 || publicAccessCode.value.length > 12) return
@@ -1347,7 +1351,8 @@ function handleThemeRuntimeFailure(error: Error) {
         </NButton>
       </NDropdown>
     </div>
-    <div v-if="homeReady" class="offline-status" :class="{ 'offline-status--theme-hidden': themeRuntimeActive && isOnline }" data-testid="offline-status">
+    <!-- Public links have no space selector; nothing should occupy that spot. -->
+    <div v-if="homeReady && !publicCode" class="offline-status" :class="{ 'offline-status--theme-hidden': themeRuntimeActive && isOnline }" data-testid="offline-status">
       <span v-if="pwaReady" data-testid="pwa-ready">{{ $t('panelHome.pwaReady') }}</span>
       <template v-if="!isOnline && hasValidCachedHome">
         <span data-testid="offline-readonly">{{ $t('panelHome.offlineReadonly') }}</span>
@@ -1381,6 +1386,7 @@ function handleThemeRuntimeFailure(error: Error) {
         :class="{ 'theme-runtime-monitor-layer--info': panelState.panelConfig.iconStyle === PanelPanelConfigStyleEnum.info, 'theme-runtime-monitor-layer--yin': themeRuntimePackage?.manifest.id === 'org.yin.default' }"
         data-testid="theme-runtime-monitor"
         :data-panel-side="activeSpace?.side || 'yin'"
+        :style="{ '--yin-theme-content-top': `${panelState.panelConfig.marginTop ?? 10}vh` }"
       >
         <SystemMonitor
           :snapshot-controller="monitorSnapshotController"
@@ -1785,7 +1791,11 @@ function handleThemeRuntimeFailure(error: Error) {
 .theme-runtime-monitor-layer { position: absolute; z-index: 5; top: 72px; left: var(--yin-pageGutter); right: var(--yin-pageGutter); max-height: 220px; overflow: auto; pointer-events: none; }
 .theme-runtime-monitor-layer > * { pointer-events: none; }
 .theme-runtime-monitor-layer--info { max-height: 260px; }
-.theme-runtime-monitor-layer--yin { top: clamp(169.5px, 23.1vh, 208px); right: auto; left: 50%; width: min(calc(var(--yin-contentMaxWidth, 1200px) - 30px), calc(100vw - 30px)); max-width: none; max-height: 286px; padding-top: 26px; box-sizing: border-box; transform: translateX(-50%); --yin-text: #fff; --yin-textMuted: rgb(255 255 255 / 82%); --yin-primary: #fff; --yin-border: transparent; --yin-component-app-icon-surface: rgb(42 42 42 / 42%); --yin-component-system-monitor-heading-size: 18px; }
+/* The theme matches the search-box bottom to the same content formula it uses
+   for its own layout (marginTopPercent of the viewport + a fixed masthead and
+   search height). Anchoring the monitor layer to that keeps it below the search
+   box instead of the old viewport-height guess, which sat on top of it. */
+.theme-runtime-monitor-layer--yin { top: calc(var(--yin-theme-content-top, 10vh) + 187px); right: auto; left: 50%; width: min(calc(var(--yin-contentMaxWidth, 1200px) - 30px), calc(100vw - 30px)); max-width: none; max-height: 286px; padding-top: 26px; box-sizing: border-box; transform: translateX(-50%); --yin-text: #fff; --yin-textMuted: rgb(255 255 255 / 82%); --yin-primary: #fff; --yin-border: transparent; --yin-component-app-icon-surface: rgb(42 42 42 / 42%); --yin-component-system-monitor-heading-size: 18px; }
 :global(.theme-runtime-monitor-layer--yin .n-progress-graph-circle-rail) { stroke: rgb(255 255 255 / 36%) !important; }
 @media (max-width: 640px) {
   :global(.theme-runtime-monitor-layer--yin:not(.theme-runtime-monitor-layer--directory)) { top: 169.5px; }

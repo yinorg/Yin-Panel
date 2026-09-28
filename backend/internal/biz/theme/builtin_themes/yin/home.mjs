@@ -205,7 +205,9 @@ export default {
     let clockDate
     let searchSection
     let searchInput
-    let engineSelect
+    let engineMenu
+    let engineButton
+    let selectedEngineId = ''
     let searchButton
     let directoryNav
     let collection
@@ -308,17 +310,27 @@ export default {
           submitSearch()
         }
       })
-      engineSelect = element('select', 'yin-search-engine')
-      engineSelect.setAttribute('aria-label', 'Search engine')
-      engineSelect.addEventListener('change', () => {
-        updateEngineIndicator()
-        submitSearch()
+      // The pre-theme engine switcher revealed the engine icons and let the user
+      // pick one, instead of a native select. Mirror that: a button showing the
+      // active engine plus a popup of engine icons.
+      engineButton = element('button', 'yin-search-engine')
+      engineButton.type = 'button'
+      engineButton.setAttribute('aria-label', 'Search engine')
+      engineButton.setAttribute('aria-haspopup', 'listbox')
+      engineButton.setAttribute('aria-expanded', 'false')
+      engineButton.addEventListener('click', event => {
+        event.stopPropagation()
+        setEngineMenuOpen(engineMenu.hidden)
       })
+      engineMenu = element('div', 'yin-search-engines')
+      engineMenu.setAttribute('role', 'listbox')
+      engineMenu.hidden = true
+      engineMenu.addEventListener('click', event => event.stopPropagation())
       searchButton = element('button', 'yin-search-submit', 'Search')
       searchButton.type = 'button'
       searchButton.setAttribute('aria-label', 'Search')
       searchButton.addEventListener('click', submitSearch)
-      searchSection.append(searchInput, engineSelect, searchButton)
+      searchSection.append(searchInput, engineButton, engineMenu, searchButton)
       directoryNav = element('nav', 'directory-folders')
       directoryNav.setAttribute('aria-label', 'Bookmark groups')
       status = element('p', 'yin-status')
@@ -410,8 +422,9 @@ export default {
     const submitSearch = () => {
       const presentation = snapshot?.presentation
       if (!presentation?.search?.visible) return
-      const engineId = engineSelect.value
+      const engineId = selectedEngineId
       const engines = presentation.search.engines || []
+      setEngineMenuOpen(false)
       if (engineId && engines.some(engine => engine.id === engineId)) {
         return run(() => api.commands.execute('search.submit', { action: 'engine', engineId, query }))
       }
@@ -441,14 +454,19 @@ export default {
     // The engine picker must reflect the selection immediately. Waiting for the
     // Core round trip leaves the previous icon on screen, and the submission
     // opens a new tab that takes focus away before any snapshot arrives.
+    const setEngineMenuOpen = open => {
+      engineMenu.hidden = !open
+      engineButton.setAttribute('aria-expanded', open ? 'true' : 'false')
+    }
+
     const updateEngineIndicator = () => {
       const engines = snapshot?.presentation?.search?.engines || []
-      const currentEngine = engines.find(engine => engine.id === engineSelect.value)
-      engineSelect.style.backgroundImage = currentEngine?.iconSrc
+      const currentEngine = engines.find(engine => engine.id === selectedEngineId)
+      engineButton.style.backgroundImage = currentEngine?.iconSrc
         ? `url("${currentEngine.iconSrc.replace(/["\\\n\r]/g, '')}")`
         : 'none'
-      engineSelect.setAttribute('aria-label', currentEngine ? `Search engine: ${currentEngine.title}` : 'Search engine')
-      searchButton.hidden = !engineSelect.value
+      engineButton.setAttribute('aria-label', currentEngine ? `Search engine: ${currentEngine.title}` : 'Search engine')
+      searchButton.hidden = !selectedEngineId
     }
 
     const updateSearch = presentation => {
@@ -457,17 +475,32 @@ export default {
       searchInput.hidden = !search?.itemFilterEnabled
       if (searchInput.value !== query) searchInput.value = query
       searchInput.disabled = snapshot.status === 'loading'
-      const oldValue = engineSelect.value
-      engineSelect.replaceChildren()
-      for (const engine of search?.engines || []) {
-        const option = element('option', '', engine.title)
-        option.value = engine.id
-        engineSelect.append(option)
+      const engines = search?.engines || []
+      if (!engines.some(engine => engine.id === selectedEngineId))
+        selectedEngineId = search?.currentEngineId || engines[0]?.id || ''
+      engineMenu.replaceChildren()
+      for (const engine of engines) {
+        const option = element('button', 'yin-search-engine-option')
+        option.type = 'button'
+        option.setAttribute('role', 'option')
+        option.setAttribute('aria-selected', String(engine.id === selectedEngineId))
+        option.setAttribute('aria-label', engine.title)
+        option.title = engine.title
+        if (engine.iconSrc)
+          option.style.backgroundImage = `url("${engine.iconSrc.replace(/["\\\n\r]/g, '')}")`
+        else
+          option.textContent = engine.title.slice(0, 1)
+        option.addEventListener('click', () => {
+          selectedEngineId = engine.id
+          setEngineMenuOpen(false)
+          updateEngineIndicator()
+          submitSearch()
+        })
+        engineMenu.append(option)
       }
-      engineSelect.hidden = !(search?.engines || []).length
-      engineSelect.value = (search?.engines || []).some(engine => engine.id === oldValue)
-        ? oldValue
-        : search?.currentEngineId || ''
+      engineButton.hidden = !engines.length
+      engineMenu.hidden = true
+      engineButton.setAttribute('aria-expanded', 'false')
       updateEngineIndicator()
       searchButton.disabled = snapshot.status === 'loading'
     }
@@ -510,7 +543,7 @@ export default {
       heading.append(title, controls, toggle)
       const list = element('div', 'yin-group-items')
       section.append(heading, list)
-      section._yin = { title, toggle, list, addItem, editGroup, deleteGroup, moveGroupUp, moveGroupDown }
+      section._yin = { heading, title, toggle, list, addItem, editGroup, deleteGroup, moveGroupUp, moveGroupDown }
       return section
     }
 
@@ -573,8 +606,18 @@ export default {
       } else {
         icon.textContent = itemIcon?.text || itemIcon?.fileName || (item.title || '?').slice(0, 1)
       }
-      button.classList.toggle('yin-item--info', layout === 'standard' && presentation?.iconStyle === 'info')
-      if (itemIcon?.backgroundColor) icon.style.backgroundColor = itemIcon.backgroundColor
+      const infoStyle = layout === 'standard' && presentation?.iconStyle === 'info'
+      button.classList.toggle('yin-item--info', infoStyle)
+      // The detailed style paints the whole card with the item colour and keeps
+      // the glyph on a transparent tile, matching the pre-theme build.
+      if (infoStyle) {
+        if (itemIcon?.backgroundColor) button.style.backgroundColor = itemIcon.backgroundColor
+        else button.style.removeProperty('background-color')
+        icon.style.removeProperty('background-color')
+      } else {
+        button.style.removeProperty('background-color')
+        if (itemIcon?.backgroundColor) icon.style.backgroundColor = itemIcon.backgroundColor
+      }
     }
 
     const groupTree = groups => {
@@ -717,6 +760,10 @@ export default {
         section._yin.toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true')
         section.classList.toggle('is-collapsed', collapsed)
         section.style.setProperty('--yin-group-depth', String(depth))
+        // In the directory layout the selected root is already named by the
+        // folder picker above, so its own heading row is redundant. Keep the
+        // items, drop the heading.
+        section._yin.heading.hidden = isDirectory && depth === 0
         const siblings = (snapshot.groups || []).filter(candidate => (candidate.parentId ?? null) === (group.parentId ?? null))
         const siblingIndex = siblings.findIndex(candidate => String(candidate.id) === String(group.id))
         section._yin.addItem.hidden = !canCreateItems()
@@ -790,6 +837,9 @@ export default {
       const presentation = snapshot.presentation || {}
       root.dataset.layout = presentation.layout === 'directory' ? 'directory' : 'standard'
       page.classList.toggle('yin-page--directory', presentation.layout === 'directory')
+      // The pre-theme build switched the item grid to a 200px-minimum card grid
+      // for the "detailed" icon style; the marker lets the stylesheet do the same.
+      page.classList.toggle('yin-page--info', presentation.layout !== 'directory' && presentation.iconStyle === 'info')
       page.style.setProperty('--yin-viewport-height', `${viewportHeight()}px`)
       page.style.setProperty('--yin-content-max-width', `${presentation.content?.maxWidth || 1200}${presentation.content?.maxWidthUnit || 'px'}`)
       page.style.setProperty('--yin-margin-x', `${presentation.content?.marginX || 0}px`)
@@ -815,11 +865,14 @@ export default {
           // The Core monitor layer is positioned with viewport units, so the
           // reservation has to be recomputed whenever the viewport changes.
           const handleViewportResize = () => positionCollectionAfterMonitor()
+          const handleDocumentPointerDown = () => setEngineMenuOpen(false)
           window.addEventListener('resize', handleViewportResize)
+          document.addEventListener('pointerdown', handleDocumentPointerDown)
           return {
             update,
             unmount() {
               window.removeEventListener('resize', handleViewportResize)
+              document.removeEventListener('pointerdown', handleDocumentPointerDown)
               if (clockTimer) window.clearInterval(clockTimer)
               if (collectionLayoutFrame) cancelAnimationFrame(collectionLayoutFrame)
               root?.replaceChildren()

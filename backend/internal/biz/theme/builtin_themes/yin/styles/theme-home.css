@@ -212,10 +212,52 @@ select {
   background-position: center;
   background-size: 24px 24px;
   color: transparent;
+  cursor: pointer;
 }
 
-.yin-search-engine option {
-  color: #20282c;
+/* The engine picker opens a grid of engine icons, mirroring the pre-theme
+   switcher instead of a native dropdown. */
+.yin-search-engines {
+  position: absolute;
+  z-index: 3;
+  top: calc(100% + 6px);
+  left: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-width: min(320px, 80vw);
+  padding: 8px;
+  border: 1px solid var(--yin-border, rgb(255 255 255 / 22%));
+  border-radius: var(--yin-radiusControl, 8px);
+  background: var(--yin-component-menu-surface, rgb(24 28 32 / 92%));
+  box-shadow: 0 8px 24px rgb(0 0 0 / 35%);
+}
+
+.yin-search-engine-option {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background-color: transparent;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 22px 22px;
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.yin-search-engine-option:hover,
+.yin-search-engine-option:focus-visible {
+  border-color: rgb(255 255 255 / 60%);
+  background-color: rgb(255 255 255 / 12%);
+}
+
+.yin-search-engine-option[aria-selected='true'] {
+  border-color: var(--yin-primary, #176b80);
 }
 
 .yin-search-submit {
@@ -533,7 +575,7 @@ select {
   text-align: center;
 }
 
-.yin-item:hover {
+.yin-item:not(.yin-item--info):hover {
   transform: translateY(-2px);
   background: transparent;
 }
@@ -596,21 +638,53 @@ select {
   font-size: 12px;
 }
 
+/* Detailed style. The pre-theme build used a separate .icon-info-box grid with
+   200px-minimum columns and a full-width rounded card per item, so mirror that
+   instead of reusing the 81px icon column. */
+.yin-page--info .yin-group-items {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 18px;
+}
+
 .yin-item--info {
-  min-height: 68px;
+  width: 100%;
+  min-height: 70px;
   justify-content: flex-start;
-  padding: 10px 12px;
+  gap: 0;
+  padding: 0;
+  border-radius: 16px;
+  overflow: hidden;
+  text-align: left;
+  background: var(--yin-component-app-icon-surface, #2a2a2a6b);
 }
 
 .yin-item--info .yin-item-icon {
-  width: 42px;
-  height: 42px;
-  flex-basis: 42px;
-  font-size: 18px;
+  width: 70px;
+  height: 70px;
+  flex: 0 0 70px;
+  border-radius: 0;
+  background: transparent;
+  font-size: 24px;
+}
+
+.yin-item--info .yin-item-copy {
+  padding: 0 12px;
 }
 
 .yin-item--info .yin-item-title {
-  font-size: 14px;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.yin-item--info .yin-item-description {
+  color: rgb(255 255 255 / 82%);
+  font-size: 12px;
+}
+
+@media (max-width: 500px) {
+  .yin-page--info .yin-group-items { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
 }
 
 .yin-empty {

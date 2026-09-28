@@ -297,7 +297,7 @@ func TestBuiltinPackagesV2AreCompleteDTCGAndRepeatable(t *testing.T) {
 		}
 		wantVersion := "2.3.2"
 		if summary.ID == "org.yin.default" {
-			wantVersion = "2.3.5"
+			wantVersion = "2.3.8"
 		}
 		if pkg.Manifest.Version != wantVersion {
 			t.Errorf("%s builtin version = %q, want %q", summary.ID, pkg.Manifest.Version, wantVersion)
@@ -361,8 +361,8 @@ func TestBuiltinHomeAssetsLoadFromPackagedThemeSources(t *testing.T) {
 func TestBuiltinHomeResourceHashesOnlyChangeForDefaultYin(t *testing.T) {
 	expected := map[string]map[string]string{
 		"org.yin.default": {
-			"views/home.mjs":  "148991d74b7088e9e2e2b31ed649402be73852637d657ec5bb7d78b5fc758ac4",
-			"styles/home.css": "0d73fcf5277744d17dbbb490cc9de540a8569d6a8679bc68fcb9af3859e4df5b",
+			"views/home.mjs":  "ed33f9cdf69cdf3f651171b6a1dab01385e0e61da2e570f6ef101e36c9330253",
+			"styles/home.css": "0a5aae99890633a53ea0c25f110e229f2d451fa9424bdeeec12eec8f25b40e2e",
 		},
 		"org.yin.glass": {
 			"views/home.mjs":  "6f380f2079ba8f523ad4ce149b9f9faa7b5f7d11a9053e8a336b0624e0b1a091",
@@ -441,7 +441,7 @@ func TestEnsureBuiltinV2UpgradesOnlyActivationForSelectedBuiltin(t *testing.T) {
 		t.Fatal(err)
 	}
 	latest, err := LatestPackageRevisionV2(db, "org.yin.default")
-	if err != nil || latest.Version != "2.3.5" || activation.ActiveRevisionID != latest.ID {
+	if err != nil || latest.Version != "2.3.8" || activation.ActiveRevisionID != latest.ID {
 		t.Fatalf("selected builtin activation = %+v, latest=%s, err=%v", activation, latest.ID, err)
 	}
 	if latest.ID == old.Revision {
