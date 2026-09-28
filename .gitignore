@@ -52,6 +52,15 @@ coverage/
 /test-results/
 /frontend/test-results/
 /blob-report/
+/frontend/playwright-report-ruler/
+/frontend/playwright-report-visual/
+/frontend/debug-command-center.png
+
+# Visual regression: screenshots are generated artifacts, not source.
+# The old-version ruler is captured from ghcr.io/yinorg/yin-panel-ce:0.4.2
+# via scripts/visual-regression-ruler.sh and must never be committed.
+/frontend/tests/visual/ruler-snapshots/
+/frontend/tests/visual/snapshots/
 /.nyc_output/
 .frontend-design/
 

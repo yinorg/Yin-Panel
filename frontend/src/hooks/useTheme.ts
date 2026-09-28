@@ -114,6 +114,12 @@ export function useTheme() {
 
   const themeOverrides = computed<GlobalThemeOverrides>(() => {
     const slots = activeThemeSlots.value
+    // The pre-theme build rendered Naive components with their own defaults.
+    // Injecting the theme package's Naive overrides changes control heights,
+    // borders and text colours (the login form drifted by several pixels), so
+    // the built-in default theme in light mode keeps Naive's own tokens.
+    if (!isDark.value && !previewToken && activeThemePackageId.value === 'org.yin.default')
+      return {}
     const controlHeight = toNaiveDimension(slots.controlHeight, '36px')
     return {
       common: {

@@ -20,7 +20,7 @@ import { t } from '@/locales'
 import { getDiskStateByPath, getEnableStatus, getSnapshot } from '@/api/system/systemMonitor'
 import { clearSpaceCache, readSpaceCache, readSpacesCache, writeSpaceCache, writeSpacesCache } from '@/utils/spaceCache'
 import { resolvePanelValue } from '@/utils/theme'
-import { activeThemePackage, activeThemeSlots } from '@/hooks/useTheme'
+import { activeThemePackage, activeThemeSlots, activeThemeWallpaper } from '@/hooks/useTheme'
 import { getThemeRuntimeGrant, setThemeRuntimeGrant } from '@/api/theme'
 import { createHomeThemeHandlers } from '@/core/home/themeHandlers'
 import { executeHomeThemeRequest } from '@/core/home/themeRequest'
@@ -64,6 +64,18 @@ const publicCode = parsePublicCodeFromPath()
 const previewTheme = new URLSearchParams(window.location.search).has('themePreview')
 const useThemeDefaults = computed(() => previewTheme || !!panelState.panelConfig.useThemeDefaults)
 const useThemeColors = computed(() => useThemeDefaults.value || panelState.panelConfig.wallpaperMode === 'theme')
+// Mirrors the resolution order in WallpaperLayer.vue: the layer renders unless
+// the user explicitly disabled wallpapers, so the content above it has to know
+// whether artwork is actually painting behind it.
+const wallpaperActive = computed(() => {
+  if (previewTheme) return true
+  const config = panelState.panelConfig
+  if (config.wallpaperMode === 'none') return false
+  return config.wallpaperMode === 'custom'
+    || config.wallpaperMode === 'theme'
+    || !!config.backgroundImageSrc
+    || !!activeThemeWallpaper.value
+})
 const panelIconTextColor = computed(() => resolvePanelValue('var(--yin-text)', panelState.panelConfig.iconTextColor, useThemeDefaults.value))
 const directoryLayout = computed(() => panelState.panelConfig.homeLayout === 'directory')
 const directoryRoots = computed(() => getHomeGroupRoots(items.value))
@@ -1248,7 +1260,7 @@ function handleThemeRuntimeFailure(error: Error) {
 </script>
 
 <template>
-  <div class="w-full h-full sun-main" :class="{ 'side-switching': sideSwitching, 'theme-defaults': useThemeColors, 'theme-runtime-yin': themeRuntimeActive && themeRuntimePackage?.manifest.id === 'org.yin.default' }" :data-panel-side="activeSpace?.side || 'yin'">
+  <div class="w-full h-full sun-main" :class="{ 'side-switching': sideSwitching, 'theme-defaults': useThemeColors, 'wallpaper-active': wallpaperActive, 'theme-runtime-yin': themeRuntimeActive && themeRuntimePackage?.manifest.id === 'org.yin.default' }" :data-panel-side="activeSpace?.side || 'yin'">
     <CommandCenter
       :visible="commandCenterVisible"
       :query="commandCenterQuery"
@@ -1793,9 +1805,61 @@ html {
   user-select: none;
 }
 
+/* The pre-theme build let Naive default the app-icon avatar radius to 3px. */
+.sun-main .n-avatar {
+  border-radius: 3px;
+}
+
+/* The pre-theme build sized the group heading with Tailwind's text-xl, i.e.
+   a 1.4 line box, and separated it from the icons with 20px. Without this the
+   heading inherits --yin-lineHeightBody and --yin-component-group-gap, which
+   grows the group and walks every later group down the page. */
+.sun-main .directory-group-heading {
+  line-height: 1.4;
+  margin-bottom: 20px;
+}
+
+/* Old-version home geometry, scoped to the home shell so the login page and
+   other surfaces keep their own (Naive UI) metrics. The pre-theme build used
+   Tailwind's rounded-2xl for the search box and app icons, a 17px search input,
+   a 2px portrait blur and 50px between group sections; these variables carry
+   those values down to the child components. font-family is set directly as
+   well, because it inherits from body and a variable alone would not repaint
+   already-computed descendants. */
+.sun-main {
+  font-family: v-sans, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  --yin-fontBody: v-sans, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  /* Font sizes stay at the pre-theme values here. Only the search input is
+     17px, and it sets that itself; scaling the whole shell leaked into the
+     app-icon letters and labels. */
+  --yin-fontSmallSize: 14px;
+  --yin-fontHeadingWeight: 400;
+  --yin-lineHeightBody: 1.6;
+  --yin-spaceXs: 5px;
+  --yin-component-app-icon-radius: 16px;
+  --yin-component-iconography-container-radius: 16px;
+  --yin-component-search-box-radius: 16px;
+  --yin-component-search-box-height: 40px;
+  --yin-component-search-box-blur: 2px;
+  /* Pre-theme focus treatment: a wide soft dark halo with a 5px backdrop blur. */
+  --yin-component-search-box-shadow: 0 0 30px -5px rgb(41 41 41 / 45%);
+  --yin-component-search-box-focus-blur: 5px;
+  --yin-component-input-padding-x: 10px;
+  --yin-component-group-section-spacing: 50px;
+  --yin-component-group-gap: 18px;
+  --yin-effect-text-shadow: 2px 2px 50px #000000;
+}
+
 .sun-main.theme-defaults {
   background-color: var(--yin-canvas);
   color: var(--yin-text);
+}
+
+/* When a wallpaper layer is actually painting artwork behind the content, the
+   header, clock and group titles must switch to the on-wallpaper colour and
+   keep their text shadow, otherwise dark-on-photo text is unreadable. */
+.sun-main.wallpaper-active {
+  background-color: transparent;
 }
 
 :global(:root[data-yin-layout='directory'] .sun-main) { background: transparent; color: var(--yin-text); }
@@ -1822,6 +1886,26 @@ html {
 :root[data-yin-layout='directory'] .offline-status {
   color: var(--yin-text);
   text-shadow: none;
+}
+
+/* Wallpaper-active overrides come last so they win over the theme-defaults
+   rules above, which are equally specific but are declared earlier. */
+.sun-main.wallpaper-active {
+  color: var(--yin-onWallpaper, #ffffff);
+}
+
+.sun-main.wallpaper-active .home-header-row,
+.sun-main.wallpaper-active .home-header-row span,
+.sun-main.wallpaper-active .item-list > div:first-child,
+.sun-main.wallpaper-active .group-title,
+.sun-main.wallpaper-active .space-status-button,
+.sun-main.wallpaper-active .offline-status {
+  color: var(--yin-onWallpaper, #ffffff) !important;
+}
+
+.sun-main.wallpaper-active .text-shadow,
+.sun-main.wallpaper-active .app-icon-text-shadow {
+  text-shadow: var(--yin-effect-text-shadow, 2px 2px 50px #000000);
 }
 
 .sun-main.side-switching {

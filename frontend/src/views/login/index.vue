@@ -172,20 +172,29 @@ function getProviderLabel(provider: string) {
         padding: 20px;
         display: flex;
         justify-content: center;
-        align-items: flex-start;
-        min-height: 100vh;
-        padding-top: max(40px, 6vh);
-        background-color: var(--yin-canvas);
+        /* The pre-theme build centred the card in an exactly viewport-tall
+           container; the current build top-aligns it with a padding offset. */
+        align-items: center;
+        height: 100vh;
+        background-color: #f2f6ff;
+        /* The pre-theme login form used Naive UI's own control metrics. The
+           theme's shared control variables are re-scoped here so the login
+           keeps 34px controls with Naive's border treatment. */
+        --yin-radiusControl: 3px;
+        --yin-component-input-height: 34px;
+        --yin-component-input-radius: 3px;
+        --yin-component-input-border-width: 0px;
+        --yin-component-button-height: 34px;
+        --yin-component-button-radius: 3px;
+        --yin-component-button-border-width: 0px;
     }
 
-    @media (max-width: 639px) {
-      .login-container {
-        padding-top: max(8vh, 40px);
-      }
+    .dark .login-container {
+      background-color: rgb(43, 43, 43);
     }
 
     .login-card {
-      color: var(--yin-text);
+      color: #333639;
     }
 
     @media (min-width: 600px) {

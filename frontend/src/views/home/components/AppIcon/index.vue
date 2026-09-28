@@ -205,7 +205,7 @@ const cardStyle = computed(() => {
 .app-icon-info-icon-inner { width: 100%; height: 100%; }
 .app-icon-info:hover, .app-icon-small-icon:hover { scale: var(--yin-component-state-hover-scale); }
 .app-icon-small-icon { width: var(--yin-component-app-icon-size); height: var(--yin-component-app-icon-size); }
-.app-icon-small-title { margin-top: var(--yin-spaceXs); text-align: center; font-family: var(--yin-fontBody); font-size: var(--yin-fontSmallSize); font-weight: var(--yin-fontHeadingWeight); }
+.app-icon-small-title { margin-top: 2px; text-align: center; font-family: var(--yin-fontBody); font-size: var(--yin-fontSmallSize); font-weight: var(--yin-fontHeadingWeight); }
 .app-icon-info-text-box-title { font-weight: var(--yin-fontHeadingWeight); }
 .app-icon-info-text-box-description { font-size: var(--yin-fontSmallSize); }
 .app-icon-glyph :deep(.item-icon) { overflow: hidden; border-radius: var(--yin-component-iconography-container-radius); }

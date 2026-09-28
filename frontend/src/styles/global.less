@@ -21,6 +21,11 @@ body {
 	--yin-surfaceElevated: #ffffff;
 	--yin-text: #172126;
 	--yin-textMuted: #53636a;
+	/* Text drawn on top of a wallpaper, where the dark --yin-text would be
+	   unreadable. The pre-theme build used white text over the artwork. */
+	--yin-onWallpaper: #ffffff;
+	--yin-onWallpaperMuted: #e6ecee;
+	--yin-searchBoxSurface: rgb(42 42 42 / 42%);
 	--yin-border: #d5dfe2;
 	--yin-primary: #075b68;
 	--yin-onPrimary: #ffffff;
@@ -84,7 +89,9 @@ body {
 	--yin-component-search-box-height: 44px;
 	--yin-component-search-box-option-size: 40px;
 	--yin-component-search-box-option-gap: 10px;
-	--yin-component-search-box-surface: var(--yin-surfaceElevated);
+	/* Translucent dark fill, matching the pre-theme build (rgba(42,42,42,0.42)),
+	   so the wallpaper stays visible through the search box. */
+	--yin-component-search-box-surface: var(--yin-searchBoxSurface, rgb(42 42 42 / 42%));
 	--yin-component-search-box-radius: var(--yin-radiusControl);
 	--yin-component-search-box-border-width: 1px;
 	--yin-component-search-box-surface-mode: solid;
@@ -169,7 +176,13 @@ button, input, select, textarea, [role='button'] {
 	border-radius: var(--yin-component-card-radius);
 	transition: background-color var(--yin-component-state-hover-duration) var(--yin-component-state-easing), border-color var(--yin-component-state-hover-duration) var(--yin-component-state-easing), box-shadow var(--yin-component-state-hover-duration) var(--yin-component-state-easing);
 }
-.n-card { padding: var(--yin-component-card-padding); box-shadow: var(--yin-component-card-shadow); }
+/* The login card keeps Naive UI's own padding; the pre-theme build never added
+   a wrapper padding there, and the extra 16px shifted the whole form. */
+.n-card:not(.login-card) { padding: var(--yin-component-card-padding); box-shadow: var(--yin-component-card-shadow); }
+/* Naive sizes each form row from --n-blank-height (driven by the shared control
+   height, 36px). The pre-theme login used 34px rows, so pin the login blank to
+   the same control height the login container re-scopes. */
+.login-container .n-form-item .n-form-item-blank { min-height: var(--yin-component-input-height); }
 .n-popover, .n-dropdown-menu { border-radius: var(--yin-component-menu-radius); box-shadow: var(--yin-component-menu-shadow); }
 .n-base-select-menu { z-index: 2001 !important; }
 .n-tooltip { padding: var(--yin-component-tooltip-padding); border-radius: var(--yin-component-tooltip-radius); box-shadow: var(--yin-component-tooltip-shadow); }

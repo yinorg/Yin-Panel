@@ -151,10 +151,25 @@ onUnmounted(() => window.removeEventListener('yin-panel-search-config-saved', ha
   border-radius: var(--yin-component-search-box-radius);
   transition: box-shadow var(--yin-component-state-hover-duration) var(--yin-component-state-easing), backdrop-filter var(--yin-component-state-hover-duration) var(--yin-component-state-easing);
   min-height: var(--yin-component-search-box-height);
-  padding: 0 var(--yin-component-input-padding-x);
+  padding: 2px var(--yin-component-input-padding-x);
   backdrop-filter: blur(var(--yin-component-search-box-blur));
   background: var(--yin-component-search-box-surface);
   color: var(--yin-text);
+}
+
+/* Over a wallpaper the translucent dark fill needs light text, matching the
+   pre-theme build where the search box sat on the artwork in white. */
+:global(.sun-main.wallpaper-active) .search-container,
+:global(.sun-main.wallpaper-active) .search-engines {
+  color: var(--yin-onWallpaper, #ffffff);
+}
+
+:global(.sun-main.wallpaper-active) .search-container input {
+  color: var(--yin-onWallpaper, #ffffff);
+}
+
+:global(.sun-main.wallpaper-active) .search-container input::placeholder {
+  color: var(--yin-onWallpaperMuted, #e6ecee);
 }
 .search-engines { padding: var(--yin-component-menu-padding); border-radius: var(--yin-component-menu-radius); background: var(--yin-component-menu-surface, var(--yin-surfaceElevated)); box-shadow: var(--yin-component-menu-shadow); }
 .search-engines { margin-top: var(--yin-component-search-box-option-gap); }
@@ -167,14 +182,14 @@ onUnmounted(() => window.removeEventListener('yin-panel-search-config-saved', ha
   width: 100%;
   min-width: 0;
   height: var(--yin-component-search-box-height);
-  padding: 0 var(--yin-spaceXs);
+  padding: 10px var(--yin-spaceXs);
   border: none;
   outline: none;
-  font: var(--yin-fontBodyWeight) var(--yin-fontBodySize)/var(--yin-lineHeightBody) var(--yin-fontBody);
+  font: var(--yin-fontBodyWeight) 17px/var(--yin-lineHeightBody) var(--yin-fontBody);
 }
 
 .focused, .search-container:hover {
   box-shadow: var(--yin-component-search-box-shadow);
-  backdrop-filter: blur(var(--yin-component-search-box-blur));
+  backdrop-filter: blur(var(--yin-component-search-box-focus-blur, var(--yin-component-search-box-blur)));
 }
 </style>

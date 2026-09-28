@@ -1,0 +1,98 @@
+name: Visual Regression Testing
+
+# Compares the current build against the old-version ruler. The ruler is
+# captured from the published release image (ghcr.io/yinorg/yin-panel-ce:0.4.2)
+# rather than rebuilt from a git commit, so the comparison stays honest when
+# the toolchain moves forward.
+#
+# Ruler screenshots are build artefacts and are intentionally not committed
+# (see .gitignore). This workflow therefore regenerates them from the image on
+# every run instead of checking a stored copy in.
+
+on:
+  pull_request:
+    branches: [master, main]
+  push:
+    branches: [master, main]
+  workflow_dispatch:
+    inputs:
+      ruler_image:
+        description: 'Published image the ruler is captured from'
+        required: false
+        default: 'ghcr.io/yinorg/yin-panel-ce:0.4.2'
+
+jobs:
+  visual-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: frontend
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+        working-directory: frontend
+
+      - name: Build the frontend
+        run: npm run build-only
+        working-directory: frontend
+
+      - name: Build the backend
+        run: go build -o yin-panel .
+        working-directory: backend
+
+      - name: Capture the ruler from the published image
+        env:
+          YIN_RULER_IMAGE: ${{ github.event.inputs.ruler_image || 'ghcr.io/yinorg/yin-panel-ce:0.4.2' }}
+        run: ./scripts/visual-regression-ruler.sh --update
+
+      - name: Start the current build
+        run: |
+          cd backend
+          ./yin-panel > yin-panel.log 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -sf -o /dev/null http://127.0.0.1:${YIN_PANEL_PORT:-3002}/; then
+              echo "server is up"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "server failed to start"
+          cat yin-panel.log
+          exit 1
+
+      - name: Compare the current build against the ruler
+        run: ./scripts/visual-regression-compare.sh
+
+      - name: Upload diff artefacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-regression-diffs
+          path: |
+            frontend/test-results/
+            frontend/playwright-report-visual/
+
+      - name: Upload the captured ruler
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-regression-ruler
+          path: frontend/tests/visual/ruler-snapshots/
