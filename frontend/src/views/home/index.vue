@@ -420,6 +420,29 @@ watch(directoryLayout, (enabled) => {
 }, { immediate: true })
 const publicAccessCode = ref('')
 const publicAccessReady = ref(!publicCode || !!sessionStorage.getItem(`yin-panel-public-access:${publicCode}`))
+// A public link may be configured for direct access, in which case the server
+// does not require an access code at all. Only the server knows the mode, so
+// start in a checking state and ask /api/spaces (reachable with the public code
+// header) before showing the prompt.
+const publicAccessChecking = ref(!!publicCode && !publicAccessReady.value)
+
+async function resolvePublicAccessMode() {
+  if (!publicCode || publicAccessReady.value) {
+    publicAccessChecking.value = false
+    return
+  }
+  try {
+    const { code, data } = await getSpaces<Space[]>()
+    if (code === 0 && Array.isArray(data) && data[0]?.publicMode !== 'code')
+      publicAccessReady.value = true
+  }
+  catch {
+    // Fall through to the access-code prompt.
+  }
+  finally {
+    publicAccessChecking.value = false
+  }
+}
 
 const sessionOnlyCache = !!publicCode
 function getCachedSpace(spaceId: number) { return readSpaceCache(spaceId, authStore.userInfo?.id, sessionOnlyCache) }
@@ -940,7 +963,13 @@ onMounted(() => {
   syncThemeEnvironment()
   void updatePwaReady()
   navigator.serviceWorker?.addEventListener('controllerchange', updatePwaReady)
-  if (publicCode && !publicAccessReady.value) return
+  if (publicCode && !publicAccessReady.value) {
+    void resolvePublicAccessMode().then(() => {
+      if (publicAccessReady.value)
+        loadHomeData()
+    })
+    return
+  }
   loadHomeData()
 })
 
@@ -1287,7 +1316,7 @@ function handleThemeRuntimeFailure(error: Error) {
         </div>
       </div>
     </div>
-    <NModal :show="!!publicCode && !publicAccessReady" :mask-closable="false" :closable="false">
+    <NModal :show="!!publicCode && !publicAccessReady && !publicAccessChecking" :mask-closable="false" :closable="false">
       <NCard :title="$t('spaceManage.accessVerification')" style="width: min(92vw, 380px)">
         <NSpace vertical>
           <span>{{ $t('spaceManage.enterAccessCode') }}</span>

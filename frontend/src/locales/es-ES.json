@@ -128,18 +128,6 @@
       "deleteWarnText": "Are you sure you want to delete this group [{name}]? The application icons in this group will be lost after deletion.",
       "groupName": "Gruppenname"
     },
-    "uploadsFileManager": {
-      "alertText": "Here you can manage wallpapers and icons you have uploaded.",
-      "appName": "Dateiverwaltung für Uploads",
-      "copyFailed": "Kopieren fehlgeschlagen",
-      "copyLink": "Link kopieren",
-      "copySuccess": "Link copied successfully. You can paste it in the address bar.",
-      "deleteWarningText": "Cannot be recovered after deletion. Are you sure you want to continue?",
-      "infoTitle": "Dateidetails",
-      "nothingText": "You haven't uploaded any images yet.",
-      "path": "Dateipfad",
-      "uploadTime": "Uploadzeit"
-    },
     "userInfo": {
       "appName": "Mi información",
       "theme": "Design",

@@ -15,7 +15,6 @@ const componentLoaders: Record<string, () => Promise<Component>> = {
   UserInfo: () => import('../../apps/UserInfo/index.vue'),
   Style: () => import('../../apps/Style/index.vue'),
   SpaceManage: () => import('../../apps/SpaceManage/index.vue'),
-  UploadFileManager: () => import('../../apps/UploadFileManager/index.vue'),
   About: () => import('../../apps/About/index.vue'),
   Users: () => import('../../apps/Users/index.vue'),
 }

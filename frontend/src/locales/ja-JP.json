@@ -128,18 +128,6 @@
       "deleteWarnText": "このグループ[{name}]を削除しますか？グループ内の項目も失われます。",
       "groupName": "グループ名"
     },
-    "uploadsFileManager": {
-      "alertText": "アップロードした壁紙とアイコンを管理できます。",
-      "appName": "アップロードファイル管理",
-      "copyFailed": "コピーに失敗しました",
-      "copyLink": "リンクをコピー",
-      "copySuccess": "リンクをコピーしました。アドレスバーに貼り付けできます。",
-      "deleteWarningText": "削除後は復元できません。続行しますか？",
-      "infoTitle": "ファイル詳細",
-      "nothingText": "まだ画像をアップロードしていません。",
-      "path": "ファイルパス",
-      "uploadTime": "アップロード日時"
-    },
     "userInfo": {
       "appName": "マイページ",
     "theme": "テーマ",

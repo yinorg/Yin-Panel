@@ -97,13 +97,6 @@ onMounted(() => {
       return
     if (!apps.value.some(item => item.componentName === 'Users'))
       apps.value.push(adminApp)
-    if (!apps.value.some(item => item.componentName === 'UploadFileManager'))
-      apps.value.push({
-        name: t('apps.uploadsFileManager.appName'),
-        componentName: 'UploadFileManager',
-        icon: 'tabler:file-upload',
-        auth: 1,
-      })
   }
   addAdminApp()
   apps.value.push(aboutApp)

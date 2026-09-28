@@ -128,18 +128,6 @@
       "deleteWarnText": "Are you sure you want to delete this group [{name}]? The application icons in this group will be lost after deletion.",
       "groupName": "그룹 이름"
     },
-    "uploadsFileManager": {
-      "alertText": "Here you can manage wallpapers and icons you have uploaded.",
-      "appName": "업로드 파일 관리",
-      "copyFailed": "복사 실패",
-      "copyLink": "링크 복사",
-      "copySuccess": "Link copied successfully. You can paste it in the address bar.",
-      "deleteWarningText": "Cannot be recovered after deletion. Are you sure you want to continue?",
-      "infoTitle": "파일 세부 정보",
-      "nothingText": "You haven't uploaded any images yet.",
-      "path": "파일 경로",
-      "uploadTime": "업로드 시간"
-    },
     "userInfo": {
       "appName": "내 정보",
       "theme": "테마",

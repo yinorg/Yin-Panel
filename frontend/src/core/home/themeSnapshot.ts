@@ -2,6 +2,14 @@ import type { ThemeCollectionStatus, ThemeGroup, ThemeHomePresentation, ThemeHom
 // @ts-expect-error Node's strip-types runner requires an explicit source extension.
 import { toThemeItemIcon } from './iconifyResource.ts'
 
+// The pre-theme default brand name. It is treated as "not customised" so the
+// name can follow the active panel side (Yin-Panel / Yang-Panel).
+const DEFAULT_LOGO_TEXT = 'Yin-Panel'
+
+function configuredLogoText(value: unknown): string {
+  return typeof value === 'string' && value.trim() !== '' ? value : DEFAULT_LOGO_TEXT
+}
+
 interface SearchEngineSource {
   id?: string
   title?: string
@@ -111,7 +119,7 @@ export function createThemeHomeSnapshot(input: {
       })
     }
   }
-  const presentation = mapPresentation(input.presentation, input.searchConfiguration, input.monitorReservedHeight)
+  const presentation = mapPresentation(input.presentation, input.searchConfiguration, input.monitorReservedHeight, input.activeSpaceSide)
   const capabilities = [
     ...(input.activeSpaceCanEdit === true && input.canWrite ? ['items.write'] : []),
     ...(input.activeSpaceCanEdit === true && input.canWriteGroups ? ['groups.write'] : []),
@@ -132,7 +140,7 @@ export function createThemeHomeSnapshot(input: {
   }
 }
 
-function mapPresentation(source?: PresentationSource, searchConfiguration?: SearchConfigurationSource, monitorReservedHeight?: number): ThemeHomePresentation | undefined {
+function mapPresentation(source?: PresentationSource, searchConfiguration?: SearchConfigurationSource, monitorReservedHeight?: number, activeSide?: 'yin' | 'yang'): ThemeHomePresentation | undefined {
   if (!source && !searchConfiguration) return undefined
   const defaults = {
     homeLayout: 'standard',
@@ -177,7 +185,13 @@ function mapPresentation(source?: PresentationSource, searchConfiguration?: Sear
     iconTextColor: optionalText(defaults.iconTextColor),
     iconTextInfoHideDescription: defaults.iconTextInfoHideDescription === true,
     iconTextIconHideTitle: defaults.iconTextIconHideTitle === true,
-    logoText: typeof defaults.logoText === 'string' ? defaults.logoText : 'Yin-Panel',
+    // 'Yin-Panel' is the built-in default rather than a user choice. Whenever
+    // the configured text is still that default, derive the name from the
+    // active side so switching to Yang-Panel updates the theme's logo; a
+    // genuinely customised logo is passed through untouched.
+    logoText: configuredLogoText(defaults.logoText) === DEFAULT_LOGO_TEXT
+      ? (activeSide === 'yang' ? 'Yang-Panel' : DEFAULT_LOGO_TEXT)
+      : configuredLogoText(defaults.logoText),
     logoImageSrc: optionalText(defaults.logoImageSrc),
     clock: {
       visible: defaults.clockShow !== false,

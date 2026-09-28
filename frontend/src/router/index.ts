@@ -45,12 +45,6 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../views/theme/recovery/index.vue'),
   },
 
-  {
-    path: '/test',
-    name: 'test',
-    component: () => import('../views/exception/test/index.vue'),
-  },
-
   // 专门处理公开访问代码的路由
   // 匹配空间公开 FN ID
   {

@@ -128,18 +128,6 @@
       "deleteWarnText": "你確定刪除此分組[{name}]，刪除後此分組應用圖標將丟失？",
       "groupName": "分組名稱"
     },
-    "uploadsFileManager": {
-      "alertText": "你可以在這裡管理你上傳過的壁紙和圖標",
-      "appName": "上傳文件管理",
-      "copyFailed": "複製失敗",
-      "copyLink": "複製鏈接",
-      "copySuccess": "鏈接複製成功，可以在圖標地址欄",
-      "deleteWarningText": "刪除後無法恢復，你確定要繼續嗎？",
-      "infoTitle": "文件詳情",
-      "nothingText": "你還沒有上傳過任何圖片",
-      "path": "文件路徑",
-      "uploadTime": "上傳時間"
-    },
     "userInfo": {
       "appName": "我的信息",
       "theme": "主題",
