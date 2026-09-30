@@ -36,11 +36,11 @@ select {
    Using vh here would feed the frame height back into its own spacing. */
 .yin-page {
   box-sizing: border-box;
-  width: min(var(--yin-content-max-width, 1200px), calc(100% - 2 * var(--yin-margin-x, 5px)));
+  width: min(var(--yin-content-max-width, 1200px), 100%);
   min-height: var(--yin-viewport-height, 100vh);
   margin-inline: auto;
   position: relative;
-  padding: calc(var(--yin-content-top, 10vh) + 30px) calc(var(--yin-margin-x, 5px) + 10px) var(--yin-content-bottom, 10vh);
+  padding: calc(var(--yin-content-top, 10vh) + 10px) 10px var(--yin-content-bottom, 10vh);
   background: transparent;
 }
 
@@ -48,7 +48,7 @@ select {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 72px;
+  min-height: 60px;
   position: relative;
 }
 
@@ -96,11 +96,12 @@ select {
   object-fit: contain;
 }
 
+/* The pre-theme clock was a plain centred block: the time stayed inline and the
+   date row became a block underneath, so the two rows keep their own metrics. */
 .yin-clock {
-  width: 120px;
-  display: grid;
-  justify-items: center;
-  gap: 0;
+  width: auto;
+  display: block;
+  text-align: center;
   color: inherit;
   font-size: 30px;
   font-weight: 600;
@@ -110,32 +111,26 @@ select {
 }
 
 .yin-clock-date {
+  display: block;
   font-size: 14px;
   font-weight: 400;
-  line-height: 21px;
+  line-height: 1.6;
 }
 
 .yin-logo-divider {
   margin-inline: 10px;
   color: var(--yin-icon-text-color, #fff);
-  font-size: 28px;
+  font-size: 24px;
   font-weight: 300;
 }
 
 .directory-folder-button,
 .yin-search-submit {
-  min-height: 44px;
-  padding: 8px 12px;
-  border: 1px solid var(--yin-border, #d8e0e3);
-  border-radius: var(--yin-radiusControl, 8px);
-  background: rgb(42 42 42 / 42%);
   color: var(--yin-icon-text-color, #fff);
-  backdrop-filter: blur(8px);
   cursor: pointer;
 }
 
-.directory-folder-button:hover,
-.yin-search-submit:hover {
+.directory-folder-button:hover {
   border-color: var(--yin-primary, #176b80);
   color: var(--yin-icon-text-color, #fff);
   background: rgb(42 42 42 / 62%);
@@ -143,7 +138,7 @@ select {
 
 .directory-folder-button:focus-visible,
 .yin-search-submit:focus-visible,
-.yin-search-input:focus-visible,
+.yin-search-clear:focus-visible,
 .yin-search-engine:focus-visible,
 .yin-item:focus-visible,
 .yin-group-toggle:focus-visible {
@@ -162,55 +157,88 @@ select {
   color: var(--yin-primary, #176b80);
 }
 
+/* Mirrors the pre-theme .home-header: an 80%-wide block that centres the
+   masthead, with the search box as a further 80% of it from the lg breakpoint up
+   and full width below that. */
+.yin-header {
+  width: 80%;
+  margin-inline: auto;
+}
+
 .yin-search {
   position: relative;
   display: flex;
   align-items: stretch;
-  width: 80%;
-  max-width: 755px;
-  margin: 15px auto 0;
+  width: 100%;
+  margin: 20px auto 0;
 }
 
-.yin-search-input,
-.yin-search-engine {
+@media (min-width: 1024px) {
+  .yin-search { width: 80%; }
+}
+
+/* The pre-theme build put the rounded, bordered surface on a wrapper and left
+   the input transparent inside it, with a 40px engine slot and a 25px submit
+   slot as flex siblings. Reproduce that split so the border, radius, padding
+   and the input's text origin land where the pixel baselines expect. */
+.yin-search-container {
   box-sizing: border-box;
-  min-width: 0;
-  min-height: 44px;
-  padding: 9px 12px;
-  border: 1px solid rgb(255 255 255 / 72%);
-  border-radius: var(--yin-radiusControl, 8px);
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 46px;
+  padding: 2px 10px;
+  border: 1px solid #ccc;
+  border-radius: 16px;
   background: rgb(42 42 42 / 42%);
   color: var(--yin-icon-text-color, #fff);
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(2px);
+}
+
+/* The pre-theme row let all three slots shrink proportionally (the input's basis
+   is 100% of the content box), so the engine slot lands a few pixels narrower
+   than 40px. Keeping the same basis reproduces that exactly. */
+/* The pre-theme build showed focus on the wrapper as a soft shadow rather than
+   an outline on the field, so the ring never appeared inside the box. */
+.yin-search-container:focus-within {
+  box-shadow: 0 0 30px -5px rgb(41 41 41 / 45%);
+  backdrop-filter: blur(5px);
 }
 
 .yin-search-input {
-  flex: 1 1 auto;
-  height: 46px;
-  padding-left: 48px;
-  padding-right: 38px;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  height: 40px;
+  padding: 10px 5px;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
   font-size: 17px;
+  line-height: 1.6;
 }
 
+/* The pre-theme field was a Naive input whose placeholder resolved to Tailwind
+   gray-400, a cool grey rather than a translucent white. */
 .yin-search-input::placeholder {
-  color: rgb(255 255 255 / 76%);
+  color: #9ca3af;
 }
 
 .yin-search-engine {
-  flex: 0 0 40px;
-  position: absolute;
-  z-index: 1;
-  top: 1px;
-  left: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 40px;
-  height: 44px;
-  padding-inline: 4px;
+  height: 40px;
+  padding: 0;
   border: 0;
   background-color: transparent;
   appearance: none;
   background-repeat: no-repeat;
   background-position: center;
-  background-size: 24px 24px;
+  background-size: 20px 20px;
   color: transparent;
   cursor: pointer;
 }
@@ -220,7 +248,7 @@ select {
 .yin-search-engines {
   position: absolute;
   z-index: 3;
-  top: calc(100% + 6px);
+  top: calc(100% + 10px);
   left: 0;
   display: flex;
   flex-wrap: wrap;
@@ -260,27 +288,55 @@ select {
   border-color: var(--yin-primary, #176b80);
 }
 
-.yin-search-submit {
-  position: absolute;
-  top: 1px;
-  right: 5px;
-  z-index: 1;
-  flex: 0 0 25px;
-  overflow: hidden;
+.yin-search-clear {
+  position: relative;
   width: 25px;
-  height: 44px;
+  height: 20px;
+  margin-right: 10px;
   padding: 0;
   border: 0;
   background: transparent;
+  color: var(--yin-icon-text-color, #fff);
   font-size: 0;
+  cursor: pointer;
 }
 
+.yin-search-clear::before,
+.yin-search-clear::after {
+  position: absolute;
+  top: 9px;
+  left: 6px;
+  width: 12px;
+  height: 2px;
+  border-radius: 1px;
+  background: currentColor;
+  content: '';
+}
+
+.yin-search-clear::before { transform: rotate(45deg); }
+.yin-search-clear::after { transform: rotate(-45deg); }
+
+.yin-search-submit {
+  position: relative;
+  overflow: hidden;
+  width: 25px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--yin-icon-text-color, #fff);
+  font-size: 0;
+  cursor: pointer;
+}
+
+/* A 20px magnifier drawn in CSS, centred in the 25x40 slot the pre-theme build
+   reserved for the search glyph. */
 .yin-search-submit::before {
   position: absolute;
-  top: 12px;
-  left: 3px;
-  width: 16px;
-  height: 16px;
+  top: 2px;
+  left: 4px;
+  width: 10px;
+  height: 10px;
   border: 2px solid currentColor;
   border-radius: 50%;
   content: '';
@@ -288,10 +344,10 @@ select {
 
 .yin-search-submit::after {
   position: absolute;
-  top: 28px;
-  left: 17px;
-  width: 8px;
-  height: 3px;
+  top: 13px;
+  left: 13px;
+  width: 6px;
+  height: 2px;
   transform: rotate(45deg);
   transform-origin: left center;
   background: currentColor;
@@ -316,6 +372,9 @@ select {
   display: block;
   align-items: start;
   margin-top: 50px;
+  /* The pre-theme container carried the horizontal margin on the content block
+     rather than on the page, which keeps the header 10px wider than the grid. */
+  margin-inline: var(--yin-margin-x, 5px);
 }
 
 .yin-page--directory .yin-collection { margin-top: 18px; }
@@ -324,13 +383,19 @@ select {
   min-width: 0;
 }
 
+/* The pre-theme build put a 50px top margin on every group list, which is what
+   separates consecutive groups; the collection only supplies the first gap. */
+.yin-group + .yin-group {
+  margin-top: 50px;
+}
+
 .yin-group-heading {
   position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 32px;
-  margin: 0 0 17px 10px;
+  min-height: 28px;
+  margin: 0 0 20px 10px;
 }
 
 .yin-group-heading > .yin-group-title {
@@ -414,12 +479,151 @@ select {
 }
 
 .yin-group-title {
+  flex: 0 1 auto;
+}
+
+.yin-group-controls,
+.yin-actions,
+.yin-dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.yin-group-controls {
+  position: absolute;
+  top: 0;
+  right: 36px;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.yin-group-heading:hover .yin-group-controls,
+.yin-group-heading:focus-within .yin-group-controls {
+  opacity: 1;
+}
+
+.yin-action-button {
+  min-height: 32px;
+  padding: 5px 9px;
+  border: 1px solid var(--yin-border, #d8e0e3);
+  border-radius: var(--yin-radiusControl, 8px);
+  background: color-mix(in srgb, var(--yin-surface, #fff) 88%, transparent);
+  color: var(--yin-text, #20282c);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.yin-action-button:hover:not(:disabled) {
+  border-color: var(--yin-primary, #176b80);
+  color: var(--yin-primary, #176b80);
+}
+
+.yin-action-button:focus-visible,
+.yin-dialog-input:focus-visible {
+  outline: 3px solid var(--yin-focusRing, var(--yin-primary, #176b80));
+  outline-offset: 2px;
+}
+
+.yin-action-button:disabled {
+  cursor: wait;
+  opacity: .6;
+}
+
+.yin-action-button--primary {
+  border-color: var(--yin-primary, #176b80);
+  background: var(--yin-primary, #176b80);
+  color: #fff;
+}
+
+.yin-action-button--primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--yin-primary, #176b80) 88%, #000);
+  color: #fff;
+}
+
+.yin-actions {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  right: 0;
+  justify-content: flex-end;
+  padding: 0;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.yin-actions:hover,
+.yin-actions:focus-within {
+  opacity: 1;
+}
+
+/*
+ * The fixed utility stack the pre-theme build kept on the right edge. Every
+ * length here was measured off that build's own ruler screenshot rather than
+ * eyeballed: the panel occupies x 1864..1910 and y 894..1030 in a 1920x1080
+ * viewport, i.e. 46px wide, four 34px cells with no gaps, 10px from the right
+ * edge and 50px from the bottom, with 20px icons centred in each cell.
+ */
+.yin-floating {
+  position: fixed;
+  z-index: 22;
+  right: 10px;
+  bottom: 50px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 0 10px 2px rgba(0, 0, 0, 0.2);
+}
+
+.yin-floating[hidden] {
+  display: none;
+}
+
+.yin-floating-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  /* The old buttons were Naive's `color="#2a2a2a6b"`: a 42%-opaque dark fill. */
+  background: rgba(42, 42, 42, 0.42);
+  color: #fff;
+  cursor: pointer;
+}
+
+.yin-floating-button svg {
+  width: 20px;
+  height: 20px;
+}
+
+.yin-floating-button:hover {
+  background: rgba(42, 42, 42, 0.6);
+}
+
+.yin-floating-button:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.8);
+  outline-offset: -2px;
+}
+
+/* Only the outer corners are rounded, matching a Naive vertical button group. */
+.yin-floating-button:first-child {
+  border-radius: 3px 3px 0 0;
+}
+
+.yin-floating-button:last-child {
+  border-radius: 0 0 3px 3px;
+}
+
+.yin-group-title {
   min-width: 0;
   margin: 0;
   font-family: var(--yin-fontDisplay, var(--yin-fontBody, Inter, system-ui, sans-serif));
   color: var(--yin-icon-text-color, #fff);
   font-size: 20px;
   font-weight: 800;
+  line-height: 28px;
   text-shadow: 0 2px 5px rgb(0 0 0 / 75%);
   overflow-wrap: anywhere;
 }
@@ -427,16 +631,33 @@ select {
 .yin-group-toggle {
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
-  flex: 0 0 30px;
+  /* 20px, matching the pre-theme chevron's icon box, so centring it in the 28px
+     heading row lands it at the same offset. */
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
   border: 0;
   border-radius: var(--yin-radiusControl, 8px);
   background: transparent;
   color: var(--yin-icon-text-color, #fff);
-  font-size: 18px;
+  /* The affordance is drawn rather than typed: the pre-theme build used an
+     mdi-chevron-up/down icon, and a "+"/"-" character does not read the same. */
+  font-size: 0;
   text-shadow: 0 2px 4px rgb(0 0 0 / 80%);
   cursor: pointer;
+}
+
+.yin-group-toggle::before {
+  width: 9px;
+  height: 9px;
+  border-top: 2px solid currentColor;
+  border-left: 2px solid currentColor;
+  transform: rotate(45deg) translate(1px, 1px);
+  content: '';
+}
+
+.yin-group-toggle[aria-expanded='false']::before {
+  transform: rotate(-135deg) translate(-1px, -1px);
 }
 
 .yin-dialog-backdrop {
@@ -533,11 +754,14 @@ select {
   color: var(--yin-primary, #176b80);
 }
 
+/* The pre-theme build laid items out on an auto-fill grid (75px minimum on
+   desktop, 70px below 500px), so the columns stretch to fill the row instead
+   of leaving a ragged trailing gap. */
 .yin-group-items {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: var(--yin-component-group-gap, 12px) 18px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(75px, 1fr));
+  gap: 18px;
+  align-items: start;
 }
 
 .yin-page--directory .yin-group-items {
@@ -555,7 +779,7 @@ select {
   align-items: center;
   gap: 10px;
   min-width: 0;
-  width: 81px;
+  width: 100%;
   min-height: 94px;
   padding: 0;
   border: 0;
@@ -571,7 +795,7 @@ select {
 .yin-item:not(.yin-item--info) {
   flex-direction: column;
   justify-content: center;
-  gap: 6px;
+  gap: 2px;
   text-align: center;
 }
 
@@ -584,19 +808,42 @@ select {
   transform: scale(.985);
 }
 
+/* The pre-theme tile was a 70x70 clip box with a 1px transparent border and a
+   16px radius; the coloured avatar inside was also 70x70 but anchored at the
+   content origin, so overflow clipping left a 68x68 visible tile inset by 1px
+   with a 15px inner radius, and the letter centred on the full 70x70 box.
+   Reproduce that with a background-clip on a 1px border plus an inner layer. */
 .yin-item-icon {
+  position: relative;
   display: grid;
   place-items: center;
-  width: 68px;
-  height: 68px;
-  flex: 0 0 68px;
+  box-sizing: border-box;
+  width: 70px;
+  height: 70px;
+  flex: 0 0 70px;
   overflow: hidden;
-  border-radius: 15px;
+  border: 1px solid transparent;
+  border-radius: 16px;
   background: rgb(42 42 42 / 42%);
+  background-clip: padding-box;
   color: var(--yin-icon-text-color, #fff);
-  font-size: 22px;
-  font-weight: 700;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.25;
   white-space: nowrap;
+}
+
+/* The letter rides on its own full-size layer so it centres on the whole 70x70
+   box rather than on the 1px-inset content area, as the avatar text did. */
+.yin-item-icon > * {
+  grid-area: 1 / 1;
+}
+
+.yin-item-icon-letters {
+  display: grid;
+  place-items: center;
+  width: 70px;
+  height: 70px;
 }
 
 .yin-item-icon-image {
@@ -623,13 +870,13 @@ select {
   max-width: 100%;
   color: var(--yin-icon-text-color, #fff);
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 400;
   text-shadow: 0 2px 4px rgb(0 0 0 / 80%);
   white-space: normal;
   overflow: visible;
   text-overflow: clip;
   overflow-wrap: anywhere;
-  line-height: 1.2;
+  line-height: 1.6;
 }
 
 .yin-item-description,
@@ -692,12 +939,33 @@ select {
   padding: 24px 0;
 }
 
+/* The pre-theme footer wrapped the markup in a utility-classed block
+   (text-slate-300, justify-center) carrying a 100px top margin. Classes do not
+   survive into the theme, so the presentation is restated here and the wrapper's
+   margin becomes the footer's own. */
+/* Flex rather than text-align, because the pre-theme wrapper centred its
+   children as flex items: that drops the trailing space of the text run, which
+   is what makes the link land 2px further left. */
 .yin-footer {
-  width: calc(100% + 10px);
-  margin: 29px 0 0 -5px;
-  color: #161616;
-  text-align: left;
+  display: flex;
+  justify-content: center;
+  width: auto;
+  margin: 100px 0 0;
+  color: #cbd5e1;
+  font-size: 14px;
   line-height: 1.6;
+}
+
+/* The pre-theme build reset anchors to inherit colour and decoration, so a link
+   inside footer markup looked like plain text rather than a browser-blue link. */
+.yin-footer a {
+  margin-left: 5px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.yin-footer a:hover {
+  text-decoration: underline;
 }
 
 .yin-page--directory .yin-collection {
@@ -746,10 +1014,7 @@ select {
 }
 
 @media (max-width: 640px) {
-  .yin-page {
-    width: 100%;
-    padding-inline: max(calc(var(--yin-margin-x, 5px) + 10px), 12px);
-  }
+  .yin-page { width: 100%; }
 
   .yin-masthead {
     align-items: flex-start;
@@ -789,13 +1054,47 @@ select {
     flex-wrap: wrap;
   }
 
-  .yin-group-heading > .yin-group-title {
-    flex-basis: calc(100% - 40px);
-  }
-
+  /* The pre-theme heading kept the collapse chevron immediately after the title
+     (an 8px gap, no justify-between), so the title must stay content-sized; only
+     the hover controls drop to their own line. */
   .yin-group-controls {
     order: 3;
     flex-basis: 100%;
+  }
+}
+
+/* The pre-theme build had a dedicated narrow-viewport block (max-width: 500px):
+   it kept a 42px masthead padding, narrowed the header by 24px, shrank the logo
+   and tightened the item grid. Reproduce it after the 640px block so it wins at
+   the narrowest widths. */
+@media (max-width: 500px) {
+  /* The pre-theme narrow block narrowed the header itself and put the extra top
+     padding on it, so both the identity row and the search box moved down. */
+  .yin-header {
+    width: calc(100% - 24px);
+    padding-top: 42px;
+  }
+
+  .yin-masthead {
+    flex-wrap: nowrap;
+    align-items: center;
+    min-height: 32px;
+  }
+
+  /* The pre-theme narrow block gave the identity row a 6px gap on top of the
+     divider's own 4px margin, and kept the row vertically centred. */
+  .yin-identity {
+    width: auto;
+    gap: 6px;
+  }
+
+  .yin-logo { font-size: 1.35rem; line-height: 1.25; }
+  .yin-logo-divider { margin-inline: 4px; font-size: 1rem; }
+  .yin-clock { width: auto; font-size: 24px; line-height: 32px; }
+  .yin-group-items {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+    gap: 12px 8px;
   }
 }
 

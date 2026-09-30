@@ -144,6 +144,7 @@
   "themeRecovery": { "title": "Восстановление темы", "description": "Запустите Yin Home в безопасном режиме без JavaScript активной темы сообщества. Режим действует только в этой сессии браузера и не меняет сохранённую тему или макет.", "start": "Запустить безопасный режим Yin", "exit": "Выйти из безопасного режима", "restoreYin": "Восстановить тему Yin", "restoreFailed": "Не удалось восстановить тему Yin. Войдите в систему и повторите попытку.", "active": "Безопасный режим Yin включён. JavaScript темы сообщества отключён на эту сессию.", "home": "На главную" },
   "themeWallpaper": { "follow": "Следовать теме", "custom": "Свой вариант", "none": "Без обоев", "image": "Изображение", "video": "Видео", "web": "Локальные веб-обои", "external": "Внешний сайт", "source": "Адрес обоев", "poster": "Адрес статичной заставки", "uploadWeb": "Загрузить пакет веб-обоев", "preview": "Просмотр темы", "home": "Главная", "login": "Вход", "desktop": "Компьютер", "mobile": "Телефон", "light": "Светлая", "dark": "Тёмная", "remoteDomain": "Внешний домен", "confirmExternal": "Эта тема загрузит {hosts} на главной странице всех пользователей. Сделать её стандартной?", "loadFailed": "Не удалось загрузить тему", "wallpaperPlay": "Воспроизвести обои", "wallpaperPause": "Остановить обои", "wallpaperInteract": "Взаимодействовать с обоями", "wallpaperExit": "Выйти из режима взаимодействия" },
   "common": {
+    "refresh": "Refresh",
     "action": "Aktion",
     "add": "Добавить",
     "addSuccess": "Erfolgreich hinzugefügt",
@@ -273,6 +274,14 @@
     "oauthBackToLogin": "Back to login"
   },
   "panelHome": {
+    "systemSettings": "System settings",
+    "floatingActions": "Page utilities",
+    "fallbackReasonSafeMode": "Safe mode is enabled",
+    "fallbackReasonNoHomeView": "The active theme provides no home view",
+    "fallbackNotice": "Showing a simplified home page.",
+    "fallbackReason": "Reason",
+    "fallbackEmpty": "No bookmarks in this space.",
+    "fallbackReload": "Reload",
     "changeToLanModel": "Switch to LAN mode",
     "changeToLanModelSuccess": "Switched to LAN mode (mode status saved locally)",
     "changeToWanModel": "Switch to WAN mode",

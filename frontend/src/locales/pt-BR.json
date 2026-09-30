@@ -144,6 +144,7 @@
   "themeRecovery": { "title": "Recuperação do tema", "description": "Inicie o Yin Home no modo de segurança sem executar o JavaScript do tema comunitário ativo. O modo vale apenas para esta sessão do navegador e não altera o tema nem o layout salvos.", "start": "Iniciar modo seguro Yin", "exit": "Sair do modo seguro", "restoreYin": "Restaurar tema Yin", "restoreFailed": "Não foi possível restaurar o tema Yin. Entre na conta e tente novamente.", "active": "O modo seguro Yin está ativo. O JavaScript do tema comunitário está desativado nesta sessão.", "home": "Voltar ao início" },
   "themeWallpaper": { "follow": "Seguir tema", "custom": "Personalizado", "none": "Sem papel de parede", "image": "Imagem", "video": "Vídeo", "web": "Papel de parede web local", "external": "Site externo", "source": "URL do papel de parede", "poster": "URL da imagem estática", "uploadWeb": "Enviar pacote de papel de parede web", "preview": "Prévia do tema", "home": "Início", "login": "Entrar", "desktop": "Desktop", "mobile": "Celular", "light": "Claro", "dark": "Escuro", "remoteDomain": "Domínio externo", "confirmExternal": "Este tema carregará {hosts} na página inicial de todos. Definir como padrão?", "loadFailed": "Não foi possível carregar o tema", "wallpaperPlay": "Reproduzir papel de parede", "wallpaperPause": "Pausar papel de parede", "wallpaperInteract": "Interagir com o papel de parede", "wallpaperExit": "Encerrar interação" },
   "common": {
+    "refresh": "Refresh",
     "action": "Aktion",
     "add": "Adicionar",
     "addSuccess": "Erfolgreich hinzugefügt",
@@ -273,6 +274,14 @@
     "oauthBackToLogin": "Back to login"
   },
   "panelHome": {
+    "systemSettings": "System settings",
+    "floatingActions": "Page utilities",
+    "fallbackReasonSafeMode": "Safe mode is enabled",
+    "fallbackReasonNoHomeView": "The active theme provides no home view",
+    "fallbackNotice": "Showing a simplified home page.",
+    "fallbackReason": "Reason",
+    "fallbackEmpty": "No bookmarks in this space.",
+    "fallbackReload": "Reload",
     "changeToLanModel": "Switch to LAN mode",
     "changeToLanModelSuccess": "Switched to LAN mode (mode status saved locally)",
     "changeToWanModel": "Switch to WAN mode",

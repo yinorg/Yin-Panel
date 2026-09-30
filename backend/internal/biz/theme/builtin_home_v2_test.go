@@ -36,10 +36,8 @@ func TestSharedHomeViewDropsTheSpaceNavAndMovesTheSideSwitchToTheBrandMark(t *te
 // selector orphaned in the shared base or in a variant.
 func TestBuiltinPaletteSheetsLeaveNoDeadSpaceOrToggleSelectors(t *testing.T) {
 	sheets := map[string]string{
-		"shared":  "builtin_themes/shared/home.css",
-		"glass":   "builtin_themes/glass/styles/home.css",
-		"cyber":   "builtin_themes/cyber/styles/home.css",
-		"minimal": "builtin_themes/minimal/styles/home.css",
+		"shared": "builtin_themes/shared/home.css",
+		"glass":  "builtin_themes/glass/styles/home.css",
 	}
 	for name, path := range sheets {
 		data, err := builtinThemeFiles.ReadFile(path)
@@ -63,15 +61,14 @@ func TestBuiltinPaletteSheetsLeaveNoDeadSpaceOrToggleSelectors(t *testing.T) {
 }
 
 // A published revision is immutable, so a theme whose home resources changed
-// must ship under a new version or startup aborts. Guard every built-in theme,
-// including the three that share the shared home view, against silently reusing
-// a version whose resources have moved on.
+// must ship under a new version or startup aborts. Guard every built-in theme
+// against silently reusing a version whose resources have moved on.
 func TestBuiltinHomeVersionsAdvanceWhenSharedHomeResourcesChange(t *testing.T) {
 	versions := map[string]string{}
 	for _, pkg := range builtinPackagesV2() {
 		versions[pkg.Manifest.ID] = pkg.Manifest.Version
 	}
-	for _, id := range []string{"org.yin.default", "org.yin.glass", "org.yin.cyber", "org.yin.minimal"} {
+	for _, id := range []string{"org.yin.default", "org.yin.glass"} {
 		version, ok := versions[id]
 		if !ok {
 			t.Fatalf("built-in package %s must expose a version", id)
@@ -80,7 +77,39 @@ func TestBuiltinHomeVersionsAdvanceWhenSharedHomeResourcesChange(t *testing.T) {
 			t.Errorf("built-in package %s still uses version 2.3.1 after its home resources changed; bump it or startup aborts on the immutability guard", id)
 		}
 	}
-	if versions["org.yin.glass"] != versions["org.yin.cyber"] || versions["org.yin.glass"] != versions["org.yin.minimal"] {
-		t.Error("the three palettes that share one home view must move together, otherwise the shared change ships half-applied")
+}
+
+// Yin and Glass are the only built-in themes. A retired palette must not come
+// back through the seed table, the built-in ID set, or the embedded filesystem,
+// because a database seeded by an earlier release can still carry its rows and
+// the resolution fallback then treats them as a missing package.
+func TestOnlyYinAndGlassAreBuiltIn(t *testing.T) {
+	seeded := map[string]bool{}
+	for _, pkg := range builtinPackagesV2() {
+		seeded[pkg.Manifest.ID] = true
+	}
+	for _, id := range []string{"org.yin.default", "org.yin.glass"} {
+		if !seeded[id] {
+			t.Errorf("built-in package %s must be seeded on every startup", id)
+		}
+		if !isBuiltinThemeID(id) {
+			t.Errorf("%s must be recognised as built-in, otherwise it can be removed or overwritten like a community package", id)
+		}
+	}
+	if len(seeded) != 2 {
+		t.Errorf("expected exactly 2 built-in packages, got %d", len(seeded))
+	}
+	for _, retired := range []string{"org.yin.minimal", "org.yin.cyber"} {
+		if seeded[retired] {
+			t.Errorf("retired built-in %s is still seeded", retired)
+		}
+		if isBuiltinThemeID(retired) {
+			t.Errorf("retired built-in %s is still treated as built-in", retired)
+		}
+		// Its stylesheet must no longer be embedded, or the package could be
+		// rebuilt from source under a version this build no longer knows.
+		if _, err := builtinThemeFiles.ReadFile("builtin_themes/" + strings.TrimPrefix(retired, "org.yin.") + "/styles/home.css"); err == nil {
+			t.Errorf("retired built-in %s still has an embedded stylesheet", retired)
+		}
 	}
 }

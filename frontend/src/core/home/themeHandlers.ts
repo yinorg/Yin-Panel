@@ -39,6 +39,11 @@ export interface HomeThemeActionBindings {
   reorderGroups: (parentId: number | null, groupIds: number[]) => Promise<unknown> | unknown
   openCommandCenter: () => Promise<unknown> | unknown
   toggleSide: () => Promise<unknown> | unknown
+  setNetworkMode: (mode: 'lan' | 'wan') => Promise<unknown> | unknown
+  /** The sandbox reports the measured bottom edge of its search box. */
+  reportLayout: (input: { searchBottom: number }) => Promise<unknown> | unknown
+  forwardKey: (key: string) => Promise<unknown> | unknown
+  openLink: (url: string) => Promise<unknown> | unknown
   refresh: () => Promise<unknown> | unknown
   searchItems: (query: string) => Promise<readonly Panel.ItemInfo[]> | readonly Panel.ItemInfo[]
   getMonitorSnapshot: () => Promise<unknown> | unknown
@@ -170,6 +175,39 @@ export function createHomeThemeHandlers(bindings: HomeThemeActionBindings): Them
           return bindings.openEditor({ item, groupId })
         }
         case 'commandCenter.open': return bindings.openCommandCenter()
+        case 'network.setMode': {
+          const mode = payload.mode
+          if (mode !== 'lan' && mode !== 'wan')
+            throw apiError('INVALID_ARGUMENT', 'Network mode must be "lan" or "wan"')
+          return bindings.setNetworkMode(mode)
+        }
+        case 'layout.report': {
+          // Geometry hint from the sandbox, used to place the Core's monitor
+          // layer. Bounded so a misbehaving theme cannot move it absurdly.
+          const searchBottom = payload.searchBottom
+          if (typeof searchBottom !== 'number' || !Number.isFinite(searchBottom) || searchBottom < 0 || searchBottom > 100000)
+            throw apiError('INVALID_ARGUMENT', 'Search bottom must be a finite, non-negative number')
+          return bindings.reportLayout({ searchBottom })
+        }
+        case 'input.forwardKey': {
+          const key = payload.key
+          if (typeof key !== 'string' || key.length !== 1)
+            throw apiError('INVALID_ARGUMENT', 'Forwarded key must be a single character')
+          return bindings.forwardKey(key)
+        }
+        case 'link.open': {
+          // Only ever hand the Core an ordinary web link. Anything else
+          // (`javascript:`, `data:`, a bare protocol-relative URL) is refused
+          // here rather than reaching window.open.
+          const url = typeof payload.url === 'string' ? payload.url.trim() : ''
+          if (!url) throw apiError('INVALID_ARGUMENT', 'Link URL is required')
+          let parsed: URL
+          try { parsed = new URL(url) }
+          catch { throw apiError('INVALID_ARGUMENT', 'Link URL is not absolute') }
+          if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:')
+            throw apiError('INVALID_ARGUMENT', 'Only http and https links can be opened')
+          return bindings.openLink(parsed.toString())
+        }
         case 'ui.openCoreSurface': throw apiError('UNSUPPORTED_CAPABILITY', 'Core surface routing is not available in this adapter')
       }
     },

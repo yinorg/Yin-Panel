@@ -120,7 +120,7 @@ func validWallpaperBytes(asset ResourceData) bool {
 
 func isBuiltinThemeID(id string) bool {
 	switch id {
-	case "org.yin.default", "org.yin.glass", "org.yin.minimal", "org.yin.cyber":
+	case "org.yin.default", "org.yin.glass":
 		return true
 	default:
 		return false

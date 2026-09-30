@@ -259,14 +259,12 @@ func TestBuiltinPackagesV2AreCompleteDTCGAndRepeatable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(packages) != 4 {
-		t.Fatalf("expected Yin/Glass/Minimal/Cyber, got %d", len(packages))
+	if len(packages) != 2 {
+		t.Fatalf("expected Yin/Glass, got %d", len(packages))
 	}
 	expectedPermissions := map[string][]string{
-		"org.yin.default": {"spaces.read", "groups.read", "items.read", "items.write", "groups.write"},
+		"org.yin.default": {"spaces.read", "groups.read", "items.read", "items.write", "groups.write", "preferences.read", "preferences.write", "diagnostics.report"},
 		"org.yin.glass":   {"spaces.read", "groups.read", "items.read"},
-		"org.yin.minimal": {"spaces.read", "groups.read", "items.read"},
-		"org.yin.cyber":   {"spaces.read", "groups.read", "items.read"},
 	}
 	for _, summary := range packages {
 		pkg, err := PackageRevisionPublicV2(db, summary.Revision)
@@ -297,7 +295,7 @@ func TestBuiltinPackagesV2AreCompleteDTCGAndRepeatable(t *testing.T) {
 		}
 		wantVersion := "2.3.2"
 		if summary.ID == "org.yin.default" {
-			wantVersion = "2.3.8"
+			wantVersion = "2.3.27"
 		}
 		if pkg.Manifest.Version != wantVersion {
 			t.Errorf("%s builtin version = %q, want %q", summary.ID, pkg.Manifest.Version, wantVersion)
@@ -311,14 +309,6 @@ func TestBuiltinPackagesV2AreCompleteDTCGAndRepeatable(t *testing.T) {
 			if !strings.Contains(string(mustPackageAsset(t, db, summary.Revision, "styles/home.css")), "backdrop-filter") {
 				t.Error("Glass home styling is missing translucent surfaces")
 			}
-		case "org.yin.minimal":
-			if !strings.Contains(string(mustPackageAsset(t, db, summary.Revision, "styles/home.css")), "flex-direction: column; gap: 0") {
-				t.Error("Minimal home styling is missing its editorial list treatment")
-			}
-		case "org.yin.cyber":
-			if !strings.Contains(string(mustPackageAsset(t, db, summary.Revision, "styles/home.css")), "background-size: 28px 28px") {
-				t.Error("Cyber home styling is missing its technical grid treatment")
-			}
 		}
 		for scheme, document := range pkg.Tokens {
 			if err := validateDTCGDocument202510(document); err != nil {
@@ -329,7 +319,7 @@ func TestBuiltinPackagesV2AreCompleteDTCGAndRepeatable(t *testing.T) {
 }
 
 func TestBuiltinHomeAssetsLoadFromPackagedThemeSources(t *testing.T) {
-	ids := []string{"org.yin.default", "org.yin.glass", "org.yin.minimal", "org.yin.cyber"}
+	ids := []string{"org.yin.default", "org.yin.glass"}
 	styles := map[string]string{}
 	for _, id := range ids {
 		resources := builtinHomeResourcesV2(id)
@@ -344,13 +334,11 @@ func TestBuiltinHomeAssetsLoadFromPackagedThemeSources(t *testing.T) {
 		}
 		styles[id] = string(resources["styles/home.css"].Content)
 	}
-	if styles[ids[0]] == styles[ids[1]] || styles[ids[0]] == styles[ids[2]] || styles[ids[0]] == styles[ids[3]] {
-		t.Fatal("official theme source styles must differ from Yin")
+	if styles[ids[0]] == styles[ids[1]] {
+		t.Fatal("Glass source styles must differ from Yin")
 	}
 	for id, marker := range map[string]string{
-		"org.yin.glass":   "backdrop-filter: blur(18px)",
-		"org.yin.minimal": "flex-direction: column; gap: 0",
-		"org.yin.cyber":   "background-size: 28px 28px",
+		"org.yin.glass": "backdrop-filter: blur(18px)",
 	} {
 		if !strings.Contains(styles[id], marker) {
 			t.Errorf("%s source is missing its visual signature %q", id, marker)
@@ -361,20 +349,12 @@ func TestBuiltinHomeAssetsLoadFromPackagedThemeSources(t *testing.T) {
 func TestBuiltinHomeResourceHashesOnlyChangeForDefaultYin(t *testing.T) {
 	expected := map[string]map[string]string{
 		"org.yin.default": {
-			"views/home.mjs":  "ed33f9cdf69cdf3f651171b6a1dab01385e0e61da2e570f6ef101e36c9330253",
-			"styles/home.css": "0a5aae99890633a53ea0c25f110e229f2d451fa9424bdeeec12eec8f25b40e2e",
+			"views/home.mjs":  "089a6f08812ca50381cfb9ae8b688a50131dfa960e2c6a2129181e280508d635",
+			"styles/home.css": "b0bcd54a3d101da47d4cefacc7da6d940517cb130fcba1bc8b7da41af399a0e7",
 		},
 		"org.yin.glass": {
 			"views/home.mjs":  "6f380f2079ba8f523ad4ce149b9f9faa7b5f7d11a9053e8a336b0624e0b1a091",
 			"styles/home.css": "a46ef90408799b5fafad0f26a59faea0d8c54f29d1f5518f6335b81bf87559cc",
-		},
-		"org.yin.minimal": {
-			"views/home.mjs":  "6f380f2079ba8f523ad4ce149b9f9faa7b5f7d11a9053e8a336b0624e0b1a091",
-			"styles/home.css": "84f1a6ff276e43d29e1ce6150d449f04e28d9cf0b02ae4b2a5d46e032daea151",
-		},
-		"org.yin.cyber": {
-			"views/home.mjs":  "6f380f2079ba8f523ad4ce149b9f9faa7b5f7d11a9053e8a336b0624e0b1a091",
-			"styles/home.css": "a41bcb1a21a82534b76f512ec76b9ca1e42661694ed6fcce56c52056271cc17f",
 		},
 	}
 	for id, want := range expected {
@@ -441,7 +421,7 @@ func TestEnsureBuiltinV2UpgradesOnlyActivationForSelectedBuiltin(t *testing.T) {
 		t.Fatal(err)
 	}
 	latest, err := LatestPackageRevisionV2(db, "org.yin.default")
-	if err != nil || latest.Version != "2.3.8" || activation.ActiveRevisionID != latest.ID {
+	if err != nil || latest.Version != "2.3.27" || activation.ActiveRevisionID != latest.ID {
 		t.Fatalf("selected builtin activation = %+v, latest=%s, err=%v", activation, latest.ID, err)
 	}
 	if latest.ID == old.Revision {
@@ -450,6 +430,70 @@ func TestEnsureBuiltinV2UpgradesOnlyActivationForSelectedBuiltin(t *testing.T) {
 	activation, err = GetActivationV2(db, "user:13")
 	if err != nil || activation.ActiveRevisionID != community.Revision {
 		t.Fatalf("community activation changed during builtin update: %+v, err=%v", activation, err)
+	}
+}
+
+// A database seeded by an earlier release keeps the rows of themes a later build
+// no longer ships, and an activation record can still point at one. Reading the
+// active theme must not fail on that; it must fall back to Yin, the one package
+// guaranteed to be seeded on every startup.
+func TestActivePackageRevisionV2FallsBackWhenTheActivatedPackageIsGone(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open("file:theme-builtins-v2-retired?mode=memory&cache=shared"), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := Migrate(db); err != nil {
+		t.Fatal(err)
+	}
+	if err := EnsureBuiltinV2(db); err != nil {
+		t.Fatal(err)
+	}
+	yin, err := InstanceDefaultRevisionV2(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Reproduce the retired-package state: an activation pointing at a revision
+	// that no longer resolves, with no migration to repair it.
+	retired := packageFixtureV2("2.3.2", "retired")
+	retired.Manifest.ID = "org.yin.minimal"
+	retired.Manifest.Name = "Minimal"
+	if err := InstallPackageV2(db, 0, retired); err != nil {
+		t.Fatal(err)
+	}
+	if err := InitializeActivationV2(db, ActivationScopeForUserV2(7), retired.Manifest.ID, retired.Revision); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Where("id = ?", retired.Revision).Delete(&RevisionRecordV2{}).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	// Reading the retired package's revision directly still reports it missing,
+	// so the fallback cannot be passing because the lookup succeeded.
+	if _, err := GetPackageRevisionV2(db, retired.Revision); !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Fatalf("retired revision should be gone, got err=%v", err)
+	}
+
+	got, err := ActivePackageRevisionV2(db, ActivationScopeForUserV2(7), yin.ID)
+	if err != nil {
+		t.Fatalf("resolving a retired activation must fall back, got err=%v", err)
+	}
+	if got.ID != yin.ID {
+		t.Fatalf("retired activation resolved to %s, want Yin %s", got.ID, yin.ID)
+	}
+
+	// A resolvable activation must still win over the fallback, or this change
+	// would silently reset every user onto Yin.
+	working := packageFixtureV2("1.0.0", "working")
+	working.Manifest.ID = "com.example.working"
+	if err := InstallPackageV2(db, 7, working); err != nil {
+		t.Fatal(err)
+	}
+	if err := InitializeActivationV2(db, ActivationScopeForUserV2(8), working.Manifest.ID, working.Revision); err != nil {
+		t.Fatal(err)
+	}
+	got, err = ActivePackageRevisionV2(db, ActivationScopeForUserV2(8), yin.ID)
+	if err != nil || got.ID != working.Revision {
+		t.Fatalf("live activation = %s, want %s, err=%v", got.ID, working.Revision, err)
 	}
 }
 

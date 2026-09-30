@@ -17,6 +17,15 @@ const commandPermissions: Record<ThemeCommand, ThemePermission> = {
   'editor.open': 'items.write',
   'commandCenter.open': 'items.read',
   'ui.openCoreSurface': 'preferences.read',
+  // The network mode (LAN/WAN) is a user-level display/navigation preference.
+  'network.setMode': 'preferences.write',
+  // Geometry telemetry: the theme telling the Core where its layout landed.
+  'layout.report': 'diagnostics.report',
+  // Gated like the command centre, which is the only thing a forwarded key can
+  // open, so losing the grant is a visible no-op rather than a silent bypass.
+  'input.forwardKey': 'items.read',
+  // Same class of action as `item.open`: following a link out of the panel.
+  'link.open': 'items.read',
 }
 
 export function requiredCommandPermission(command: ThemeCommand): ThemePermission {

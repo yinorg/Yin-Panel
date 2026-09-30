@@ -69,6 +69,44 @@ export const router = createRouter({
   scrollBehavior: () => ({ left: 0, top: 0 }),
 })
 
+/**
+ * A lazily loaded route can 404 after an upgrade: build assets carry a content
+ * hash, so the file a previously loaded document asked for no longer exists once
+ * a new build lands. Reloading once fetches the current entry document, which
+ * references the current chunks.
+ *
+ * The session flag makes this a single retry — without it a genuinely missing
+ * chunk would reload forever — and it is cleared as soon as a navigation
+ * succeeds, so a later upgrade can recover on its own.
+ */
+const CHUNK_RECOVERY_KEY = 'yin-chunk-reload'
+
+function isChunkLoadFailure(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error)
+  return /dynamically imported module|Failed to fetch|Importing a module script failed|ChunkLoadError/i.test(message)
+}
+
+router.onError((error) => {
+  if (!isChunkLoadFailure(error)) return
+  try {
+    if (sessionStorage.getItem(CHUNK_RECOVERY_KEY) === '1') return
+    sessionStorage.setItem(CHUNK_RECOVERY_KEY, '1')
+  }
+  catch {
+    // Private mode can refuse storage; a reload is still better than a dead page.
+  }
+  window.location.reload()
+})
+
+router.afterEach(() => {
+  try {
+    sessionStorage.removeItem(CHUNK_RECOVERY_KEY)
+  }
+  catch {
+    // Nothing to clear.
+  }
+})
+
 setupPageGuard(router)
 
 export async function setupRouter(app: App) {

@@ -340,6 +340,10 @@ test('Core Home command adapter resolves IDs from live data and ignores theme-pr
   const item = { id: 31, itemIconGroupId: 21, title: 'Console', icon: null, url: 'https://internal.test', openMethod: 3 }
   let opened: Panel.ItemInfo | undefined
   let deletedItemId = 0
+  let requestedMode = ''
+  let reportedBottom = -1
+  const forwardedKeys: string[] = []
+  const openedLinks: string[] = []
   const handlers = createHomeThemeHandlers({
     getSpaces: () => [{ id: 12 }],
     getGroups: () => [{ id: 21, items: [item] }],
@@ -367,6 +371,10 @@ test('Core Home command adapter resolves IDs from live data and ignores theme-pr
     getStorage: () => undefined,
     setStorage: () => undefined,
     removeStorage: () => undefined,
+    setNetworkMode: (mode) => { requestedMode = mode },
+    reportLayout: ({ searchBottom }) => { reportedBottom = searchBottom },
+    forwardKey: (key) => { forwardedKeys.push(key) },
+    openLink: (url) => { openedLinks.push(url) },
   })
   await handlers.executeCommand('item.open', { itemId: '31', url: 'https://attacker.test' })
   expect(opened).toBe(item)
@@ -386,6 +394,25 @@ test('Core Home command adapter resolves IDs from live data and ignores theme-pr
   await expect(handlers.executeCommand('item.open', { itemId: '999' })).rejects.toMatchObject({ code: 'NOT_FOUND' })
   await handlers.executeCommand('item.delete', { itemId: '31', url: 'https://attacker.test' })
   expect(deletedItemId).toBe(31)
+  // Both commands added for the theme runtime must stay wired through the adapter.
+  await handlers.executeCommand('network.setMode', { mode: 'lan' })
+  expect(requestedMode).toBe('lan')
+  await handlers.executeCommand('layout.report', { searchBottom: 328 })
+  expect(reportedBottom).toBe(328)
+  // The sandbox cannot deliver key events to the Core, so the theme's shortcut
+  // only works while this binding stays wired through the adapter.
+  await handlers.executeCommand('input.forwardKey', { key: 'a' })
+  expect(forwardedKeys).toEqual(['a'])
+  await expect(handlers.executeCommand('input.forwardKey', { key: 'Enter' }))
+    .rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
+  // The sandbox cannot open windows, so links come back to the Core; anything
+  // that is not a plain web link is refused before it reaches window.open.
+  await handlers.executeCommand('link.open', { url: 'https://github.com/yinorg/Yin-Panel' })
+  expect(openedLinks).toEqual(['https://github.com/yinorg/Yin-Panel'])
+  for (const url of ['javascript:alert(1)', 'data:text/html,x', '/relative', 'not a url']) {
+    await expect(handlers.executeCommand('link.open', { url })).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
+  }
+  expect(openedLinks).toHaveLength(1)
 })
 
 test('Theme API v1 dispatcher enforces permission and rejects stale contexts', async () => {
@@ -521,6 +548,7 @@ test('sandbox Theme API forwards search through its isolated MessageChannel runt
     const sandboxPath = '/src/theme/runtime/sandbox.ts'
     const { mountThemeSandbox } = await import(sandboxPath)
     const frame = document.createElement('iframe')
+    frame.setAttribute('data-theme-sandbox-under-test', '')
     document.body.appendChild(frame)
     const script = `export default {
       apiVersion: '1.0.0',
@@ -557,7 +585,11 @@ test('sandbox Theme API forwards search through its isolated MessageChannel runt
     })
     ;(window as Window & { __testThemeRuntime?: { dispose: () => Promise<void> } }).__testThemeRuntime = runtime
   })
-  const themedRoot = page.frameLocator('iframe').locator('#theme-root')
+  // The home page now hosts the real theme frame, so a bare `iframe` selector
+  // matches more than one element. The wallpaper and window frames are also
+  // plain iframes with no distinguishing test id, so the sandbox under test is
+  // marked at creation time and selected by that instead.
+  const themedRoot = page.frameLocator('iframe[data-theme-sandbox-under-test]').locator('#theme-root')
   await expect(themedRoot).toHaveAttribute('data-result', 'search.query:0|spaces.list:3|groups.list:0|items.list:0')
   await page.evaluate(async () => {
     await (window as Window & { __testThemeRuntime?: { dispose: () => Promise<void> } }).__testThemeRuntime?.dispose()

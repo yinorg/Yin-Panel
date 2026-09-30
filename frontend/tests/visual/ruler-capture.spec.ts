@@ -44,19 +44,26 @@ async function mockOldApi(page: import('@playwright/test').Page) {
     })
   })
 
-  // Old version auth: just set the localStorage keys it expects
+  // Auth for the old build. It persists through the same `ss` storage wrapper as
+  // the current one, which stores `{ data, expire }`; writing a bare
+  // `{ token, userInfo }` left the store's token undefined, so the baseline was
+  // silently captured logged-out and any logged-in chrome (space status bar,
+  // floating buttons) was missing from it.
   await page.addInitScript(() => {
     localStorage.setItem('authStorage', JSON.stringify({
-      token: 'test-token-123',
-      userInfo: {
-        id: 1,
-        name: 'Test User',
-        mail: 'test@example.com',
-        avatar: '',
-        role: 1,
-        createTime: Date.now(),
-        updateTime: Date.now()
-      }
+      data: {
+        token: 'test-token-123',
+        userInfo: {
+          id: 1,
+          name: 'Test User',
+          mail: 'test@example.com',
+          avatar: '',
+          role: 1,
+          createTime: Date.now(),
+          updateTime: Date.now()
+        }
+      },
+      expire: null
     }))
   })
 }

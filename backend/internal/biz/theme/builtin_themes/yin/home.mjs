@@ -26,6 +26,10 @@ export default {
     let contextMenu
     let actionBar
     let addGroupButton
+    let commandCenterButton
+    let styleButton
+    let networkMode = 'wan'
+    let reportedSearchBottom = -1
     let groupDialogValue
     let groupDialogOpener
     let contextItemTrigger
@@ -40,9 +44,12 @@ export default {
       catch (error) { if (status) status.textContent = error?.message || 'Action failed' }
     }
 
+    // Deliberately excludes snapshot.permissions: that is authorization (may the
+    // theme ever write?) while these sources are space-scoped (may it write
+    // *here*?). Mixing them would re-expose write affordances on a read-only
+    // Space just because the user granted write scope elsewhere.
     const globalCapabilitySources = () => [
       snapshot?.capabilities,
-      snapshot?.permissions,
       snapshot?.activeSpaceCapabilities,
       snapshot?.presentation?.capabilities,
       ...(snapshot?.groups || []).map(group => group.capabilities),
@@ -50,6 +57,10 @@ export default {
 
     const hasGlobalCapability = (...names) => globalCapabilitySources().some(capabilities =>
       capabilities.some(capability => names.includes(capability)))
+
+    // Authorization for Core-owned surfaces. A theme mounted without a grant has
+    // an empty set, so these entries hide instead of failing on click.
+    const hasPermission = name => (snapshot?.permissions || []).includes(name)
 
     const canCreateItems = () => hasGlobalCapability('items.write', 'item.create')
       || (snapshot?.items || []).some(item => (item.capabilities || []).some(capability => ['item.update', 'item.delete'].includes(capability)))
@@ -204,6 +215,8 @@ export default {
     let clockTime
     let clockDate
     let searchSection
+    let searchContainer
+    let searchClearButton
     let searchInput
     let engineMenu
     let engineButton
@@ -246,6 +259,13 @@ export default {
       const reported = Number(api.environment?.get?.()?.viewport?.height)
       return Number.isFinite(reported) && reported > 0 ? reported : window.innerHeight
     }
+    // The pre-theme build placed the content with `margin-top: 10%`, and CSS
+    // resolves a percentage margin against the containing block's *width*. So
+    // the vertical offset tracks the viewport width, not the height.
+    const viewportWidth = () => {
+      const reported = Number(api.environment?.get?.()?.viewport?.width)
+      return Number.isFinite(reported) && reported > 0 ? reported : window.innerWidth
+    }
 
     const togglePanelSide = async () => {
       if (sideSwitching || !canToggleSide()) return
@@ -266,6 +286,11 @@ export default {
       root.replaceChildren()
       root.className = 'yin-theme-root'
       page = element('div', 'yin-page')
+      // The pre-theme build nested the masthead and the search box inside an
+      // 80%-wide header, and the search box was a further 80% of that above
+      // the lg breakpoint. Keep the nesting so both widths track the viewport
+      // the same way instead of relying on a hard max-width.
+      const headerSection = element('header', 'yin-header')
       const masthead = element('header', 'yin-masthead')
       const identity = element('div', 'yin-identity')
       logo = element('div', 'yin-logo')
@@ -291,17 +316,27 @@ export default {
       masthead.append(identity)
       actionBar = element('div', 'yin-actions')
       actionBar.setAttribute('aria-label', 'Bookmark actions')
+      commandCenterButton = addActionButton(actionBar, 'Commands', 'theme-open-command-center', 'Open command center', () => run(() => api.commands.execute('commandCenter.open')))
       addGroupButton = addActionButton(actionBar, 'Add group', 'theme-add-group', 'Add group', () => showGroupDialog('create'))
+      styleButton = addActionButton(actionBar, 'Style', 'theme-open-style', 'Open theme style settings', () => run(() => api.ui.openCoreSurface('theme-settings')))
+
       searchSection = element('section', 'yin-search')
       searchSection.setAttribute('role', 'search')
       searchSection.dataset.testid = 'theme-home-search'
+      // The pre-theme build put the rounded, bordered surface on a wrapper and
+      // left the input itself transparent inside it. Keeping that split means
+      // the border, radius and padding sit where the pixel baselines expect.
+      searchContainer = element('div', 'yin-search-container')
       searchInput = element('input', 'yin-search-input')
-      searchInput.type = 'search'
+      // Not type=search: the UA cancel affordance is unstyleable and would
+      // sit where the pre-theme build put its own clear slot.
+      searchInput.type = 'text'
       searchInput.autocomplete = 'off'
       searchInput.setAttribute('aria-label', 'Search bookmarks')
       searchInput.placeholder = 'Enter search content'
       searchInput.addEventListener('input', () => {
         query = searchInput.value
+        searchClearButton.hidden = query === ''
         renderCollection()
       })
       searchInput.addEventListener('keydown', event => {
@@ -326,11 +361,25 @@ export default {
       engineMenu.setAttribute('role', 'listbox')
       engineMenu.hidden = true
       engineMenu.addEventListener('click', event => event.stopPropagation())
+      // The pre-theme build showed a 25px clear slot with a 10px right margin
+      // only while a query was present, which is what squeezed the input.
+      searchClearButton = element('button', 'yin-search-clear')
+      searchClearButton.type = 'button'
+      searchClearButton.setAttribute('aria-label', 'Clear search')
+      searchClearButton.hidden = true
+      searchClearButton.addEventListener('click', () => {
+        searchInput.value = ''
+        query = ''
+        searchClearButton.hidden = true
+        renderCollection()
+        searchInput.focus()
+      })
       searchButton = element('button', 'yin-search-submit', 'Search')
       searchButton.type = 'button'
       searchButton.setAttribute('aria-label', 'Search')
       searchButton.addEventListener('click', submitSearch)
-      searchSection.append(searchInput, engineButton, engineMenu, searchButton)
+      searchSection.append(searchContainer, engineMenu)
+      searchContainer.append(engineButton, searchInput, searchClearButton, searchButton)
       directoryNav = element('nav', 'directory-folders')
       directoryNav.setAttribute('aria-label', 'Bookmark groups')
       status = element('p', 'yin-status')
@@ -389,7 +438,8 @@ export default {
       contextMenu.hidden = true
       contextMenu.setAttribute('role', 'menu')
       contextMenu.setAttribute('aria-label', 'Item actions')
-      page.append(masthead, actionBar, searchSection, directoryNav, status, collection, emptyState, footer, groupDialog, contextMenu)
+      headerSection.append(masthead, actionBar, searchSection)
+      page.append(headerSection, directoryNav, status, collection, emptyState, footer, groupDialog, contextMenu)
       page.addEventListener('keydown', event => {
         if (!groupDialog.hidden && event.key === 'Tab') {
           const focusable = [...groupDialog.querySelectorAll('input:not(:disabled), button:not(:disabled)')]
@@ -411,6 +461,32 @@ export default {
             if (contextItemTrigger?.isConnected) contextItemTrigger.focus()
           }
         }
+      })
+      // The home lives in a cross-origin frame, so a key pressed here never
+      // reaches the Core's window listener and the global shortcut (type a letter
+      // to open the command centre) would be dead. Forwarding keeps the policy in
+      // the Core: it decides whether a dialog owns the keyboard, and this only
+      // passes on unmodified single characters typed outside a field.
+      //
+      // This listens on the document rather than on `page`, because a key pressed
+      // with nothing focused targets <body>, which is an *ancestor* of the page
+      // element — the event bubbles up from body and never reaches it.
+      document.addEventListener('keydown', event => {
+        const target = event.target
+        const editable = target instanceof Element && !!target.closest('input, textarea, select, [contenteditable="true"]')
+        if (event.isComposing || editable || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return
+        if (event.key.length !== 1 || !groupDialog.hidden) return
+        run(() => api.commands.execute('input.forwardKey', { key: event.key }))
+      })
+      // Panel-supplied links (the "Powered by" footer) cannot open a window from
+      // inside the sandbox, so the click is handed to the Core, which applies the
+      // same open policy as a bookmark. Relative links, anchors and mailto: stay
+      // in the frame, where they work without any privilege.
+      footer.addEventListener('click', event => {
+        const anchor = event.target instanceof Element ? event.target.closest('a[data-link-url]') : null
+        if (!anchor) return
+        event.preventDefault()
+        run(() => api.commands.execute('link.open', { url: anchor.dataset.linkUrl }))
       })
       page.addEventListener('pointerdown', event => {
         if (!contextMenu.hidden && !contextMenu.contains(event.target)) contextMenu.hidden = true
@@ -530,7 +606,8 @@ export default {
         const current = (snapshot?.groups || []).find(candidate => String(candidate.id) === section.dataset.groupId)
         if (current) reorderGroup(current, 1, button)
       })
-      const toggle = element('button', 'yin-group-toggle', '−')
+      // The chevron is drawn in CSS from aria-expanded, so no glyph text.
+      const toggle = element('button', 'yin-group-toggle')
       toggle.type = 'button'
       toggle.setAttribute('aria-label', 'Collapse group')
       toggle.setAttribute('aria-expanded', 'true')
@@ -604,7 +681,11 @@ export default {
         image.referrerPolicy = 'no-referrer'
         icon.append(image)
       } else {
-        icon.textContent = itemIcon?.text || itemIcon?.fileName || (item.title || '?').slice(0, 1)
+        // The letter sits on its own 70x70 layer so it centres on the full tile
+        // box, not on the 1px-inset content area left by the transparent border.
+        const letters = element('span', 'yin-item-icon-letters')
+        letters.textContent = itemIcon?.text || itemIcon?.fileName || (item.title || '?').slice(0, 1)
+        icon.append(letters)
       }
       const infoStyle = layout === 'standard' && presentation?.iconStyle === 'info'
       button.classList.toggle('yin-item--info', infoStyle)
@@ -671,21 +752,49 @@ export default {
       footer.hidden = false
       const parsed = new DOMParser().parseFromString(`<body>${html}</body>`, 'text/html').body
       const allowed = new Set(['A', 'B', 'BR', 'EM', 'I', 'P', 'SMALL', 'SPAN', 'STRONG'])
+      // Layout wrappers carry no formatting of their own and their classes are
+      // not carried over either, so dropping them would silently discard the
+      // whole block. The default footer markup is one such wrapper, so unwrap
+      // instead of reject and keep the text plus any allowed inline children.
+      const transparent = new Set(['ASIDE', 'CENTER', 'DIV', 'FIGCAPTION', 'FIGURE', 'FOOTER', 'HEADER', 'MAIN', 'NAV', 'SECTION'])
+      const SAFE_STYLE_PROPERTIES = new Set(['color', 'font-size', 'font-weight', 'letter-spacing', 'margin', 'margin-bottom', 'margin-left', 'margin-right', 'margin-top', 'text-align', 'text-transform'])
       const appendSafe = (source, target) => {
         for (const child of source.childNodes) {
           if (child.nodeType === Node.TEXT_NODE) {
             target.append(document.createTextNode(child.textContent || ''))
             continue
           }
-          if (child.nodeType !== Node.ELEMENT_NODE || !allowed.has(child.tagName)) continue
+          if (child.nodeType !== Node.ELEMENT_NODE) continue
+          if (transparent.has(child.tagName)) {
+            appendSafe(child, target)
+            continue
+          }
+          if (!allowed.has(child.tagName)) continue
           const safe = document.createElement(child.tagName.toLowerCase())
+          // Classes cannot be carried over because the theme ships no utility
+          // CSS, so honour a small set of presentational inline declarations to
+          // keep hand-written footer markup close to what the user authored.
+          const style = child.getAttribute('style')
+          if (style) {
+            const kept = style
+              .split(';')
+              .filter(decl => {
+                const prop = decl.split(':')[0]
+                return prop ? SAFE_STYLE_PROPERTIES.has(prop.trim().toLowerCase()) : false
+              })
+              .map(decl => `${decl.trim()};`)
+            if (kept.length) safe.setAttribute('style', kept.join(' '))
+          }
           if (child.tagName === 'A') {
             const href = child.getAttribute('href') || ''
             if (/^(https?:|mailto:|\/|#)/i.test(href)) {
               safe.setAttribute('href', href)
               if (/^https?:/i.test(href)) {
-                safe.setAttribute('target', '_blank')
-                safe.setAttribute('rel', 'noopener noreferrer')
+                // No `target`: the sandbox has no `allow-popups`, so the browser
+                // would refuse to open a new window and log a violation. Clicks
+                // are routed to the Core instead (see the footer click handler),
+                // which also keeps the link on the Core's own open policy.
+                safe.dataset.linkUrl = href
               }
             }
           }
@@ -696,8 +805,7 @@ export default {
       appendSafe(parsed, footer)
     }
 
-    const positionCollectionAfterMonitor = () => {
-      if (collectionLayoutFrame) cancelAnimationFrame(collectionLayoutFrame)
+    const positionCollectionAfterMonitor = () => {      if (collectionLayoutFrame) cancelAnimationFrame(collectionLayoutFrame)
       collection.style.removeProperty('margin-top')
       if (directoryNav) directoryNav.style.removeProperty('margin-top')
       collectionLayoutFrame = requestAnimationFrame(() => {
@@ -723,6 +831,18 @@ export default {
           collection.style.marginTop = `${naturalMargin + Math.max(0, desiredTop - currentTop)}px`
         }
       })
+    }
+
+    // The Core cannot measure inside the sandboxed frame, so report where the
+    // search box ended up and let it place the monitor layer from real
+    // geometry. The collection offset below never moves the search box, so this
+    // cannot feed back into another layout pass.
+    const reportLayout = () => {
+      if (!searchSection || searchSection.hidden) return
+      const bottom = Math.round(searchSection.getBoundingClientRect().bottom)
+      if (!Number.isFinite(bottom) || bottom <= 0 || bottom === reportedSearchBottom) return
+      reportedSearchBottom = bottom
+      void Promise.resolve(api.commands.execute('layout.report', { searchBottom: bottom })).catch(() => {})
     }
 
     const renderCollection = () => {
@@ -755,7 +875,6 @@ export default {
         section.dataset.groupId = String(group.id)
         section._yin.title.textContent = group.title || 'Untitled group'
         const collapsed = collapsedGroups.has(String(group.id))
-        section._yin.toggle.textContent = collapsed ? '+' : '−'
         section._yin.toggle.setAttribute('aria-label', collapsed ? 'Expand group' : 'Collapse group')
         section._yin.toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true')
         section.classList.toggle('is-collapsed', collapsed)
@@ -843,18 +962,28 @@ export default {
       page.style.setProperty('--yin-viewport-height', `${viewportHeight()}px`)
       page.style.setProperty('--yin-content-max-width', `${presentation.content?.maxWidth || 1200}${presentation.content?.maxWidthUnit || 'px'}`)
       page.style.setProperty('--yin-margin-x', `${presentation.content?.marginX || 0}px`)
-      page.style.setProperty('--yin-content-top', `${(viewportHeight() * (presentation.content?.marginTopPercent || 0)) / 100}px`)
-      page.style.setProperty('--yin-content-bottom', `${(viewportHeight() * (presentation.content?.marginBottomPercent || 0)) / 100}px`)
+      page.style.setProperty('--yin-content-top', `${(viewportWidth() * (presentation.content?.marginTopPercent || 0)) / 100}px`)
+      page.style.setProperty('--yin-content-bottom', `${(viewportWidth() * (presentation.content?.marginBottomPercent || 0)) / 100}px`)
       page.style.setProperty('--yin-icon-text-color', presentation.iconTextColor || '#ffffff')
       const reservedHeight = Number(presentation.monitor?.reservedHeight)
       page.style.setProperty('--yin-monitor-reserved-height', `${Number.isFinite(reservedHeight) && reservedHeight > 0 ? reservedHeight : 0}px`)
       updateLogo(presentation)
       updateClock()
       addGroupButton.hidden = !canMutateGroup('create')
+      // The remaining entries open Core-owned surfaces, so they need the command
+      // permission rather than a Space capability.
+      // The command center needs only items.read, which an anonymous public link
+      // also holds, but the Core refuses to open it without a session.
+      commandCenterButton.hidden = !hasPermission('items.read') || presentation.signedIn !== true
+      // `ui.openCoreSurface` is a top-level Theme API method, not a command:
+      // dispatching it through commands.execute is rejected as an unknown
+      // command, which is why this entry used to do nothing.
+      styleButton.hidden = !hasPermission('preferences.read')
       updateSearch(presentation)
       updateFooter(presentation.footerHtml || '')
       renderCollection()
       positionCollectionAfterMonitor()
+      reportLayout()
     }
 
     return {
@@ -864,7 +993,7 @@ export default {
           update(initialSnapshot)
           // The Core monitor layer is positioned with viewport units, so the
           // reservation has to be recomputed whenever the viewport changes.
-          const handleViewportResize = () => positionCollectionAfterMonitor()
+          const handleViewportResize = () => { positionCollectionAfterMonitor(); reportLayout() }
           const handleDocumentPointerDown = () => setEngineMenuOpen(false)
           window.addEventListener('resize', handleViewportResize)
           document.addEventListener('pointerdown', handleDocumentPointerDown)

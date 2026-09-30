@@ -144,6 +144,7 @@
   "themeRecovery": { "title": "テーマの復旧", "description": "現在のコミュニティテーマの JavaScript を実行せずに Yin Home をセーフモードで起動します。セーフモードはこのブラウザーセッション中のみ有効で、保存済みのテーマやレイアウトは変更しません。", "start": "Yin セーフモードを開始", "exit": "セーフモードを終了", "restoreYin": "Yin テーマを復元", "restoreFailed": "Yin テーマを復元できませんでした。ログインして再試行してください。", "active": "Yin セーフモードが有効です。このセッションではコミュニティテーマの JavaScript は無効です。", "home": "ホームに戻る" },
   "themeWallpaper": { "follow": "テーマに従う", "custom": "カスタム", "none": "壁紙なし", "image": "画像", "video": "動画", "web": "ローカル Web 壁紙", "external": "外部 Web サイト", "source": "壁紙 URL", "poster": "静止画 URL", "uploadWeb": "Web 壁紙パッケージをアップロード", "preview": "テーマをプレビュー", "home": "ホーム", "login": "ログイン", "desktop": "デスクトップ", "mobile": "モバイル", "light": "ライト", "dark": "ダーク", "remoteDomain": "外部ドメイン", "confirmExternal": "このテーマは全ユーザーのホームで {hosts} を読み込みます。既定に設定しますか？", "loadFailed": "テーマを読み込めません", "wallpaperPlay": "壁紙を再生", "wallpaperPause": "壁紙を一時停止", "wallpaperInteract": "壁紙を操作", "wallpaperExit": "壁紙の操作を終了" },
   "common": {
+    "refresh": "Refresh",
     "action": "操作",
     "add": "追加",
     "addSuccess": "追加しました",
@@ -273,6 +274,14 @@
     "oauthBackToLogin": "ログインに戻る"
   },
   "panelHome": {
+    "systemSettings": "System settings",
+    "floatingActions": "Page utilities",
+    "fallbackReasonSafeMode": "Safe mode is enabled",
+    "fallbackReasonNoHomeView": "The active theme provides no home view",
+    "fallbackNotice": "Showing a simplified home page.",
+    "fallbackReason": "Reason",
+    "fallbackEmpty": "No bookmarks in this space.",
+    "fallbackReload": "Reload",
     "changeToLanModel": "LANモードに切り替え",
     "changeToLanModelSuccess": "LANモードに切り替えました（モード状態はローカルに保存されます）",
     "changeToWanModel": "WANモードに切り替え",

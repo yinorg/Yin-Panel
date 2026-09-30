@@ -144,6 +144,7 @@
   "themeRecovery": { "title": "主题恢复", "description": "以安全模式启动 Yin 首页，不运行当前社区主题。安全模式仅在此浏览器会话内有效，不会修改已保存的主题或布局。", "start": "启动 Yin 安全模式", "exit": "退出安全模式", "restoreYin": "恢复 Yin 主题", "restoreFailed": "恢复 Yin 主题失败。请登录后重试。", "active": "Yin 安全模式已启用。本次会话不会运行社区主题 JavaScript。", "home": "返回首页" },
   "themeWallpaper": { "follow": "跟随主题", "custom": "自定义", "none": "关闭壁纸", "image": "图片", "video": "视频", "web": "本地网页壁纸", "external": "外部网页", "source": "壁纸地址", "poster": "静态封面地址", "uploadWeb": "上传网页壁纸包", "preview": "预览主题", "home": "首页", "login": "登录页", "desktop": "桌面", "mobile": "手机", "light": "浅色", "dark": "深色", "remoteDomain": "外部网页域名", "confirmExternal": "此主题会为全站首页加载 {hosts}。确认设为默认主题吗？", "loadFailed": "读取主题失败", "wallpaperPlay": "播放壁纸", "wallpaperPause": "暂停壁纸", "wallpaperInteract": "与壁纸交互", "wallpaperExit": "退出壁纸交互" },
   "common": {
+    "refresh": "刷新",
     "action": "操作",
     "add": "添加",
     "addSuccess": "添加成功",
@@ -273,6 +274,14 @@
     "oauthBackToLogin": "返回登录"
   },
   "panelHome": {
+    "systemSettings": "系统设置",
+    "floatingActions": "页面工具",
+    "fallbackReasonSafeMode": "已启用安全模式",
+    "fallbackReasonNoHomeView": "当前主题未提供首页视图",
+    "fallbackNotice": "当前显示简化首页。",
+    "fallbackReason": "原因",
+    "fallbackEmpty": "该空间暂无书签。",
+    "fallbackReload": "重新加载",
     "changeToLanModel": "切换为内网模式",
     "changeToLanModelSuccess": "已经切换到内网模式（模式状态仅保存在本地）",
     "changeToWanModel": "切换为公网模式",

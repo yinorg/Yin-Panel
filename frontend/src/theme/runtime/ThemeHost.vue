@@ -83,8 +83,18 @@ async function start() {
     if (!scriptPath || !manifest.contributes?.views?.includes('home') || !manifest.runtime?.supportedModes?.includes(props.executionMode || 'sandbox'))
       throw new Error(`Theme package does not declare a ${props.executionMode || 'sandbox'} home view`)
     const requiredPermissions = manifest.permissions?.required?.map(item => item.name as ThemePermission) || []
-    if (requiredPermissions.some(permission => !props.permissions.includes(permission)))
-      throw new Error('Theme API permissions have not been granted')
+    const missingPermissions = requiredPermissions.filter(permission => !props.permissions.includes(permission))
+    // A trusted theme runs in this document's own origin, so a missing grant is
+    // fatal: there is no isolation to fall back on and the code would run with
+    // full page privileges while silently failing every capability.
+    // The sandbox is the opposite case. It is a cross-origin frame with no
+    // token and no access to this document, and the dispatcher still rejects
+    // every command whose permission was not granted — so a missing grant costs
+    // the theme capabilities, not safety. Refusing to start would leave the
+    // visitor on a public link looking at the Core home instead, and the theme
+    // already hides write affordances based on the snapshot's capabilities.
+    if (missingPermissions.length && (props.executionMode || 'sandbox') !== 'sandbox')
+      throw new Error(`Theme API permissions have not been granted: ${missingPermissions.join(', ')}`)
 
     const script = await loadTextResource(props.theme, scriptPath, 'text/javascript')
     const assets: Record<string, string> = {}
@@ -203,6 +213,9 @@ function scopedSnapshot(snapshot: ThemeHomeSnapshot): ThemeHomeSnapshot {
   return {
     ...snapshot,
     capabilities,
+    // Restate the effective set so the theme can never see an authorization the
+    // dispatcher would refuse.
+    permissions: [...permissions],
     spaces: canReadSpaces ? snapshot.spaces : [],
     activeSpaceId: canReadSpaces ? snapshot.activeSpaceId : undefined,
     activeSpaceSide: canReadSpaces ? snapshot.activeSpaceSide : undefined,
@@ -245,7 +258,14 @@ async function loadTextResource(theme: ThemePackage, path: string, mediaType: st
 
 async function loadResource(theme: ThemePackage, resource: NonNullable<ThemePackage['manifest']['resources']>[number], maxBytes: number) {
   validateResourceURL(resource.url!)
-  const response = await fetch(new URL(resource.url!, window.location.origin), { credentials: 'omit', cache: 'no-store', redirect: 'error' })
+  // The response is served `immutable` (see AssetV2) and its URL carries the
+  // package revision, so it is cacheable by construction. This deliberately does
+  // NOT set `cache: 'no-store'`: that overrode the server's own caching decision
+  // and made the theme impossible to load offline, which silently dropped the
+  // page back to the C3 fallback list. Freshness still does not depend on the
+  // cache — the sha256 check below rejects any byte that is not the exact
+  // resource the manifest names.
+  const response = await fetch(new URL(resource.url!, window.location.origin), { credentials: 'omit', redirect: 'error' })
   if (!response.ok) throw new Error(`Theme resource request failed: ${resource.path}`)
   const bytes = await response.arrayBuffer()
   if (bytes.byteLength > maxBytes) throw new Error(`Theme resource exceeds the runtime size limit: ${resource.path}`)

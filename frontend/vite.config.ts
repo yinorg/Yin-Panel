@@ -12,18 +12,74 @@ function setupPlugins(env: ImportMetaEnv): PluginOption[] {
       injectRegister: 'auto',
       registerType: 'autoUpdate',
       workbox: {
+        // `index.html` stays precached and stays the navigation fallback: it is
+        // what makes the panel open at all with no network. Removing it (or
+        // forcing navigations to the network) was tried and breaks offline.
+        //
+        // The stale-chunk 404 after an upgrade was not caused by caching the
+        // entry document, but by the new worker never taking over: with
+        // `registerType: 'autoUpdate'` the replacement is only *downloaded*, so
+        // the old worker kept serving the previous build's `index.html`, whose
+        // content-hashed chunk names no longer existed. `skipWaiting` +
+        // `clientsClaim` below make the handover immediate, which is the actual
+        // fix, and it costs offline nothing.
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api(?:\/|$)/],
-        // Precache the shell and compiled entry chunks. Other same-origin
-        // assets are cached as they are used, keeping installation bounded.
         globPatterns: ['index.html', 'assets/js/index.*.js', 'assets/js/vue-vendor.*.js', 'assets/*.css'],
+        skipWaiting: true,
+        clientsClaim: true,
         runtimeCaching: [{
+          // Hashed build assets: safe to serve from cache first, and the hash
+          // makes a cache hit correct by construction.
           urlPattern: /\/assets\//,
           handler: 'CacheFirst',
           options: {
             cacheName: 'yin-panel-runtime-assets',
             cacheableResponse: { statuses: [0, 200] },
             expiration: { maxEntries: 200, maxAgeSeconds: 7 * 24 * 60 * 60 },
+          },
+        }, {
+          // A theme-rendered home needs three runtime requests, and offline it
+          // needs all three: the package manifest, the sandbox grant, and the
+          // resource bytes. Any one of them missing means the sandbox cannot boot
+          // and the page silently drops to the C3 list.
+          //
+          // The paths are an explicit allowlist rather than a prefix match: every
+          // other API call (bookmarks, spaces, monitor snapshots) stays
+          // network-only, so no user data is ever written to a disk cache.
+          //
+          // The manifest and grant are keyed by URL, so `CacheFirst` would pin a
+          // stale authorization or an outdated package after an upgrade. They are
+          // therefore `StaleWhileRevalidate`: offline falls back to the cached
+          // copy, and online they refresh in the background for next time. The
+          // resource bytes stay `CacheFirst` because their URL carries the
+          // package revision, which makes a hit correct by construction.
+          // The matcher is serialized into sw.js and evaluated in the worker, so
+          // it has to be self-contained: a reference to a module-level constant
+          // would throw a ReferenceError at runtime and silently drop the rule.
+          urlPattern: ({ url }) => ['/api/theme/v2/current', '/api/theme/v2/grants/'].some(pattern => url.pathname.startsWith(pattern)),
+          handler: 'StaleWhileRevalidate',
+          options: {
+            cacheName: 'yin-panel-theme-metadata',
+            cacheableResponse: { statuses: [0, 200] },
+            expiration: { maxEntries: 8, maxAgeSeconds: 7 * 24 * 60 * 60 },
+          },
+        }, {
+          // Theme resources are fetched by URL at runtime and the sandbox origin
+          // may not touch the network, so without this the theme silently fails
+          // offline and the page falls back to the C3 list. The URL carries the
+          // package revision (a content hash), so a cache hit is correct by
+          // construction — the same property the build assets rely on. The Core
+          // additionally verifies every resource's sha256 after loading it, so
+          // this does not weaken the integrity guarantee.
+          urlPattern: /\/api\/theme\/v2\/assets\//,
+          handler: 'CacheFirst',
+          options: {
+            cacheName: 'yin-panel-theme-assets',
+            cacheableResponse: { statuses: [0, 200] },
+            // Revisions are immutable, so entries never need evicting; the limit
+            // only stops an unbounded pile-up across many upgrades.
+            expiration: { maxEntries: 24, maxAgeSeconds: 30 * 24 * 60 * 60 },
           },
         }],
       },

@@ -144,6 +144,7 @@
   "themeRecovery": { "title": "테마 복구", "description": "활성 커뮤니티 테마의 JavaScript를 실행하지 않고 Yin 홈을 안전 모드로 시작합니다. 안전 모드는 현재 브라우저 세션에만 적용되며 저장된 테마나 레이아웃은 변경하지 않습니다.", "start": "Yin 안전 모드 시작", "exit": "안전 모드 종료", "restoreYin": "Yin 테마 복원", "restoreFailed": "Yin 테마를 복원하지 못했습니다. 로그인한 뒤 다시 시도하세요.", "active": "Yin 안전 모드가 켜졌습니다. 이번 세션에서는 커뮤니티 테마 JavaScript가 비활성화됩니다.", "home": "홈으로" },
   "themeWallpaper": { "follow": "테마 따르기", "custom": "사용자 지정", "none": "배경화면 끄기", "image": "이미지", "video": "동영상", "web": "로컬 웹 배경화면", "external": "외부 웹사이트", "source": "배경화면 URL", "poster": "정적 표지 URL", "uploadWeb": "웹 배경화면 패키지 업로드", "preview": "테마 미리보기", "home": "홈", "login": "로그인", "desktop": "데스크톱", "mobile": "모바일", "light": "라이트", "dark": "다크", "remoteDomain": "외부 도메인", "confirmExternal": "이 테마는 모든 사용자의 홈에서 {hosts}를 불러옵니다. 기본값으로 설정할까요?", "loadFailed": "테마를 불러올 수 없습니다", "wallpaperPlay": "배경화면 재생", "wallpaperPause": "배경화면 일시 중지", "wallpaperInteract": "배경화면과 상호작용", "wallpaperExit": "배경화면 상호작용 종료" },
   "common": {
+    "refresh": "Refresh",
     "action": "작업",
     "add": "추가",
     "addSuccess": "추가했습니다",
@@ -273,6 +274,14 @@
     "oauthBackToLogin": "Back to login"
   },
   "panelHome": {
+    "systemSettings": "System settings",
+    "floatingActions": "Page utilities",
+    "fallbackReasonSafeMode": "Safe mode is enabled",
+    "fallbackReasonNoHomeView": "The active theme provides no home view",
+    "fallbackNotice": "Showing a simplified home page.",
+    "fallbackReason": "Reason",
+    "fallbackEmpty": "No bookmarks in this space.",
+    "fallbackReload": "Reload",
     "changeToLanModel": "Switch to LAN mode",
     "changeToLanModelSuccess": "Switched to LAN mode (mode status saved locally)",
     "changeToWanModel": "Switch to WAN mode",

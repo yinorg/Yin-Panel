@@ -266,10 +266,32 @@ func ActivePackageRevisionV2(db *gorm.DB, scope, fallbackRevisionID string) (Rev
 		}
 		return ActivePackageRevisionV2(db, scope, fallbackRevisionID)
 	}
-	if activation.PendingRevisionID != "" {
-		return GetPackageRevisionV2(db, activation.PendingRevisionID)
+	// A pending trial revision takes priority over the active one, as before.
+	// Resolving either may fail with ErrRecordNotFound when a database seeded by
+	// an earlier release still points at a package this build no longer ships.
+	// That is not a database error: fall through to the caller's default, which
+	// is always the seeded Yin package, rather than failing every theme read.
+	//
+	// The lookup order is preserved exactly; only a missing revision changes the
+	// outcome, from ErrRecordNotFound to the fallback.
+	pending := activation.PendingRevisionID
+	active := activation.ActiveRevisionID
+	for _, revisionID := range []string{pending, active} {
+		if revisionID == "" {
+			continue
+		}
+		revision, err := GetPackageRevisionV2(db, revisionID)
+		if err == nil {
+			return revision, nil
+		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return RevisionRecordV2{}, err
+		}
 	}
-	return GetPackageRevisionV2(db, activation.ActiveRevisionID)
+	if fallbackRevisionID == "" {
+		return RevisionRecordV2{}, gorm.ErrRecordNotFound
+	}
+	return GetPackageRevisionV2(db, fallbackRevisionID)
 }
 
 func InstanceDefaultRevisionV2(db *gorm.DB) (RevisionRecordV2, error) {
@@ -710,8 +732,6 @@ func builtinPackagesV2() []*PackageV2 {
 	palettes := []builtinPaletteV2{
 		{"org.yin.default", "Yin", map[string]string{"canvas": "#f4f7f8", "surface": "#ffffff", "text": "#20282c", "muted": "#64737a", "border": "#d8e0e3", "primary": "#176b80"}, map[string]string{"canvas": "#171d20", "surface": "#22292c", "text": "#f2f5f6", "muted": "#b7c1c4", "border": "#536066", "primary": "#78c5d4"}, "8px", "16px", "0 8px 24px #18242a22", "180ms", []string{"Inter", "system-ui", "sans-serif"}, 1, 1, 0, 0, 0, 0, "16px", "70px"},
 		{"org.yin.glass", "Glass", map[string]string{"canvas": "#e7edf4", "surface": "#edf2f8cc", "text": "#182535", "muted": "#53677c", "border": "#a9bed3aa", "primary": "#2666a6"}, map[string]string{"canvas": "#101827", "surface": "#19263acc", "text": "#eef5ff", "muted": "#a6b8cd", "border": "#526c89aa", "primary": "#73b9ff"}, "18px", "22px", "0 18px 50px #18365b55", "260ms", []string{"Inter", "system-ui", "sans-serif"}, 1.08, .82, 18, 0, 0, .08, "22px", "76px"},
-		{"org.yin.minimal", "Minimal", map[string]string{"canvas": "#ffffff", "surface": "#fafafa", "text": "#202020", "muted": "#666666", "border": "#e6e6e6", "primary": "#303030"}, map[string]string{"canvas": "#141414", "surface": "#1b1b1b", "text": "#eeeeee", "muted": "#aaaaaa", "border": "#363636", "primary": "#d0d0d0"}, "2px", "22px", "none", "100ms", []string{"Arial", "sans-serif"}, 1.25, 1, 0, 0, 0, 0, "22px", "64px"},
-		{"org.yin.cyber", "Cyber", map[string]string{"canvas": "#f5f3ff", "surface": "#ffffff", "text": "#251847", "muted": "#65568a", "border": "#8f77c8", "primary": "#5a27d5"}, map[string]string{"canvas": "#100b20", "surface": "#19112e", "text": "#f5edff", "muted": "#b5a5d5", "border": "#6746a0", "primary": "#ed4bc5"}, "1px", "14px", "0 0 24px #ed4bc566", "90ms", []string{"IBM Plex Mono", "monospace"}, .85, 1, 0, 22, .12, 0, "14px", "72px"},
 	}
 	result := make([]*PackageV2, 0, len(palettes))
 	for _, palette := range palettes {
@@ -722,8 +742,18 @@ func builtinPackagesV2() []*PackageV2 {
 		if palette.id == "org.yin.default" {
 			// Bump whenever a home resource changes; a published version is
 			// immutable, so reusing it would abort startup.
-			version = "2.3.8"
-			requiredPermissions = append(requiredPermissions, PermissionV2{Name: "items.write"}, PermissionV2{Name: "groups.write"})
+			version = "2.3.27"
+			requiredPermissions = append(requiredPermissions,
+				PermissionV2{Name: "items.write"},
+				PermissionV2{Name: "groups.write"},
+				// The theme exposes the settings surface and the LAN/WAN switch,
+				// which the Core gates on these preferences permissions.
+				PermissionV2{Name: "preferences.read"},
+				PermissionV2{Name: "preferences.write"},
+				// The theme reports its measured layout so the Core can place the
+				// monitor layer from real geometry.
+				PermissionV2{Name: "diagnostics.report"},
+			)
 		}
 		resources := make([]ResourceV2, 0, len(files))
 		for name, asset := range files {

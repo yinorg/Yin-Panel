@@ -144,6 +144,7 @@
   "themeRecovery": { "title": "Theme recovery", "description": "Start Yin Home without running the active community theme. Safe mode lasts for this browser session and does not change your saved theme or layout.", "start": "Start Yin safe mode", "exit": "Exit safe mode", "restoreYin": "Restore Yin theme", "restoreFailed": "The Yin theme could not be restored. Sign in and try again.", "active": "Yin safe mode is active. Community Theme JavaScript is disabled for this session.", "home": "Return to Home" },
   "themeWallpaper": { "follow": "Follow theme", "custom": "Custom", "none": "No wallpaper", "image": "Image", "video": "Video", "web": "Local web wallpaper", "external": "External website", "source": "Wallpaper URL", "poster": "Static poster URL", "uploadWeb": "Upload web wallpaper package", "preview": "Preview theme", "home": "Home", "login": "Login", "desktop": "Desktop", "mobile": "Mobile", "light": "Light", "dark": "Dark", "remoteDomain": "External domain", "confirmExternal": "This theme will load {hosts} on every user's home page. Set it as the default?", "loadFailed": "Could not load theme", "wallpaperPlay": "Play wallpaper", "wallpaperPause": "Pause wallpaper", "wallpaperInteract": "Interact with wallpaper", "wallpaperExit": "Exit wallpaper interaction" },
   "common": {
+    "refresh": "Refresh",
     "action": "Action",
     "add": "Add",
     "addSuccess": "Added successfully",
@@ -273,6 +274,14 @@
     "oauthBackToLogin": "Back to login"
   },
   "panelHome": {
+    "systemSettings": "System settings",
+    "floatingActions": "Page utilities",
+    "fallbackReasonSafeMode": "Safe mode is enabled",
+    "fallbackReasonNoHomeView": "The active theme provides no home view",
+    "fallbackNotice": "Showing a simplified home page.",
+    "fallbackReason": "Reason",
+    "fallbackEmpty": "No bookmarks in this space.",
+    "fallbackReload": "Reload",
     "changeToLanModel": "Switch to LAN mode",
     "changeToLanModelSuccess": "Switched to LAN mode (mode status saved locally)",
     "changeToWanModel": "Switch to WAN mode",

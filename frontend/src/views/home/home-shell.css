@@ -1,0 +1,380 @@
+/**
+ * Styles for the home shell (the Core-owned chrome around the theme frame).
+ *
+ * These used to live in three `<style>` blocks inside `index.vue`. They were moved
+ * out to keep the host focused on composition, which means they are now *global*
+ * rather than scoped. That is safe because every selector here is owned by this
+ * view (`.sun-main`, `.space-status-*`, `.theme-runtime-*`, `.theme-home-host`,
+ * `.taiji-*`), and the two blocks that were already global (`body`/`:root` rules)
+ * are unchanged.
+ *
+ * Two consequences to keep in mind when editing:
+ * - there is no `[data-v-*]` attribute adding specificity any more, so a rule that
+ *   competes with a Naive UI default must win on selector specificity, not on the
+ *   scoping attribute;
+ * - `:deep()` / `:global()` compositions are not valid CSS and were unwrapped when
+ *   this file was extracted.
+ */
+
+/* ---- from <style scoped> (scoped) ---- */
+.space-status-bar {
+  position: fixed;
+  z-index: 20;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: var(--yin-component-sidebar-padding);
+  border: var(--yin-component-button-border-width) solid var(--yin-border);
+  border-radius: var(--yin-component-sidebar-radius);
+  background: color-mix(in srgb, var(--yin-surfaceElevated) calc(var(--yin-component-surface-opacity) * 100%), transparent);
+  backdrop-filter: blur(var(--yin-component-surface-blur));
+  box-shadow: var(--yin-component-menu-shadow);
+}
+.space-status-button { color: var(--yin-text); min-width: 140px; }
+/* These overrides must beat the later scoped `theme-defaults` /
+   `:root[data-yin-layout='directory']` rules in the second style block, which
+   carry a `[data-v-*]` attribute and therefore outrank a plain global
+   selector. Without `!important` the pill keeps the light surface background
+   while its label stays forced white, making it invisible. */
+/* Under the theme runtime the Core-owned surfaces take the pre-theme build's
+   hardcoded values, because the default theme is a pixel replica of it. The
+   token-driven declarations above still apply to every other theme, so this is
+   an override of the replica, not a replacement of the token system.
+   The pill is still 2px taller than the pre-theme build: `.n-button` carries
+   `min-height: var(--yin-component-button-height)`, which resolves from the
+   global `--yin-controlHeight: 36px`, while the pre-theme build used Naive's
+   34px default. That token is app-wide, so pinning it is a global decision
+   rather than a replica fix, and `height` cannot lift a `min-height` floor. */
+.sun-main.theme-runtime-yin .space-status-bar { padding: 3px; border-color: rgb(255 255 255 / 22%) !important; border-radius: 999px; background: rgb(18 22 28 / 46%) !important; backdrop-filter: blur(14px); box-shadow: 0 8px 30px rgb(0 0 0 / 18%); }
+.sun-main.theme-runtime-yin .space-status-button { min-width: 140px !important; color: #fff !important; }
+.sun-main.theme-runtime-yin .space-status-dot { background: #7dd3fc; box-shadow: 0 0 10px #7dd3fc; }
+.space-status-dot { width: 7px; height: 7px; margin-right: 8px; border-radius: 50%; background: var(--yin-success); box-shadow: 0 0 var(--yin-component-surface-glow) var(--yin-success); }
+.offline-status { position: fixed; z-index: 21; top: 14px; right: 18px; display: flex; gap: var(--yin-component-group-gap); color: var(--yin-text); font-size: var(--yin-fontSmallSize); text-shadow: var(--yin-effect-text-shadow); }
+.theme-safe-mode-banner { position: fixed; z-index: 22; top: 48px; right: 18px; display: flex; align-items: center; gap: 12px; max-width: min(440px, calc(100vw - 36px)); padding: 8px 12px; border: 1px solid var(--yin-border); border-radius: var(--yin-component-card-radius); background: var(--yin-surfaceElevated); color: var(--yin-text); font-size: var(--yin-fontSmallSize); }
+.theme-safe-mode-banner a { color: var(--yin-primary); text-decoration: underline; }
+.offline-unavailable { position: fixed; z-index: 31; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(0, 0, 0, 0.48); }
+.theme-home-host { position: absolute; z-index: 1; inset: 0; overflow: auto; pointer-events: auto; }
+.theme-runtime-monitor-layer { position: absolute; z-index: 5; top: 72px; left: var(--yin-pageGutter); right: var(--yin-pageGutter); max-height: 220px; overflow: auto; pointer-events: none; }
+.theme-runtime-monitor-layer > * { pointer-events: none; }
+.theme-runtime-monitor-layer--info { max-height: 260px; }
+/* The theme matches the search-box bottom to the same content formula it uses
+   for its own layout (marginTopPercent of the viewport + a fixed masthead and
+   search height). Anchoring the monitor layer to that keeps it below the search
+   box instead of the old viewport-height guess, which sat on top of it. */
+.theme-runtime-monitor-layer--yin { top: var(--yin-theme-monitor-top, calc(var(--yin-theme-content-top, 10vh) + 187px)); right: auto; left: 50%; width: min(calc(var(--yin-contentMaxWidth, 1200px) - 30px), calc(100vw - 30px)); max-width: none; max-height: 286px; padding-top: 26px; box-sizing: border-box; transform: translateX(-50%); --yin-text: #fff; --yin-textMuted: rgb(255 255 255 / 82%); --yin-primary: #fff; --yin-border: transparent; --yin-component-app-icon-surface: rgb(42 42 42 / 42%); --yin-component-system-monitor-heading-size: 18px; }
+.theme-runtime-monitor-layer--yin .n-progress-graph-circle-rail { stroke: rgb(255 255 255 / 36%) !important; }
+@media (max-width: 640px) {
+  .theme-runtime-monitor-layer--yin:not(.theme-runtime-monitor-layer--directory) { top: 169.5px; }
+}
+.sun-main.theme-runtime-yin .wallpaper-media { transform: scale(1.05); }
+.sun-main.theme-runtime-yin .offline-status--theme-hidden { display: none; }
+.theme-runtime-notice { display: flex; align-items: center; justify-content: space-between; gap: var(--yin-component-group-gap); margin: var(--yin-component-group-section-spacing) auto; padding: var(--yin-component-card-padding); border: var(--yin-component-button-border-width) solid var(--yin-border); border-radius: var(--yin-component-card-radius); background: var(--yin-surfaceElevated); color: var(--yin-text); }
+.theme-runtime-consent-content { display: grid; gap: var(--yin-spaceMd); color: var(--yin-text); line-height: var(--yin-lineHeightBody); }
+.theme-runtime-consent-content > p { margin: 0; }
+.theme-runtime-consent-package { color: var(--yin-textMuted); font-size: var(--yin-fontSmallSize); overflow-wrap: anywhere; }
+.theme-runtime-mode-list { display: grid; gap: var(--yin-spaceSm); }
+.theme-runtime-mode-option { display: flex; min-height: 56px; align-items: flex-start; gap: var(--yin-spaceSm); padding: var(--yin-spaceMd); border: var(--yin-borderWidth) solid var(--yin-border); border-radius: var(--yin-component-card-radius); background: var(--yin-surface); cursor: pointer; }
+.theme-runtime-mode-option--selected { border-color: var(--yin-focusRing); box-shadow: inset 0 0 0 var(--yin-effect-focus-width) var(--yin-focusRing); }
+.theme-runtime-mode-option > span { display: grid; gap: var(--yin-spaceXs); }
+.theme-runtime-mode-option small { color: var(--yin-textMuted); font-size: var(--yin-fontSmallSize); }
+.theme-runtime-permissions { display: flex; flex-wrap: wrap; gap: var(--yin-spaceXs); margin: 0; padding: 0; list-style: none; }
+.theme-runtime-permissions li { max-width: 100%; padding: var(--yin-spaceXs) var(--yin-spaceSm); border-radius: var(--yin-component-button-radius); background: var(--yin-surface); color: var(--yin-text); font: var(--yin-fontSmallSize)/var(--yin-lineHeightBody) ui-monospace, monospace; overflow-wrap: anywhere; }
+.theme-runtime-risk { display: grid; gap: var(--yin-spaceSm); padding: var(--yin-spaceMd); border-inline-start: var(--yin-effect-focus-width) solid var(--yin-danger); background: color-mix(in srgb, var(--yin-danger) 8%, var(--yin-surfaceElevated)); }
+.theme-runtime-risk h3, .theme-runtime-risk p { margin: 0; }
+.theme-runtime-risk h3 { font-size: var(--yin-fontBodySize); }
+.theme-runtime-consent-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: var(--yin-spaceSm); }
+.theme-runtime-consent-actions .n-button { min-height: max(var(--yin-component-button-height), 44px); }
+
+/* ---- from <style> (global) ---- */
+body,
+html {
+  overflow: hidden;
+  background-color: var(--yin-canvas);
+}
+:root[data-yin-layout='directory'] body { background-color: transparent; }
+
+/* ---- from <style scoped> (scoped) ---- */
+.sun-main {
+  user-select: none;
+}
+
+/* The pre-theme build let Naive default the app-icon avatar radius to 3px. */
+
+/* The pre-theme build sized the group heading with Tailwind's text-xl, i.e.
+   a 1.4 line box, and separated it from the icons with 20px. Without this the
+   heading inherits --yin-lineHeightBody and --yin-component-group-gap, which
+   grows the group and walks every later group down the page. */
+
+/* Old-version home geometry, scoped to the home shell so the login page and
+   other surfaces keep their own (Naive UI) metrics. The pre-theme build used
+   Tailwind's rounded-2xl for the search box and app icons, a 17px search input,
+   a 2px portrait blur and 50px between group sections; these variables carry
+   those values down to the child components. font-family is set directly as
+   well, because it inherits from body and a variable alone would not repaint
+   already-computed descendants. */
+.sun-main {
+  font-family: v-sans, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  --yin-fontBody: v-sans, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  /* Font sizes stay at the pre-theme values here. Only the search input is
+     17px, and it sets that itself; scaling the whole shell leaked into the
+     app-icon letters and labels. */
+  --yin-fontSmallSize: 14px;
+  --yin-fontHeadingWeight: 400;
+  --yin-lineHeightBody: 1.6;
+  --yin-spaceXs: 5px;
+  --yin-component-app-icon-radius: 16px;
+  --yin-component-iconography-container-radius: 16px;
+  /* Pre-theme focus treatment: a wide soft dark halo with a 5px backdrop blur. */
+  --yin-component-input-padding-x: 10px;
+  --yin-component-group-section-spacing: 50px;
+  --yin-component-group-gap: 18px;
+  --yin-effect-text-shadow: 2px 2px 50px #000000;
+}
+
+.sun-main.theme-defaults {
+  background-color: var(--yin-canvas);
+  color: var(--yin-text);
+}
+
+/* When a wallpaper layer is actually painting artwork behind the content, the
+   header, clock and group titles must switch to the on-wallpaper colour and
+   keep their text shadow, otherwise dark-on-photo text is unreadable. */
+.sun-main.wallpaper-active {
+  background-color: transparent;
+}
+
+:root[data-yin-layout='directory'] .sun-main { background: transparent; color: var(--yin-text); }
+
+.sun-main.theme-defaults .space-status-bar,
+:root[data-yin-layout='directory'] .space-status-bar {
+  border-color: var(--yin-border);
+  background-color: var(--yin-surfaceElevated);
+}
+
+.sun-main.theme-defaults .space-status-button,
+.sun-main.theme-defaults .offline-status,
+:root[data-yin-layout='directory'] .space-status-button,
+:root[data-yin-layout='directory'] .offline-status {
+  color: var(--yin-text);
+  text-shadow: none;
+}
+
+/* Wallpaper-active overrides come last so they win over the theme-defaults
+   rules above, which are equally specific but are declared earlier. */
+.sun-main.wallpaper-active {
+  color: var(--yin-onWallpaper, #ffffff);
+}
+
+.sun-main.wallpaper-active .space-status-button,
+.sun-main.wallpaper-active .offline-status {
+  color: var(--yin-onWallpaper, #ffffff) !important;
+}
+
+.sun-main.side-switching {
+  animation: panel-content-pulse var(--yin-component-state-space-transition-duration, 1000ms) var(--yin-component-state-space-transition-easing, ease-in-out);
+}
+
+@keyframes panel-content-pulse {
+  0% {
+    filter: brightness(1);
+  }
+  45% {
+    filter: brightness(0.84);
+  }
+  100% {
+    filter: brightness(1);
+  }
+}
+
+.taiji-transition {
+  position: fixed;
+  z-index: 30;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+.taiji-aura {
+  position: relative;
+  width: clamp(120px, 22vw, 190px);
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  animation: taiji-aura var(--yin-component-state-space-transition-duration, 1000ms) var(--yin-component-state-space-transition-easing, cubic-bezier(0.22, 0.61, 0.36, 1)) both;
+}
+
+.taiji-symbol {
+  --taiji-start-angle: 0deg;
+  position: relative;
+  z-index: 1;
+  width: 58%;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: var(--yin-effect-focus-width, 2px) solid color-mix(in srgb, var(--yin-surfaceElevated) 82%, transparent);
+  border-radius: 50%;
+  background: linear-gradient(90deg, var(--yin-text) 0 50%, var(--yin-surfaceElevated) 50%);
+  box-shadow: 0 0 var(--yin-component-surface-glow, 34px) color-mix(in srgb, var(--yin-surfaceElevated) 30%, transparent), 0 0 calc(var(--yin-component-surface-glow, 34px) * 2.35) color-mix(in srgb, var(--yin-text) 30%, transparent);
+  animation: taiji-spin var(--yin-component-state-space-transition-duration, 1000ms) var(--yin-component-state-space-transition-easing, cubic-bezier(0.22, 0.61, 0.36, 1)) both;
+}
+
+.taiji-symbol.taiji-yang {
+  --taiji-start-angle: 180deg;
+}
+
+.taiji-symbol::before,
+.taiji-symbol::after {
+  position: absolute;
+  left: 25%;
+  width: 50%;
+  height: 50%;
+  content: '';
+  border-radius: 50%;
+}
+
+.taiji-symbol::before {
+  top: 0;
+  background: var(--yin-surfaceElevated);
+}
+
+.taiji-symbol::after {
+  bottom: 0;
+  background: var(--yin-text);
+}
+
+.taiji-dot {
+  position: absolute;
+  z-index: 2;
+  width: 12%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+}
+
+.taiji-dot-dark {
+  top: 25%;
+  left: 44%;
+  background: var(--yin-text);
+}
+
+.taiji-dot-light {
+  bottom: 25%;
+  left: 44%;
+  background: var(--yin-surfaceElevated);
+}
+
+.taiji-bagua {
+  position: absolute;
+  inset: 0;
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  border-radius: 50%;
+  animation: taiji-spin var(--yin-component-state-space-transition-duration, 1000ms) var(--yin-component-state-space-transition-easing, cubic-bezier(0.22, 0.61, 0.36, 1)) reverse both;
+}
+
+.taiji-bagua span {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 16%;
+  height: 3px;
+  transform: rotate(calc(var(--index, 0) * 45deg)) translateX(255%);
+  transform-origin: left center;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: 6px 0 0 rgba(255, 255, 255, 0.72);
+}
+
+.taiji-bagua span:nth-child(1) { --index: 0; }
+.taiji-bagua span:nth-child(2) { --index: 1; }
+.taiji-bagua span:nth-child(3) { --index: 2; }
+.taiji-bagua span:nth-child(4) { --index: 3; }
+.taiji-bagua span:nth-child(5) { --index: 4; }
+.taiji-bagua span:nth-child(6) { --index: 5; }
+.taiji-bagua span:nth-child(7) { --index: 6; }
+.taiji-bagua span:nth-child(8) { --index: 7; }
+
+@keyframes taiji-aura {
+  0% { opacity: 0; transform: scale(0.72); }
+  18%, 72% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.72); }
+}
+
+@keyframes taiji-spin {
+  from { transform: rotate(var(--taiji-start-angle, 0deg)); }
+  to { transform: rotate(calc(var(--taiji-start-angle, 0deg) + 180deg)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sun-main.side-switching {
+    animation: none;
+  }
+}
+
+
+@media (max-width: 500px) {
+  /* The space switcher stays centred at the top, same as every other viewport.
+     Only the overflow guards remain here: the pill must not exceed the viewport
+     and a long space name has to ellipsize instead of pushing the pill wide. */
+  .space-status-bar {
+    max-width: calc(100vw - 16px);
+  }
+  .space-status-button {
+    min-width: 0;
+    max-width: calc(100vw - 28px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+}
+/*
+ * The fixed utility stack on the right edge, restored from the pre-theme build.
+ * Every length was measured off that build's own ruler screenshot at 1920x1080
+ * rather than eyeballed: the stack occupied x 1864..1910 and y 894..1030 — 46px
+ * wide, four 34px cells flush against each other, 10px from the right edge and
+ * 50px up from the bottom.
+ */
+.home-floating {
+  position: fixed;
+  z-index: 22;
+  right: 10px;
+  bottom: 50px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 0 10px 2px rgba(0, 0, 0, 0.2);
+}
+
+.home-floating-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  /* The old buttons were Naive's `color="#2a2a2a6b"`: a 42%-opaque dark fill. */
+  background: rgba(42, 42, 42, 0.42);
+  color: #fff;
+  cursor: pointer;
+}
+
+.home-floating-button svg {
+  width: 20px;
+  height: 20px;
+}
+
+.home-floating-button:hover {
+  background: rgba(42, 42, 42, 0.6);
+}
+
+.home-floating-button:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.8);
+  outline-offset: -2px;
+}
+
+/* Only the outer corners are rounded, matching a Naive vertical button group. */
+.home-floating-button:first-child {
+  border-radius: 3px 3px 0 0;
+}
+
+.home-floating-button:last-child {
+  border-radius: 0 0 3px 3px;
+}

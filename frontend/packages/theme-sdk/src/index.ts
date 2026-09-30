@@ -33,6 +33,19 @@ export type ThemeCommand =
   | 'editor.open'
   | 'commandCenter.open'
   | 'ui.openCoreSurface'
+  | 'network.setMode'
+  // The sandbox is a distinct origin, so only the theme can measure its own
+  // DOM. It reports the search box's bottom edge here so the Core can place its
+  // monitor layer from real geometry instead of guessing with viewport units.
+  | 'layout.report'
+  // The home is rendered inside a cross-origin frame, so keystrokes never reach
+  // the Core's own window listener. The theme forwards them here so the global
+  // shortcut keeps working; the Core keeps the policy (dialogs, modifiers).
+  | 'input.forwardKey'
+  // The sandbox has no `allow-popups`, so a theme cannot open a window itself.
+  // Panel-supplied links (the footer) therefore ask the Core to open them, which
+  // also keeps them on the Core's own open policy (LAN/WAN, in-page vs new tab).
+  | 'link.open'
 
 export type ThemeSearchSubmitAction = 'filter' | 'clear' | 'engine'
 
@@ -107,6 +120,20 @@ export interface ThemeHomePresentation {
   content: { marginTopPercent: number; marginBottomPercent: number; maxWidth: number; maxWidthUnit: 'px' | '%' | 'rem' | 'vw'; marginX: number }
   footerHtml: string
   monitor: { visible: boolean; showTitle: boolean; reservedHeight?: number }
+  /**
+   * The LAN/WAN mode the Core currently opens items with. `switchVisible`
+   * mirrors the user's "show the network switch" preference, so a theme can
+   * decide whether to offer the affordance and label it correctly.
+   */
+  network: { mode: 'lan' | 'wan'; switchVisible: boolean }
+  /**
+   * True for a signed-in user, false for an anonymous public-link visitor. Needed
+   * in addition to `permissions` because a Core surface can require only a read
+   * scope that a public link also holds (the command center needs `items.read`)
+   * yet still be unavailable without a session; the Core refuses to open it then,
+   * so a theme can hide the entry instead of offering a dead button.
+   */
+  signedIn: boolean
 }
 
 export interface ThemeHomeSnapshot {
@@ -122,6 +149,12 @@ export interface ThemeHomeSnapshot {
   items: readonly ThemeItem[]
   /** Core write capabilities granted for this active Space and Theme. */
   capabilities?: readonly string[]
+  /** Permissions the theme is authorized to use at all, independent of the active
+   *  Space. Distinct from `capabilities`: this is authorization (may the theme
+   *  ever write?) while `capabilities` is space-scoped (may it write *here*?).
+   *  Core-surface entries such as the settings dialog key off this list, so a
+   *  theme mounted without a grant can hide entries it could never use. */
+  permissions?: readonly string[]
   /** Optional for compatibility with snapshots produced before presentation was added. */
   presentation?: ThemeHomePresentation
 }

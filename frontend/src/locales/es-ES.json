@@ -144,6 +144,7 @@
   "themeRecovery": { "title": "Recuperación del tema", "description": "Inicia Yin Home en modo seguro sin ejecutar el JavaScript del tema comunitario activo. El modo solo dura esta sesión del navegador y no cambia el tema ni el diseño guardados.", "start": "Iniciar modo seguro de Yin", "exit": "Salir del modo seguro", "restoreYin": "Restaurar el tema Yin", "restoreFailed": "No se pudo restaurar el tema Yin. Inicia sesión e inténtalo de nuevo.", "active": "El modo seguro de Yin está activo. El JavaScript del tema comunitario está desactivado durante esta sesión.", "home": "Volver al inicio" },
   "themeWallpaper": { "follow": "Seguir tema", "custom": "Personalizado", "none": "Sin fondo", "image": "Imagen", "video": "Vídeo", "web": "Fondo web local", "external": "Sitio externo", "source": "URL del fondo", "poster": "URL de imagen fija", "uploadWeb": "Subir paquete de fondo web", "preview": "Vista previa del tema", "home": "Inicio", "login": "Acceso", "desktop": "Escritorio", "mobile": "Móvil", "light": "Claro", "dark": "Oscuro", "remoteDomain": "Dominio externo", "confirmExternal": "Este tema cargará {hosts} en el inicio de todos los usuarios. ¿Establecerlo como predeterminado?", "loadFailed": "No se pudo cargar el tema", "wallpaperPlay": "Reproducir fondo", "wallpaperPause": "Pausar fondo", "wallpaperInteract": "Interactuar con el fondo", "wallpaperExit": "Salir de la interacción" },
   "common": {
+    "refresh": "Refresh",
     "action": "Aktion",
     "add": "Añadir",
     "addSuccess": "Erfolgreich hinzugefügt",
@@ -273,6 +274,14 @@
     "oauthBackToLogin": "Back to login"
   },
   "panelHome": {
+    "systemSettings": "System settings",
+    "floatingActions": "Page utilities",
+    "fallbackReasonSafeMode": "Safe mode is enabled",
+    "fallbackReasonNoHomeView": "The active theme provides no home view",
+    "fallbackNotice": "Showing a simplified home page.",
+    "fallbackReason": "Reason",
+    "fallbackEmpty": "No bookmarks in this space.",
+    "fallbackReload": "Reload",
     "changeToLanModel": "Switch to LAN mode",
     "changeToLanModelSuccess": "Switched to LAN mode (mode status saved locally)",
     "changeToWanModel": "Switch to WAN mode",

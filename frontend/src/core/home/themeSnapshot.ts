@@ -1,6 +1,8 @@
 import type { ThemeCollectionStatus, ThemeGroup, ThemeHomePresentation, ThemeHomeSnapshot, ThemeItem, ThemeSearchEngine, ThemeSpace } from '../../theme/api/v1'
 // @ts-expect-error Node's strip-types runner requires an explicit source extension.
 import { toThemeItemIcon } from './iconifyResource.ts'
+// @ts-expect-error Node's strip-types runner requires an explicit source extension.
+import { defaultFooterHtml } from '../../constants/panelFooter.ts'
 
 // The pre-theme default brand name. It is treated as "not customised" so the
 // name can follow the active panel side (Yin-Panel / Yang-Panel).
@@ -38,6 +40,11 @@ interface PresentationSource {
   footerHtml?: string
   systemMonitorShow?: boolean
   systemMonitorShowTitle?: boolean
+  /** Current LAN/WAN mode; 'wan' unless the Core reports otherwise. */
+  networkMode?: string
+  netModeChangeButtonShow?: boolean
+  /** True for a signed-in user, false for an anonymous public-link visitor. */
+  signedIn?: boolean
 }
 
 interface SearchConfigurationSource {
@@ -81,6 +88,10 @@ export function createThemeHomeSnapshot(input: {
   groups: readonly GroupSource[]
   canWrite: boolean
   canWriteGroups?: boolean
+  /** Permissions the theme is authorized to use at all, independent of the active
+   *  Space. Core-surface entries key off this so a theme mounted without a grant
+   *  can hide entries it could never use. */
+  permissions?: readonly string[]
   /** Viewport height through the bottom edge of Core's fixed monitor layer. */
   monitorReservedHeight?: number
   presentation?: PresentationSource
@@ -136,6 +147,7 @@ export function createThemeHomeSnapshot(input: {
     groups,
     items,
     ...(capabilities.length ? { capabilities } : {}),
+    ...(input.permissions ? { permissions: input.permissions } : {}),
     ...(presentation ? { presentation } : {}),
   }
 }
@@ -159,7 +171,7 @@ function mapPresentation(source?: PresentationSource, searchConfiguration?: Sear
     maxWidth: 1200,
     maxWidthUnit: 'px',
     marginX: 5,
-    footerHtml: '',
+    footerHtml: defaultFooterHtml,
     systemMonitorShow: false,
     systemMonitorShowTitle: true,
     ...source,
@@ -217,6 +229,12 @@ function mapPresentation(source?: PresentationSource, searchConfiguration?: Sear
       showTitle: defaults.systemMonitorShowTitle !== false,
       ...(monitorReservedHeight !== undefined ? { reservedHeight: boundedFinite(monitorReservedHeight, 0, 0, 100000) } : {}),
     },
+    // 'lan' is the only value that differs; anything else means WAN.
+    network: {
+      mode: defaults.networkMode === 'lan' ? 'lan' : 'wan',
+      switchVisible: defaults.netModeChangeButtonShow === true,
+    },
+    signedIn: defaults.signedIn === true,
   }
 }
 

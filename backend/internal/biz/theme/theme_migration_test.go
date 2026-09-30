@@ -70,7 +70,7 @@ func TestMigrationPreservesLegacyRowsAndOnlyMigratesColorMode(t *testing.T) {
 		t.Fatal("legacy package selection was activated")
 	}
 	packages, err := ListPackagesV2(db)
-	if err != nil || len(packages) != 4 {
+	if err != nil || len(packages) != 2 {
 		t.Fatalf("v2 package list = %v err=%v", packages, err)
 	}
 }

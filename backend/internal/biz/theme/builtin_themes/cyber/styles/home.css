@@ -1,8 +1,0 @@
-.builtin-home { font-family: var(--yin-fontBody, 'IBM Plex Mono', monospace); background-image: linear-gradient(color-mix(in srgb, var(--yin-primary) 7%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--yin-primary) 7%, transparent) 1px, transparent 1px); background-size: 28px 28px; }
-.home-header { align-items: flex-start; flex-direction: column; border-bottom: 2px solid var(--yin-primary); box-shadow: 0 8px 28px color-mix(in srgb, var(--yin-primary) 18%, transparent); }
-.home-title { font-family: var(--yin-fontBody, monospace); text-transform: uppercase; }
-.home-eyebrow, .group-title { color: var(--yin-secondary, var(--yin-primary)); text-transform: uppercase; letter-spacing: .06em; }
-.item-button { border: 1px solid var(--yin-primary); border-radius: 1px; box-shadow: 0 0 14px color-mix(in srgb, var(--yin-primary) 20%, transparent); }
-.item-button { min-height: 70px; background: color-mix(in srgb, var(--yin-surface) 88%, transparent); }
-.item-button:hover { box-shadow: 0 0 22px color-mix(in srgb, var(--yin-primary) 40%, transparent); }
-.item-icon { border: 1px solid var(--yin-secondary, var(--yin-primary)); border-radius: 1px; background: transparent; color: var(--yin-secondary, var(--yin-primary)); }

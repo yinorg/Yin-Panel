@@ -133,3 +133,7 @@ docs/optimization-goals.md
 *.tmp
 *.temp
 .codex/
+TODO.md
+opencode-proxy.sh
+.gitignore
+opencode.jsonc

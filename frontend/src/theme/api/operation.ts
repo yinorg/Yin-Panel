@@ -98,8 +98,34 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value)
 }
 
+// Single source of truth for the commands the runtime accepts. The permission
+// map in ./permissions.ts is a Record over ThemeCommand, so TypeScript keeps
+// the two in step; this list keeps the runtime check in step as well.
+export const THEME_COMMANDS = [
+  'space.select',
+  'space.toggleSide',
+  'item.open',
+  'item.create',
+  'item.update',
+  'item.delete',
+  'items.reorder',
+  'group.create',
+  'group.update',
+  'group.delete',
+  'groups.reorder',
+  'search.submit',
+  'data.refresh',
+  'editor.open',
+  'commandCenter.open',
+  'ui.openCoreSurface',
+  'network.setMode',
+  'layout.report',
+  'input.forwardKey',
+  'link.open',
+] as const satisfies readonly ThemeCommand[]
+
 export function isThemeCommand(value: string): value is ThemeCommand {
-  return ['space.select', 'space.toggleSide', 'item.open', 'item.create', 'item.update', 'item.delete', 'items.reorder', 'group.create', 'group.update', 'group.delete', 'groups.reorder', 'search.submit', 'data.refresh', 'editor.open', 'commandCenter.open', 'ui.openCoreSurface'].includes(value)
+  return (THEME_COMMANDS as readonly string[]).includes(value)
 }
 
 function apiError(code: string, message: string) {

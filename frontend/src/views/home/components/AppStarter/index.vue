@@ -63,6 +63,10 @@ function handleClickApp(item: App) {
     collapsed.value = true
 }
 
+function toggleCollapsed() {
+  collapsed.value = !collapsed.value
+}
+
 function getScreenWidth() {
   return window.innerWidth
 }
@@ -119,7 +123,26 @@ onUnmounted(() => {
       size="small"
     >
       <template #header>
-        <div class="flex items-center select-none" @click="collapsed = !collapsed">
+        <!--
+          The header toggle is the first focusable element inside the modal, and it is
+          rendered synchronously with the dialog. vueuc's FocusTrap (used internally by
+          NModal) resolves its initial focus once, on mount, by looking for a focusable
+          descendant; the settings pages it hosts arrive later as an async chunk, so at
+          that moment there is nothing to focus and the trap falls back to parking focus
+          on its own aria-hidden 0x0 sentinel, which the browser then reports as
+          "Blocked aria-hidden on an element because its descendant retained focus".
+          Being focusable here keeps the trap on its intended path, and it also makes the
+          collapse toggle reachable by keyboard, which it previously was not.
+        -->
+        <div
+          class="flex items-center select-none"
+          role="button"
+          tabindex="0"
+          data-testid="app-starter-header-toggle"
+          @click="toggleCollapsed"
+          @keydown.enter.prevent="toggleCollapsed"
+          @keydown.space.prevent="toggleCollapsed"
+        >
           <div class="text-3xl cursor-pointer" style="color:var(--n-color-target)">
             <SvgIcon class=" transition-all duration-500" :icon="collapsed ? 'tabler-layout-sidebar-right-collapse-filled' : 'tabler-layout-sidebar-left-collapse-filled'" />
           </div>

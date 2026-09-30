@@ -97,6 +97,40 @@ Every command must run in the directory stated by its `cd` or tool working-direc
 - Existing merge commits and existing remote branches are not rewritten or deleted by this policy unless the user explicitly requests a separate migration.
 - After a local commit, merge, or push, verify with `git status --short --branch`, `git branch -vv`, and `git ls-remote --heads origin`; report retained local branches, remote branches deleted by explicit request, and any stale upstream tracking references.
 
+## Home Rendering Boundary (Core vs Theme)
+
+The home page is rendered by a theme package. The Core supplies only what a theme cannot safely do for itself. This section is the binding summary; the full statement lives in `frontend/THEME_SYSTEM.md`.
+
+### Core responsibilities (frontend)
+
+| # | Responsibility | Content |
+| --- | --- | --- |
+| C1 | Data channel | Talks to the backend, fetches and mutates data, projects it into the snapshot handed to the theme. **A theme never talks HTTP.** |
+| C2 | Policy and trust boundary | Holds the JWT, enforces a permission per command, validates arguments. **A theme never holds a token.** |
+| C3 | Bootstrap and degradation | Startup loading state, theme consent prompt, and the minimum viable fallback view when the theme cannot render. |
+| C4 | Application shell | Login, public access codes, theme recovery, settings and admin surfaces — everything that is not the home's own rendering. |
+
+### Theme responsibilities
+
+All presentation and interaction of the home page: layout, styling, and which affordances it exposes.
+
+### Data access: typed capability commands
+
+A theme reaches data only through typed commands (`api.commands.execute('item.create', {...})`). Each command declares the permission it needs and the Core enforces it, so the backend HTTP shape is not part of the theme contract. The snapshot is scoped by the same permission set, so an ungranted theme renders read-only and empty instead of leaking data.
+
+### Surfaces the Core keeps
+
+A theme invokes them; the Core renders them: `editor.open` (item editor — privileged file upload and icon selection), `commandCenter.open` (cross-module navigation), `ui.openCoreSurface('theme-settings')` (application shell).
+
+### Decision rule
+
+> Needs a privilege (token, file, routing) **or** must exist when no theme is present → **Core**
+> Pure presentation and interaction → **theme**
+
+### Where this lives in the code
+
+`frontend/src/views/home/index.vue` is the host: it wires the `frontend/src/core/home/use*` composables (environment, monitor, theme runtime, data, modals, public access, commands) and renders the Core-owned chrome around the theme frame. The theme renders inside a sandboxed, cross-origin frame, so the Core cannot measure inside it; the theme reports its layout back through the `layout.report` command for the monitor band.
+
 ## Project Facts
 
 - Core repository: `https://github.com/yinorg/Yin-Panel`

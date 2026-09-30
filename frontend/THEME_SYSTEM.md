@@ -1,5 +1,32 @@
 # Theme System
 
+## Core and Theme Responsibility Boundary
+
+The home page is rendered by a theme package; the Core supplies what a theme cannot safely do for itself.
+
+| # | Core responsibility | Content |
+| --- | --- | --- |
+| C1 | Data channel | Talks to the backend, fetches and mutates data, projects it into the snapshot handed to the theme. A theme never talks HTTP. |
+| C2 | Policy and trust boundary | Holds the JWT, enforces a permission per command, validates arguments before acting. A theme never holds a token. |
+| C3 | Bootstrap and degradation | Startup loading state, the theme consent prompt, and the minimum viable fallback view for when the theme cannot render. |
+| C4 | Application shell | Login, public access codes, theme recovery, settings and admin surfaces — everything that is not the home's own rendering. |
+
+The theme owns all presentation and interaction of the home page: layout, styling, and which affordances it exposes.
+
+**Data access uses typed capability commands.** A theme never calls HTTP directly; it goes through `api.commands.execute('item.create', { ... })`. Each command declares the permission it needs and the Core enforces it, so the backend HTTP shape is not part of the theme contract and can evolve freely. The snapshot handed to the theme is scoped by the same permission set (`scopedSnapshot` in `ThemeHost.vue`), so a theme without a grant renders read-only and empty rather than leaking data it was never allowed to see.
+
+**Surfaces the Core keeps.** A theme invokes them through commands; the Core renders them:
+
+| Command | Core surface | Why it stays in Core |
+| --- | --- | --- |
+| `editor.open` | Item editor dialog | Needs file upload and icon selection, i.e. privileged operations |
+| `commandCenter.open` | Command centre | Cross-module navigation and service aggregation |
+| `ui.openCoreSurface('theme-settings')` | Theme settings page | Application shell (C4) |
+
+**Decision rule for future work.** Needs a privilege (token, file, routing) or must exist when no theme is present → Core. Pure presentation and interaction → theme.
+
+**Where the home shell sits.** `views/home/index.vue` is the host: it wires the `core/home/use*` composables (environment, monitor, theme runtime, data, modals, public access, commands) and renders only the Core-owned chrome around the theme frame. The theme renders inside a sandboxed cross-origin frame that the Core cannot measure, so the theme reports its own geometry back through `layout.report` for the monitor band.
+
 ## Package and Runtime Boundary
 
 Theme packages contain a manifest, DTCG 2025.10 token documents, declared CSS/JS entrypoints, optional component/view contributions, and static resources. JavaScript runs through the Theme API permission boundary; components and views mount through stable slots rather than relying on Core DOM selectors. Wallpaper metadata remains a constrained manifest resource reference; wallpaper image bytes and fonts remain static assets.

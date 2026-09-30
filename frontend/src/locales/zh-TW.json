@@ -144,6 +144,7 @@
   "themeRecovery": { "title": "主題復原", "description": "以安全模式啟動 Yin 首頁，不執行目前的社群主題。安全模式僅在此瀏覽器工作階段有效，不會修改已儲存的主題或版面。", "start": "啟動 Yin 安全模式", "exit": "退出安全模式", "restoreYin": "還原 Yin 主題", "restoreFailed": "無法還原 Yin 主題。請登入後再試一次。", "active": "Yin 安全模式已啟用。本次工作階段不會執行社群主題 JavaScript。", "home": "返回首頁" },
   "themeWallpaper": { "follow": "跟隨主題", "custom": "自訂", "none": "關閉桌布", "image": "圖片", "video": "影片", "web": "本機網頁桌布", "external": "外部網頁", "source": "桌布網址", "poster": "靜態封面網址", "uploadWeb": "上傳網頁桌布套件", "preview": "預覽主題", "home": "首頁", "login": "登入頁", "desktop": "桌面", "mobile": "手機", "light": "淺色", "dark": "深色", "remoteDomain": "外部網域", "confirmExternal": "此主題會在所有使用者的首頁載入 {hosts}。確定設為預設主題？", "loadFailed": "無法讀取主題", "wallpaperPlay": "播放桌布", "wallpaperPause": "暫停桌布", "wallpaperInteract": "與桌布互動", "wallpaperExit": "結束桌布互動" },
   "common": {
+    "refresh": "重新整理",
     "action": "操作",
     "add": "添加",
     "addSuccess": "添加成功",
@@ -273,6 +274,14 @@
     "oauthBackToLogin": "返回登錄"
   },
   "panelHome": {
+    "systemSettings": "系統設定",
+    "floatingActions": "頁面工具",
+    "fallbackReasonSafeMode": "已啟用安全模式",
+    "fallbackReasonNoHomeView": "目前主題未提供首頁檢視",
+    "fallbackNotice": "目前顯示簡化首頁。",
+    "fallbackReason": "原因",
+    "fallbackEmpty": "此空間尚無書籤。",
+    "fallbackReload": "重新載入",
     "changeToLanModel": "切換為內網模式",
     "changeToLanModelSuccess": "已經切換到內網模式（模式狀態僅保存在本地）",
     "changeToWanModel": "切換為公網模式",

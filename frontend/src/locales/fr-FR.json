@@ -144,6 +144,7 @@
   "themeRecovery": { "title": "Récupération du thème", "description": "Démarrer Yin Home en mode sans échec sans exécuter le JavaScript du thème communautaire actif. Ce mode dure uniquement pendant cette session du navigateur et ne modifie ni le thème ni la disposition enregistrés.", "start": "Démarrer le mode sans échec Yin", "exit": "Quitter le mode sans échec", "restoreYin": "Restaurer le thème Yin", "restoreFailed": "Impossible de restaurer le thème Yin. Connectez-vous puis réessayez.", "active": "Le mode sans échec Yin est actif. Le JavaScript du thème communautaire est désactivé pour cette session.", "home": "Retour à l’accueil" },
   "themeWallpaper": { "follow": "Suivre le thème", "custom": "Personnalisé", "none": "Sans fond d’écran", "image": "Image", "video": "Vidéo", "web": "Fond Web local", "external": "Site externe", "source": "URL du fond d’écran", "poster": "URL de l’image fixe", "uploadWeb": "Importer un fond Web", "preview": "Aperçu du thème", "home": "Accueil", "login": "Connexion", "desktop": "Ordinateur", "mobile": "Mobile", "light": "Clair", "dark": "Sombre", "remoteDomain": "Domaine externe", "confirmExternal": "Ce thème chargera {hosts} sur l’accueil de tous les utilisateurs. Le définir par défaut ?", "loadFailed": "Impossible de charger le thème", "wallpaperPlay": "Lire le fond d’écran", "wallpaperPause": "Mettre en pause", "wallpaperInteract": "Interagir avec le fond", "wallpaperExit": "Quitter l’interaction" },
   "common": {
+    "refresh": "Refresh",
     "action": "Aktion",
     "add": "Ajouter",
     "addSuccess": "Erfolgreich hinzugefügt",
@@ -273,6 +274,14 @@
     "oauthBackToLogin": "Back to login"
   },
   "panelHome": {
+    "systemSettings": "System settings",
+    "floatingActions": "Page utilities",
+    "fallbackReasonSafeMode": "Safe mode is enabled",
+    "fallbackReasonNoHomeView": "The active theme provides no home view",
+    "fallbackNotice": "Showing a simplified home page.",
+    "fallbackReason": "Reason",
+    "fallbackEmpty": "No bookmarks in this space.",
+    "fallbackReload": "Reload",
     "changeToLanModel": "Switch to LAN mode",
     "changeToLanModelSuccess": "Switched to LAN mode (mode status saved locally)",
     "changeToWanModel": "Switch to WAN mode",

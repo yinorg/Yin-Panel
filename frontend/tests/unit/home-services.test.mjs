@@ -430,6 +430,8 @@ test('Core Home presentation maps panel configuration, search engines, and safe 
     search: { visible: false, itemFilterEnabled: false, engines: [{ id: 'bing', title: 'Bing', iconSrc: '/bing.svg' }], currentEngineId: 'bing' },
     content: { marginTopPercent: 18, marginBottomPercent: 27, maxWidth: 88, maxWidthUnit: '%', marginX: 24 },
     footerHtml: '<strong>Footer</strong>', monitor: { visible: true, showTitle: false, reservedHeight: 184 },
+    network: { mode: 'wan', switchVisible: false },
+    signedIn: false,
   })
   assert.deepEqual(panelConfig, {
     homeLayout: 'directory', iconStyle: 0, iconTextColor: '#abc', iconTextInfoHideDescription: true,
@@ -443,6 +445,27 @@ test('Core Home presentation maps panel configuration, search engines, and safe 
   assert.equal(defaults.layout, 'standard')
   assert.equal(defaults.iconStyle, 'icon')
   assert.deepEqual(defaults.content, { marginTopPercent: 10, marginBottomPercent: 10, maxWidth: 1200, maxWidthUnit: 'px', marginX: 5 })
+})
+
+test('Core Home snapshot reports the granted permissions and session state for Core surfaces', () => {
+  const granted = ['spaces.read', 'groups.read', 'items.read', 'diagnostics.report']
+  const snapshot = createThemeHomeSnapshot({
+    version: 1, status: 'ready', spaces: [], groups: [], canWrite: false,
+    permissions: granted,
+    presentation: { signedIn: false },
+  })
+  // A public-link visitor holds read scopes but no session, which is exactly the
+  // combination a theme needs to hide Core surfaces it could never open.
+  assert.deepEqual(snapshot.permissions, granted)
+  assert.equal(snapshot.presentation.signedIn, false)
+
+  const signedIn = createThemeHomeSnapshot({
+    version: 2, status: 'ready', spaces: [], groups: [], canWrite: false,
+    presentation: { signedIn: true },
+  })
+  assert.equal(signedIn.presentation.signedIn, true)
+  // Omitting the list must not advertise an empty authorization as a real one.
+  assert.equal(signedIn.permissions, undefined)
 })
 
 test('Core Home snapshot preserves text, image, and Iconify item icon representations', () => {
