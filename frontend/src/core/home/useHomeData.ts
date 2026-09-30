@@ -82,6 +82,13 @@ export function useHomeData(input: {
   const canEditActiveSpace = computed(() => !input.publicCode && activeSpace.value?.canEdit !== false)
   const canWrite = computed(() => input.isOnline.value && !offlineUnavailable.value && canEditActiveSpace.value)
 
+  // Refreshing clears every cache and reloads, which is a read-side operation: a
+  // public visitor may legitimately want it, and gating it on write permission
+  // left the button inert on a public link. The online requirement stays, because
+  // clearing the caches while offline would delete the very data the offline view
+  // depends on.
+  const canRefresh = computed(() => input.isOnline.value && !offlineUnavailable.value)
+
   function applyGroups(data: HomeGroupNode[], itemsByGroup = new Map<number, Panel.ItemInfo[]>(), spaceId = activeSpace.value?.id) {
     collectionSpaceId.value = spaceId ?? null
     const { groups: flattened } = buildHomeGroupTree(data, itemsByGroup)
@@ -254,11 +261,23 @@ export function useHomeData(input: {
   }
 
   async function refreshCurrentSpace() {
-    if (!canWrite.value) return
+    if (!canRefresh.value) return
     const authStorage = localStorage.getItem('authStorage')
     localStorage.clear()
     if (authStorage !== null) localStorage.setItem('authStorage', authStorage)
+    // Keep the public-access grant for the same reason the login is kept: the
+    // visitor already proved they may see this space, and a refresh should not
+    // send them back to the access-code prompt.
+    const publicAccessGrants = new Map<string, string>()
+    for (let index = 0; index < sessionStorage.length; index += 1) {
+      const key = sessionStorage.key(index)
+      if (key?.startsWith('yin-panel-public-access:')) {
+        const value = sessionStorage.getItem(key)
+        if (value !== null) publicAccessGrants.set(key, value)
+      }
+    }
     sessionStorage.clear()
+    publicAccessGrants.forEach((value, key) => sessionStorage.setItem(key, value))
     if ('serviceWorker' in navigator) {
       const registrations = await navigator.serviceWorker.getRegistrations()
       await Promise.all(registrations.map(registration => registration.unregister()))

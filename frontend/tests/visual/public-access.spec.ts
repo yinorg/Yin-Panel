@@ -142,6 +142,31 @@ test('a public link keeps the other three buttons working', async ({ page }) => 
   await expect(page.locator('.home-floating-button').nth(2)).not.toHaveAttribute('data-testid', before!)
 })
 
+test('the refresh button refreshes on a public link instead of doing nothing', async ({ page }) => {
+  // The refresh action used to return early unless the visitor held write
+  // permission, which a public link never has. Hit-testing the button passes
+  // either way, so this asserts the effect rather than the affordance.
+  //
+  // The reload is the action's own evidence: it is the last statement in the
+  // handler, so reaching it proves the permission gate was passed, the caches
+  // were cleared and the service worker was unregistered. The success toast is
+  // raised just before it and is not asserted — the same message api is used by
+  // the other home actions, and it could not be observed from this path.
+  await preparePublicLink(page)
+  await page.goto(`/${PUBLIC_CODE}`, { waitUntil: 'domcontentloaded' })
+  await expect(page.getByTestId('home-floating-bar')).toBeVisible({ timeout: 30_000 })
+
+  let navigations = 0
+  page.on('framenavigated', (frame) => { if (frame === page.mainFrame()) navigations += 1 })
+  const before = navigations
+
+  await page.getByTestId('floating-refresh-button').click()
+
+  await expect.poll(() => navigations, { timeout: 20_000 }).toBeGreaterThan(before)
+  // And the page is usable again afterwards, rather than stuck mid-refresh.
+  await expect(page.getByTestId('home-floating-bar')).toBeVisible({ timeout: 30_000 })
+})
+
 test('the keyboard opens the search palette on a public link, without commands', async ({ page }) => {
   await preparePublicLink(page)
   await page.goto(`/${PUBLIC_CODE}`, { waitUntil: 'domcontentloaded' })
