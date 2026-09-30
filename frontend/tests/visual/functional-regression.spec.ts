@@ -340,6 +340,44 @@ test.describe('Functional Regression: Performance', () => {
   })
 })
 
+test.describe('Functional Regression: Request layer logging', () => {
+  // The message api is mounted as a separate app, so a refused request can fail to
+  // produce any visible toast for reasons the request layer cannot see. The console
+  // is the channel that cannot go missing, and it is what a developer has when a
+  // request is refused and nothing appears on screen.
+  test('a refused request is logged with its code', async ({ page }) => {
+    await mockApi(page)
+    const logs: string[] = []
+    page.on('console', msg => logs.push(`${msg.type()} ${msg.text()}`))
+
+    await page.route('**/api/spaces**', route => route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ code: 1400, msg: 'bad shape', data: [] }),
+    }))
+
+    await page.goto('/', { waitUntil: 'domcontentloaded' })
+    await expect.poll(() => logs.some(l => l.includes('[api]') && l.includes('/spaces') && l.includes('1400')))
+      .toBe(true)
+    // A real fault is an error, not a warning, so it stands out from the expected
+    // refusals (1000/1001/1005) the layer handles on its own.
+    expect(logs.filter(l => l.startsWith('error') && l.includes('[api]')).length).toBeGreaterThan(0)
+
+    // And the reference: a refusal the layer treats as expected stays a warning.
+    logs.length = 0
+    await page.unroute('**/api/spaces**')
+    await page.route('**/api/spaces**', route => route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ code: 1005, msg: '', data: [] }),
+    }))
+    await page.reload({ waitUntil: 'domcontentloaded' })
+    await expect.poll(() => logs.some(l => l.includes('[api]') && l.includes('1005'))).toBe(true)
+    expect(logs.filter(l => l.startsWith('warning') && l.includes('[api]')).length).toBeGreaterThan(0)
+    expect(logs.filter(l => l.startsWith('error') && l.includes('1005'))).toHaveLength(0)
+  })
+})
+
 test.describe('Functional Regression: Public link theme rendering', () => {
   // A public link has no user, so it can never hold a theme grant record. The
   // Core must still hand the theme the read scopes the link already exposes —

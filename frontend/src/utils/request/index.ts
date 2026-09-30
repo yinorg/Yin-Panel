@@ -32,6 +32,25 @@ function http<T = any>(
     if (res.data.code === 0)
       return res.data
 
+    // The console is the one channel that cannot be missing. The message api is
+    // mounted as a separate app, so a toast can fail to appear for reasons this
+    // layer cannot see — no container, a provider that never mounted, or an empty
+    // localised string — and a refused request would then leave no trace at all.
+    // Only the code and the server's own message are logged; the body may carry
+    // user data and is deliberately left out.
+    const failure = `[api] ${method} ${url} -> code ${res.data.code}${res.data.msg ? `: ${res.data.msg}` : ''}`
+    switch (res.data.code) {
+      case 1001:
+      case 1000:
+      case 1005:
+      case -1:
+        // Expected refusals, handled below rather than surfaced as faults.
+        console.warn(failure)
+        break
+      default:
+        console.error(failure)
+    }
+
     if (res.data.code === 1001 && !window.location.pathname.match(/^\/[a-z][a-z0-9-]{4,28}[a-z0-9]\/?$/)) {
       // 避免重复弹窗
       if (!loginMessageShow) {
@@ -77,6 +96,7 @@ function http<T = any>(
     afterRequest?.()
     if (signal?.aborted)
       throw error
+    console.error(`[api] ${method} ${url} -> transport failure`, error?.msg || error)
     message.error(t('common.networkError'), {
       duration: 50000,
       closable: true,
