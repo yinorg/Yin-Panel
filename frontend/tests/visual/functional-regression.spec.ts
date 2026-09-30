@@ -158,8 +158,11 @@ test.describe('Functional Regression: Theme home (production path)', () => {
 
     const theme = page.frameLocator('[data-testid="theme-home-frame"]')
     await expect(theme.locator('section.yin-group')).toHaveCount(2, { timeout: 30_000 })
-    await expect(theme.locator('section.yin-group').nth(0).locator('.yin-item')).toHaveCount(2)
-    await expect(theme.locator('section.yin-group').nth(1).locator('.yin-item')).toHaveCount(1)
+    // The group count resolving does not mean the item nodes have painted; the
+    // frame reports them in a later pass. Without the explicit timeout these fall
+    // back to the 5s default and flake under parallel load.
+    await expect(theme.locator('section.yin-group').nth(0).locator('.yin-item')).toHaveCount(2, { timeout: 30_000 })
+    await expect(theme.locator('section.yin-group').nth(1).locator('.yin-item')).toHaveCount(1, { timeout: 30_000 })
   })
 
   test('Theme search filters the rendered collection', async ({ page }) => {

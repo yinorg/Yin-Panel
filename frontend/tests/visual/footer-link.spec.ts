@@ -91,9 +91,14 @@ test('the footer link opens through the Core instead of a blocked popup', async 
   // the navigation and logs a violation, so the attribute must not be there.
   expect(await link.getAttribute('target')).toBeNull()
 
-  await link.click()
-  await expect
-    .poll(() => page.evaluate(() => (window as unknown as { __openedUrls: string[] }).__openedUrls), { timeout: 10_000 })
-    .toEqual(['https://github.com/yinorg/Yin-Panel'])
+  // The theme ships as an async chunk, so the click can land before the Core
+  // binding that handles it is live. Retrying the whole interaction is what makes
+  // the assertion about the wiring rather than about the load order.
+  await expect(async () => {
+    await link.click()
+    await expect
+      .poll(() => page.evaluate(() => (window as unknown as { __openedUrls: string[] }).__openedUrls), { timeout: 2000 })
+      .toEqual(['https://github.com/yinorg/Yin-Panel'])
+  }).toPass({ timeout: 20_000 })
   expect(sandboxViolations, 'the sandbox should not report a blocked window').toEqual([])
 })

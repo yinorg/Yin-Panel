@@ -1,5 +1,5 @@
 import type { AxiosProgressEvent, AxiosResponse, GenericAbortSignal } from 'axios'
-import request from './axios'
+import request, { parsePublicCodeFromPath } from './axios'
 import { apiRespErrMsg, message } from './apiMessage'
 import { t } from '../../locales'
 import { useAppStore, useAuthStore } from '../../store'
@@ -55,7 +55,11 @@ function http<T = any>(
     }
 
     if (res.data.code === 1005) {
-      message.warning(res.data.msg)
+      // A public link is not a signed-in session: every JWT-only endpoint refuses
+      // it with 1005, which is an expected state rather than something the visitor
+      // can act on. Announcing it puts a warning toast over the home on every open.
+      if (!parsePublicCodeFromPath())
+        message.warning(res.data.msg)
       return res.data
     }
 

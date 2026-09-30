@@ -122,7 +122,7 @@ export function useHomeCommands(input: {
     { key: 'copy', label: t('common.copyUrl') },
   ])
 
-  const filteredCommandDefinitions = computed(() => filterHomeCommands(commandDefinitions.value, commandCenterQuery.value))
+  const filteredCommandDefinitions = computed(() => input.publicCode ? [] : filterHomeCommands(commandDefinitions.value, commandCenterQuery.value))
   const allCommandItems = computed(() => input.items.value.flatMap(group => group.items || []))
   const commandCenterItems = computed(() => filterHomeCommandItems(commandCenterQuery.value, remoteCommandItems.value, allCommandItems.value))
 
@@ -233,7 +233,10 @@ export function useHomeCommands(input: {
    * consumed, which is what tells the DOM path to preventDefault.
    */
   function handleShortcutKey(key: string) {
-    if (commandCenterVisible.value || !authStore.token || (input.publicCode && !input.publicAccessReady.value)) return false
+    // A signed-in visitor and a public-link visitor both get the shortcut; a
+    // public link only once its access has been resolved, so typing into the
+    // access-code prompt never opens the palette behind it.
+    if (commandCenterVisible.value || (!authStore.token && !input.publicCode) || (input.publicCode && !input.publicAccessReady.value)) return false
     if (hasBlockingLayer()) return false
     if (key.length !== 1) return false
     openCommandCenter(key)

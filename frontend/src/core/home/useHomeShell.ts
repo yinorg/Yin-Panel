@@ -286,7 +286,12 @@ export function useHomeShell() {
   const activeSpaceLabel = computed(() => activeSpace.value
     ? spaceDisplayName(activeSpace.value, spaces.value, authStore.userInfo?.id)
     : '')
-  const showSpaceBar = computed(() => homeReady.value && spaces.value.length > 0 && !!authStore.token)
+  // A public link has no space to select: it shows the one space it points at.
+  // `authStore.token` alone is not a safe test, because a visitor who is (or was)
+  // signed in keeps the token in localStorage while opening a public link — the
+  // request layer skips the Authorization header for those links but never clears
+  // the store, so the bar would render for exactly that visitor.
+  const showSpaceBar = computed(() => homeReady.value && spaces.value.length > 0 && !!authStore.token && !publicCode)
 
   /**
    * The fixed utility stack on the right edge (refresh, back to top, LAN/WAN and
@@ -300,7 +305,10 @@ export function useHomeShell() {
    * same class of thing as the space bar and the monitor band, and every button
    * calls a Core capability directly instead of a round trip through the sandbox.
    */
-  const showFloatingBar = computed(() => homeReady.value && !!authStore.token && !publicCode)
+  const showFloatingBar = computed(() => homeReady.value && (!!authStore.token || !!publicCode))
+  // System settings are an operator surface, so a public link gets the other
+  // three buttons but not this one.
+  const showSystemSettingsButton = computed(() => !!authStore.token && !publicCode)
   const networkMode = computed<'lan' | 'wan'>(() => panelState.networkMode === PanelStateNetworkModeEnum.lan ? 'lan' : 'wan')
   const showNetworkSwitch = computed(() => panelState.panelConfig.netModeChangeButtonShow === true)
   function toggleNetworkMode() {
@@ -399,6 +407,7 @@ export function useHomeShell() {
     sideSwitching,
     directoryLayout,
     showFloatingBar,
+    showSystemSettingsButton,
     scrollToTop,
     networkMode,
     showNetworkSwitch,

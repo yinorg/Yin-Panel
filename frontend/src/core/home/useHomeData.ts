@@ -105,7 +105,12 @@ export function useHomeData(input: {
   })
 
   const homeBootstrap = createHomeBootstrap({
-    getMonitor: signal => getEnableStatus<{ enabled: boolean, refresh_interval?: number }>(signal),
+    // The monitor band is Core chrome for a signed-in session. Its enabling flag
+    // and its data endpoint are both JWT-only, so a public link can never render
+    // the band; probing anyway only earns a 1005 on every open.
+    getMonitor: signal => input.publicCode
+      ? Promise.resolve({ code: 0, msg: '', data: { enabled: false } })
+      : getEnableStatus<{ enabled: boolean, refresh_interval?: number }>(signal),
     getSpaces: signal => getSpaces<Space[]>(signal),
     refreshConfig: signal => panelState.updatePanelConfigByCloud(signal),
     timeoutMs: HOME_REQUEST_TIMEOUT,

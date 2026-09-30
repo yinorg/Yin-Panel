@@ -50,22 +50,8 @@ async function prepareHome(page: Page) {
   })
 }
 
-/**
- * The warning is emitted by the renderer, not by page script, so it only shows up
- * on the browser log channel. Collecting it through CDP is the reliable way to
- * read it; `page.on('console')` misses messages the browser logs itself.
- */
-async function collectBrowserLog(page: Page) {
-  const entries: string[] = []
-  const client = await page.context().newCDPSession(page)
-  await client.send('Log.enable')
-  client.on('Log.entryAdded', ({ entry }) => entries.push(entry.text))
-  return entries
-}
-
 test('opening system settings does not park focus on the focus-trap sentinel', async ({ page }) => {
   await prepareHome(page)
-  const log = await collectBrowserLog(page)
   await page.goto('/', { waitUntil: 'domcontentloaded' })
 
   await page.getByTestId('system-settings-button').click()
@@ -95,33 +81,11 @@ test('opening system settings does not park focus on the focus-trap sentinel', a
   expect(focused.inDialog).toBe(true)
   expect(focused.role).toBe('button')
 
-  // The reported half. Kept as a separate assertion so a failure names the
-  // regression the user actually sees.
-  const blocked = log.filter(text => text.includes('Blocked aria-hidden'))
-  expect(blocked, 'the browser must not report blocked aria-hidden').toEqual([])
-})
-
-test('the log channel used above can actually observe this warning', async ({ page }) => {
-  // `expect(blocked).toEqual([])` passes trivially if the CDP log channel never
-  // carries this warning at all, which would make the assertion above untested.
-  // Provoking the identical warning synthetically proves the channel works, so a
-  // green result in the test above means the warning is genuinely absent.
-  await prepareHome(page)
-  const log = await collectBrowserLog(page)
-  await page.goto('/', { waitUntil: 'domcontentloaded' })
-
-  await page.evaluate(() => {
-    const host = document.createElement('div')
-    host.setAttribute('aria-hidden', 'true')
-    const button = document.createElement('button')
-    button.textContent = 'hidden focus target'
-    host.appendChild(button)
-    document.body.appendChild(host)
-    button.focus()
-  })
-
-  await expect.poll(() => log.filter(text => text.includes('Blocked aria-hidden')).length)
-    .toBeGreaterThan(0)
+  // The reported half cannot be asserted here: headless Chromium does not emit
+  // this warning at all, so a "no warning" expectation would pass no matter what
+  // the code did. Measured, not assumed — provoking the identical condition
+  // synthetically on a real page produces zero browser-log entries. What this
+  // test *can* prove is the cause, which is the focus placement asserted above.
 })
 
 test('the settings header toggle is reachable and operable by keyboard', async ({ page }) => {
