@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Yin-Panel Clear Local Data</title>
+  <style>
+    :root { color-scheme: light dark; font: 16px system-ui, sans-serif; background: #f5f6f8; color: #20242b; }
+    body { display: grid; min-height: 100vh; margin: 0; place-items: center; }
+    main { width: min(560px, calc(100% - 40px)); }
+    h1 { margin: 0 0 12px; font-size: 26px; line-height: 1.25; }
+    p { margin: 0 0 12px; line-height: 1.6; }
+    ul { margin: 0 0 20px; padding-left: 20px; line-height: 1.8; }
+    .muted { color: #5b6673; }
+    .failed { color: #a12627; }
+    .ok { color: #28784a; }
+    a.button { display: inline-flex; min-height: 44px; align-items: center; padding: 0 18px; border: 0; border-radius: 6px; background: #2675d8; color: #fff; font: inherit; text-decoration: none; }
+    @media (prefers-color-scheme: dark) { :root { background: #15191f; color: #edf1f5; } .muted { color: #9aa6b4; } }
+  </style>
+</head>
+<body>
+  <main data-testid="static-clear">
+    <h1 data-i18n="title">Clear local data</h1>
+    <p class="muted" data-i18n="intro">
+      This page runs on its own, without the application bundle, so it still works when the
+      panel will not load. It clears this browser only; nothing on the server is touched.
+    </p>
+    <ul id="results"></ul>
+    <p id="status" class="muted" data-i18n="working">Clearing…</p>
+    <p><a class="button" href="/" data-i18n="open">Open Yin-Panel</a></p>
+  </main>
+
+  <script>
+    // Deliberately plain and self-contained: no bundle, no framework, no service
+    // worker involvement. This is reached with `/clear.html` by path, and both the
+    // backend and the worker's navigation fallback are told not to answer it with
+    // the app shell, so the request goes to the network and this document runs.
+    //
+    // The translations are inlined rather than loaded, because loading anything is
+    // the failure this page exists to survive. The set and the browser-language
+    // matching mirror `frontend/src/locales/index.ts` so the page agrees with the
+    // application instead of drifting from it.
+    (function () {
+      var MESSAGES = {
+        'en-US': {
+          title: 'Clear local data',
+          intro: 'This page runs on its own, without the application bundle, so it still works when the panel will not load. It clears this browser only; nothing on the server is touched.',
+          working: 'Clearing…',
+          done: 'Done. Reload the panel to start from a clean state.',
+          problems: 'Finished with {count} problem(s); the list above says what failed.',
+          open: 'Open Yin-Panel',
+          local: 'Local storage cleared',
+          localFail: 'Local storage cleared — entries remain',
+          session: 'Session storage cleared',
+          sessionFail: 'Session storage cleared — entries remain',
+          workers: 'Service workers unregistered',
+          workersSkip: 'Service workers not supported in this browser',
+          workersFail: 'Service workers unregistered — {count} still registered',
+          caches: 'Cache storage cleared',
+          cachesSkip: 'Cache storage not supported in this browser',
+          cachesFail: 'Cache storage cleared — {count} caches remain',
+        },
+        'zh-CN': {
+          title: '清理本地数据',
+          intro: '此页面不依赖应用代码独立运行，因此面板无法打开时它仍可用。它只清理本浏览器的数据，不影响服务器。',
+          working: '清理中…',
+          done: '已完成。重新加载面板即可从干净状态开始。',
+          problems: '完成，但有 {count} 项失败，具体见上方列表。',
+          open: '打开 Yin-Panel',
+          local: '本地存储已清理',
+          localFail: '本地存储已清理 — 仍有残留',
+          session: '会话存储已清理',
+          sessionFail: '会话存储已清理 — 仍有残留',
+          workers: '已注销所有 Service Worker',
+          workersSkip: '此浏览器不支持 Service Worker',
+          workersFail: '已注销 Service Worker — 仍有 {count} 个注册',
+          caches: '缓存存储已清理',
+          cachesSkip: '此浏览器不支持缓存存储',
+          cachesFail: '缓存存储已清理 — 仍有 {count} 个缓存',
+        },
+        'zh-TW': {
+          title: '清理本機資料',
+          intro: '此頁面不依賴應用程式碼獨立執行，因此面板無法開啟時仍可使用。它只清理本瀏覽器的資料，不影響伺服器。',
+          working: '清理中…',
+          done: '已完成。重新載入面板即可從乾淨狀態開始。',
+          problems: '完成，但有 {count} 項失敗，詳見上方清單。',
+          open: '開啟 Yin-Panel',
+          local: '本機儲存已清理',
+          localFail: '本機儲存已清理 — 仍有殘留',
+          session: '工作階段儲存已清理',
+          sessionFail: '工作階段儲存已清理 — 仍有殘留',
+          workers: '已註銷所有 Service Worker',
+          workersSkip: '此瀏覽器不支援 Service Worker',
+          workersFail: '已註銷 Service Worker — 仍有 {count} 個註冊',
+          caches: '快取儲存已清理',
+          cachesSkip: '此瀏覽器不支援快取儲存',
+          cachesFail: '快取儲存已清理 — 仍有 {count} 個快取',
+        },
+        'ja-JP': {
+          title: 'ローカルデータを消去',
+          intro: 'このページはアプリのコードに依存せず単独で動作するため、パネルが開けないときでも使用できます。このブラウザーのデータのみを消去し、サーバーには触れません。',
+          working: '消去中…',
+          done: '完了しました。パネルを再読み込みするとクリーンな状態で開始できます。',
+          problems: '{count} 件失敗しました。上の一覧を確認してください。',
+          open: 'Yin-Panel を開く',
+          local: 'ローカルストレージを消去しました',
+          localFail: 'ローカルストレージを消去しました — 残っています',
+          session: 'セッションストレージを消去しました',
+          sessionFail: 'セッションストレージを消去しました — 残っています',
+          workers: 'Service Worker をすべて解除しました',
+          workersSkip: 'このブラウザーは Service Worker に対応していません',
+          workersFail: 'Service Worker を解除しました — {count} 件残っています',
+          caches: 'キャッシュストレージを消去しました',
+          cachesSkip: 'このブラウザーはキャッシュストレージに対応していません',
+          cachesFail: 'キャッシュストレージを消去しました — {count} 件残っています',
+        },
+        'ko-KR': {
+          title: '로컬 데이터 지우기',
+          intro: '이 페이지는 애플리케이션 번들 없이 단독으로 실행되므로 패널이 열리지 않을 때도 사용할 수 있습니다. 이 브라우저의 데이터만 지우며 서버는 건드리지 않습니다.',
+          working: '지우는 중…',
+          done: '완료했습니다. 패널을 새로 고치면 깨끗한 상태에서 시작합니다.',
+          problems: '{count}개 실패했습니다. 위 목록을 확인하세요.',
+          open: 'Yin-Panel 열기',
+          local: '로컬 저장소를 지웠습니다',
+          localFail: '로컬 저장소를 지웠습니다 — 남아 있음',
+          session: '세션 저장소를 지웠습니다',
+          sessionFail: '세션 저장소를 지웠습니다 — 남아 있음',
+          workers: 'Service Worker를 모두 해제했습니다',
+          workersSkip: '이 브라우저는 Service Worker를 지원하지 않습니다',
+          workersFail: 'Service Worker를 해제했습니다 — {count}개 남음',
+          caches: '캐시 저장소를 지웠습니다',
+          cachesSkip: '이 브라우저는 캐시 저장소를 지원하지 않습니다',
+          cachesFail: '캐시 저장소를 지웠습니다 — {count}개 남음',
+        },
+        'de-DE': {
+          title: 'Browserdaten löschen',
+          intro: 'Diese Seite läuft eigenständig, ohne das Anwendungs-Bundle, und funktioniert daher auch, wenn das Panel nicht lädt. Sie löscht nur diesen Browser, nicht die Serverdaten.',
+          working: 'Wird gelöscht…',
+          done: 'Fertig. Laden Sie das Panel neu, um mit einem sauberen Zustand zu starten.',
+          problems: 'Mit {count} Problem(en) beendet; die Liste oben nennt die Fehler.',
+          open: 'Yin-Panel öffnen',
+          local: 'Lokaler Speicher gelöscht',
+          localFail: 'Lokaler Speicher gelöscht — Einträge bleiben',
+          session: 'Sitzungsspeicher gelöscht',
+          sessionFail: 'Sitzungsspeicher gelöscht — Einträge bleiben',
+          workers: 'Service Worker abgemeldet',
+          workersSkip: 'Service Worker werden von diesem Browser nicht unterstützt',
+          workersFail: 'Service Worker abgemeldet — {count} weiterhin registriert',
+          caches: 'Cache-Speicher gelöscht',
+          cachesSkip: 'Cache-Speicher wird von diesem Browser nicht unterstützt',
+          cachesFail: 'Cache-Speicher gelöscht — {count} Caches bleiben',
+        },
+        'fr-FR': {
+          title: 'Effacer les données locales',
+          intro: "Cette page fonctionne seule, sans le bundle de l'application, et reste donc utilisable lorsque le panneau ne se charge pas. Elle n'efface que ce navigateur, pas les données du serveur.",
+          working: 'Effacement…',
+          done: 'Terminé. Rechargez le panneau pour repartir d’un état propre.',
+          problems: 'Terminé avec {count} problème(s) ; la liste ci-dessus indique les échecs.',
+          open: 'Ouvrir Yin-Panel',
+          local: 'Stockage local effacé',
+          localFail: 'Stockage local effacé — des entrées subsistent',
+          session: 'Stockage de session effacé',
+          sessionFail: 'Stockage de session effacé — des entrées subsistent',
+          workers: 'Service workers désenregistrés',
+          workersSkip: 'Les service workers ne sont pas pris en charge par ce navigateur',
+          workersFail: 'Service workers désenregistrés — {count} encore enregistrés',
+          caches: 'Stockage de cache effacé',
+          cachesSkip: 'Le stockage de cache n’est pas pris en charge par ce navigateur',
+          cachesFail: 'Stockage de cache effacé — {count} caches subsistent',
+        },
+        'es-ES': {
+          title: 'Borrar datos locales',
+          intro: 'Esta página funciona por sí sola, sin el paquete de la aplicación, así que sigue siendo útil cuando el panel no carga. Solo borra este navegador, no los datos del servidor.',
+          working: 'Borrando…',
+          done: 'Listo. Recarga el panel para empezar desde un estado limpio.',
+          problems: 'Terminó con {count} problema(s); la lista de arriba indica qué falló.',
+          open: 'Abrir Yin-Panel',
+          local: 'Almacenamiento local borrado',
+          localFail: 'Almacenamiento local borrado — quedan entradas',
+          session: 'Almacenamiento de sesión borrado',
+          sessionFail: 'Almacenamiento de sesión borrado — quedan entradas',
+          workers: 'Service workers desregistrados',
+          workersSkip: 'Este navegador no admite service workers',
+          workersFail: 'Service workers desregistrados — quedan {count} registrados',
+          caches: 'Almacenamiento de caché borrado',
+          cachesSkip: 'Este navegador no admite almacenamiento de caché',
+          cachesFail: 'Almacenamiento de caché borrado — quedan {count} cachés',
+        },
+        'pt-BR': {
+          title: 'Limpar dados locais',
+          intro: 'Esta página funciona sozinha, sem o pacote da aplicação, então continua útil quando o painel não carrega. Ela limpa apenas este navegador, não os dados do servidor.',
+          working: 'Limpando…',
+          done: 'Concluído. Recarregue o painel para começar de um estado limpo.',
+          problems: 'Concluído com {count} problema(s); a lista acima mostra o que falhou.',
+          open: 'Abrir Yin-Panel',
+          local: 'Armazenamento local limpo',
+          localFail: 'Armazenamento local limpo — restam entradas',
+          session: 'Armazenamento de sessão limpo',
+          sessionFail: 'Armazenamento de sessão limpo — restam entradas',
+          workers: 'Service workers desregistrados',
+          workersSkip: 'Este navegador não suporta service workers',
+          workersFail: 'Service workers desregistrados — restam {count} registrados',
+          caches: 'Armazenamento de cache limpo',
+          cachesSkip: 'Este navegador não suporta armazenamento de cache',
+          cachesFail: 'Armazenamento de cache limpo — restam {count} caches',
+        },
+        'ru-RU': {
+          title: 'Очистка локальных данных',
+          intro: 'Эта страница работает самостоятельно, без кода приложения, поэтому она доступна, когда панель не открывается. Она очищает только этот браузер, не данные сервера.',
+          working: 'Очистка…',
+          done: 'Готово. Перезагрузите панель, чтобы начать с чистого состояния.',
+          problems: 'Завершено с ошибками: {count}. Подробности в списке выше.',
+          open: 'Открыть Yin-Panel',
+          local: 'Локальное хранилище очищено',
+          localFail: 'Локальное хранилище очищено — записи остались',
+          session: 'Хранилище сеанса очищено',
+          sessionFail: 'Хранилище сеанса очищено — записи остались',
+          workers: 'Service workers сняты с регистрации',
+          workersSkip: 'Этот браузер не поддерживает service workers',
+          workersFail: 'Service workers сняты — осталось {count}',
+          caches: 'Хранилище кэша очищено',
+          cachesSkip: 'Этот браузер не поддерживает хранилище кэша',
+          cachesFail: 'Хранилище кэша очищено — осталось {count}',
+        },
+      }
+
+      // Mirrors resolveBrowserLocale() in frontend/src/locales/index.ts.
+      function pickLocale() {
+        var raw = (navigator.language || navigator.userLanguage || '').toLowerCase()
+        if (raw.indexOf('zh-tw') === 0 || raw.indexOf('zh-hk') === 0 || raw.indexOf('zh-mo') === 0) return 'zh-TW'
+        if (raw.indexOf('zh') === 0) return 'zh-CN'
+        if (raw.indexOf('ja') === 0) return 'ja-JP'
+        if (raw.indexOf('ko') === 0) return 'ko-KR'
+        if (raw.indexOf('de') === 0) return 'de-DE'
+        if (raw.indexOf('fr') === 0) return 'fr-FR'
+        if (raw.indexOf('es') === 0) return 'es-ES'
+        if (raw.indexOf('pt') === 0) return 'pt-BR'
+        if (raw.indexOf('ru') === 0) return 'ru-RU'
+        return 'en-US'
+      }
+
+      var locale = pickLocale()
+      var messages = MESSAGES[locale] || MESSAGES['en-US']
+
+      function t(key, replacements) {
+        var text = messages[key] || MESSAGES['en-US'][key] || key
+        if (replacements) {
+          Object.keys(replacements).forEach(function (name) {
+            text = text.replace('{' + name + '}', String(replacements[name]))
+          })
+        }
+        return text
+      }
+
+      document.documentElement.lang = locale
+
+      // Static copy first, so the page reads correctly before any work happens.
+      var nodes = document.querySelectorAll('[data-i18n]')
+      for (var index = 0; index < nodes.length; index += 1) {
+        var node = nodes[index]
+        var key = node.getAttribute('data-i18n')
+        if (key && messages[key]) node.textContent = messages[key]
+      }
+      var titleNode = document.querySelector('title')
+      if (titleNode) titleNode.textContent = 'Yin-Panel — ' + t('title')
+
+      var results = document.getElementById('results')
+      var status = document.getElementById('status')
+      var failures = 0
+
+      function report(text, ok) {
+        var item = document.createElement('li')
+        item.textContent = (ok ? '✓ ' : '✗ ') + text
+        item.className = ok ? 'ok' : 'failed'
+        results.appendChild(item)
+        if (!ok) failures += 1
+      }
+
+      async function step(okKey, failKey, action) {
+        try {
+          var skipped = await action()
+          report(t(skipped || okKey), true)
+        }
+        catch (error) {
+          var detail = error && error.message ? error.message : String(error)
+          var message = t(failKey, { count: detail })
+          // A failure message that still carries the raw count is clearer than one
+          // that hides it, so the detail is appended when the template lacks it.
+          if (message.indexOf('{count}') === -1 && message.indexOf(detail) === -1) message += ' — ' + detail
+          report(message, false)
+        }
+      }
+
+      async function run() {
+        await step('local', 'localFail', function () {
+          localStorage.clear()
+          if (localStorage.length !== 0) throw new Error(String(localStorage.length))
+        })
+
+        await step('session', 'sessionFail', function () {
+          sessionStorage.clear()
+          if (sessionStorage.length !== 0) throw new Error(String(sessionStorage.length))
+        })
+
+        await step('workers', 'workersFail', async function () {
+          if (!('serviceWorker' in navigator)) return 'workersSkip'
+          var registrations = await navigator.serviceWorker.getRegistrations()
+          await Promise.all(registrations.map(function (registration) { return registration.unregister() }))
+          var remaining = await navigator.serviceWorker.getRegistrations()
+          if (remaining.length !== 0) throw new Error(String(remaining.length))
+        })
+
+        await step('caches', 'cachesFail', async function () {
+          if (typeof caches === 'undefined') return 'cachesSkip'
+          var names = await caches.keys()
+          await Promise.all(names.map(function (name) { return caches.delete(name) }))
+          var remaining = await caches.keys()
+          if (remaining.length !== 0) throw new Error(String(remaining.length))
+        })
+
+        // A worker that is already controlling this client keeps serving from its
+        // own memory until the client goes away, so the reload the page offers is
+        // what actually puts the cleared state into effect.
+        status.textContent = failures === 0 ? t('done') : t('problems', { count: failures })
+        status.className = failures === 0 ? 'ok' : 'failed'
+      }
+
+      run()
+    })()
+  </script>
+</body>
+</html>

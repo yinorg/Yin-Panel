@@ -77,6 +77,16 @@ async function restoreYin() {
           {{ t('themeRecovery.home') }}
         </NButton>
       </div>
+      <p class="theme-recovery__footnote">
+        {{ t('themeRecovery.clearHint') }}
+        <!--
+          A plain link, not a button: the clear page is a static document served by
+          path, and the worker's navigation fallback is denied for that path so it
+          is fetched from the network. It is the way out when the panel itself will
+          not load, which is why it cannot depend on this bundle.
+        -->
+        <a href="/clear.html" data-testid="theme-recovery-clear" rel="noreferrer">{{ t('themeRecovery.clear') }}</a>
+      </p>
     </section>
   </main>
 </template>
@@ -127,6 +137,18 @@ h1 {
   flex-wrap: wrap;
   gap: 10px;
   margin-top: 24px;
+}
+
+.theme-recovery__footnote {
+  margin: 20px 0 0;
+  color: var(--yin-textMuted, #5b6673);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.theme-recovery__footnote a {
+  color: var(--yin-primary, #2675d8);
+  text-decoration: underline;
 }
 
 @media (max-width: 480px) {

@@ -84,6 +84,17 @@ func InitRouters(addr string) error {
 	registerExtensionRoutes(routerGroup, extension.Modules())
 	system.NewFileRouter().InitPublicRouter(rootRouter)
 
+	registerStaticRoutes(rootRouter)
+
+	zaplog.Logger.Info("Yin-Panel is Started.  Listening and serving HTTP on ", addr)
+	return router.Run(addr)
+}
+
+// registerStaticRoutes wires the built web files onto the root router. It is
+// separate from InitRouters so a test can inspect the routing decisions without
+// starting a listener, which would collide with a running instance.
+func registerStaticRoutes(rootRouter *gin.RouterGroup) {
+	router := rootRouter
 	// WEB文件服务
 	if config.AppConfig.Base.EnableStaticServer {
 		webPath := "./web"
@@ -99,6 +110,12 @@ func InitRouters(addr string) error {
 		noCacheGroup.StaticFile("/registerSW.js", webPath+"/registerSW.js")
 		noCacheGroup.StaticFile("/sw.js", webPath+"/sw.js")
 		noCacheGroup.StaticFile("/manifest.webmanifest", webPath+"/manifest.webmanifest")
+		// `/clear.html` is a standalone document, not an SPA route. It must be
+		// served as a file: its whole purpose is to work when the application does
+		// not, so it carries its own script and loads no bundle. Without this route
+		// it would fall through to `/:publicId` below and be answered with the SPA
+		// entry document, silently losing the page exactly when it is needed.
+		noCacheGroup.StaticFile("/clear.html", webPath+"/clear.html")
 
 		// 处理根目录下的特定文件
 		noCacheGroup.StaticFile("/", webPath+"/index.html")
@@ -126,7 +143,4 @@ func InitRouters(addr string) error {
 	} else {
 		zaplog.Logger.Info("Static file server is disabled")
 	}
-
-	zaplog.Logger.Info("Yin-Panel is Started.  Listening and serving HTTP on ", addr)
-	return router.Run(addr)
 }

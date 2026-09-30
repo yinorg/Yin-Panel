@@ -484,8 +484,11 @@ test.describe('Functional Regression: Fallback home view (safe mode)', () => {
     await expect(page.locator('[data-testid="home-fallback-group"]').first()).toContainText('Development')
     // It must say why it is showing instead of the theme.
     await expect(page.locator('[data-testid="home-fallback-notice"]')).toBeVisible()
-    // And offer the way out.
-    await expect(page.locator('[data-testid="home-fallback-recovery"]')).toHaveAttribute('href', '/theme-recovery.html')
+    // And offer the way out — the in-app route, not a static page: the fallback is
+    // a Vue component, so the router is already running and has the full recovery
+    // surface. The static page it used to point at was a subset of this route and
+    // was answered by the worker's navigation fallback anyway.
+    await expect(page.locator('[data-testid="home-fallback-recovery"]')).toHaveAttribute('href', '/__yin/theme-recovery')
     // Exactly one full view is mounted.
     await expect(page.locator('[data-testid="theme-home-frame"]')).toHaveCount(0)
     await expect(page.locator('.home-scroll-container')).toHaveCount(0)

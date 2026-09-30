@@ -109,7 +109,7 @@ const visibleGroups = computed(() => props.groups.filter(group => (group.items |
         <button type="button" class="fallback-action" data-testid="home-fallback-refresh" @click="emit('refresh')">
           {{ $t('panelHome.fallbackReload') }}
         </button>
-        <a class="fallback-action" href="/theme-recovery.html" data-testid="home-fallback-recovery">{{ $t('themeRecovery.title') }}</a>
+        <a class="fallback-action" href="/__yin/theme-recovery" data-testid="home-fallback-recovery">{{ $t('themeRecovery.title') }}</a>
       </p>
     </div>
   </div>

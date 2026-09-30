@@ -24,7 +24,17 @@ function setupPlugins(env: ImportMetaEnv): PluginOption[] {
         // `clientsClaim` below make the handover immediate, which is the actual
         // fix, and it costs offline nothing.
         navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/api(?:\/|$)/],
+        // `/clear.html` has to reach the network. Its whole job is to get a browser
+        // out of a broken worker or a poisoned cache, so a navigation answered by
+        // the cached app shell — or precached at all — would defeat it. Being
+        // denied here means it needs a connection to open, which is the correct
+        // trade for the one page whose purpose is escaping local state.
+        //
+        // A static page reached by path is still precached by default, which is
+        // why the deny entry is present rather than implied: without it the
+        // worker would answer the navigation with `index.html` and the page would
+        // never run.
+        navigateFallbackDenylist: [/^\/api(?:\/|$)/, /^\/clear\.html$/],
         globPatterns: ['index.html', 'assets/js/index.*.js', 'assets/js/vue-vendor.*.js', 'assets/*.css'],
         skipWaiting: true,
         clientsClaim: true,
