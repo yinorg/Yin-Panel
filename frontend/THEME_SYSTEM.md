@@ -25,7 +25,20 @@ The theme owns all presentation and interaction of the home page: layout, stylin
 
 **Decision rule for future work.** Needs a privilege (token, file, routing) or must exist when no theme is present → Core. Pure presentation and interaction → theme.
 
-**Where the home shell sits.** `views/home/index.vue` is the host: it wires the `core/home/use*` composables (environment, monitor, theme runtime, data, modals, public access, commands) and renders only the Core-owned chrome around the theme frame. The theme renders inside a sandboxed cross-origin frame that the Core cannot measure, so the theme reports its own geometry back through `layout.report` for the monitor band.
+**Where the home shell sits.** `views/home/index.vue` is the host: it wires the `core/home/use*` composables (environment, monitor, theme runtime, data, modals, public access, commands) and renders only the Core-owned chrome around the theme frame. The theme renders inside a frame the Core cannot measure, so the theme reports its own geometry back through `layout.report` for the monitor band.
+
+## Theme Trust Boundary
+
+**The theme frame is same-origin with the panel, and a theme must therefore be treated as fully trusted code.** The frame's `sandbox` (defined in exactly one place, `src/theme/runtime/sandbox.ts`) carries `allow-scripts allow-popups allow-popups-to-escape-sandbox allow-same-origin`. Consequences, which are accepted rather than incidental:
+
+- A theme can read the panel's `localStorage` (including the JWT), its cookies, and its DOM.
+- `allow-scripts` plus `allow-same-origin` together let the frame remove its own `sandbox` attribute.
+- The frame is not an OOPIF, so it shares a renderer process with the panel.
+
+**Why `allow-same-origin` is required.** Without it the frame has an opaque origin and Chrome's site isolation puts it in a separate process (an OOPIF). DevTools device mode synthesises input with `Input.emulateTouchFromMouseEvent` (mouse-to-touch), and that path **does not deliver events into an OOPIF**. The symptom is precise and easy to misread: under device emulation a tap on the theme does nothing at all — the theme never sees a single `pointerdown` — while the same build works perfectly on a real device, which uses the ordinary input pipeline. No amount of listener changes fixes it, because the events never arrive.
+
+**This is acceptable only while every theme is built in.** `yin` and `glass` ship from this repository and the operator trusts the code they deploy. **If third-party themes or a theme marketplace are ever introduced, this token must be re-evaluated first**: an untrusted theme must not be given it. In that case DevTools device emulation can no longer be used to accept or reject a change to theme click handling; **a real device becomes the only valid check**.
+
 
 ## Package and Runtime Boundary
 

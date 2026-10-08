@@ -24,6 +24,7 @@
     "preview": "vite preview",
     "build-only": "vite build",
     "test:perf": "npm run build-only && playwright test",
+    "test:e2e": "playwright test --config playwright.e2e.config.ts",
     "type-check": "vue-tsc --noEmit",
     "lint": "npm run audit:theme-tokens && eslint .",
     "lint:fix": "eslint . --fix",

@@ -380,7 +380,13 @@ test('Core Home snapshot exposes stable DTO IDs and omits internal item URLs', (
   assert.deepEqual(snapshot.groups[0], { id: '20', spaceId: '10', parentId: undefined, title: 'Tools', icon: undefined, itemIds: ['30'], capabilities: [] })
   assert.equal(snapshot.items[0].id, '30')
   assert.deepEqual(snapshot.items[0].capabilities, ['item.open'])
-  assert.equal('url' in snapshot.items[0], false)
+  // 主题要自己开窗，所以快照带解析后的地址。这是当前设计：主题帧有
+  // `allow-popups-to-escape-sandbox`，它开的窗口能拿到目标正常 origin，登录态不丢。
+  // 早先"主题不碰 URL"的前提（窗口继承 opaque origin、书签永远没登录态）已不成立。
+  assert.equal(snapshot.items[0].url, 'https://internal.test')
+  // 未解析的变体仍然不外泄。
+  assert.equal('lanUrl' in snapshot.items[0], false)
+  assert.equal('mobileUrl' in snapshot.items[0], false)
 })
 
 test('Core Home snapshot keeps Item and Group write capabilities independent and read-only by default', () => {
@@ -727,7 +733,8 @@ test('ThemeHost Core bridge routes paginated search requests through the Theme A
   const itemPage = await executeHomeThemeRequest(handlers, { method: 'items.list', groupId: '5', limit: 1 })
   assert.equal(itemPage.total, 2)
   assert.equal(itemPage.items[0].id, '1')
-  assert.equal(itemPage.items[0].url, undefined)
+  // 搜索/列表路径上的 item 同样带地址：主题要在自己的点击里开窗。
+  assert.equal(itemPage.items[0].url, 'https://core-only.example')
   assert.equal(itemPage.nextCursor, '1')
   activeSpaceId = 20
   groupsForSpace = [{ id: 8, parentId: null, title: 'Other Space', items: [] }]

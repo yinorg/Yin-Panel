@@ -330,10 +330,13 @@ test('Theme home DTO uses string IDs and excludes Core-only item URLs', () => {
     activeSpaceId: '12',
     spaces: [{ id: '12', pairedSpaceId: '13', capabilities: ['space.select'] }],
     groups: [{ id: '21', spaceId: '12', itemIds: ['31'] }],
-    items: [{ id: '31', groupId: '21', capabilities: ['item.open'] }],
+    // 主题在自己的点击里开窗，所以 `openMethod` 和解析后的 `url` 都给它。
+    // `allow-popups-to-escape-sandbox` 让它开的窗口拿到目标正常 origin，登录态不丢。
+    items: [{ id: '31', groupId: '21', capabilities: ['item.open'], openMethod: 3, url: 'https://internal.test' }],
   })
-  expect(snapshot.items[0]).not.toHaveProperty('url')
-  expect(snapshot.items[0]).not.toHaveProperty('openMethod')
+  // 未解析的变体仍然不能泄露：主题只该看到 Core 解析后的那一个地址。
+  expect(snapshot.items[0]).not.toHaveProperty('lanUrl')
+  expect(snapshot.items[0]).not.toHaveProperty('mobileUrl')
 })
 
 test('Core Home command adapter resolves IDs from live data and ignores theme-provided URLs', async () => {

@@ -3,6 +3,8 @@ import type { ThemeCollectionStatus, ThemeGroup, ThemeHomePresentation, ThemeHom
 import { toThemeItemIcon } from './iconifyResource.ts'
 // @ts-expect-error Node's strip-types runner requires an explicit source extension.
 import { defaultFooterHtml } from '../../constants/panelFooter.ts'
+// @ts-expect-error Node's strip-types runner requires an explicit source extension.
+import { resolveItemOpenUrl, type OpenableItem } from '../items/openPolicy.ts'
 
 // The pre-theme default brand name. It is treated as "not customised" so the
 // name can follow the active panel side (Yin-Panel / Yang-Panel).
@@ -74,6 +76,12 @@ interface ItemSource {
   description?: string
   icon?: { itemType: number; src?: string; fileName?: string; text?: string; backgroundColor?: string; resolvedSrc?: string } | null
   sort?: number
+  /** 1 = 当前页, 2 = 新窗口, 3 = 面板内窗口。缺省按 1 处理。 */
+  openMethod?: number
+  /** Core 的 item 一定有地址（`OpenableItem.url` 是必填），变体可选。 */
+  url: string
+  lanUrl?: string
+  mobileUrl?: string
 }
 
 export function createThemeHomeSnapshot(input: {
@@ -96,6 +104,20 @@ export function createThemeHomeSnapshot(input: {
   monitorReservedHeight?: number
   presentation?: PresentationSource
   searchConfiguration?: SearchConfigurationSource
+  /**
+   * Resolves an item's open address with the Core's LAN/WAN and mobile policy.
+   * Supplied by the caller so the snapshot and the Core's own open path cannot drift;
+   * without it the two would pick different addresses for the same item.
+   */
+  resolveOpenUrl?: (item: OpenableItem) => string
+  networkMode?: string
+  isMobile?: boolean
+  /**
+   * Turns on the theme's on-screen click trace for this session. Driven by `?yinDiag`
+   * on the panel URL. It has to reach the theme through the snapshot: a sandboxed theme
+   * cannot read the panel's URL by any other route.
+   */
+  showClickTrace?: boolean
   error?: { code: string; message: string }
 }): ThemeHomeSnapshot {
   const spaces: ThemeSpace[] = input.spaces.map(space => ({
@@ -126,6 +148,21 @@ export function createThemeHomeSnapshot(input: {
         description: item.description,
         icon: toThemeItemIcon(item.icon),
         sort: item.sort ?? 0,
+        // 主题在自己的点击同步栈里开窗——只有收到手势的那个框能开，Core 代开在手机上会被拒。
+        //
+        // 因此 URL 必须一起交给主题：先前用"主题开空窗 + Core 按名导航"绕开它，但手机上
+        // 按名导航找不到可复用的窗口，结果什么都没开出来。`allow-popups-to-escape-sandbox`
+        // 让主题开的窗口拿到目标的正常 origin，所以这条间接路径已经不需要了。
+        //
+        // 用 `resolveItemOpenUrl` 而不是 `item.url`：LAN/WAN 和移动端变体必须由同一份
+        // 策略解析，否则主题开出来的地址会和 Core 自己开的那个不一致。
+        //
+        // 这还不是最终关卡：ThemeHost 的 `scopedSnapshot` 会逐字段重建 item，那里也必须
+        // 列上 `url`，否则主题照样拿不到。
+        openMethod: item.openMethod ?? 1,
+        url: input.resolveOpenUrl
+          ? input.resolveOpenUrl(item)
+          : resolveItemOpenUrl(item, { networkMode: input.networkMode || 'wan', isMobile: input.isMobile === true }),
         capabilities: input.activeSpaceCanEdit === true && input.canWrite ? ['item.open', 'item.update', 'item.delete'] : ['item.open'],
       })
     }
@@ -149,6 +186,12 @@ export function createThemeHomeSnapshot(input: {
     ...(capabilities.length ? { capabilities } : {}),
     ...(input.permissions ? { permissions: input.permissions } : {}),
     ...(presentation ? { presentation } : {}),
+    // 只在面板 URL 明确要求时才下发，缺省不出现——主题平时不该为调试留任何后门。
+    // 走快照而不是让主题自己读面板 URL：主题文档是 `about:srcdoc`（无查询串），
+    // `document.referrer` 为空，靠读 URL 从来就不可靠。同源之后 `parent.location`
+    // 读得到，但把调试开关挂在另一个文档的 URL 上本身就是脆的，而快照是主题本来就在用的
+    // 那条通道。
+    ...(input.showClickTrace ? { diagnostics: { showClickTrace: true } } : {}),
   }
 }
 

@@ -237,6 +237,19 @@ function scopedSnapshot(snapshot: ThemeHomeSnapshot): ThemeHomeSnapshot {
       description: item.description === undefined ? undefined : String(item.description),
       icon: toThemeItemIcon(item.icon),
       sort: Number(item.sort) || 0,
+      // 这个映射是主题真正收到内容的唯一关卡：它逐字段重建 item，没列出的字段到不了
+      // 主题。所以 `openMethod` 和 `url` 都必须写在这里——只在上游
+      // （`createThemeHomeSnapshot`、`toThemeItem`）加字段是无效的，主题照样拿不到。
+      //
+      // `url` 是书签地址，主题需要它才能在自己的点击里开窗。
+      //
+      // 别把这条理解成某种边界：主题框现在是**面板同源**的（`sandbox.ts` 里的
+      // `allow-same-origin`，为的是让 DevTools 设备模拟的合成输入能投递进来），所以
+      // 主题本来就能直接读面板的 localStorage、cookie 和 DOM。把地址放进快照，是为了
+      // 让主题不必去戳面板内部状态就能开窗，而不是为了把地址挡在某个隔离之外 ——
+      // 那个隔离已经不存在了。信任前提与代价见 `sandbox.ts`。
+      openMethod: Number(item.openMethod) || 1,
+      url: typeof item.url === 'string' ? item.url : undefined,
       capabilities: item.capabilities.map(capability => String(capability)),
     })) : [],
   }
@@ -304,6 +317,12 @@ onBeforeUnmount(() => {
 defineExpose({ scrollToTop })
 </script>
 
+<!--
+  The theme frame carries no `sandbox` attribute on purpose: `mountThemeSandbox`
+  sets it, and that is the only place the tokens are defined. Binding it here as
+  well looks correct but is dead — the mount overwrites it immediately, which is
+  how a token change here can appear to do nothing. See `sandbox.ts`.
+-->
 <template>
   <div ref="shell" class="theme-runtime-shell">
     <slot />
@@ -318,7 +337,6 @@ defineExpose({ scrollToTop })
       v-else
       ref="frame"
       class="theme-host"
-      sandbox="allow-scripts"
       referrerpolicy="no-referrer"
       :title="title"
       :style="{ height: layoutHeight ? `${layoutHeight}px` : '100%' }"

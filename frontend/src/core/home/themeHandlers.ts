@@ -81,6 +81,13 @@ export function createHomeThemeHandlers(bindings: HomeThemeActionBindings): Them
       icon: toThemeItemIcon(item.icon),
       sort: item.sort ?? 0,
       capabilities: ['item.open'],
+      // 主题在自己的点击同步栈里开窗——只有收到手势的框能开，Core 代开在手机上会被拒。
+      // 因此 `openMethod` 与 `url` 一起交给主题。
+      //
+      // 注意这只是 command 响应这条路径。主题 home 快照走的是 ThemeHost 的
+      // `scopedSnapshot`，它逐字段重建 item——那里也必须列上这两个字段。
+      openMethod: item.openMethod ?? 1,
+      url: item.url || undefined,
     }
   }
 

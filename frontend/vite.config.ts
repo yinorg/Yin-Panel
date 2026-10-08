@@ -60,18 +60,32 @@ function setupPlugins(env: ImportMetaEnv): PluginOption[] {
           //
           // The manifest and grant are keyed by URL, so `CacheFirst` would pin a
           // stale authorization or an outdated package after an upgrade. They are
-          // therefore `StaleWhileRevalidate`: offline falls back to the cached
-          // copy, and online they refresh in the background for next time. The
-          // resource bytes stay `CacheFirst` because their URL carries the
+          // therefore `NetworkFirst`: offline still falls back to the cached copy,
+          // and online they are always the current ones.
+          //
+          // `StaleWhileRevalidate` was tried here and is wrong for these two paths.
+          // It answers from the cache first and refreshes afterwards, so the *first*
+          // page load after a theme upgrade runs the previous revision — and a theme
+          // upgrade is exactly when behaviour changes. The symptom is a fix that is
+          // present on the server and still not in effect, with no error anywhere:
+          // the old theme simply runs. These are two small JSON responses and they
+          // decide which theme boots, so they must not be served stale.
+          //
+          // The resource bytes stay `CacheFirst` because their URL carries the
           // package revision, which makes a hit correct by construction.
           // The matcher is serialized into sw.js and evaluated in the worker, so
           // it has to be self-contained: a reference to a module-level constant
           // would throw a ReferenceError at runtime and silently drop the rule.
           urlPattern: ({ url }) => ['/api/theme/v2/current', '/api/theme/v2/grants/'].some(pattern => url.pathname.startsWith(pattern)),
-          handler: 'StaleWhileRevalidate',
+          handler: 'NetworkFirst',
           options: {
             cacheName: 'yin-panel-theme-metadata',
             cacheableResponse: { statuses: [0, 200] },
+            // Without a timeout `NetworkFirst` waits on the network indefinitely, so a
+            // panel opened offline would hang before it ever reached the cached copy.
+            // Three seconds is long enough for a LAN round trip and short enough that
+            // the C3 fallback still appears promptly.
+            networkTimeoutSeconds: 3,
             expiration: { maxEntries: 8, maxAgeSeconds: 7 * 24 * 60 * 60 },
           },
         }, {

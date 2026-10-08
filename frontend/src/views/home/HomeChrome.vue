@@ -177,7 +177,13 @@ const EditItem = defineAsyncComponent(() => import('./components/EditItem/index.
          floating button group that used to host it is gone. -->
     <AppStarter :visible="dialogs.settingModalShow" @spaces-changed="dialogs.handleSpacesChanged" @update:visible="dialogs.setSettingModalShow" />
 
-    <EditItem :visible="dialogs.editItemInfoShow" :item-info="dialogs.editItemInfoData" :item-group-id="dialogs.currentAddItenIconGroupId" :space-id="home.activeSpace?.id" :mutations="dialogs.homeMutations" />
+    <!--
+      `@update:visible` was missing here, so the modal emitted its close and nobody
+      received it: `props.visible` stayed true and the dialog never went away. Worse,
+      its mask kept intercepting pointer events, so the whole page became unclickable.
+      `dialogs.setEditItemInfoShow` already existed for this; it simply had no caller.
+    -->
+    <EditItem :visible="dialogs.editItemInfoShow" :item-info="dialogs.editItemInfoData" :item-group-id="dialogs.currentAddItenIconGroupId" :space-id="home.activeSpace?.id" :mutations="dialogs.homeMutations" @update:visible="dialogs.setEditItemInfoShow" />
 
     <!-- 弹窗 -->
     <NModal

@@ -774,6 +774,9 @@ select {
   display: none;
 }
 
+/* 书签是 <a> 而不是 <button>：「新窗口」必须能靠浏览器原生导航打开，
+   不能依赖主题的 JS 事件处理器（见 home.mjs 里 createItemNode 的说明）。
+   所以这里要把锚点自身的默认外观清掉，让它和原来的按钮长得一样。 */
 .yin-item {
   display: flex;
   align-items: center;
@@ -789,6 +792,14 @@ select {
   box-shadow: none;
   cursor: pointer;
   text-align: left;
+  font: inherit;
+  text-decoration: none;
+  /* 书签外层是 `overflow: auto` 的滚动容器（iframe 高度=内容高度，比视口高），
+     触摸落在可滚动区域时浏览器会先按「滚动起手」判定，轻微的移动就让本次触摸
+     变成滚动、不再生成 click —— 症状就是「点了完全没反应，连事件都没有」。
+     `manipulation` 关掉双击缩放那条判定，把单击交还给元素。 */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
   transition: transform var(--yin-motion-duration, 180ms) ease, border-color var(--yin-motion-duration, 180ms) ease, box-shadow var(--yin-motion-duration, 180ms) ease;
 }
 
@@ -1107,3 +1118,16 @@ select {
     animation-duration: .01ms !important;
   }
 }
+
+/* 诊断条：只在 URL 带 yinDiag=1 时挂载，正常使用时不存在。
+   它渲染在主题自己的文档里，所以结果直接出现在屏幕上——查问题不需要 DevTools。 */
+.yin-diag {
+  position: fixed; inset: auto 0 0 0; z-index: 2147483000;
+  max-height: 46vh; overflow: auto;
+  padding: 10px 12px; border-top: 3px solid #ff3b30;
+  background: #101014; color: #f5f5f7; box-shadow: 0 -6px 24px rgba(0, 0, 0, .5);
+  font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: pre-wrap; word-break: break-all; text-align: left;
+}
+.yin-diag b { color: #ffd60a; }
+.yin-diag i { color: #ff453a; font-style: normal; }

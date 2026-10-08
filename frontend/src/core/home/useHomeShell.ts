@@ -202,6 +202,10 @@ export function useHomeShell() {
     items,
     canWrite,
     environment: runtimeEnvironment,
+    // The theme opens "new window" bookmarks inside the tap, so the snapshot has to
+    // carry the resolved address. Handing over the Core's own resolver is what keeps
+    // the two from picking different URLs for the same item.
+    getItemOpenUrl,
     getMonitorReservedHeight: () => themeMonitorReservedHeight.value,
     getSearchConfiguration: () => ({
       engines: themeSearchEngineConfiguration.value.engines.map(engine => ({ id: engine.id, title: engine.title, iconSrc: engine.iconSrc, url: engine.url })),

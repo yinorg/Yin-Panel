@@ -7,6 +7,52 @@ const element = (tag, className, text) => {
 
 const textValue = value => typeof value === 'string' ? value : ''
 
+// 诊断开关来自 Core 快照的 `diagnostics.showClickTrace`。
+//
+// 它不能从 URL 读。主题文档是 `srcdoc`，实测三条路都不通：
+//   location.href   = "about:srcdoc"（没有查询串）
+//   document.referrer = ""（空）
+//   parent.location  = SecurityError（沙箱禁止）
+// 所以面板 URL 上的 `?yinDiag=1` 无法到达主题，只能由 Core 在组装快照时告诉它。
+//
+// 它存在的理由：主题跑在一个 opaque 的沙箱 iframe 里，父文档和外部工具都读不到它内部
+// 的状态——从外面 `frame.contentWindow.go()` 是 SecurityError，在顶层 Console 包
+// `window.open` 也看不到框内的调用（那是另一个 window）。于是「点了没反应」这件事
+// 从外面完全不可观测，只能靠猜。把结果直接渲染在主题自己的文档里，它就出现在屏幕上。
+let diagOn = false
+
+// 面板保留全部记录，不覆盖：一次点击会产生多条（事件、手势、开窗结果），
+// 互相覆盖会让真正需要的那条恰好消失——这正是它第一版没给出答案的原因。
+const diag = lines => {
+  if (!diagOn) return
+  let box = document.querySelector('.yin-diag')
+  if (!box) {
+    box = element('pre', 'yin-diag')
+    document.body.append(box)
+  }
+  if (box.textContent) box.textContent = `${box.textContent}\n${'─'.repeat(24)}\n${lines.join('\n')}`
+  else box.textContent = lines.join('\n')
+  box.scrollTop = box.scrollHeight
+}
+
+// 记录一次点击到底发生了什么。每一项都是可直接读的事实，不含推断。
+const diagClick = (label, detail) => {
+  if (!diagOn) return
+  const activation = (() => {
+    try {
+      const ua = navigator.userActivation
+      return `active=${ua.isActive} hasBeenActive=${ua.hasBeenActive}`
+    } catch { return 'userActivation=unavailable' }
+  })()
+  diag([
+    `点击: ${label}`,
+    `时间: ${new Date().toISOString()}`,
+    `视口: ${innerWidth}x${innerHeight}`,
+    `手势(userActivation): ${activation}`,
+    ...detail,
+  ])
+}
+
 export default {
   apiVersion: '1.0.0',
   setup(api) {
@@ -625,44 +671,77 @@ export default {
     }
 
     const createItemNode = item => {
-      const button = element('button', 'yin-item')
-      button.type = 'button'
+      // 「新窗口」用真正的锚点，而不是 button + window.open。
+      //
+      // 锚点是浏览器原生导航，不经过主题的 JS 事件处理器：即使点击处理器因为任何原因
+      // 没有执行，`target="_blank"` 也会照常开出新标签。这是「浏览器自己的打开方式能用、
+      // 脚本打开不行」那类环境下唯一可靠的路径。
+      //
+      // 其余打开方式（当前页、面板内窗口）需要 Core 参与，所以由 JS 接管并
+      // `preventDefault`，不让锚点的默认导航生效。
+      const link = element('a', 'yin-item')
+      link.rel = 'noopener noreferrer'
       const icon = element('span', 'yin-item-icon')
       const copy = element('span', 'yin-item-copy')
       const title = element('strong', 'yin-item-title')
       const description = element('span', 'yin-item-description')
       copy.append(title, description)
-      button.append(icon, copy)
-      button.addEventListener('click', () => run(() => api.commands.execute('item.open', { itemId: button.dataset.itemId })))
-      button._yin = { icon, title, description }
-      button.addEventListener('contextmenu', event => {
-        const item = button._yin.item
-        const group = (snapshot?.groups || []).find(candidate => candidate.itemIds?.map(String).includes(button.dataset.itemId))
+      link.append(icon, copy)
+      link.addEventListener('click', event => {
+        const item = link._yin.item
+        const method = Number(item && item.openMethod) || 1
+        const isNewWindow = method === 2
+        diagClick(isNewWindow ? 'item(新窗口)' : 'item(其他方式)', [
+          `openMethod: ${item && item.openMethod}`,
+          `url: ${item && item.url ? item.url : '(空!)'}`,
+          `href: ${link.getAttribute('href')}`,
+          `target: ${link.getAttribute('target')}`,
+          `event.isTrusted: ${event.isTrusted}`,
+          `event.type: ${event.type}`,
+        ])
+        if (isNewWindow && item.url) {
+          // 交给原生 `target="_blank"`。这里不 `preventDefault`、也不再 `window.open`，
+          // 否则会开两次；而且脚本开窗正是那条在部分环境下不成立的路径。
+          diag(['新窗口交给原生 target=_blank，本处理器不再开窗'])
+          return
+        }
+        event.preventDefault()
+        run(() => api.commands.execute('item.open', { itemId: link.dataset.itemId }))
+      })
+      link._yin = { icon, title, description }
+      link.addEventListener('contextmenu', event => {
+        const item = link._yin.item
+        const group = (snapshot?.groups || []).find(candidate => candidate.itemIds?.map(String).includes(link.dataset.itemId))
         if (item && group) openItemMenu(event, item, group)
       })
-      button.addEventListener('keydown', event => {
+      link.addEventListener('keydown', event => {
         if (event.key !== 'ContextMenu' && !(event.shiftKey && event.key === 'F10')) return
-        const item = button._yin.item
-        const group = (snapshot?.groups || []).find(candidate => candidate.itemIds?.map(String).includes(button.dataset.itemId))
+        const item = link._yin.item
+        const group = (snapshot?.groups || []).find(candidate => candidate.itemIds?.map(String).includes(link.dataset.itemId))
         if (!item || !group) return
         openItemMenu({
           preventDefault: () => event.preventDefault(),
           stopPropagation: () => event.stopPropagation(),
-          clientX: button.getBoundingClientRect().left,
-          clientY: button.getBoundingClientRect().bottom,
+          clientX: link.getBoundingClientRect().left,
+          clientY: link.getBoundingClientRect().bottom,
         }, item, group)
       })
-      return button
+      return link
     }
 
-    const updateItemNode = (button, item, presentation, layout) => {
-      const { icon, title, description } = button._yin
-      button.dataset.itemId = String(item.id)
-      button.dataset.testid = 'theme-home-item'
-      button.setAttribute('aria-label', `Open ${item.title}`)
+    const updateItemNode = (link, item, presentation, layout) => {
+      const { icon, title, description } = link._yin
+      link.dataset.itemId = String(item.id)
+      link.dataset.testid = 'theme-home-item'
+      link.setAttribute('aria-label', `Open ${item.title}`)
+      // 锚点的导航目标。新窗口靠原生 `target="_blank"`；其余方式由 JS 接管并
+      // preventDefault，`href` 只是让锚点保持可聚焦、可右键、可中键。
+      const isNewWindow = Number(item.openMethod) === 2
+      link.href = isNewWindow && item.url ? item.url : '#'
+      link.target = isNewWindow ? '_blank' : '_self'
       title.textContent = item.title || ''
       description.textContent = item.description || ''
-      button._yin.item = item
+      link._yin.item = item
       title.hidden = layout === 'directory' ? false : presentation?.iconTextIconHideTitle === true
       description.hidden = layout === 'directory'
         ? true
@@ -688,15 +767,15 @@ export default {
         icon.append(letters)
       }
       const infoStyle = layout === 'standard' && presentation?.iconStyle === 'info'
-      button.classList.toggle('yin-item--info', infoStyle)
+      link.classList.toggle('yin-item--info', infoStyle)
       // The detailed style paints the whole card with the item colour and keeps
       // the glyph on a transparent tile, matching the pre-theme build.
       if (infoStyle) {
-        if (itemIcon?.backgroundColor) button.style.backgroundColor = itemIcon.backgroundColor
-        else button.style.removeProperty('background-color')
+        if (itemIcon?.backgroundColor) link.style.backgroundColor = itemIcon.backgroundColor
+        else link.style.removeProperty('background-color')
         icon.style.removeProperty('background-color')
       } else {
-        button.style.removeProperty('background-color')
+        link.style.removeProperty('background-color')
         if (itemIcon?.backgroundColor) icon.style.backgroundColor = itemIcon.backgroundColor
       }
     }
@@ -902,13 +981,13 @@ export default {
             if (!item) continue
             const searchable = `${item.title || ''} ${item.description || ''}`.toLocaleLowerCase()
             if (needle && presentation.search?.itemFilterEnabled !== false && !searchable.includes(needle)) continue
-            let button = itemNodes.get(String(item.id))
-            if (!button) {
-              button = createItemNode(item)
-              itemNodes.set(String(item.id), button)
+            let node = itemNodes.get(String(item.id))
+            if (!node) {
+              node = createItemNode(item)
+              itemNodes.set(String(item.id), node)
             }
-            updateItemNode(button, item, presentation, isDirectory ? 'directory' : 'standard')
-            list.append(button)
+            updateItemNode(node, item, presentation, isDirectory ? 'directory' : 'standard')
+            list.append(node)
             visibleItemIds.add(String(item.id))
           }
           for (const child of [...list.children]) {
@@ -953,6 +1032,9 @@ export default {
 
     const update = nextSnapshot => {
       snapshot = nextSnapshot || {}
+      // 诊断开关只能从快照进来：主题文档是 srcdoc，读不到面板 URL 上的查询串，
+      // 也读不到父窗口（SecurityError）。详见文件顶部关于 `diagOn` 的说明。
+      diagOn = Boolean(snapshot.diagnostics && snapshot.diagnostics.showClickTrace)
       const presentation = snapshot.presentation || {}
       root.dataset.layout = presentation.layout === 'directory' ? 'directory' : 'standard'
       page.classList.toggle('yin-page--directory', presentation.layout === 'directory')
@@ -997,11 +1079,38 @@ export default {
           const handleDocumentPointerDown = () => setEngineMenuOpen(false)
           window.addEventListener('resize', handleViewportResize)
           document.addEventListener('pointerdown', handleDocumentPointerDown)
+
+          // 诊断：记录文档级事件与「哪一层在最上层」。用来区分两种失败——
+          // 事件根本没到主题（文档级也没有记录），还是到了但开窗失败。
+          //
+          // 监听器无条件挂上，成本是每次事件多几次字符串拼接；只有开关打开时才会往
+          // 屏幕上写内容。开关可以在运行中切换，所以不能在这里判断一次就定型。
+          const diagSeen = []
+          const onDiagEvent = event => {
+            if (!diagOn) return
+            const target = event.target && event.target.className ? `.${event.target.className}` : ''
+            diagSeen.unshift(`${event.type} (trusted=${event.isTrusted}) → ${event.target && event.target.tagName || '?'}${target}`)
+            diagSeen.length = Math.min(diagSeen.length, 8)
+            const top = (() => {
+              try {
+                const el = document.elementFromPoint(innerWidth / 2, innerHeight / 2)
+                return el ? `${el.tagName}.${el.className}` : 'null'
+              } catch { return 'unavailable' }
+            })()
+            diag([`文档收到的最近事件（新→旧）:`, ...diagSeen, `视口中心最上层元素: ${top}`])
+          }
+          for (const type of ['pointerdown', 'touchstart', 'touchend', 'pointerup', 'click']) {
+            document.addEventListener(type, onDiagEvent, { capture: true })
+          }
+
           return {
             update,
             unmount() {
               window.removeEventListener('resize', handleViewportResize)
               document.removeEventListener('pointerdown', handleDocumentPointerDown)
+              for (const type of ['pointerdown', 'touchstart', 'touchend', 'pointerup', 'click']) {
+                document.removeEventListener(type, onDiagEvent, { capture: true })
+              }
               if (clockTimer) window.clearInterval(clockTimer)
               if (collectionLayoutFrame) cancelAnimationFrame(collectionLayoutFrame)
               root?.replaceChildren()

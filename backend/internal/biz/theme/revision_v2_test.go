@@ -295,7 +295,7 @@ func TestBuiltinPackagesV2AreCompleteDTCGAndRepeatable(t *testing.T) {
 		}
 		wantVersion := "2.3.2"
 		if summary.ID == "org.yin.default" {
-			wantVersion = "2.3.27"
+			wantVersion = "2.3.37"
 		}
 		if pkg.Manifest.Version != wantVersion {
 			t.Errorf("%s builtin version = %q, want %q", summary.ID, pkg.Manifest.Version, wantVersion)
@@ -349,8 +349,10 @@ func TestBuiltinHomeAssetsLoadFromPackagedThemeSources(t *testing.T) {
 func TestBuiltinHomeResourceHashesOnlyChangeForDefaultYin(t *testing.T) {
 	expected := map[string]map[string]string{
 		"org.yin.default": {
-			"views/home.mjs":  "089a6f08812ca50381cfb9ae8b688a50131dfa960e2c6a2129181e280508d635",
-			"styles/home.css": "b0bcd54a3d101da47d4cefacc7da6d940517cb130fcba1bc8b7da41af399a0e7",
+			// 移动端「新窗口」书签：点击处理里用自己的手势直接开窗（URL 来自 Core 快照）。
+			// 改动的是 Yin 主题的点击处理，所以只有它的哈希变。
+			"views/home.mjs": "1e6da36a45912598064fe640a8a5f6eded7c3f2e313faef86970ba662a0b2f76",
+			"styles/home.css": "b12a3e135852d1bb36252a12fd70959d96f65aee1154214f10c4b103382d3a12",
 		},
 		"org.yin.glass": {
 			"views/home.mjs":  "6f380f2079ba8f523ad4ce149b9f9faa7b5f7d11a9053e8a336b0624e0b1a091",
@@ -421,7 +423,7 @@ func TestEnsureBuiltinV2UpgradesOnlyActivationForSelectedBuiltin(t *testing.T) {
 		t.Fatal(err)
 	}
 	latest, err := LatestPackageRevisionV2(db, "org.yin.default")
-	if err != nil || latest.Version != "2.3.27" || activation.ActiveRevisionID != latest.ID {
+	if err != nil || latest.Version != "2.3.37" || activation.ActiveRevisionID != latest.ID {
 		t.Fatalf("selected builtin activation = %+v, latest=%s, err=%v", activation, latest.ID, err)
 	}
 	if latest.ID == old.Revision {

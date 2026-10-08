@@ -742,7 +742,7 @@ func builtinPackagesV2() []*PackageV2 {
 		if palette.id == "org.yin.default" {
 			// Bump whenever a home resource changes; a published version is
 			// immutable, so reusing it would abort startup.
-			version = "2.3.27"
+			version = "2.3.37"
 			requiredPermissions = append(requiredPermissions,
 				PermissionV2{Name: "items.write"},
 				PermissionV2{Name: "groups.write"},

@@ -88,6 +88,36 @@ export interface ThemeItem {
   icon?: ThemeItemIcon
   sort: number
   capabilities: readonly string[]
+  /**
+   * How this item opens, mirroring the Core's open method: 1 = the current page,
+   * 2 = a new window, 3 = the in-app window.
+   *
+   * The theme needs this because a "new window" open has to happen inside the tap:
+   * only the frame that received the click holds the user gesture, and the Core's
+   * own `window.open` runs after the command has crossed a frame and a message
+   * channel, by which time the gesture is gone. Desktop browsers tolerate that and
+   * phones refuse it, which is why this only ever broke on mobile.
+   */
+  openMethod: number
+
+  /**
+   * Where this item points, and the only case in which a theme sees a bookmark
+   * address. It is supplied so the theme can open the window itself, inside the
+   * tap: only the frame that received the click still holds the user gesture, and
+   * the Core's own `window.open` runs too late to be allowed. The gesture-local
+   * open is what makes "new window" work on a phone.
+   *
+   * This is not a boundary. The theme frame is same-origin with the panel (see
+   * `allow-same-origin` in `frontend/src/theme/runtime/sandbox.ts`), so a theme can
+   * already read the panel's `localStorage`, cookies and DOM. The address travels in
+   * the snapshot so the theme does not have to reach into the panel for it — not to
+   * keep it away from the theme.
+   *
+   * The indirect scheme was tried first (theme reserves a blank named window, Core
+   * navigates it afterwards) and does not work on a phone: the Core's by-name
+   * navigation finds no window to reuse, so nothing appears.
+   */
+  url?: string
 }
 
 export type ThemeItemIcon =
@@ -157,6 +187,17 @@ export interface ThemeHomeSnapshot {
   permissions?: readonly string[]
   /** Optional for compatibility with snapshots produced before presentation was added. */
   presentation?: ThemeHomePresentation
+  /**
+   * Diagnostics the Core turns on for a single session. Absent unless requested.
+   *
+   * It arrives through the snapshot so the theme does not depend on the panel's URL
+   * shape. The frame's own document is `about:srcdoc` (no query string) and
+   * `document.referrer` is empty, so reading the panel's URL was never a reliable
+   * route. Now that the frame is same-origin, `parent.location` *is* readable — but
+   * keying a debug switch off another document's URL is fragile, and the snapshot is
+   * the channel the theme already uses for everything else.
+   */
+  diagnostics?: { showClickTrace?: boolean }
 }
 
 export interface ThemeSearchPage {

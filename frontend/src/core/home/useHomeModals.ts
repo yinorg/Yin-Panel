@@ -67,7 +67,10 @@ export function useHomeModals(input: {
         window.location.href = url
         break
       case 2:
-        window.open(url)
+        // item 的「新窗口」由主题在自己的点击里开（见 ThemeItem.openMethod 的说明），
+        // 因为只有收到手势的那个框能开窗。这里处理的是没有主题参与的链接：页脚、
+        // 搜索引擎、以及任何 Core 自己派发的点击——手势仍在 Core 这边，可以直接开。
+        window.open(url, '_blank', 'noopener,noreferrer')
         break
       case 3:
         windowShow.value = true

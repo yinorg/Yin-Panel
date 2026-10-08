@@ -50,6 +50,13 @@ export function useThemeRuntime(input: {
   activeSpace: Ref<Space | null>
   items: Ref<{ id?: number | string, parentId?: number | null, title?: string, icon?: string, sort?: number, items?: readonly Panel.ItemInfo[] }[]>
   canWrite: Ref<boolean>
+  /**
+   * The Core's own open-address resolver, LAN/WAN and mobile variant included. The
+   * theme opens "new window" bookmarks itself inside the tap and therefore needs the
+   * address in the snapshot; reusing this is what stops the two paths from choosing
+   * different URLs for one item.
+   */
+  getItemOpenUrl: (item: Panel.ItemInfo) => string
   // Environment and monitor
   environment: Ref<ThemeRuntimeEnvironment>
   /** Lazy: the monitor band composable is created after this one, and this one's
@@ -149,6 +156,21 @@ export function useThemeRuntime(input: {
   })
 
   const themeCanWriteGroups = computed(() => input.canWrite.value && input.activeSpace.value?.canEdit === true && themeRuntimePackage.value?.manifest.id === 'org.yin.default' && themeRuntimePermissions.value.includes('groups.write'))
+
+  // `?yinDiag` 只在这个标签页里生效，不落盘、不进配置，所以关掉标签页就没了。
+  // 它存在的意义是让「点了到底发生什么」可以直接看见：主题跑在 opaque 沙箱里，
+  // 从外部（父文档、顶层 Console、其他工具）一律读不到它内部发生了什么。
+  //
+  // 必须同步求值，不能放进 `onMounted`：主题快照是这个 composable 内部的 computed，
+  // 它可能早于挂载就被求值一次，那时开关还是 false，首帧快照就不带 diagnostics，
+  // 而主题只在收到 init 那一刻读一次，之后不会再纠正。
+  const themeClickTraceEnabled = (() => {
+    try {
+      return new URL(window.location.href).searchParams.has('yinDiag')
+    } catch {
+      return false
+    }
+  })()
   const themeRuntimeSlots = computed(() => activeThemeSlots.value)
 
   // Iconify identifiers in item icons need resolving to usable sources before the
@@ -195,6 +217,14 @@ export function useThemeRuntime(input: {
     })),
     canWrite: input.canWrite.value && themeRuntimePermissions.value.includes('items.write'),
     canWriteGroups: themeCanWriteGroups.value,
+    // The theme opens "new window" bookmarks itself, inside the tap, so it needs the
+    // same address the Core would open. Reusing the Core's own resolver keeps LAN/WAN
+    // and the mobile variant from drifting between the two.
+    resolveOpenUrl: item => input.getItemOpenUrl(item as unknown as Panel.ItemInfo),
+    // 诊断开关来自面板 URL 的 `?yinDiag`。必须由 Core 读、再经快照送进主题：
+    // 沙箱里的主题读不到面板 URL（`about:srcdoc` 无查询串、referrer 为空、
+    // `parent.location` 抛 SecurityError），快照是唯一通道。
+    showClickTrace: themeClickTraceEnabled,
     permissions: themeRuntimePermissions.value,
     presentation: {
       ...panelState.panelConfig,

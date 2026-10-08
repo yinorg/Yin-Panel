@@ -182,6 +182,11 @@ test.describe('Functional Regression: Theme home (production path)', () => {
     await expect(page.locator('[data-testid="wallpaper-layer"]').first()).toBeVisible()
   })
 
+  // Whether a "new window" bookmark actually opens a window on a phone is an
+  // end-to-end behaviour that depends on the browser's own popup gating, and that
+  // lives in `tests/e2e/` under `playwright.e2e.config.ts`. Asserting it here with a
+  // stubbed `window.open` would only prove the stub behaves, not the browser.
+
   test('Core utility entries are reachable without hovering the action bar', async ({ page }) => {
     // P4a deleted the Core copy of the refresh / back-to-top / LAN-WAN /
     // settings chrome. Those entries are Core chrome again (see

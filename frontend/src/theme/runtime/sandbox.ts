@@ -210,7 +210,39 @@ export interface ThemeSandboxHandle {
 }
 
 export async function mountThemeSandbox(frame: HTMLIFrameElement, options: ThemeSandboxOptions): Promise<ThemeSandboxHandle> {
-  frame.setAttribute('sandbox', 'allow-scripts')
+  // 这一行才是主题框 sandbox 的真正来源：它覆盖 `ThemeHost.vue` 模板里的同名属性。
+  // 改模板而不改这里不会有任何效果。
+  //
+  // `allow-popups` 让主题能在点击的同步栈里开窗。手势只交给收到点击的那个框，命令
+  // 跨过 frame 和 message channel 之后手势就不再属于本次调用，所以开窗只能发生在这里；
+  // 主题开的是一个以 item id 命名的空窗口，Core 随后按同名导航。URL 不经过主题。
+  //
+  // `allow-popups-to-escape-sandbox` 是必需的，不是可选的安全放宽。没有它，主题开的
+  // 那个窗口在导航之后 origin 仍是 `null`，目标网站拿不到 cookie 和 storage——用户的
+  // 书签打开后永远是陌生人，登录态全部失效。
+  //
+  // ---------------------------------------------------------------------------
+  // `allow-same-origin`：这一条改变了主题的信任级别，读之前先读完下面这段。
+  // ---------------------------------------------------------------------------
+  //
+  // 没有它时主题框是 opaque origin，它**收不到**「鼠标转触摸」合成出来的输入事件。
+  // 这不是理论：DevTools 设备模拟正是用 `Input.emulateTouchFromMouseEvent` 把鼠标
+  // 转成触摸的，实测（同一份代码、同一个书签、同一次点击）——
+  //   opaque 框            → 主题收到 `[]`，不弹窗
+  //   + allow-same-origin  → 主题收到 `pointerdown/mousedown/pointerup/click`，弹窗
+  // 真机走的是真实触摸事件，不受影响；只有 DevTools 设备模拟这条合成路径会被吞掉。
+  // 症状是「设备模拟下点了完全没反应、连事件都没有」，而真机正常。
+  //
+  // 代价是真实的，不是理论：加上它之后主题文档的 origin 就是**面板自己的 origin**，
+  // 于是主题能读面板的 localStorage（含 JWT）和 cookie、能读写面板的 DOM，并且
+  // `allow-scripts` + `allow-same-origin` 的组合允许它自行移除这个 sandbox 属性。
+  // 主题从「被隔离」变成「完全受信」。
+  //
+  // 这个代价目前可接受，因为内置主题只有 `yin` 和 `glass`，两者都由本仓库随面板一起
+  // 发布，用户信任的本来就是自己部署的代码。**如果以后引入第三方主题或主题市场，
+  // 这条边界必须重新评估**：那时不能给不受信主题这个令牌，DevTools 设备模拟下的
+  // 点击也就无法作为验收手段，只能以真机为准。
+  frame.setAttribute('sandbox', 'allow-scripts allow-popups allow-popups-to-escape-sandbox allow-same-origin')
   const connected = waitForFrameLoad(frame)
   frame.srcdoc = createThemeSandboxDocument(window.location.origin, bootstrap(createThemeApiClient.toString()))
   await connected
