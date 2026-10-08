@@ -45,6 +45,7 @@ func TestPublicCodeRoutePolicyAllowsOnlyHomeReads(t *testing.T) {
 		{http.MethodPost, "/api/spaces/:spaceId/items/:itemId/delete", false},
 		{http.MethodPost, "/api/spaces/:spaceId/groups", false},
 		{http.MethodPost, "/api/spaces/:spaceId/groups/sort", false},
+		{http.MethodPost, "/api/spaces/:spaceId/layout/arrange", false},
 		{http.MethodPut, "/api/spaces/:spaceId/groups/:groupId", false},
 		{http.MethodPost, "/api/spaces/:spaceId/groups/:groupId/update", false},
 		{http.MethodDelete, "/api/spaces/:spaceId/groups/:groupId", false},

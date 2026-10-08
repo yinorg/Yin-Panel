@@ -61,6 +61,7 @@ func (r *SpaceRouter) InitRouter(router *gin.RouterGroup) {
 	g.POST("/:spaceId/clear", r.ClearSpace)
 	g.POST("/:spaceId/groups", r.CreateGroup)
 	g.POST("/:spaceId/groups/sort", r.SortGroups)
+	g.POST("/:spaceId/layout/arrange", r.ArrangeLayout)
 	g.PUT("/:spaceId/groups/:groupId", r.UpdateGroup)
 	g.POST("/:spaceId/groups/:groupId/update", r.UpdateGroup)
 	g.DELETE("/:spaceId/groups/:groupId", r.DeleteGroup)
@@ -1640,6 +1641,99 @@ func (r *SpaceRouter) SortItems(c *gin.Context) {
 	}
 	response.Success(c)
 }
+// ArrangeLayout applies a whole home layout — item membership, item order and
+// group order — in one transaction. The theme stages a drag in edit mode and
+// saves it through here, so a half-applied layout can never be observed, which
+// the per-group reorder endpoints cannot guarantee once items move across
+// groups.
+func (r *SpaceRouter) ArrangeLayout(c *gin.Context) {
+	if _, public := c.Get("publicSpaceID"); public {
+		response.ErrorNoAccess(c)
+		return
+	}
+	user, ok := base.GetCurrentUserInfo(c)
+	if !ok {
+		response.Error(c, "not logged in")
+		return
+	}
+	id, err := spaceID(c)
+	if err != nil || !canEditSpace(user.ID, id) {
+		response.ErrorNoAccess(c)
+		return
+	}
+	var req struct {
+		Items []struct {
+			ID              uint `json:"id"`
+			ItemIconGroupId uint `json:"itemIconGroupId"`
+			Sort            int  `json:"sort"`
+		} `json:"items"`
+		Groups []struct {
+			ID   uint `json:"id"`
+			Sort int  `json:"sort"`
+		} `json:"groups"`
+	}
+	if c.ShouldBindJSON(&req) != nil || (len(req.Items) == 0 && len(req.Groups) == 0) {
+		response.ErrorParamFomat(c, "invalid layout request")
+		return
+	}
+	seenItems := make(map[uint]struct{}, len(req.Items))
+	for _, item := range req.Items {
+		if item.ID == 0 || item.ItemIconGroupId == 0 {
+			response.ErrorParamFomat(c, "invalid item entry")
+			return
+		}
+		if _, dup := seenItems[item.ID]; dup {
+			response.ErrorParamFomat(c, "duplicate item entry")
+			return
+		}
+		seenItems[item.ID] = struct{}{}
+	}
+	seenGroups := make(map[uint]struct{}, len(req.Groups))
+	for _, group := range req.Groups {
+		if group.ID == 0 {
+			response.ErrorParamFomat(c, "invalid group entry")
+			return
+		}
+		if _, dup := seenGroups[group.ID]; dup {
+			response.ErrorParamFomat(c, "duplicate group entry")
+			return
+		}
+		seenGroups[group.ID] = struct{}{}
+	}
+	err = repository.Db.Transaction(func(tx *gorm.DB) error {
+		for _, item := range req.Items {
+			var existing repository.ItemIcon
+			if err := tx.Where("id = ? AND space_id = ?", item.ID, id).First(&existing).Error; err != nil {
+				return fmt.Errorf("item %d is not in this space", item.ID)
+			}
+			var group repository.ItemIconGroup
+			if err := tx.Where("id = ? AND space_id = ?", item.ItemIconGroupId, id).First(&group).Error; err != nil {
+				return fmt.Errorf("target group %d is not in this space", item.ItemIconGroupId)
+			}
+			if err := tx.Model(&repository.ItemIcon{}).Where("id = ?", item.ID).
+				Updates(map[string]any{"item_icon_group_id": item.ItemIconGroupId, "sort": item.Sort}).Error; err != nil {
+				return err
+			}
+		}
+		for _, group := range req.Groups {
+			var existing repository.ItemIconGroup
+			if err := tx.Where("id = ? AND space_id = ?", group.ID, id).First(&existing).Error; err != nil {
+				return fmt.Errorf("group %d is not in this space", group.ID)
+			}
+			if err := tx.Model(&repository.ItemIconGroup{}).Where("id = ?", group.ID).
+				Update("sort", group.Sort).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		response.ErrorParamFomat(c, err.Error())
+		return
+	}
+	response.Success(c)
+}
+
 func (r *SpaceRouter) CreateSpace(c *gin.Context) {
 	user, ok := base.GetCurrentUserInfo(c)
 	if !ok {
