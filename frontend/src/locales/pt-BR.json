@@ -221,7 +221,7 @@
       "wed": "Mittwoch"
     },
     "searchBox": {
-      "inputPlaceholder": "Suchbegriff eingeben"
+      "inputPlaceholder": "Digite o conteúdo da pesquisa"
     },
     "systemMonitor": {
       "cpuState": "CPU-Status",

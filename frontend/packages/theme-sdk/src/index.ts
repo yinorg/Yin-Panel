@@ -60,6 +60,12 @@ export interface ThemeEnvironment {
   online: boolean
   viewport: { width: number; height: number }
   assets?: Readonly<Record<string, string>>
+  /**
+   * Localized UI strings the Core owns, keyed by a stable identifier. A theme
+   * holds no locale bundle of its own: it reads the key it needs and keeps a
+   * hard-coded fallback, so a Core older than the key still renders correctly.
+   */
+  labels?: Readonly<Record<string, string>>
 }
 
 export interface ThemeSpace {

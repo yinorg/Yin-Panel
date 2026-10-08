@@ -1,4 +1,5 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { t } from '@/locales'
 import type { ThemeEnvironment } from '@/theme/api/v1'
 
 /**
@@ -68,6 +69,12 @@ export function useHomeEnvironment(input: {
     viewport: {
       width: Number(runtimeViewport.value.width),
       height: Number(runtimeViewport.value.height),
+    },
+    // The theme holds no locale bundle, so the Core supplies the labels it
+    // renders. Keys are stable identifiers; the theme keeps its own fallback so
+    // a Core older than a key still renders correctly.
+    labels: {
+      'search.placeholder': t('deskModule.searchBox.inputPlaceholder'),
     },
   }))
 

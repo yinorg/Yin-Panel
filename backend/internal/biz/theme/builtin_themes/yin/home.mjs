@@ -379,7 +379,7 @@ export default {
       searchInput.type = 'text'
       searchInput.autocomplete = 'off'
       searchInput.setAttribute('aria-label', 'Search bookmarks')
-      searchInput.placeholder = 'Enter search content'
+      searchInput.placeholder = api.environment?.get?.()?.labels?.['search.placeholder'] || 'Enter search content'
       searchInput.addEventListener('input', () => {
         query = searchInput.value
         searchClearButton.hidden = query === ''
@@ -613,10 +613,11 @@ export default {
         else
           option.textContent = engine.title.slice(0, 1)
         option.addEventListener('click', () => {
+          // Temporary switch only. Picking an engine must not launch a search on
+          // its own; the next Enter or the submit button uses the new engine.
           selectedEngineId = engine.id
           setEngineMenuOpen(false)
           updateEngineIndicator()
-          submitSearch()
         })
         engineMenu.append(option)
       }
@@ -1076,7 +1077,13 @@ export default {
           // The Core monitor layer is positioned with viewport units, so the
           // reservation has to be recomputed whenever the viewport changes.
           const handleViewportResize = () => { positionCollectionAfterMonitor(); reportLayout() }
-          const handleDocumentPointerDown = () => setEngineMenuOpen(false)
+          const handleDocumentPointerDown = (event) => {
+            // Fired on pointerdown, before a picker option's click. Closing while
+            // the pointer is on the button or the popup hid the option before it
+            // could be chosen, so switching the engine never took effect.
+            if (engineButton?.contains(event.target) || engineMenu?.contains(event.target)) return
+            setEngineMenuOpen(false)
+          }
           window.addEventListener('resize', handleViewportResize)
           document.addEventListener('pointerdown', handleDocumentPointerDown)
 
