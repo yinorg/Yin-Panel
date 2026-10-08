@@ -64,6 +64,15 @@ Which theme a visitor sees is decided by **one server-side resolution**, never b
 **Failure fallback.** If the resolved theme cannot run (removed or retired, an unavailable mode, consent refused) resolution moves one step down the chain and reports why. **Guest resolution skips trusted-only or consent-requiring themes.**
 
 
+## Governance: Review, Signing, Version Re-Review, Revocation
+
+The install-trust layer is enforced by these mechanisms:
+
+- **Signing and review.** A package is signed by its publisher and reviewed before publication. `ParsePackageArchiveV2` accepts an unsigned package only with an explicit `confirmUnverified`; the admin UI shows a verified/unverified badge and prompts before installing an unsigned one, so the operator always knows what they are trusting.
+- **Version re-review.** Trust is granted per revision, not per package: a new revision needs its own grant, and enabling the trusted runtime is a separate administrator decision per revision. A theme cannot gain behaviour by shipping an update.
+- **Revocation.** Removing a package marks it removed, reverts activations to the built-in default, and resolution skips any space or per-user preference that points at it, so a revoked theme falls back instead of staying pinned.
+- **Audit.** Install, select, remove, and trusted-policy changes are recorded.
+
 ## Package and Runtime Boundary
 
 Theme packages contain a manifest, DTCG 2025.10 token documents, declared CSS/JS entrypoints, optional component/view contributions, and static resources. JavaScript runs through the Theme API permission boundary; components and views mount through stable slots rather than relying on Core DOM selectors. Wallpaper metadata remains a constrained manifest resource reference; wallpaper image bytes and fonts remain static assets.

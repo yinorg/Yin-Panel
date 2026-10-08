@@ -95,6 +95,15 @@ func TestResolveThemeV2FollowsPrecedenceChain(t *testing.T) {
 	if got := resolve(0, 5); got.Source != "space" {
 		t.Fatalf("guest resolution = %s, want space", got.Source)
 	}
+
+	// Removing a package makes the space preference fall back to the system
+	// default instead of pinning a theme that is no longer offered.
+	if err := RemovePackageV2(db, 1, "space.example"); err != nil {
+		t.Fatal(err)
+	}
+	if got := resolve(0, 5); got.Source != "system" {
+		t.Fatalf("removed space theme did not fall back: got %s", got.Source)
+	}
 }
 
 func resolverFixtureV2(id, version string) *PackageV2 {

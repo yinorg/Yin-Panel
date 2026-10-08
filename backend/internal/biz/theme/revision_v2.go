@@ -506,6 +506,15 @@ func presentRevisionV2(db *gorm.DB, revisionID string) (RevisionRecordV2, bool, 
 	if err != nil {
 		return RevisionRecordV2{}, false, err
 	}
+	// A removed package must not keep serving: the revision row survives removal,
+	// so the space/override preference has to fall through instead of pinning it.
+	var packageRecord PackageRecordV2
+	if err := db.First(&packageRecord, "id = ? AND removed = ?", revision.PackageID, false).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return RevisionRecordV2{}, false, nil
+		}
+		return RevisionRecordV2{}, false, err
+	}
 	return revision, true, nil
 }
 
