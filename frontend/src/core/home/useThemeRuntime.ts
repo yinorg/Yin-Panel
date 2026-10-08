@@ -77,6 +77,18 @@ export function useThemeRuntime(input: {
   const themeRuntimePackage = computed(() => activeThemePackage.value)
   const trustedRouteRevision = computed(() => route.name === 'trustedThemeHome' ? String(route.params.revision || '') : '')
   const themeExecutionMode = computed<'sandbox' | 'trusted'>(() => trustedRouteRevision.value ? 'trusted' : 'sandbox')
+  /** First-party themes ship with the panel, so they mount same-origin by default
+   *  instead of in the legacy iframe. This is the "theme = trusted app" boundary:
+   *  the built-in is trusted by construction, and the sandbox was never a real
+   *  isolation for it anyway. Third-party themes stay on `sandbox` until trusted. */
+  const isBuiltinTheme = computed(() => {
+    const id = themeRuntimePackage.value?.manifest.id
+    return id === 'org.yin.default' || id === 'org.yin.glass'
+  })
+  /** Mount strategy, deliberately separate from the permission `executionMode`:
+   *  a built-in theme keeps the (already granted) sandbox capability flow but is
+   *  rendered same-origin in a shadow root; the `trusted` route forces direct. */
+  const themeMountMode = computed<'sandbox' | 'direct'>(() => themeExecutionMode.value === 'trusted' || isBuiltinTheme.value ? 'direct' : 'sandbox')
   const themeHomeContribution = computed(() => {
     const manifest = themeRuntimePackage.value?.manifest
     return !!manifest?.entrypoints?.script && !!manifest.contributes?.views?.includes('home') && !!manifest.runtime?.supportedModes?.includes(themeExecutionMode.value)
@@ -402,6 +414,7 @@ export function useThemeRuntime(input: {
     themeRuntimePackage,
     trustedRouteRevision,
     themeExecutionMode,
+    themeMountMode,
     themeHomeContribution,
     themeRequiredPermissions,
     themeGrantMatches,

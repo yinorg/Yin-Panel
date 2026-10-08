@@ -16,6 +16,13 @@ export interface ThemeDirectOptions {
   execute: (request: unknown) => Promise<unknown>
   onError: (error: Error) => void
   contributions?: { views?: readonly string[]; regions?: readonly string[]; components?: readonly string[] }
+  /**
+   * `true` for the fullscreen trusted-route takeover: the host becomes its own
+   * fixed scroll container. `false` (the default) keeps the host in normal flow
+   * so the Core's shell owns the page scroll and the monitor layer keeps
+   * scrolling with the theme exactly as it did over the sandbox frame.
+   */
+  takeover?: boolean
 }
 
 export interface ThemeDirectHandle {
@@ -41,7 +48,10 @@ export async function mountThemeDirect(options: ThemeDirectOptions): Promise<The
   const root = document.createElement('div')
   root.id = 'theme-root'
   const baseStyle = document.createElement('style')
-  baseStyle.textContent = ':host{display:block;position:fixed;inset:0;z-index:40;overflow:auto} :host,#theme-root{box-sizing:border-box;min-height:100%;margin:0}*,*::before,*::after{box-sizing:inherit}#theme-root{min-height:100dvh}'
+  const hostBox = options.takeover
+    ? ':host{display:block;position:absolute;inset:0;overflow:auto}'
+    : ':host{display:block;position:relative;min-height:100%;overflow:visible}'
+  baseStyle.textContent = `${hostBox} :host,#theme-root{box-sizing:border-box;min-height:100%;margin:0}*,*::before,*::after{box-sizing:inherit}#theme-root{min-height:100dvh}`
   shadow.replaceChildren(baseStyle, root)
   const tokenStyle = document.createElement('style')
   tokenStyle.textContent = options.tokens.replace(/:root\b/g, ':host')

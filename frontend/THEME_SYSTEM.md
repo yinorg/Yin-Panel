@@ -7,7 +7,7 @@ The home page is rendered by a theme package; the Core supplies what a theme can
 | # | Core responsibility | Content |
 | --- | --- | --- |
 | C1 | Data channel | Talks to the backend, fetches and mutates data, projects it into the snapshot handed to the theme. A theme never talks HTTP. |
-| C2 | Policy and trust boundary | Holds the JWT, enforces a permission per command, validates arguments before acting. A theme never holds a token. |
+| C2 | Policy and trust boundary | Holds the session token (httpOnly cookie), enforces a permission per command, validates arguments before acting. The backend is the ceiling: a theme can never exceed the acting user's rights. |
 | C3 | Bootstrap and degradation | Startup loading state, the theme consent prompt, and the minimum viable fallback view for when the theme cannot render. |
 | C4 | Application shell | Login, public access codes, theme recovery, settings and admin surfaces — everything that is not the home's own rendering. |
 
@@ -25,19 +25,43 @@ The theme owns all presentation and interaction of the home page: layout, stylin
 
 **Decision rule for future work.** Needs a privilege (token, file, routing) or must exist when no theme is present → Core. Pure presentation and interaction → theme.
 
-**Where the home shell sits.** `views/home/index.vue` is the host: it wires the `core/home/use*` composables (environment, monitor, theme runtime, data, modals, public access, commands) and renders only the Core-owned chrome around the theme frame. The theme renders inside a frame the Core cannot measure, so the theme reports its own geometry back through `layout.report` for the monitor band.
+**Where the home shell sits.** `views/home/index.vue` is the host: it wires the `core/home/use*` composables (environment, monitor, theme runtime, data, modals, public access, commands) and renders only the Core-owned chrome around the theme. A theme mounts same-origin (trusted); where a legacy iframe is used the Core cannot measure inside it, so the theme reports its own geometry back through `layout.report` for the monitor band.
 
-## Theme Trust Boundary
+## Theme Execution, Trust, and the Component Bridge
 
-**The theme frame is same-origin with the panel, and a theme must therefore be treated as fully trusted code.** The frame's `sandbox` (defined in exactly one place, `src/theme/runtime/sandbox.ts`) carries `allow-scripts allow-popups allow-popups-to-escape-sandbox allow-same-origin`. Consequences, which are accepted rather than incidental:
+**Themes are same-origin, trusted applications ("theme = app").** A theme is code the operator explicitly installed and trusts, the way VS Code extensions and WordPress themes are. This is a deliberate trade: it lets a theme render the whole home page and reuse the Core's own components, at the cost of "a theme can act as the user". Consequently the security boundary is three layers, not a sandbox:
 
-- A theme can read the panel's `localStorage` (including the JWT), its cookies, and its DOM.
-- `allow-scripts` plus `allow-same-origin` together let the frame remove its own `sandbox` attribute.
-- The frame is not an OOPIF, so it shares a renderer process with the panel.
+1. **Install trust (front door).** Installing a theme, and every later version, is an explicit act by the user/operator. The marketplace reviews and signs packages and **re-reviews version updates** so a theme cannot silently gain behaviour; revocation is always available.
+2. **Backend ceiling (hard).** The backend authorizes every request against the acting user's rights. A theme can never exceed the user's own permissions, reach another tenant's private data, or affect the server. It cannot escalate privilege; it can only do what the user could do.
+3. **Frontend hardening (damage reduction).** The session token lives in an **httpOnly cookie** so theme code cannot read credentials, and a strict **CSP** (`connect-src`/`img-src 'self'`) blocks exfiltration. These are not a sandbox; together they bound a malicious theme to "acting as the user inside the app".
 
-**Why `allow-same-origin` is required.** Without it the frame has an opaque origin and Chrome's site isolation puts it in a separate process (an OOPIF). DevTools device mode synthesises input with `Input.emulateTouchFromMouseEvent` (mouse-to-touch), and that path **does not deliver events into an OOPIF**. The symptom is precise and easy to misread: under device emulation a tap on the theme does nothing at all — the theme never sees a single `pointerdown` — while the same build works perfectly on a real device, which uses the ordinary input pipeline. No amount of listener changes fixes it, because the events never arrive.
+Two consequences must be stated plainly:
 
-**This is acceptable only while every theme is built in.** `yin` and `glass` ship from this repository and the operator trusts the code they deploy. **If third-party themes or a theme marketplace are ever introduced, this token must be re-evaluated first**: an untrusted theme must not be given it. In that case DevTools device emulation can no longer be used to accept or reject a change to theme click handling; **a real device becomes the only valid check**.
+- Backend enforcement cannot tell "the user clicked delete" from "the theme called delete". Protecting a user from a theme **they installed** is out of scope; protecting the server, other tenants, and credentials is in scope.
+- Third-party themes default to the same trusted treatment (**install = trust**). A package that wants isolation may still be published as an untrusted theme that runs in the legacy frame — that path is kept for that case and is no longer the default.
+
+**Core component bridge.** So themes never re-implement Core UI, the Core registers its home components as **custom elements** (for example `<yin-system-monitor>`, later `<yin-item-editor>`). A theme uses them declaratively and gets the exact Core rendering with zero duplication; the built-in Yin theme consumes the same elements, which is how it stays pixel-identical across releases. Rollout is staged: the monitor element first, other surfaces follow.
+
+## Theme Resolution and Scoping
+
+Which theme a visitor sees is decided by **one server-side resolution**, never by the client. Precedence, highest first:
+
+1. the user's per-space override (reserved; not yet exposed);
+2. the user's own choice (`mode = custom`);
+3. the space's theme (`mode = follow-space`, and any user without a choice);
+4. the system default;
+5. the built-in default (`org.yin.default`).
+
+| Actor | May set |
+| --- | --- |
+| System administrator | the system default; own preference |
+| Space administrator (owner/admin) | that space's theme; own preference |
+| Editor / viewer | own preference |
+| Guest (public link) | nothing — resolves to the space theme, then the system default |
+
+**Empty means inherit.** A space or user with no explicit theme follows the system default dynamically, so changing the default reaches every space that has not overridden it. New accounts default to `follow-space`; existing preferences migrate to `custom`.
+
+**Failure fallback.** If the resolved theme cannot run (removed or retired, an unavailable mode, consent refused) resolution moves one step down the chain and reports why. **Guest resolution skips trusted-only or consent-requiring themes.**
 
 
 ## Package and Runtime Boundary

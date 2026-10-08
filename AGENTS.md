@@ -108,13 +108,25 @@ The home page is rendered by a theme package. The Core supplies only what a them
 | # | Responsibility | Content |
 | --- | --- | --- |
 | C1 | Data channel | Talks to the backend, fetches and mutates data, projects it into the snapshot handed to the theme. **A theme never talks HTTP.** |
-| C2 | Policy and trust boundary | Holds the JWT, enforces a permission per command, validates arguments. **A theme never holds a token.** |
+| C2 | Policy and trust boundary | Holds the session token (moved to an **httpOnly cookie**), enforces a permission per command, validates arguments. **The backend is the ceiling: a theme can never exceed the acting user's rights.** |
 | C3 | Bootstrap and degradation | Startup loading state, theme consent prompt, and the minimum viable fallback view when the theme cannot render. |
 | C4 | Application shell | Login, public access codes, theme recovery, settings and admin surfaces — everything that is not the home's own rendering. |
 
 ### Theme responsibilities
 
 All presentation and interaction of the home page: layout, styling, and which affordances it exposes.
+
+### Theme execution and trust
+
+A theme is a **same-origin, trusted application** ("theme = app"), not sandboxed code: it may render the whole home and reuse Core components. The security boundary is three layers — **install trust** (installing a theme and every version update is an explicit act), the **backend ceiling** (the server authorizes every request against the acting user's rights), and **frontend hardening** (httpOnly token + a strict `connect-src`/`img-src 'self'` CSP). The fake sandbox is not the boundary; the iframe frame path is retained only for explicitly untrusted packages. Full statement in `frontend/THEME_SYSTEM.md`.
+
+### Core component bridge
+
+So themes never re-implement Core UI, the Core registers its home components as **custom elements** (for example `<yin-system-monitor>`); a theme consumes them declaratively and gets the exact Core rendering. The monitor band, item editor, and command centre stay Core-owned and are reached through the bridge or commands.
+
+### Theme resolution and scoping
+
+One **server-side** resolution decides which theme a visitor sees. Precedence: user per-space override (reserved) → user choice (`custom`) → space theme (`follow-space`) → system default → built-in. System admins set the system default, space admins set their space's theme, editors/viewers set only their own preference, and a guest resolves to the space theme then the system default. A resolved theme that cannot run falls back one step down the chain.
 
 ### Data access: typed capability commands
 
@@ -131,7 +143,7 @@ A theme invokes them; the Core renders them: `editor.open` (item editor — priv
 
 ### Where this lives in the code
 
-`frontend/src/views/home/index.vue` is the host: it wires the `frontend/src/core/home/use*` composables (environment, monitor, theme runtime, data, modals, public access, commands) and renders the Core-owned chrome around the theme frame. The theme renders inside a sandboxed, cross-origin frame, so the Core cannot measure inside it; the theme reports its layout back through the `layout.report` command for the monitor band.
+`frontend/src/views/home/index.vue` is the host: it wires the `frontend/src/core/home/use*` composables (environment, monitor, theme runtime, data, modals, public access, commands) and renders the Core-owned chrome around the theme. A theme mounts same-origin (trusted); where a legacy iframe is used the Core still cannot measure inside it, so the theme reports its layout back through the `layout.report` command for the monitor band.
 
 ## Project Facts
 

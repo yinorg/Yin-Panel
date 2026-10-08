@@ -115,6 +115,7 @@ const EditItem = defineAsyncComponent(() => import('./components/EditItem/index.
       :environment="theme.themeRuntimeEnvironment"
       :permissions="theme.themeRuntimePermissions"
       :execution-mode="theme.themeExecutionMode"
+      :mount-mode="theme.themeMountMode"
       :slots="theme.themeRuntimeSlots"
       :title="theme.themeRuntimePackage.manifest.name"
       :execute="theme.executeThemeRequest"

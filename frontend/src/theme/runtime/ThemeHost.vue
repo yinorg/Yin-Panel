@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { ThemeEnvironment, ThemeHomeSnapshot, ThemePermission } from '../api/v1'
 import type { ThemePackage } from '@/utils/theme'
 import { mountThemeSandbox, type ThemeSandboxHandle, type ThemeSandboxStylesheet } from './sandbox'
@@ -14,6 +14,14 @@ const props = defineProps<{
   environment: Omit<ThemeEnvironment, 'apiVersion'>
   permissions: ThemePermission[]
   executionMode?: 'sandbox' | 'trusted'
+  /**
+   * How the package is mounted, independent of the permission `executionMode`.
+   * `direct` mounts it same-origin inside a shadow root of this document (used by
+   * the `trusted` route and by first-party built-in themes); `sandbox` keeps the
+   * legacy frame. Defaults to `direct` for the trusted execution mode so existing
+   * callers that only pass `executionMode` keep working.
+   */
+  mountMode?: 'sandbox' | 'direct'
   slots: Record<string, string>
   title: string
   execute: (request: unknown) => Promise<unknown>
@@ -23,6 +31,20 @@ const emit = defineEmits<{
   failed: [error: Error]
   ready: []
 }>()
+
+const mountMode = computed<'sandbox' | 'direct'>(() => props.mountMode ?? ((props.executionMode || 'sandbox') === 'trusted' ? 'direct' : 'sandbox'))
+/** First-party themes ship with the panel. Their implicit permissions resolve
+ *  over the API, so on the very first tick the grant may not be in hand yet; the
+ *  host remounts when it arrives (the permission list is part of the key), so a
+ *  direct-mount built-in must tolerate that gap instead of failing closed. */
+const isBuiltinPackage = computed(() => props.theme.manifest.id === 'org.yin.default' || props.theme.manifest.id === 'org.yin.glass')
+/**
+ * The explicit trusted-route takeover is the fullscreen, frame-replacing mount
+ * with its own exit toolbar. A built-in theme mounting directly on the normal
+ * home is same-origin too but stays inside the shell, so the Core's monitor layer
+ * keeps painting above it exactly as it did over the frame.
+ */
+const trustedTakeover = computed(() => (props.executionMode || 'sandbox') === 'trusted')
 
 const frame = ref<HTMLIFrameElement>()
 const shell = ref<HTMLElement>()
@@ -84,16 +106,16 @@ async function start() {
       throw new Error(`Theme package does not declare a ${props.executionMode || 'sandbox'} home view`)
     const requiredPermissions = manifest.permissions?.required?.map(item => item.name as ThemePermission) || []
     const missingPermissions = requiredPermissions.filter(permission => !props.permissions.includes(permission))
-    // A trusted theme runs in this document's own origin, so a missing grant is
-    // fatal: there is no isolation to fall back on and the code would run with
-    // full page privileges while silently failing every capability.
+    // A theme mounted directly runs in this document's own origin, so a missing
+    // grant is fatal: there is no isolation to fall back on and the code would run
+    // with full page privileges while silently failing every capability.
     // The sandbox is the opposite case. It is a cross-origin frame with no
     // token and no access to this document, and the dispatcher still rejects
     // every command whose permission was not granted — so a missing grant costs
     // the theme capabilities, not safety. Refusing to start would leave the
     // visitor on a public link looking at the Core home instead, and the theme
     // already hides write affordances based on the snapshot's capabilities.
-    if (missingPermissions.length && (props.executionMode || 'sandbox') !== 'sandbox')
+    if (missingPermissions.length && mountMode.value === 'direct' && !isBuiltinPackage.value)
       throw new Error(`Theme API permissions have not been granted: ${missingPermissions.join(', ')}`)
 
     const script = await loadTextResource(props.theme, scriptPath, 'text/javascript')
@@ -114,13 +136,13 @@ async function start() {
     for (const stylePath of manifest.entrypoints?.styles || []) {
       const resource = findResource(props.theme, stylePath, 'text/css')
       const source = await loadTextResource(props.theme, stylePath, 'text/css')
-      styles.push({ text: await rewriteThemeStylesheet(source, resource.url!, manifest.resources || [], assets, window.location.origin, (props.executionMode || 'sandbox') === 'trusted') })
+      styles.push({ text: await rewriteThemeStylesheet(source, resource.url!, manifest.resources || [], assets, window.location.origin, mountMode.value === 'direct') })
     }
     const initialSnapshot = scopedSnapshot(props.snapshot)
     runtimeSnapshot = initialSnapshot
     const initialEnvironment = { ...props.environment, assets }
     const tokens = `:root{${Object.entries(props.slots).filter(([name]) => /^[a-z0-9-]+$/.test(name)).map(([name, value]) => `--yin-${name}:${value}`).join(';')}}`
-    const nextRuntime = (props.executionMode || 'sandbox') === 'trusted'
+    const nextRuntime = mountMode.value === 'direct'
       ? await mountThemeDirect({
           host: trustedHost.value!,
           script,
@@ -132,6 +154,7 @@ async function start() {
           execute: props.execute,
           onError: error => emit('failed', error),
           contributions: manifest.contributes,
+          takeover: trustedTakeover.value,
         })
       : await mountThemeSandbox(frame.value!, {
           script,
@@ -190,7 +213,7 @@ function publishSnapshot(next: ThemeHomeSnapshot) {
 }
 
 function scrollToTop() {
-  if ((props.executionMode || 'sandbox') === 'trusted') {
+  if (mountMode.value === 'direct' && trustedTakeover.value) {
     runtime?.scrollToTop()
     return
   }
@@ -326,9 +349,9 @@ defineExpose({ scrollToTop })
 <template>
   <div ref="shell" class="theme-runtime-shell">
     <slot />
-    <template v-if="(executionMode || 'sandbox') === 'trusted'">
-      <div ref="trustedHost" class="theme-host theme-host--trusted" :aria-label="title" data-testid="theme-trusted-host" />
-      <div class="theme-trusted-toolbar" data-testid="theme-trusted-toolbar">
+    <template v-if="mountMode === 'direct'">
+      <div ref="trustedHost" class="theme-host theme-host--direct" :class="{ 'theme-host--takeover': trustedTakeover }" :aria-label="title" data-testid="theme-trusted-host" />
+      <div v-if="trustedTakeover" class="theme-trusted-toolbar" data-testid="theme-trusted-toolbar">
         <span>{{ title }}</span>
         <button type="button" @click="leaveTrustedRuntime">{{ $t('themeTrustedRuntime.trustedExit') }}</button>
       </div>
@@ -347,7 +370,8 @@ defineExpose({ scrollToTop })
 
 <style scoped>
 .theme-runtime-shell { position: absolute; z-index: 1; inset: 0; overflow: auto; overscroll-behavior: contain; background: transparent; pointer-events: auto; }
-.theme-host--trusted { position: fixed; inset: 0; z-index: 40; }
+.theme-host--direct { position: relative; display: block; width: 100%; height: auto; min-height: 100%; }
+.theme-host--takeover { position: fixed; inset: 0; z-index: 40; min-height: 100%; }
 .theme-trusted-toolbar { position: fixed; z-index: 50; top: 8px; right: 8px; display: flex; align-items: center; gap: var(--yin-spaceSm); max-width: calc(100vw - 16px); padding: var(--yin-spaceXs) var(--yin-spaceSm); border: var(--yin-borderWidth) solid var(--yin-border); border-radius: var(--yin-component-button-radius); background: var(--yin-surfaceElevated); color: var(--yin-text); font: var(--yin-fontBodyWeight) var(--yin-fontSmallSize)/var(--yin-lineHeightBody) var(--yin-fontBody); box-shadow: var(--yin-shadowPopup); }
 .theme-trusted-toolbar span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .theme-trusted-toolbar button { min-height: 44px; padding: 0 var(--yin-spaceSm); border: 0; border-radius: var(--yin-component-button-radius); background: var(--yin-danger); color: var(--yin-onPrimary); font: inherit; cursor: pointer; }

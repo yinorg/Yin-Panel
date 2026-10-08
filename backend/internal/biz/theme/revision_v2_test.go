@@ -295,7 +295,7 @@ func TestBuiltinPackagesV2AreCompleteDTCGAndRepeatable(t *testing.T) {
 		}
 		wantVersion := "2.3.2"
 		if summary.ID == "org.yin.default" {
-			wantVersion = "2.3.48"
+			wantVersion = "2.3.57"
 		}
 		if pkg.Manifest.Version != wantVersion {
 			t.Errorf("%s builtin version = %q, want %q", summary.ID, pkg.Manifest.Version, wantVersion)
@@ -349,9 +349,9 @@ func TestBuiltinHomeAssetsLoadFromPackagedThemeSources(t *testing.T) {
 func TestBuiltinHomeResourceHashesOnlyChangeForDefaultYin(t *testing.T) {
 	expected := map[string]map[string]string{
 		"org.yin.default": {
-			// 移动端「新窗口」书签：点击处理里用自己的手势直接开窗（URL 来自 Core 快照）。
-			// 改动的是 Yin 主题的点击处理，所以只有它的哈希变。
-			"views/home.mjs": "9295bb9e0582fddeabdf799579456d7c6d9c2fd7db107407f0ce198ea01f5d4a",
+			// 手机宽度下第一个书签分组的上间距与桌面统一，去掉视口比例额外间距。
+			// 改动的是 Yin 主题的分组定位，所以只有它的哈希变。
+			"views/home.mjs": "86092315567d95c9af30e7a5bdc4d9cd878acb2aaaba156378e11f27485bd6fd",
 			"styles/home.css": "3c01b2aed105b337042ab9257ad3b29220220aae2dca2d732730c99317b966c4",
 		},
 		"org.yin.glass": {
@@ -423,7 +423,7 @@ func TestEnsureBuiltinV2UpgradesOnlyActivationForSelectedBuiltin(t *testing.T) {
 		t.Fatal(err)
 	}
 	latest, err := LatestPackageRevisionV2(db, "org.yin.default")
-	if err != nil || latest.Version != "2.3.48" || activation.ActiveRevisionID != latest.ID {
+	if err != nil || latest.Version != "2.3.57" || activation.ActiveRevisionID != latest.ID {
 		t.Fatalf("selected builtin activation = %+v, latest=%s, err=%v", activation, latest.ID, err)
 	}
 	if latest.ID == old.Revision {

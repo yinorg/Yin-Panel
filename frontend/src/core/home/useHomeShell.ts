@@ -172,6 +172,7 @@ export function useHomeShell() {
   const {
     themeRuntimePackage,
     themeExecutionMode,
+    themeMountMode,
     themeRequiredPermissions,
     themeRuntimeActive,
     themeRuntimeNeedsConsent,
@@ -367,6 +368,7 @@ export function useHomeShell() {
     themeRuntimeActive,
     themeRuntimePackage,
     themeExecutionMode,
+    themeMountMode,
     themeRuntimeGrant,
     themeRuntimeSnapshot,
     themeRuntimeEnvironment,

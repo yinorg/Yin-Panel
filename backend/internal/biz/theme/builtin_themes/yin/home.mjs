@@ -924,10 +924,11 @@ export default {
         if (!Number.isFinite(reservedHeight) || reservedHeight <= 0) return
         const isDirectory = snapshot?.presentation?.layout === 'directory'
         const naturalMargin = isDirectory ? 18 : 24
-        const mobileStandardGap = !isDirectory && window.matchMedia('(max-width: 640px)').matches
-          ? Math.round(viewportHeight() * 0.187) + 30
-          : 77
-        const desiredTop = reservedHeight + mobileStandardGap
+        // Unified with the desktop spacing. The monitor band already reserves its
+        // own height, so the old mobile-only viewport-proportional extra only
+        // pushed the first group needlessly far below it.
+        const standardGap = 77
+        const desiredTop = reservedHeight + standardGap
         // The directory folder picker sits between the search box and the
         // collection, so it is the element that lands inside the monitor band.
         // Push the picker below the band and keep the collection at its natural
