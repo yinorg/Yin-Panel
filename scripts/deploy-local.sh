@@ -121,11 +121,18 @@ privileged cp -a "$build_dir/yin-panel" "$run_dir/yin-panel"
 privileged cp -a "$build_dir/web" "$run_dir/web"
 
 printf 'Starting Yin-Panel from %s...\n' "$run_dir"
+# Start the daemon detached from this shell's stdio. The redirections belong on
+# the subshell invocation: if they sit on the inner command, the wrapper
+# subshell keeps this script's stdout/stderr open and can outlive it, so any
+# caller that pipes the output (for example `... | tail`) blocks forever waiting
+# for EOF, and an orphaned wrapper is left behind. `exec` replaces the wrapper
+# with the daemon, so nothing lingers.
 if command -v setsid >/dev/null 2>&1; then
-    (cd "$run_dir" && setsid ./yin-panel > yin-panel.log 2>&1 < /dev/null &)
+    (cd "$run_dir" && exec setsid ./yin-panel) > "$run_dir/yin-panel.log" 2>&1 < /dev/null &
 else
-    (cd "$run_dir" && nohup ./yin-panel > yin-panel.log 2>&1 < /dev/null &)
+    (cd "$run_dir" && exec nohup ./yin-panel) > "$run_dir/yin-panel.log" 2>&1 < /dev/null &
 fi
+disown 2>/dev/null || true
 
 for _ in $(seq 1 100); do
     if [[ -n "$(listening_pid "$port")" ]]; then
