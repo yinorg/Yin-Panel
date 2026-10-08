@@ -63,6 +63,10 @@
    box instead of the old viewport-height guess, which sat on top of it. */
 .theme-runtime-monitor-layer--yin { top: var(--yin-theme-monitor-top, calc(var(--yin-theme-content-top, 10vh) + 187px)); right: auto; left: 50%; width: min(calc(var(--yin-contentMaxWidth, 1200px) - 30px), calc(100vw - 30px)); max-width: none; max-height: 286px; padding-top: 26px; box-sizing: border-box; transform: translateX(-50%); --yin-text: #fff; --yin-textMuted: rgb(255 255 255 / 82%); --yin-primary: #fff; --yin-border: transparent; --yin-component-app-icon-surface: rgb(42 42 42 / 42%); --yin-component-system-monitor-heading-size: 18px; }
 .theme-runtime-monitor-layer--yin .n-progress-graph-circle-rail { stroke: rgb(255 255 255 / 36%) !important; }
+/* This layer forces --yin-border transparent, and the detail (line) progress
+   borrows it for its rail, so the 100% track vanished and the filled length was
+   unreadable. Give the line rail the same visible treatment as the ring. */
+.theme-runtime-monitor-layer--yin .n-progress-graph-line-rail { background-color: rgb(255 255 255 / 24%) !important; }
 @media (max-width: 640px) {
   .theme-runtime-monitor-layer--yin:not(.theme-runtime-monitor-layer--directory) { top: 169.5px; }
 }
