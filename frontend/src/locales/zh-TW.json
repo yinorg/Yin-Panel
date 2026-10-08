@@ -236,7 +236,28 @@
   "form": {
     "required": "必填項"
   },
+  "themeHome": {
+    "commands": "指令",
+    "addGroup": "新增分組",
+    "addItem": "新增項目",
+    "editGroup": "編輯分組",
+    "deleteGroup": "刪除分組",
+    "moveGroupUp": "分組上移",
+    "moveGroupDown": "分組下移",
+    "style": "風格",
+    "saveGroup": "儲存分組",
+    "createGroup": "建立分組",
+    "groupName": "分組名稱",
+    "groupIcon": "圖示識別碼（選填）",
+    "groupNameRequired": "請輸入分組名稱。",
+    "loadingItems": "正在載入項目…",
+    "loadItemsFailed": "無法載入項目",
+    "noMatchingItems": "沒有符合的項目",
+    "noItems": "此空間尚無項目"
+  },
   "iconItem": {
+    "moveUp": "上移",
+    "moveDown": "下移",
     "add": "添加項目",
     "currentPageLayerOpen": "當前頁面彈窗打開",
     "currentPageOpen": "當前頁面打開",

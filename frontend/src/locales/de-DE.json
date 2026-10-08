@@ -236,7 +236,28 @@
   "form": {
     "required": "Pflichtfeld"
   },
+  "themeHome": {
+    "commands": "Befehle",
+    "addGroup": "Gruppe hinzufügen",
+    "addItem": "Eintrag hinzufügen",
+    "editGroup": "Gruppe bearbeiten",
+    "deleteGroup": "Gruppe löschen",
+    "moveGroupUp": "Gruppe nach oben",
+    "moveGroupDown": "Gruppe nach unten",
+    "style": "Stil",
+    "saveGroup": "Gruppe speichern",
+    "createGroup": "Gruppe erstellen",
+    "groupName": "Gruppenname",
+    "groupIcon": "Symbolkennung (optional)",
+    "groupNameRequired": "Bitte einen Gruppennamen eingeben.",
+    "loadingItems": "Einträge werden geladen…",
+    "loadItemsFailed": "Einträge konnten nicht geladen werden",
+    "noMatchingItems": "Keine passenden Einträge",
+    "noItems": "Keine Einträge in diesem Bereich"
+  },
   "iconItem": {
+    "moveUp": "Nach oben",
+    "moveDown": "Nach unten",
     "add": "Eintrag hinzufügen",
     "currentPageLayerOpen": "Open in current page as layer",
     "currentPageOpen": "Open in current page",

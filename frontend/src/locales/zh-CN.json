@@ -236,7 +236,28 @@
   "form": {
     "required": "必填项"
   },
+  "themeHome": {
+    "commands": "命令",
+    "addGroup": "新增分组",
+    "addItem": "添加项目",
+    "editGroup": "编辑分组",
+    "deleteGroup": "删除分组",
+    "moveGroupUp": "分组上移",
+    "moveGroupDown": "分组下移",
+    "style": "风格",
+    "saveGroup": "保存分组",
+    "createGroup": "创建分组",
+    "groupName": "分组名称",
+    "groupIcon": "图标标识（可选）",
+    "groupNameRequired": "请输入分组名称。",
+    "loadingItems": "正在加载项目…",
+    "loadItemsFailed": "无法加载项目",
+    "noMatchingItems": "没有匹配的项目",
+    "noItems": "该空间暂无项目"
+  },
   "iconItem": {
+    "moveUp": "上移",
+    "moveDown": "下移",
     "add": "添加项目",
     "currentPageLayerOpen": "当前页面弹窗打开",
     "currentPageOpen": "当前页面打开",

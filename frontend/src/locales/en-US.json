@@ -236,7 +236,28 @@
   "form": {
     "required": "Required field"
   },
+  "themeHome": {
+    "commands": "Commands",
+    "addGroup": "Add group",
+    "addItem": "Add item",
+    "editGroup": "Edit group",
+    "deleteGroup": "Delete group",
+    "moveGroupUp": "Move group up",
+    "moveGroupDown": "Move group down",
+    "style": "Style",
+    "saveGroup": "Save group",
+    "createGroup": "Create group",
+    "groupName": "Group name",
+    "groupIcon": "Icon identifier (optional)",
+    "groupNameRequired": "Enter a group name.",
+    "loadingItems": "Loading items…",
+    "loadItemsFailed": "Could not load items",
+    "noMatchingItems": "No matching items",
+    "noItems": "No items in this space"
+  },
   "iconItem": {
+    "moveUp": "Move up",
+    "moveDown": "Move down",
     "add": "Add item",
     "currentPageLayerOpen": "Open in current page as layer",
     "currentPageOpen": "Open in current page",

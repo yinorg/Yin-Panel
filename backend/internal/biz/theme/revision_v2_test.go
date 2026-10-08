@@ -295,7 +295,7 @@ func TestBuiltinPackagesV2AreCompleteDTCGAndRepeatable(t *testing.T) {
 		}
 		wantVersion := "2.3.2"
 		if summary.ID == "org.yin.default" {
-			wantVersion = "2.3.40"
+			wantVersion = "2.3.43"
 		}
 		if pkg.Manifest.Version != wantVersion {
 			t.Errorf("%s builtin version = %q, want %q", summary.ID, pkg.Manifest.Version, wantVersion)
@@ -351,7 +351,7 @@ func TestBuiltinHomeResourceHashesOnlyChangeForDefaultYin(t *testing.T) {
 		"org.yin.default": {
 			// 移动端「新窗口」书签：点击处理里用自己的手势直接开窗（URL 来自 Core 快照）。
 			// 改动的是 Yin 主题的点击处理，所以只有它的哈希变。
-			"views/home.mjs": "01a6b53894ead1240c48b32134882f5d3d224a631b455a38976516cb42a56c4f",
+			"views/home.mjs": "3579815ff02a8c6bc1403d1127cdb4d8065554cd762ed54fa47de305139f3375",
 			"styles/home.css": "b12a3e135852d1bb36252a12fd70959d96f65aee1154214f10c4b103382d3a12",
 		},
 		"org.yin.glass": {
@@ -423,7 +423,7 @@ func TestEnsureBuiltinV2UpgradesOnlyActivationForSelectedBuiltin(t *testing.T) {
 		t.Fatal(err)
 	}
 	latest, err := LatestPackageRevisionV2(db, "org.yin.default")
-	if err != nil || latest.Version != "2.3.40" || activation.ActiveRevisionID != latest.ID {
+	if err != nil || latest.Version != "2.3.43" || activation.ActiveRevisionID != latest.ID {
 		t.Fatalf("selected builtin activation = %+v, latest=%s, err=%v", activation, latest.ID, err)
 	}
 	if latest.ID == old.Revision {

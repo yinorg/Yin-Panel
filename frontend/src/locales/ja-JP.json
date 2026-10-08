@@ -236,7 +236,28 @@
   "form": {
     "required": "必須項目です"
   },
+  "themeHome": {
+    "commands": "コマンド",
+    "addGroup": "グループを追加",
+    "addItem": "項目を追加",
+    "editGroup": "グループを編集",
+    "deleteGroup": "グループを削除",
+    "moveGroupUp": "グループを上へ",
+    "moveGroupDown": "グループを下へ",
+    "style": "スタイル",
+    "saveGroup": "グループを保存",
+    "createGroup": "グループを作成",
+    "groupName": "グループ名",
+    "groupIcon": "アイコン識別子（任意）",
+    "groupNameRequired": "グループ名を入力してください。",
+    "loadingItems": "項目を読み込み中…",
+    "loadItemsFailed": "項目を読み込めませんでした",
+    "noMatchingItems": "一致する項目がありません",
+    "noItems": "このスペースに項目はありません"
+  },
   "iconItem": {
+    "moveUp": "上へ移動",
+    "moveDown": "下へ移動",
     "add": "項目を追加",
     "currentPageLayerOpen": "現在のページでレイヤーとして開く",
     "currentPageOpen": "現在のページで開く",

@@ -58,6 +58,9 @@ export default {
   setup(api) {
     let root
     let snapshot
+    // Theme UI text is owned by the Core: the theme holds no locale bundle and
+    // falls back to its own English when a label is missing (older Core).
+    const envLabel = (key, fallback) => api.environment?.get?.()?.labels?.[key] || fallback
     let sideSwitching = false
     let query = ''
     let directoryRootId
@@ -151,8 +154,8 @@ export default {
     const showGroupDialog = (mode, group) => {
       groupDialogOpener = document.activeElement
       groupDialogValue = { mode, group }
-      groupDialogHeading.textContent = mode === 'edit' ? 'Edit group' : 'Add group'
-      groupDialogSubmit.textContent = mode === 'edit' ? 'Save group' : 'Create group'
+      groupDialogHeading.textContent = mode === 'edit' ? envLabel('dialog.editGroup', 'Edit group') : envLabel('dialog.addGroup', 'Add group')
+      groupDialogSubmit.textContent = mode === 'edit' ? envLabel('dialog.save', 'Save group') : envLabel('dialog.create', 'Create group')
       groupDialogTitle.value = group?.title || ''
       groupDialogIcon.value = group?.icon || ''
       groupDialogError.textContent = ''
@@ -173,7 +176,7 @@ export default {
       if (!groupDialogValue || groupDialogSubmit.disabled) return
       const title = groupDialogTitle.value.trim()
       if (!title) {
-        groupDialogError.textContent = 'Enter a group name.'
+        groupDialogError.textContent = envLabel('dialog.nameRequired', 'Enter a group name.')
         groupDialogTitle.focus()
         return
       }
@@ -215,15 +218,20 @@ export default {
       event.stopPropagation()
       contextItemTrigger = itemNodes.get(String(item.id))
       contextMenu.replaceChildren()
+      // Localized menu labels come from the Core environment; the English text
+      // stays as a fallback so a Core that predates a key still renders.
+      const labels = api.environment?.get?.()?.labels || {}
       const actions = []
       if (canEditItem(item)) {
-        actions.push(addActionButton(contextMenu, 'Edit item', 'theme-edit-item', `Edit ${item.title}`, button => {
+        const label = labels['item.edit'] || 'Edit item'
+        actions.push(addActionButton(contextMenu, label, 'theme-edit-item', `${label} ${item.title}`, button => {
           contextMenu.hidden = true
           void openEditor(`editor-item-${item.id}`, { itemId: String(item.id) }, button)
         }))
       }
       if (canDeleteItem(item)) {
-        actions.push(addActionButton(contextMenu, 'Delete item', 'theme-delete-item', `Delete ${item.title}`, button => {
+        const label = labels['item.delete'] || 'Delete item'
+        actions.push(addActionButton(contextMenu, label, 'theme-delete-item', `${label} ${item.title}`, button => {
           contextMenu.hidden = true
           void mutate(`item-delete-${item.id}`, button, 'item.delete', { itemId: String(item.id) })
         }))
@@ -231,13 +239,15 @@ export default {
       if (canReorderItems(group)) {
         const index = (group.itemIds || []).map(String).indexOf(String(item.id))
         if (index > 0) {
-          actions.push(addActionButton(contextMenu, 'Move item up', 'theme-reorder-item-up', `Move ${item.title} up`, button => {
+          const label = labels['item.moveUp'] || 'Move item up'
+          actions.push(addActionButton(contextMenu, label, 'theme-reorder-item-up', `${label} ${item.title}`, button => {
             contextMenu.hidden = true
             reorderItem(group, item, -1, button)
           }))
         }
         if (index >= 0 && index < (group.itemIds || []).length - 1) {
-          actions.push(addActionButton(contextMenu, 'Move item down', 'theme-reorder-item-down', `Move ${item.title} down`, button => {
+          const label = labels['item.moveDown'] || 'Move item down'
+          actions.push(addActionButton(contextMenu, label, 'theme-reorder-item-down', `${label} ${item.title}`, button => {
             contextMenu.hidden = true
             reorderItem(group, item, 1, button)
           }))
@@ -282,15 +292,17 @@ export default {
       }
       clock.hidden = false
       const now = new Date()
-      const formatter = new Intl.DateTimeFormat(undefined, {
+      // Follow the panel language, not the OS locale: passing `undefined` made
+      // Intl use the browser locale, which is how the clock kept showing English
+      // weekdays (and a hard-coded month-day order) under a Chinese UI.
+      const locale = api.environment?.get?.()?.language || undefined
+      const formatter = new Intl.DateTimeFormat(locale, {
         hour: '2-digit', minute: '2-digit', second: presentation.clock.showSeconds ? '2-digit' : undefined,
         hourCycle: 'h23',
       })
       clockTime.textContent = formatter.format(now)
-      const dateParts = new Intl.DateTimeFormat(undefined, { month: 'numeric', day: 'numeric', weekday: 'long' }).formatToParts(now)
-      const part = type => dateParts.find(value => value.type === type)?.value || ''
-      clockDate.textContent = `${part('month')}-${part('day')} ${part('weekday')}`
-      clock.title = new Intl.DateTimeFormat(undefined, { dateStyle: 'full' }).format(now)
+      clockDate.textContent = new Intl.DateTimeFormat(locale, { month: 'long', day: 'numeric', weekday: 'long' }).format(now)
+      clock.title = new Intl.DateTimeFormat(locale, { dateStyle: 'full' }).format(now)
       if (presentation.clock.color) clock.style.color = presentation.clock.color
       else clock.style.removeProperty('color')
     }
@@ -362,9 +374,9 @@ export default {
       masthead.append(identity)
       actionBar = element('div', 'yin-actions')
       actionBar.setAttribute('aria-label', 'Bookmark actions')
-      commandCenterButton = addActionButton(actionBar, 'Commands', 'theme-open-command-center', 'Open command center', () => run(() => api.commands.execute('commandCenter.open')))
-      addGroupButton = addActionButton(actionBar, 'Add group', 'theme-add-group', 'Add group', () => showGroupDialog('create'))
-      styleButton = addActionButton(actionBar, 'Style', 'theme-open-style', 'Open theme style settings', () => run(() => api.ui.openCoreSurface('theme-settings')))
+      commandCenterButton = addActionButton(actionBar, envLabel('actions.commands', 'Commands'), 'theme-open-command-center', 'Open command center', () => run(() => api.commands.execute('commandCenter.open')))
+      addGroupButton = addActionButton(actionBar, envLabel('actions.addGroup', 'Add group'), 'theme-add-group', 'Add group', () => showGroupDialog('create'))
+      styleButton = addActionButton(actionBar, envLabel('actions.style', 'Style'), 'theme-open-style', 'Open theme style settings', () => run(() => api.ui.openCoreSurface('theme-settings')))
 
       searchSection = element('section', 'yin-search')
       searchSection.setAttribute('role', 'search')
@@ -447,14 +459,14 @@ export default {
       const dialogForm = element('div', 'yin-dialog-form')
       groupDialogHeading = element('h2', 'yin-dialog-title')
       groupDialogHeading.id = 'yin-group-dialog-title'
-      const titleLabel = element('label', 'yin-dialog-label', 'Group name')
+      const titleLabel = element('label', 'yin-dialog-label', envLabel('dialog.groupName', 'Group name'))
       groupDialogTitle = element('input', 'yin-dialog-input')
       groupDialogTitle.name = 'group-title'
       groupDialogTitle.dataset.testid = 'theme-group-title-input'
       groupDialogTitle.maxLength = 50
       groupDialogTitle.required = true
       titleLabel.append(groupDialogTitle)
-      const iconLabel = element('label', 'yin-dialog-label', 'Icon identifier (optional)')
+      const iconLabel = element('label', 'yin-dialog-label', envLabel('dialog.groupIcon', 'Icon identifier (optional)'))
       groupDialogIcon = element('input', 'yin-dialog-input')
       groupDialogIcon.name = 'group-icon'
       groupDialogIcon.dataset.testid = 'theme-group-icon-input'
@@ -463,7 +475,7 @@ export default {
       groupDialogError = element('p', 'yin-dialog-error')
       groupDialogError.setAttribute('role', 'alert')
       const dialogActions = element('div', 'yin-dialog-actions')
-      const cancelGroupButton = element('button', 'yin-action-button', 'Cancel')
+      const cancelGroupButton = element('button', 'yin-action-button', envLabel('dialog.cancel', 'Cancel'))
       cancelGroupButton.type = 'button'
       cancelGroupButton.addEventListener('click', closeGroupDialog)
       groupDialogSubmit = element('button', 'yin-action-button yin-action-button--primary')
@@ -634,22 +646,22 @@ export default {
       const heading = element('div', 'yin-group-heading')
       const title = element('h2', 'yin-group-title')
       const controls = element('div', 'yin-group-controls')
-      const addItem = addActionButton(controls, 'Add item', 'theme-add-item', 'Add item', button => {
+      const addItem = addActionButton(controls, envLabel('group.addItem', 'Add item'), 'theme-add-item', 'Add item', button => {
         const groupId = section.dataset.groupId
         void openEditor(`editor-new-item-${groupId}`, { groupId }, button)
       })
-      const editGroup = addActionButton(controls, 'Edit group', 'theme-edit-group', 'Edit group', () => {
+      const editGroup = addActionButton(controls, envLabel('group.edit', 'Edit group'), 'theme-edit-group', 'Edit group', () => {
         const current = (snapshot?.groups || []).find(candidate => String(candidate.id) === section.dataset.groupId)
         if (current) showGroupDialog('edit', current)
       })
-      const deleteGroup = addActionButton(controls, 'Delete group', 'theme-delete-group', 'Delete group', button => {
+      const deleteGroup = addActionButton(controls, envLabel('group.delete', 'Delete group'), 'theme-delete-group', 'Delete group', button => {
         void mutate(`group-delete-${section.dataset.groupId}`, button, 'group.delete', { groupId: section.dataset.groupId })
       })
-      const moveGroupUp = addActionButton(controls, 'Move group up', 'theme-reorder-group-up', 'Move group up', button => {
+      const moveGroupUp = addActionButton(controls, envLabel('group.moveUp', 'Move group up'), 'theme-reorder-group-up', 'Move group up', button => {
         const current = (snapshot?.groups || []).find(candidate => String(candidate.id) === section.dataset.groupId)
         if (current) reorderGroup(current, -1, button)
       })
-      const moveGroupDown = addActionButton(controls, 'Move group down', 'theme-reorder-group-down', 'Move group down', button => {
+      const moveGroupDown = addActionButton(controls, envLabel('group.moveDown', 'Move group down'), 'theme-reorder-group-down', 'Move group down', button => {
         const current = (snapshot?.groups || []).find(candidate => String(candidate.id) === section.dataset.groupId)
         if (current) reorderGroup(current, 1, button)
       })
@@ -1020,12 +1032,12 @@ export default {
         return section && !section.hidden && section._yin.list.children.length > 0
       })
       emptyState.textContent = snapshot.status === 'loading'
-        ? 'Loading items…'
+        ? envLabel('collection.loading', 'Loading items…')
         : snapshot.status === 'error'
-          ? snapshot.error?.message || 'Could not load items'
+          ? snapshot.error?.message || envLabel('collection.loadFailed', 'Could not load items')
           : needle
-            ? 'No matching items'
-            : 'No items in this space'
+            ? envLabel('collection.noMatch', 'No matching items')
+            : envLabel('collection.empty', 'No items in this space')
       if (snapshot.status === 'loading') collection.setAttribute('aria-busy', 'true')
       else collection.removeAttribute('aria-busy')
       status.textContent = ''

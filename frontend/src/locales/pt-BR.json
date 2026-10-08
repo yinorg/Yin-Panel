@@ -236,7 +236,28 @@
   "form": {
     "required": "Pflichtfeld"
   },
+  "themeHome": {
+    "commands": "Comandos",
+    "addGroup": "Adicionar grupo",
+    "addItem": "Adicionar item",
+    "editGroup": "Editar grupo",
+    "deleteGroup": "Excluir grupo",
+    "moveGroupUp": "Mover grupo para cima",
+    "moveGroupDown": "Mover grupo para baixo",
+    "style": "Estilo",
+    "saveGroup": "Salvar grupo",
+    "createGroup": "Criar grupo",
+    "groupName": "Nome do grupo",
+    "groupIcon": "Identificador do ícone (opcional)",
+    "groupNameRequired": "Digite um nome de grupo.",
+    "loadingItems": "Carregando itens…",
+    "loadItemsFailed": "Não foi possível carregar os itens",
+    "noMatchingItems": "Nenhum item correspondente",
+    "noItems": "Nenhum item neste espaço"
+  },
   "iconItem": {
+    "moveUp": "Mover para cima",
+    "moveDown": "Mover para baixo",
     "add": "Eintrag hinzufügen",
     "currentPageLayerOpen": "Open in current page as layer",
     "currentPageOpen": "Open in current page",

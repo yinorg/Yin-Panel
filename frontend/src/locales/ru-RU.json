@@ -236,7 +236,28 @@
   "form": {
     "required": "Pflichtfeld"
   },
+  "themeHome": {
+    "commands": "Команды",
+    "addGroup": "Добавить группу",
+    "addItem": "Добавить элемент",
+    "editGroup": "Изменить группу",
+    "deleteGroup": "Удалить группу",
+    "moveGroupUp": "Группу вверх",
+    "moveGroupDown": "Группу вниз",
+    "style": "Стиль",
+    "saveGroup": "Сохранить группу",
+    "createGroup": "Создать группу",
+    "groupName": "Название группы",
+    "groupIcon": "Идентификатор значка (необязательно)",
+    "groupNameRequired": "Введите название группы.",
+    "loadingItems": "Загрузка элементов…",
+    "loadItemsFailed": "Не удалось загрузить элементы",
+    "noMatchingItems": "Нет подходящих элементов",
+    "noItems": "В этом пространстве нет элементов"
+  },
   "iconItem": {
+    "moveUp": "Вверх",
+    "moveDown": "Вниз",
     "add": "Eintrag hinzufügen",
     "currentPageLayerOpen": "Open in current page as layer",
     "currentPageOpen": "Open in current page",
