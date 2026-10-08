@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": false,
   "engines": {
-    "node": ">=22.22.2"
+    "node": ">=24.0.0"
   },
   "packageManager": "pnpm@9.15.5",
   "description": "Yin-Panel Web",
@@ -15,7 +15,7 @@
   "scripts": {
     "check:i18n": "node scripts/check-i18n-keys.mjs",
     "audit:theme-tokens": "node scripts/audit-theme-tokens.mjs",
-    "test:home-services": "node --experimental-strip-types --test tests/unit/*.test.mjs",
+    "test:home-services": "node --test tests/unit/*.test.mjs",
     "build:theme-sdk": "npm --prefix packages/theme-sdk run build",
     "create:theme": "node packages/create-theme/bin/yin-theme.mjs",
     "dev": "vite",
