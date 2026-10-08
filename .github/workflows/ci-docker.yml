@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Validate release tag
         if: github.event_name == 'push'
         run: |
@@ -29,7 +29,7 @@ jobs:
             exit 1
           }
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 24.21.0
           cache: npm
@@ -38,7 +38,7 @@ jobs:
         working-directory: frontend
         run: npm ci && npm run build-only
       - name: Upload frontend build
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: frontend-build
           path: backend/web
@@ -55,9 +55,9 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version: '1.27.1'
           cache: true
@@ -79,7 +79,7 @@ jobs:
             main.go
 
       - name: Upload backend build
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: backend-build-${{ matrix.arch }}
           path: build-output/yin-panel
@@ -97,28 +97,28 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Download frontend build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: frontend-build
           path: backend/web
       - name: Download backend build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: backend-build-${{ matrix.arch }}
           path: build-output
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
       - name: Log in to GHCR
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Package and push architecture image
         id: build-image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: ./distribution/docker-image/Dockerfile_monolith
@@ -130,7 +130,7 @@ jobs:
       - name: Save image digest
         run: echo "${{ steps.build-image.outputs.digest }}" > digest
       - name: Upload image digest
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: image-digest-${{ matrix.arch }}
           path: digest
@@ -141,20 +141,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
       - name: Log in to GHCR
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Download amd64 image digest
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: image-digest-amd64
           path: digests/amd64
       - name: Download arm64 image digest
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: image-digest-arm64
           path: digests/arm64
