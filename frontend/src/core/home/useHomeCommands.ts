@@ -272,6 +272,7 @@ export function useHomeCommands(input: {
       spaceId => input.homeMutations.deleteGroup(group.id, spaceId),
     ),
     reorderGroups: (parentId, groupIds) => input.homeMutations.reorderGroups(parentId, groupIds),
+    arrangeLayout: layout => input.homeMutations.arrangeLayout(layout),
     openCommandCenter: () => { commandCenterVisible.value = true },
     toggleSide: input.togglePanelSide,
     setNetworkMode: mode => input.handleChangeNetwork(mode === 'lan' ? PanelStateNetworkModeEnum.lan : PanelStateNetworkModeEnum.wan),

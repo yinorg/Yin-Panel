@@ -113,6 +113,7 @@ export const THEME_COMMANDS = [
   'group.update',
   'group.delete',
   'groups.reorder',
+  'layout.save',
   'search.submit',
   'data.refresh',
   'editor.open',

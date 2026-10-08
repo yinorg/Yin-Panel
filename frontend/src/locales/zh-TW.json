@@ -253,7 +253,11 @@
     "loadingItems": "正在載入項目…",
     "loadItemsFailed": "無法載入項目",
     "noMatchingItems": "沒有符合的項目",
-    "noItems": "此空間尚無項目"
+    "noItems": "此空間尚無項目",
+    "edit": "編輯",
+    "save": "儲存",
+    "layoutSaved": "版面已儲存",
+    "layoutSaveFailed": "無法儲存版面"
   },
   "iconItem": {
     "moveUp": "上移",

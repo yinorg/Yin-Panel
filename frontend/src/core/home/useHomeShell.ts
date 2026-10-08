@@ -71,6 +71,12 @@ export function useHomeShell() {
     reloadHomeData: forceRefresh => void loadHomeData(forceRefresh),
   })
 
+  // Core-owned layout edit signal. The value is carried to the theme through the
+  // environment, and the theme toggles its own edit mode when the token changes,
+  // so the two never need a shared editing flag across the sandbox boundary.
+  const layoutEditToken = ref(0)
+  const themeRuntimeEnvironment = computed(() => ({ ...runtimeEnvironment.value, editToken: layoutEditToken.value }))
+
   // Wired before the theme gates below because they read `publicAccessReady` to
   // decide whether a public link may hand the theme read scopes.
   const {
@@ -201,7 +207,7 @@ export function useHomeShell() {
     activeSpace,
     items,
     canWrite,
-    environment: runtimeEnvironment,
+    environment: themeRuntimeEnvironment,
     // The theme opens "new window" bookmarks inside the tap, so the snapshot has to
     // carry the resolved address. Handing over the Core's own resolver is what keeps
     // the two from picking different URLs for the same item.
@@ -363,7 +369,7 @@ export function useHomeShell() {
     themeExecutionMode,
     themeRuntimeGrant,
     themeRuntimeSnapshot,
-    themeRuntimeEnvironment: runtimeEnvironment,
+    themeRuntimeEnvironment,
     themeRuntimePermissions,
     themeRuntimeSlots,
     executeThemeRequest,
@@ -386,6 +392,8 @@ export function useHomeShell() {
 
   /** Space switcher, connectivity status and the fallback's data. */
   const home = reactive({
+    canWrite,
+    requestLayoutEdit: () => { layoutEditToken.value++ },
     setPublicAccessCode,
     homeReady,
     spaces,

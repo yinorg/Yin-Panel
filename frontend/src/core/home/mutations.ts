@@ -9,6 +9,11 @@ export interface HomeItemMutationCommands {
   uploadItemIcon: (file: File, expectedSpaceId: number) => Promise<HomeMutationResult>
 }
 
+export interface HomeLayoutInput {
+  items: { id: number, groupId: number, sort: number }[]
+  groups: { id: number, sort: number }[]
+}
+
 export interface HomeMutationApi {
   createItem: (spaceId: number, input: Record<string, unknown>) => Promise<HomeMutationResult>
   createItemWithIcon?: (spaceId: number, input: Record<string, unknown>, file: File) => Promise<HomeMutationResult>
@@ -20,6 +25,7 @@ export interface HomeMutationApi {
   updateGroup: (spaceId: number, groupId: number, input: { title: string; icon: string; parentId: number | null }) => Promise<HomeMutationResult>
   deleteGroup: (spaceId: number, groupId: number) => Promise<HomeMutationResult>
   reorderGroups: (spaceId: number, parentId: number | null, groupIds: number[]) => Promise<HomeMutationResult>
+  arrangeLayout: (spaceId: number, layout: HomeLayoutInput) => Promise<HomeMutationResult>
 }
 
 export function createHomeMutationService(options: {
@@ -89,6 +95,7 @@ export function createHomeMutationService(options: {
     updateGroup: (groupId: number, input: { title: string; icon: string; parentId: number | null }) => mutate(spaceId => options.api.updateGroup(spaceId, groupId, input)),
     deleteGroup: (groupId: number, expectedSpaceId?: number) => mutate(spaceId => options.api.deleteGroup(spaceId, groupId), expectedSpaceId),
     reorderGroups: (parentId: number | null, groupIds: number[]) => mutate(spaceId => options.api.reorderGroups(spaceId, parentId, groupIds)),
+    arrangeLayout: (layout: HomeLayoutInput) => mutate(spaceId => options.api.arrangeLayout(spaceId, layout)),
   }
 }
 

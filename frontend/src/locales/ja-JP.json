@@ -253,7 +253,11 @@
     "loadingItems": "項目を読み込み中…",
     "loadItemsFailed": "項目を読み込めませんでした",
     "noMatchingItems": "一致する項目がありません",
-    "noItems": "このスペースに項目はありません"
+    "noItems": "このスペースに項目はありません",
+    "edit": "編集",
+    "save": "保存",
+    "layoutSaved": "レイアウトを保存しました",
+    "layoutSaveFailed": "レイアウトを保存できませんでした"
   },
   "iconItem": {
     "moveUp": "上へ移動",

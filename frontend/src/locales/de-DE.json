@@ -253,7 +253,11 @@
     "loadingItems": "Einträge werden geladen…",
     "loadItemsFailed": "Einträge konnten nicht geladen werden",
     "noMatchingItems": "Keine passenden Einträge",
-    "noItems": "Keine Einträge in diesem Bereich"
+    "noItems": "Keine Einträge in diesem Bereich",
+    "edit": "Bearbeiten",
+    "save": "Speichern",
+    "layoutSaved": "Layout gespeichert",
+    "layoutSaveFailed": "Layout konnte nicht gespeichert werden"
   },
   "iconItem": {
     "moveUp": "Nach oben",

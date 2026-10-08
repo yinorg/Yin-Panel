@@ -37,6 +37,7 @@ export interface HomeThemeActionBindings {
   updateGroup: (groupId: number, input: { title: string; icon?: string; parentId?: number | null }) => Promise<unknown> | unknown
   deleteGroup: (group: CoreGroup) => Promise<unknown> | unknown
   reorderGroups: (parentId: number | null, groupIds: number[]) => Promise<unknown> | unknown
+  arrangeLayout?: (input: { items: { id: number, groupId: number, sort: number }[], groups: { id: number, sort: number }[] }) => Promise<unknown> | unknown
   openCommandCenter: () => Promise<unknown> | unknown
   toggleSide: () => Promise<unknown> | unknown
   setNetworkMode: (mode: 'lan' | 'wan') => Promise<unknown> | unknown
@@ -154,6 +155,14 @@ export function createHomeThemeHandlers(bindings: HomeThemeActionBindings): Them
           if (!isPermutation(siblings.map(group => group.id), groupIds))
             throw apiError('INVALID_ARGUMENT', 'Group order must contain every sibling in the active Space exactly once')
           return bindings.reorderGroups(parentId, groupIds)
+        }
+        case 'layout.save': {
+          const layout = parseLayout(payload, bindings.getGroups())
+          if (layout.groups.length && bindings.canWriteGroups && !bindings.canWriteGroups())
+            throw apiError('PERMISSION_DENIED', 'The active Space does not allow reordering groups')
+          if (!bindings.arrangeLayout)
+            throw apiError('UNSUPPORTED_CAPABILITY', 'Layout saving is not available in this adapter')
+          return bindings.arrangeLayout(layout)
         }
         case 'search.submit': {
           const query = typeof payload.query === 'string' ? payload.query : ''
@@ -401,6 +410,48 @@ function isPermutation(expected: readonly number[], actual: readonly number[]): 
   const values = new Set(expected)
   if (values.size !== expected.length) return false
   return actual.length === values.size && new Set(actual).size === actual.length && actual.every(id => values.has(id))
+}
+
+function parseLayoutList(value: unknown, label: string): Record<string, unknown>[] {
+  if (value === undefined) return []
+  if (!Array.isArray(value) || value.length > 10000) throw apiError('INVALID_ARGUMENT', `Layout ${label} must be a bounded array`)
+  return value.map((entry) => {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) throw apiError('INVALID_ARGUMENT', `Layout ${label} entries must be objects`)
+    return entry as Record<string, unknown>
+  })
+}
+
+function parseLayoutSort(value: unknown): number {
+  if (!Number.isSafeInteger(value) || (value as number) < 1) throw apiError('INVALID_ARGUMENT', 'Sort must be a positive integer')
+  return value as number
+}
+
+function parseLayout(payload: Record<string, unknown>, groups: readonly CoreGroup[]): { items: { id: number, groupId: number, sort: number }[], groups: { id: number, sort: number }[] } {
+  const itemEntries = parseLayoutList(payload.items, 'items')
+  const groupEntries = parseLayoutList(payload.groups, 'groups')
+  if (!itemEntries.length && !groupEntries.length) throw apiError('INVALID_ARGUMENT', 'Layout must include at least one change')
+  const groupIds = new Set(groups.map(group => group.id))
+  const items: { id: number, groupId: number, sort: number }[] = []
+  const seenItems = new Set<number>()
+  for (const entry of itemEntries) {
+    const id = parseCoreId(entry.id)
+    const groupId = parseCoreId(entry.groupId)
+    if (!groupIds.has(groupId)) throw apiError('NOT_FOUND', 'Target group is not available in the active Space')
+    if (!findItem(groups, id)) throw apiError('NOT_FOUND', 'Item is not available in the active Space')
+    if (seenItems.has(id)) throw apiError('INVALID_ARGUMENT', 'Duplicate item entry')
+    seenItems.add(id)
+    items.push({ id, groupId, sort: parseLayoutSort(entry.sort) })
+  }
+  const resultGroups: { id: number, sort: number }[] = []
+  const seenGroups = new Set<number>()
+  for (const entry of groupEntries) {
+    const id = parseCoreId(entry.id)
+    if (!groupIds.has(id)) throw apiError('NOT_FOUND', 'Group is not available in the active Space')
+    if (seenGroups.has(id)) throw apiError('INVALID_ARGUMENT', 'Duplicate group entry')
+    seenGroups.add(id)
+    resultGroups.push({ id, sort: parseLayoutSort(entry.sort) })
+  }
+  return { items, groups: resultGroups }
 }
 
 function apiError(code: string, message: string) {

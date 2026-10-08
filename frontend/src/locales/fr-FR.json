@@ -253,7 +253,11 @@
     "loadingItems": "Chargement des éléments…",
     "loadItemsFailed": "Impossible de charger les éléments",
     "noMatchingItems": "Aucun élément correspondant",
-    "noItems": "Aucun élément dans cet espace"
+    "noItems": "Aucun élément dans cet espace",
+    "edit": "Modifier",
+    "save": "Enregistrer",
+    "layoutSaved": "Disposition enregistrée",
+    "layoutSaveFailed": "Impossible d'enregistrer la disposition"
   },
   "iconItem": {
     "moveUp": "Monter",

@@ -99,6 +99,11 @@ export function useHomeEnvironment(input: {
       'collection.loadFailed': t('themeHome.loadItemsFailed'),
       'collection.noMatch': t('themeHome.noMatchingItems'),
       'collection.empty': t('themeHome.noItems'),
+      'actions.edit': t('themeHome.edit'),
+      'actions.save': t('themeHome.save'),
+      'actions.cancel': t('common.cancel'),
+      'status.layoutSaved': t('themeHome.layoutSaved'),
+      'status.layoutSaveFailed': t('themeHome.layoutSaveFailed'),
     },
   }))
 

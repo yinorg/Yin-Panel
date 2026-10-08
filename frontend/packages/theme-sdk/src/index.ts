@@ -28,6 +28,9 @@ export type ThemeCommand =
   | 'group.update'
   | 'group.delete'
   | 'groups.reorder'
+  // Whole-layout save for the theme's drag edit mode: item membership/order
+  // plus group order, applied in one transaction by the Core.
+  | 'layout.save'
   | 'search.submit'
   | 'data.refresh'
   | 'editor.open'
@@ -66,6 +69,13 @@ export interface ThemeEnvironment {
    * hard-coded fallback, so a Core older than the key still renders correctly.
    */
   labels?: Readonly<Record<string, string>>
+  /**
+   * Monotonic signal the Core bumps when the user asks to edit the layout from
+   * Core-owned chrome (the floating button group). The theme compares it against
+   * the value it last saw and toggles its own edit mode, so the two never need a
+   * shared editing flag across the sandbox boundary.
+   */
+  editToken?: number
 }
 
 export interface ThemeSpace {

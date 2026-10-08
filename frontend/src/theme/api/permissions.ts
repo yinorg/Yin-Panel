@@ -12,6 +12,9 @@ const commandPermissions: Record<ThemeCommand, ThemePermission> = {
   'group.update': 'groups.write',
   'group.delete': 'groups.write',
   'groups.reorder': 'groups.write',
+  // Primary capability is writing items; the handler additionally requires
+  // groups.write when the payload reorders groups.
+  'layout.save': 'items.write',
   'search.submit': 'items.read',
   'data.refresh': 'groups.read',
   'editor.open': 'items.write',

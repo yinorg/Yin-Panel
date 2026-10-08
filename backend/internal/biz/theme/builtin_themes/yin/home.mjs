@@ -88,6 +88,18 @@ export default {
     const itemNodes = new Map()
     const directoryNodes = new Map()
 
+    // Drag edit mode (see enterEditMode): while editing, the DOM is the source of
+    // truth, so renderCollection is frozen and the saved layout is diffed against
+    // the baseline captured on entry. Order is stored on the shared records, so a
+    // save reorders the space for every user.
+    let editMode = false
+    let editBaseline = null
+    let dragState = null
+    let autoScrollFrame
+    let saveButton
+    let cancelButton
+    let lastEditToken = Number(api.environment?.get?.()?.editToken) || 0
+
     const run = async action => {
       try { await action() }
       catch (error) { if (status) status.textContent = error?.message || 'Action failed' }
@@ -377,6 +389,8 @@ export default {
       commandCenterButton = addActionButton(actionBar, envLabel('actions.commands', 'Commands'), 'theme-open-command-center', 'Open command center', () => run(() => api.commands.execute('commandCenter.open')))
       addGroupButton = addActionButton(actionBar, envLabel('actions.addGroup', 'Add group'), 'theme-add-group', 'Add group', () => showGroupDialog('create'))
       styleButton = addActionButton(actionBar, envLabel('actions.style', 'Style'), 'theme-open-style', 'Open theme style settings', () => run(() => api.ui.openCoreSurface('theme-settings')))
+      saveButton = addActionButton(actionBar, envLabel('actions.save', 'Save'), 'theme-save-layout', 'Save layout', button => void saveLayout(button))
+      cancelButton = addActionButton(actionBar, envLabel('actions.cancel', 'Cancel'), 'theme-cancel-edit', 'Cancel layout editing', () => exitEditMode())
 
       searchSection = element('section', 'yin-search')
       searchSection.setAttribute('role', 'search')
@@ -444,6 +458,7 @@ export default {
       status.setAttribute('role', 'status')
       status.dataset.testid = 'theme-home-status'
       collection = element('main', 'yin-collection')
+      collection.addEventListener('pointerdown', handleCollectionPointerDown)
       emptyState = element('p', 'yin-empty')
       footer = element('footer', 'yin-footer')
       groupDialog = element('div', 'yin-dialog-backdrop')
@@ -694,6 +709,7 @@ export default {
       // `preventDefault`，不让锚点的默认导航生效。
       const link = element('a', 'yin-item')
       link.rel = 'noopener noreferrer'
+      link.draggable = false
       const icon = element('span', 'yin-item-icon')
       const copy = element('span', 'yin-item-copy')
       const title = element('strong', 'yin-item-title')
@@ -701,6 +717,7 @@ export default {
       copy.append(title, description)
       link.append(icon, copy)
       link.addEventListener('click', event => {
+        if (editMode) { event.preventDefault(); return }
         const item = link._yin.item
         const method = Number(item && item.openMethod) || 1
         const isNewWindow = method === 2
@@ -723,6 +740,7 @@ export default {
       })
       link._yin = { icon, title, description }
       link.addEventListener('contextmenu', event => {
+        if (editMode) return
         const item = link._yin.item
         const group = (snapshot?.groups || []).find(candidate => candidate.itemIds?.map(String).includes(link.dataset.itemId))
         if (item && group) openItemMenu(event, item, group)
@@ -939,6 +957,9 @@ export default {
 
     const renderCollection = () => {
       if (!snapshot || !collection) return
+      // Frozen while editing: the drag mutates the DOM directly and the layout is
+      // serialized from it, so a snapshot re-render would discard the drag.
+      if (editMode) return
       const presentation = snapshot.presentation || {}
       const tree = groupTree(snapshot.groups)
       const isDirectory = presentation.layout === 'directory'
@@ -965,6 +986,7 @@ export default {
         const section = groupNodes.get(String(group.id)) || createGroupNode(group)
         groupNodes.set(String(group.id), section)
         section.dataset.groupId = String(group.id)
+        section.dataset.parentId = group.parentId == null ? '' : String(group.parentId)
         section._yin.title.textContent = group.title || 'Untitled group'
         const collapsed = collapsedGroups.has(String(group.id))
         section._yin.toggle.setAttribute('aria-label', collapsed ? 'Expand group' : 'Collapse group')
@@ -1041,6 +1063,227 @@ export default {
       if (snapshot.status === 'loading') collection.setAttribute('aria-busy', 'true')
       else collection.removeAttribute('aria-busy')
       status.textContent = ''
+      updateEditControls()
+    }
+
+    // ---- Drag edit mode ------------------------------------------------
+
+    const canArrange = () => hasGlobalCapability('items.write')
+      || (snapshot?.groups || []).some(group => (group.capabilities || []).includes('items.reorder'))
+
+    const updateEditControls = () => {
+      if (!saveButton) return
+      saveButton.hidden = !editMode
+      cancelButton.hidden = !editMode
+      if (editMode) {
+        if (commandCenterButton) commandCenterButton.hidden = true
+        if (addGroupButton) addGroupButton.hidden = true
+        if (styleButton) styleButton.hidden = true
+      }
+    }
+
+    const serializeLayout = () => {
+      const itemOrder = new Map()
+      const itemGroup = new Map()
+      const itemIndex = new Map()
+      const order = []
+      for (const section of collection.querySelectorAll('.yin-group')) {
+        const groupId = section.dataset.groupId
+        const ids = [...section._yin.list.children]
+          .filter(node => node.classList && node.classList.contains('yin-item'))
+          .map(node => node.dataset.itemId)
+        itemOrder.set(groupId, ids)
+        ids.forEach((id, index) => { itemGroup.set(id, groupId); itemIndex.set(id, index) })
+        order.push({ groupId, parentId: section.dataset.parentId || '' })
+      }
+      const groupIndex = new Map()
+      const counters = new Map()
+      for (const entry of order) {
+        const index = counters.get(entry.parentId) || 0
+        groupIndex.set(entry.groupId, index)
+        counters.set(entry.parentId, index + 1)
+      }
+      return { itemOrder, itemGroup, itemIndex, groupIndex }
+    }
+
+    // Only changed rows are sent, so a drag that moved one icon does not rewrite
+    // the whole space. A moved item shifts its neighbours' indices, which the
+    // index comparison picks up automatically.
+    const diffLayout = (baseline, current) => {
+      const items = []
+      for (const [groupId, ids] of current.itemOrder) {
+        ids.forEach((id, index) => {
+          const moved = baseline.itemGroup.get(id) !== groupId
+          const reordered = baseline.itemIndex.get(id) !== index
+          if (moved || reordered)
+            items.push({ id: Number(id), groupId: Number(groupId), sort: index + 1 })
+        })
+      }
+      const groups = []
+      for (const [groupId, index] of current.groupIndex) {
+        if (baseline.groupIndex.get(groupId) !== index)
+          groups.push({ id: Number(groupId), sort: index + 1 })
+      }
+      return { items, groups }
+    }
+
+    const enterEditMode = () => {
+      if (editMode || !canArrange()) return
+      if (snapshot?.presentation?.layout === 'directory') return
+      // A save serializes the whole collection, so a search filter or a collapsed
+      // group would silently drop items from the layout.
+      query = ''
+      collapsedGroups.clear()
+      renderCollection()
+      editMode = true
+      editBaseline = serializeLayout()
+      root.dataset.editing = 'true'
+      updateEditControls()
+    }
+
+    const exitEditMode = () => {
+      if (!editMode) return
+      editMode = false
+      editBaseline = null
+      delete root.dataset.editing
+      renderCollection()
+    }
+
+    const saveLayout = async button => {
+      if (!editMode || !editBaseline) return
+      const diff = diffLayout(editBaseline, serializeLayout())
+      if (!diff.items.length && !diff.groups.length) { exitEditMode(); return }
+      button.disabled = true
+      try {
+        await api.commands.execute('layout.save', diff)
+        editMode = false
+        editBaseline = null
+        delete root.dataset.editing
+        if (status) status.textContent = envLabel('status.layoutSaved', 'Layout saved')
+        renderCollection()
+      }
+      catch (error) {
+        if (status) status.textContent = `${envLabel('status.layoutSaveFailed', 'Could not save the layout')}${error?.message ? `: ${error.message}` : ''}`
+      }
+      finally {
+        button.disabled = false
+      }
+    }
+
+    const moveGhost = (x, y) => {
+      if (!dragState) return
+      dragState.ghost.style.left = `${x - dragState.offsetX}px`
+      dragState.ghost.style.top = `${y - dragState.offsetY}px`
+      dragState.lastX = x
+      dragState.lastY = y
+    }
+
+    const groupListAtPoint = (x, y) => {
+      let best = null
+      let bestDistance = Infinity
+      for (const section of collection.querySelectorAll('.yin-group')) {
+        const list = section._yin && section._yin.list
+        if (!list || !list.offsetParent) continue
+        const rect = list.getBoundingClientRect()
+        if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) return list
+        const dx = x < rect.left ? rect.left - x : x > rect.right ? x - rect.right : 0
+        const dy = y < rect.top ? rect.top - y : y > rect.bottom ? y - rect.bottom : 0
+        const distance = dx + dy
+        if (distance < bestDistance) { bestDistance = distance; best = list }
+      }
+      return best
+    }
+
+    const updateItemDrop = (x, y) => {
+      const list = groupListAtPoint(x, y)
+      if (!list) return
+      const tiles = [...list.children].filter(node => node.classList.contains('yin-item') && node !== dragState.element)
+      let before = null
+      for (const tile of tiles) {
+        const rect = tile.getBoundingClientRect()
+        const cx = rect.left + rect.width / 2
+        const cy = rect.top + rect.height / 2
+        if (y < cy - rect.height / 2 || (y <= cy + rect.height / 2 && x < cx)) { before = tile; break }
+      }
+      if (before) list.insertBefore(dragState.element, before)
+      else list.append(dragState.element)
+    }
+
+    const updateGroupDrop = y => {
+      const section = dragState.element
+      const parentId = section.dataset.parentId || ''
+      const siblings = [...collection.querySelectorAll('.yin-group')]
+        .filter(node => (node.dataset.parentId || '') === parentId && node !== section)
+      let before = null
+      for (const node of siblings) {
+        const rect = node.getBoundingClientRect()
+        if (y < rect.top + rect.height / 2) { before = node; break }
+      }
+      if (before) collection.insertBefore(section, before)
+      else if (siblings.length) siblings[siblings.length - 1].after(section)
+      else collection.append(section)
+    }
+
+    const handleDragMove = event => {
+      if (!dragState) return
+      event.preventDefault()
+      moveGhost(event.clientX, event.clientY)
+      if (dragState.kind === 'item') updateItemDrop(event.clientX, event.clientY)
+      else updateGroupDrop(event.clientY)
+    }
+
+    const handleDragEnd = () => {
+      if (!dragState) return
+      dragState.ghost.remove()
+      dragState.element.classList.remove('is-dragging')
+      document.removeEventListener('pointermove', handleDragMove)
+      document.removeEventListener('pointerup', handleDragEnd)
+      document.removeEventListener('pointercancel', handleDragEnd)
+      if (autoScrollFrame) cancelAnimationFrame(autoScrollFrame)
+      autoScrollFrame = undefined
+      dragState = null
+    }
+
+    const autoScrollStep = () => {
+      if (!dragState) return
+      const edge = 64
+      const { lastX, lastY } = dragState
+      if (lastY < edge) window.scrollBy(0, -Math.ceil((edge - lastY) / 3))
+      else if (lastY > window.innerHeight - edge) window.scrollBy(0, Math.ceil((lastY - (window.innerHeight - edge)) / 3))
+      else if (lastX < edge) window.scrollBy(-Math.ceil((edge - lastX) / 3), 0)
+      else if (lastX > window.innerWidth - edge) window.scrollBy(Math.ceil((lastX - (window.innerWidth - edge)) / 3), 0)
+      autoScrollFrame = requestAnimationFrame(autoScrollStep)
+    }
+
+    const beginDrag = (event, target, kind) => {
+      if (dragState || !editMode) return
+      event.preventDefault()
+      const rect = target.getBoundingClientRect()
+      const ghost = target.cloneNode(true)
+      ghost.classList.add('yin-drag-ghost')
+      ghost.style.width = `${rect.width}px`
+      ghost.style.height = `${rect.height}px`
+      page.append(ghost)
+      target.classList.add('is-dragging')
+      dragState = { kind, element: target, ghost, offsetX: event.clientX - rect.left, offsetY: event.clientY - rect.top, lastX: event.clientX, lastY: event.clientY }
+      moveGhost(event.clientX, event.clientY)
+      document.addEventListener('pointermove', handleDragMove, { passive: false })
+      document.addEventListener('pointerup', handleDragEnd)
+      document.addEventListener('pointercancel', handleDragEnd)
+      autoScrollFrame = requestAnimationFrame(autoScrollStep)
+    }
+
+    const handleCollectionPointerDown = event => {
+      if (!editMode || event.button !== 0) return
+      const target = event.target
+      if (target.closest && target.closest('button')) return
+      const tile = target.closest && target.closest('.yin-item')
+      if (tile && collection.contains(tile)) { beginDrag(event, tile, 'item'); return }
+      const heading = target.closest && target.closest('.yin-group-heading')
+      if (heading && canMutateGroup('reorder')) {
+        const section = heading.closest('.yin-group')
+        if (section) beginDrag(event, section, 'group')
+      }
     }
 
     const update = nextSnapshot => {
@@ -1086,6 +1329,16 @@ export default {
         home(elementRoot, _api, initialSnapshot) {
           createShell(elementRoot)
           update(initialSnapshot)
+          // The Core's floating edit button bumps `environment.editToken`; toggling
+          // on each new value keeps the theme's edit mode in step without a shared
+          // flag crossing the sandbox boundary.
+          const unsubscribeEditToken = api.events.subscribe('environment.changed', event => {
+            const token = Number(event?.payload?.editToken)
+            if (!Number.isFinite(token) || token === lastEditToken) return
+            lastEditToken = token
+            if (editMode) exitEditMode()
+            else enterEditMode()
+          })
           // The Core monitor layer is positioned with viewport units, so the
           // reservation has to be recomputed whenever the viewport changes.
           const handleViewportResize = () => { positionCollectionAfterMonitor(); reportLayout() }
@@ -1125,6 +1378,7 @@ export default {
           return {
             update,
             unmount() {
+              unsubscribeEditToken()
               window.removeEventListener('resize', handleViewportResize)
               document.removeEventListener('pointerdown', handleDocumentPointerDown)
               for (const type of ['pointerdown', 'touchstart', 'touchend', 'pointerup', 'click']) {

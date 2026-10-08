@@ -1131,3 +1131,49 @@ select {
 }
 .yin-diag b { color: #ffd60a; }
 .yin-diag i { color: #ff453a; font-style: normal; }
+
+/* Drag edit mode. The theme serializes the DOM on save, so tiles and group
+   headings become the drag source; `touch-action: none` is what lets a pointer
+   drag win over the browser's scroll gesture on touch devices. */
+[data-editing='true'] .yin-item,
+[data-editing='true'] .yin-group-heading {
+  cursor: grab;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+[data-editing='true'] .yin-item:hover { transform: none; }
+.yin-item.is-dragging,
+.yin-group.is-dragging { opacity: .35; }
+.yin-drag-ghost {
+  position: fixed;
+  z-index: 2147483000;
+  margin: 0;
+  pointer-events: none;
+  opacity: .92;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 35%);
+}
+/* During a layout edit the header bar carries Save/Cancel, so keep it visible
+   even though it is otherwise revealed on hover only. */
+[data-editing='true'] .yin-actions { opacity: 1; }
+
+/* MIUI/iOS-style edit wobble: a small staggered rotation that signals "these
+   tiles can move". The tile being dragged, and its floating ghost, stay steady. */
+@keyframes yin-edit-wobble {
+  0% { transform: rotate(-1.1deg); }
+  25% { transform: rotate(0.9deg) translateY(-1px); }
+  50% { transform: rotate(-0.8deg); }
+  75% { transform: rotate(1.2deg) translateY(1px); }
+  100% { transform: rotate(-1.1deg); }
+}
+[data-editing='true'] .yin-item:not(.is-dragging) {
+  animation: yin-edit-wobble .38s infinite ease-in-out;
+  will-change: transform;
+}
+[data-editing='true'] .yin-item:nth-child(2n):not(.is-dragging) { animation-delay: -.12s; }
+[data-editing='true'] .yin-item:nth-child(3n):not(.is-dragging) { animation-delay: -.24s; }
+[data-editing='true'] .yin-item:nth-child(5n):not(.is-dragging) { animation-delay: -.06s; }
+.yin-drag-ghost { animation: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  [data-editing='true'] .yin-item:not(.is-dragging) { animation: none; }
+}

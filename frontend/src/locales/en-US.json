@@ -253,7 +253,11 @@
     "loadingItems": "Loading items…",
     "loadItemsFailed": "Could not load items",
     "noMatchingItems": "No matching items",
-    "noItems": "No items in this space"
+    "noItems": "No items in this space",
+    "edit": "Edit",
+    "save": "Save",
+    "layoutSaved": "Layout saved",
+    "layoutSaveFailed": "Could not save the layout"
   },
   "iconItem": {
     "moveUp": "Move up",

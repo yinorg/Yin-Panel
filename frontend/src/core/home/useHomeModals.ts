@@ -1,6 +1,6 @@
 import { ref, type Ref } from 'vue'
 import { useMessage } from 'naive-ui'
-import { createGroup, createItem, createItemWithIcon, createSpace, deleteGroup, deleteItem as deleteSpaceItem, sortGroups, sortItems, updateGroup, updateItem, type Space } from '@/api/panel/space'
+import { arrangeLayout, createGroup, createItem, createItemWithIcon, createSpace, deleteGroup, deleteItem as deleteSpaceItem, sortGroups, sortItems, updateGroup, updateItem, type Space } from '@/api/panel/space'
 import { uploadImage } from '@/api/panel/file'
 import { usePanelState } from '@/store'
 import { t } from '@/locales'
@@ -54,6 +54,7 @@ export function useHomeModals(input: {
       updateGroup: (spaceId, groupId, inputPayload) => updateGroup<{ code: number, msg?: string }>(spaceId, groupId, inputPayload.title, inputPayload.icon, inputPayload.parentId),
       deleteGroup: (spaceId, groupId) => deleteGroup<{ code: number, msg?: string }>(spaceId, groupId),
       reorderGroups: (spaceId, parentId, groupIds) => sortGroups<{ code: number, msg?: string }>(spaceId, parentId, groupIds.map((id, index) => ({ id, sort: index + 1 }))),
+      arrangeLayout: (spaceId, layout) => arrangeLayout<{ code: number, msg?: string }>(spaceId, layout),
     },
     getActiveSpaceId: () => input.activeSpace.value?.id,
     canWrite: () => input.canWrite.value,

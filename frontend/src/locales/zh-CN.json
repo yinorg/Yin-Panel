@@ -253,7 +253,11 @@
     "loadingItems": "正在加载项目…",
     "loadItemsFailed": "无法加载项目",
     "noMatchingItems": "没有匹配的项目",
-    "noItems": "该空间暂无项目"
+    "noItems": "该空间暂无项目",
+    "edit": "编辑",
+    "save": "保存",
+    "layoutSaved": "布局已保存",
+    "layoutSaveFailed": "无法保存布局"
   },
   "iconItem": {
     "moveUp": "上移",

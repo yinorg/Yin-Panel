@@ -69,6 +69,17 @@ export function createGroup<T>(spaceId: number, title: string, icon = '', parent
 export function updateGroup<T>(spaceId: number, groupId: number, title: string, icon = '', parentId?: number | null) { return post<T>({ url: `/spaces/${spaceId}/groups/${groupId}/update`, data: { title, icon, parentId: parentId || null } }) }
 export function deleteGroup<T>(spaceId: number, groupId: number) { return post<T>({ url: `/spaces/${spaceId}/groups/${groupId}/delete` }) }
 export function sortGroups<T>(spaceId: number, parentId: number | null, sortGroups: { id: number; sort: number }[]) { return post<T>({ url: `/spaces/${spaceId}/groups/sort`, data: { parentId, sortGroups } }) }
+export function arrangeLayout<T>(spaceId: number, data: { items: { id: number; groupId: number; sort: number }[]; groups: { id: number; sort: number }[] }) {
+  // The Core-facing layout uses `groupId` (like item.update); the backend wire
+  // shape names the column `itemIconGroupId`.
+  return post<T>({
+    url: `/spaces/${spaceId}/layout/arrange`,
+    data: {
+      items: data.items.map(item => ({ id: item.id, itemIconGroupId: item.groupId, sort: item.sort })),
+      groups: data.groups,
+    },
+  })
+}
 export function renameSpace<T>(spaceId: number, name: string) { return post<T>({ url: `/spaces/${spaceId}`, data: { name } }) }
 export function deleteSpace<T>(spaceId: number) { return post<T>({ url: `/spaces/${spaceId}/delete` }) }
 export function copySpace<T>(spaceId: number, name?: string) { return post<T>({ url: `/spaces/${spaceId}/copy`, data: name ? { name } : {} }) }

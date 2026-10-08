@@ -253,7 +253,11 @@
     "loadingItems": "Cargando elementos…",
     "loadItemsFailed": "No se pudieron cargar los elementos",
     "noMatchingItems": "No hay elementos coincidentes",
-    "noItems": "No hay elementos en este espacio"
+    "noItems": "No hay elementos en este espacio",
+    "edit": "Editar",
+    "save": "Guardar",
+    "layoutSaved": "Diseño guardado",
+    "layoutSaveFailed": "No se pudo guardar el diseño"
   },
   "iconItem": {
     "moveUp": "Subir",
