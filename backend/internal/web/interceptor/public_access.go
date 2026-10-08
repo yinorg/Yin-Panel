@@ -19,7 +19,7 @@ func PublicCodeRequestAllowed(method, route, spaceParam string, publicSpaceID ui
 		return false
 	}
 	switch route {
-	case "/api/spaces", "/api/panel/userConfig/getConfig", "/api/theme/v2/current", "/api/theme/v2/packages":
+	case "/api/spaces", "/api/panel/userConfig/getConfig", "/api/theme/v2/current", "/api/theme/v2/effective", "/api/theme/v2/packages":
 		return true
 	case "/api/theme/v2/package/:id", "/api/theme/v2/revisions/:revision", "/api/theme/v2/preview/:token", "/api/theme/v2/preview/:token/assets/*name", "/api/theme/v2/assets/:revision/*name":
 		return true

@@ -4,7 +4,7 @@ import { useAuthStore, usePanelState } from '@/store'
 import { PanelStateNetworkModeEnum } from '@/enums'
 import { resolvePanelValue } from '@/utils/theme'
 import { PanelPanelConfigStyleEnum } from '@/enums'
-import { activeThemeWallpaper } from '@/hooks/useTheme'
+import { activeThemeWallpaper, reconcileSpaceTheme } from '@/hooks/useTheme'
 import { spaceDisplayName } from '@/api/panel/space'
 import { useHomeEnvironment } from '@/core/home/useHomeEnvironment'
 import { useHomePublicAccess } from '@/core/home/useHomePublicAccess'
@@ -218,6 +218,15 @@ export function useHomeShell() {
       engines: themeSearchEngineConfiguration.value.engines.map(engine => ({ id: engine.id, title: engine.title, iconSrc: engine.iconSrc, url: engine.url })),
       currentSearchEngine: { ...themeSearchEngineConfiguration.value.currentSearchEngine },
     }),
+  })
+
+  // Re-resolve the theme when the active space changes, passing its id so the
+  // server can apply a space theme. The resolver returns the same revision
+  // today, so this never reloads the mounted theme. Watching the theme-active
+  // flag too, because the theme can become active after the space is known.
+  watch([() => activeSpace.value?.id, themeRuntimeActive], ([spaceId, active]) => {
+    if (active && spaceId)
+      void reconcileSpaceTheme(spaceId)
   })
 
   const {

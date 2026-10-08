@@ -86,6 +86,27 @@ type UserThemePreferenceV2 struct {
 	UpdatedAt time.Time
 }
 
+// SpaceThemePreferenceV2 is the theme a space shows. Absence means "inherit the
+// system default", so changing the default reaches every space that has not
+// overridden it.
+type SpaceThemePreferenceV2 struct {
+	SpaceID    uint   `gorm:"primaryKey;autoIncrement:false"`
+	PackageID  string `gorm:"size:128;not null"`
+	RevisionID string `gorm:"size:64;not null"`
+	UpdatedBy  uint   `gorm:"not null;default:0"`
+	UpdatedAt  time.Time
+}
+
+// UserSpaceThemePreferenceV2 is a user's per-space theme override. Reserved:
+// resolution already honours it, but no write path is exposed yet.
+type UserSpaceThemePreferenceV2 struct {
+	UserID     uint   `gorm:"primaryKey;autoIncrement:false"`
+	SpaceID    uint   `gorm:"primaryKey;autoIncrement:false"`
+	PackageID  string `gorm:"size:128;not null"`
+	RevisionID string `gorm:"size:64;not null"`
+	UpdatedAt  time.Time
+}
+
 type builtinPaletteV2 struct {
 	id, name    string
 	light, dark map[string]string
@@ -105,7 +126,7 @@ type builtinPaletteV2 struct {
 }
 
 func migrateRevisionV2(db *gorm.DB) error {
-	return db.AutoMigrate(&PackageRecordV2{}, &RevisionRecordV2{}, &AssetRecordV2{}, &ActivationRecordV2{}, &GrantRecordV2{}, &TrustedRuntimePolicyV2{}, &ThemeSettingsRecordV2{}, &UserThemePreferenceV2{})
+	return db.AutoMigrate(&PackageRecordV2{}, &RevisionRecordV2{}, &AssetRecordV2{}, &ActivationRecordV2{}, &GrantRecordV2{}, &TrustedRuntimePolicyV2{}, &ThemeSettingsRecordV2{}, &UserThemePreferenceV2{}, &SpaceThemePreferenceV2{}, &UserSpaceThemePreferenceV2{})
 }
 
 func InstallPackageV2(db *gorm.DB, actorID uint, pkg *PackageV2) error {
@@ -389,6 +410,92 @@ func UserThemeModeV2(db *gorm.DB, userID uint) (string, error) {
 		return "auto", nil
 	}
 	return preference.Mode, nil
+}
+
+// ThemeResolutionV2 is the theme a viewer sees, plus which step of the chain
+// chose it.
+type ThemeResolutionV2 struct {
+	Revision RevisionRecordV2
+	Source   string
+}
+
+// ResolveThemeV2 picks the theme a viewer sees for a space. Precedence, highest
+// first: a user's per-space override (reserved, not yet writable) -> the user's
+// own choice -> the space's theme -> the system default -> the built-in default.
+// A preference pointing at a revision that no longer exists is skipped, so a
+// removed theme falls back down the chain instead of failing the read.
+func ResolveThemeV2(db *gorm.DB, userID, spaceID uint) (ThemeResolutionV2, error) {
+	yin, err := InstanceDefaultRevisionV2(db)
+	if err != nil {
+		return ThemeResolutionV2{}, err
+	}
+	systemRevision, err := ActivePackageRevisionV2(db, InstanceThemeScopeV2, yin.ID)
+	if err != nil {
+		return ThemeResolutionV2{}, err
+	}
+	if userID != 0 && spaceID != 0 {
+		revision, ok, err := userSpaceThemeRevisionV2(db, userID, spaceID)
+		if err != nil {
+			return ThemeResolutionV2{}, err
+		}
+		if ok {
+			return ThemeResolutionV2{Revision: revision, Source: "user-space"}, nil
+		}
+	}
+	if userID != 0 {
+		revision, err := ActivePackageRevisionV2(db, ActivationScopeForUserV2(userID), "")
+		if err == nil {
+			return ThemeResolutionV2{Revision: revision, Source: "user"}, nil
+		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return ThemeResolutionV2{}, err
+		}
+	}
+	if spaceID != 0 {
+		revision, ok, err := spaceThemeRevisionV2(db, spaceID)
+		if err != nil {
+			return ThemeResolutionV2{}, err
+		}
+		if ok {
+			return ThemeResolutionV2{Revision: revision, Source: "space"}, nil
+		}
+	}
+	return ThemeResolutionV2{Revision: systemRevision, Source: "system"}, nil
+}
+
+func userSpaceThemeRevisionV2(db *gorm.DB, userID, spaceID uint) (RevisionRecordV2, bool, error) {
+	var preference UserSpaceThemePreferenceV2
+	err := db.First(&preference, "user_id = ? AND space_id = ?", userID, spaceID).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return RevisionRecordV2{}, false, nil
+	}
+	if err != nil {
+		return RevisionRecordV2{}, false, err
+	}
+	return presentRevisionV2(db, preference.RevisionID)
+}
+
+func spaceThemeRevisionV2(db *gorm.DB, spaceID uint) (RevisionRecordV2, bool, error) {
+	var preference SpaceThemePreferenceV2
+	err := db.First(&preference, "space_id = ?", spaceID).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return RevisionRecordV2{}, false, nil
+	}
+	if err != nil {
+		return RevisionRecordV2{}, false, err
+	}
+	return presentRevisionV2(db, preference.RevisionID)
+}
+
+func presentRevisionV2(db *gorm.DB, revisionID string) (RevisionRecordV2, bool, error) {
+	revision, err := GetPackageRevisionV2(db, revisionID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return RevisionRecordV2{}, false, nil
+	}
+	if err != nil {
+		return RevisionRecordV2{}, false, err
+	}
+	return revision, true, nil
 }
 
 func validThemeModeV2(mode string) bool {

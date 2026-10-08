@@ -52,6 +52,7 @@ func publicCodeRouteExpectedForCoreAPI(method, path string) bool {
 	case "/api/spaces",
 		"/api/panel/userConfig/getConfig",
 		"/api/theme/v2/current",
+		"/api/theme/v2/effective",
 		"/api/theme/v2/packages",
 		"/api/theme/v2/package/:id",
 		"/api/theme/v2/revisions/:revision",

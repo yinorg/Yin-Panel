@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 
@@ -26,6 +27,7 @@ func NewThemeRouter() *ThemeRouter { return &ThemeRouter{} }
 
 func (a *ThemeRouter) InitRouter(router *gin.RouterGroup) {
 	router.GET("/theme/v2/current", a.CurrentV2)
+	router.GET("/theme/v2/effective", interceptor.OptionalAuth, a.EffectiveV2)
 	router.GET("/theme/v2/packages", a.PublicListV2)
 	router.GET("/theme/v2/package/:id", a.PackageByIDV2)
 	router.GET("/theme/v2/revisions/:revision", a.PackageV2)
@@ -97,6 +99,45 @@ func (a *ThemeRouter) CurrentV2(c *gin.Context) {
 		return
 	}
 	response.SuccessData(c, pkg)
+}
+
+// EffectiveV2 resolves which theme a viewer sees for a space, applying the full
+// precedence chain. Anonymous visitors (public links) and signed-in users share
+// this endpoint; only the chain differs.
+func (a *ThemeRouter) EffectiveV2(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	var spaceID uint
+	if raw := strings.TrimSpace(c.Query("spaceId")); raw != "" {
+		parsed, err := strconv.ParseUint(raw, 10, 64)
+		if err != nil || parsed == 0 {
+			response.ErrorParamFomat(c, "spaceId must be a positive integer")
+			return
+		}
+		spaceID = uint(parsed)
+	}
+	var userID uint
+	if c.GetString("authMethod") == "jwt" {
+		if user, ok := base.GetCurrentUserInfo(c); ok {
+			userID = user.ID
+		}
+	}
+	resolution, err := theme.ResolveThemeV2(repository.Db, userID, spaceID)
+	if err != nil {
+		response.ErrorDatabase(c, err.Error())
+		return
+	}
+	pkg, err := theme.PackageRevisionPublicV2(repository.Db, resolution.Revision.ID)
+	if err != nil {
+		response.ErrorDatabase(c, err.Error())
+		return
+	}
+	mode := "auto"
+	if userID != 0 {
+		if userMode, modeErr := theme.UserThemeModeV2(repository.Db, userID); modeErr == nil {
+			mode = userMode
+		}
+	}
+	response.SuccessData(c, gin.H{"package": pkg, "revision": resolution.Revision.ID, "source": resolution.Source, "mode": mode})
 }
 
 func (a *ThemeRouter) PublicListV2(c *gin.Context) {

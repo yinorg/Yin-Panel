@@ -147,6 +147,34 @@ func Auth(c *gin.Context) {
 	c.Next()
 }
 
+// OptionalAuth resolves a session when one is present but never rejects the
+// request. It is for endpoints that serve both signed-in users and anonymous
+// visitors (theme resolution), where the difference only changes which theme is
+// chosen, not whether the request may proceed.
+func OptionalAuth(c *gin.Context) {
+	token := c.GetHeader("Authorization")
+	if token == "" {
+		token, _ = c.Cookie(AuthCookieName)
+	}
+	if token == "" {
+		c.Next()
+		return
+	}
+	claims, err := ParseJwtClaims(token)
+	if err != nil {
+		c.Next()
+		return
+	}
+	user, err := global.UserRepo.Get(claims.UserID)
+	if err != nil || user.Status != 1 || claims.TokenVersion == nil || *claims.TokenVersion != user.TokenVersion {
+		c.Next()
+		return
+	}
+	c.Set("userInfo", base.UserInfo{ID: user.ID, Name: user.Name, Role: user.Role, Mail: user.Mail, Publiccode: user.Publiccode})
+	c.Set("authMethod", "jwt")
+	c.Next()
+}
+
 // ParseUserIdFromJwtToken 解析JWT Token，获取用户ID
 func ParseUserIdFromJwtToken(authHeader string) (uint, error) {
 	claims, err := ParseJwtClaims(authHeader)

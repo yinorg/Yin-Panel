@@ -12,6 +12,86 @@ import (
 	"gorm.io/gorm"
 )
 
+func TestResolveThemeV2FollowsPrecedenceChain(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open("file:theme-resolve-v2?mode=memory&cache=shared"), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := Migrate(db); err != nil {
+		t.Fatal(err)
+	}
+	install := func(id string) RevisionRecordV2 {
+		pkg := resolverFixtureV2(id, "1.0.0")
+		if err := InstallPackageV2(db, 1, pkg); err != nil {
+			t.Fatalf("install %s: %v", id, err)
+		}
+		return RevisionRecordV2{ID: pkg.Revision, PackageID: id}
+	}
+	system := install("org.yin.default")
+	userTheme := install("user.example")
+	spaceTheme := install("space.example")
+
+	if err := InitializeActivationV2(db, InstanceThemeScopeV2, "org.yin.default", system.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	resolve := func(userID, spaceID uint) ThemeResolutionV2 {
+		t.Helper()
+		result, resolveErr := ResolveThemeV2(db, userID, spaceID)
+		if resolveErr != nil {
+			t.Fatalf("resolve(%d,%d): %v", userID, spaceID, resolveErr)
+		}
+		return result
+	}
+
+	if got := resolve(0, 0); got.Source != "system" || got.Revision.ID != system.ID {
+		t.Fatalf("anonymous resolution = %s/%s, want system/%s", got.Source, got.Revision.ID, system.ID)
+	}
+
+	if err := db.Create(&SpaceThemePreferenceV2{SpaceID: 5, PackageID: "space.example", RevisionID: spaceTheme.ID}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if got := resolve(0, 5); got.Source != "space" || got.Revision.ID != spaceTheme.ID {
+		t.Fatalf("space resolution = %s/%s, want space/%s", got.Source, got.Revision.ID, spaceTheme.ID)
+	}
+
+	if err := SetUserThemeSelectionV2(db, 42, "user.example", userTheme.ID, "auto"); err != nil {
+		t.Fatal(err)
+	}
+	if got := resolve(42, 5); got.Source != "user" || got.Revision.ID != userTheme.ID {
+		t.Fatalf("user resolution = %s/%s, want user/%s", got.Source, got.Revision.ID, userTheme.ID)
+	}
+
+	if err := db.Create(&UserSpaceThemePreferenceV2{UserID: 42, SpaceID: 5, PackageID: "org.yin.default", RevisionID: system.ID}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if got := resolve(42, 5); got.Source != "user-space" || got.Revision.ID != system.ID {
+		t.Fatalf("per-space override resolution = %s/%s, want user-space/%s", got.Source, got.Revision.ID, system.ID)
+	}
+
+	// A preference pointing at a revision that no longer exists falls through.
+	if err := db.Model(&UserSpaceThemePreferenceV2{}).Where("user_id = ? AND space_id = ?", 42, 5).Update("revision_id", strings.Repeat("0", 64)).Error; err != nil {
+		t.Fatal(err)
+	}
+	if got := resolve(42, 5); got.Source != "user" {
+		t.Fatalf("stale override did not fall back: got %s", got.Source)
+	}
+
+	// A guest never sees a user's choice.
+	if got := resolve(0, 5); got.Source != "space" {
+		t.Fatalf("guest resolution = %s, want space", got.Source)
+	}
+}
+
+func resolverFixtureV2(id, version string) *PackageV2 {
+	revisionBytes := []byte("revision:" + id + ":" + version)
+	return &PackageV2{
+		Manifest: PackageManifestV2{ID: id, Name: id, Version: version},
+		Files:    map[string]ResourceData{"views/home.mjs": {MediaType: "text/javascript", Content: []byte("export default {}")}},
+		Revision: packageRevisionV2(map[string][]byte{"manifest.json": revisionBytes}),
+	}
+}
+
 func TestRevisionV2InstallIsImmutableAndActivationCanRollback(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open("file:theme-revisions-v2?mode=memory&cache=shared"), &gorm.Config{})
 	if err != nil {

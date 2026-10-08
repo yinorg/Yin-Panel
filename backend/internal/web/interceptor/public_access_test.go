@@ -28,6 +28,7 @@ func TestPublicCodeRoutePolicyAllowsOnlyHomeReads(t *testing.T) {
 		{http.MethodGet, "/api/spaces/:spaceId/search-config", true},
 		{http.MethodGet, "/api/panel/userConfig/getConfig", true},
 		{http.MethodGet, "/api/theme/v2/current", true},
+		{http.MethodGet, "/api/theme/v2/effective", true},
 		{http.MethodGet, "/api/theme/v2/packages", true},
 		{http.MethodGet, "/api/theme/v2/package/:id", true},
 		{http.MethodGet, "/api/theme/v2/revisions/:revision", true},

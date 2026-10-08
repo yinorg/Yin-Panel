@@ -51,6 +51,20 @@ export function getMyTheme() {
   })
 }
 
+export type EffectiveThemeSource = 'user-space' | 'user' | 'space' | 'system' | 'builtin'
+
+/**
+ * The server-side resolution for a space. Anonymous visitors and signed-in users
+ * share it; only the precedence chain differs. `spaceId` is optional so the
+ * initial load (before a space is known) still resolves.
+ */
+export function getEffectiveTheme(spaceId?: number) {
+  const query = spaceId ? `?spaceId=${encodeURIComponent(spaceId)}` : ''
+  return request.get<{ code: number; data: { package: ThemePackageV2; revision: string; source: EffectiveThemeSource; mode: ThemePreference['mode'] } }>(`/theme/v2/effective${query}`).then((res) => {
+    return { ...res.data, data: { ...res.data.data, package: normalizeThemePackageV2(res.data.data.package) } }
+  })
+}
+
 export function getThemePreference() {
   return request.get<{ code: number; data: { mode: ThemePreference['mode'] } }>('/theme/v2/preference').then(res => res.data)
 }

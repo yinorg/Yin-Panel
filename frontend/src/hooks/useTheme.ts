@@ -3,7 +3,7 @@ import { computed, ref, watch, watchEffect } from 'vue'
 import { darkTheme, useOsTheme } from 'naive-ui'
 import { useAppStore } from '../store'
 import { useAuthStore } from '../store'
-import { getCurrentTheme, getMyTheme, getPreviewTheme, getThemePackage } from '../api/theme'
+import { getCurrentTheme, getEffectiveTheme, getMyTheme, getPreviewTheme, getThemePackage } from '../api/theme'
 import { parsePublicCodeFromPath } from '../utils/request/axios'
 import { resolveThemeSlots, resolveWallpaper, selectThemeScheme, type ThemePackage } from '../utils/theme'
 import { isThemeSafeMode } from '../theme/recovery/safeMode'
@@ -55,6 +55,28 @@ async function refreshCurrentTheme() {
   }
   catch {
     // Keep the last valid package if the theme endpoint is temporarily unavailable.
+  }
+}
+
+/**
+ * Re-resolve the theme for a space through the server-side precedence chain.
+ * It is a no-op when the resolved revision matches what is already mounted, so
+ * switching spaces never reloads an unchanged theme — and today no space theme
+ * is set, so it always matches. This is the reservation that lets a space theme
+ * take effect later without touching the call sites again.
+ */
+export async function reconcileSpaceTheme(spaceId?: number) {
+  if (previewToken || isThemeSafeMode() || parsePublicCodeFromPath())
+    return
+  try {
+    const effective = await getEffectiveTheme(spaceId)
+    if (effective.code !== 0 || !effective.data.package)
+      return
+    if (effective.data.package.revision !== activeThemePackage.value?.revision)
+      activeThemePackage.value = effective.data.package
+  }
+  catch {
+    // Keep the mounted package when resolution is temporarily unavailable.
   }
 }
 
