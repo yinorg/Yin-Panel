@@ -25,7 +25,12 @@ const languageValue = ref(appStore.language)
 const localizedLanguageOptions = computed(() => languageOptions.map(option => ({ ...option, label: option.key === 'auto' ? t('common.followBrowser') : option.label })))
 const themeValue = ref(appStore.theme)
 const selectedThemePackage = ref('')
+const themeModeValue = ref<'custom' | 'follow-space'>('custom')
 const themePackageOptions = ref<{ label: string; value: string }[]>([])
+const themeModeOptions = computed(() => [
+  { label: t('themeScope.modeCustom'), value: 'custom' },
+  { label: t('themeScope.modeFollowSpace'), value: 'follow-space' },
+])
 const nickName = ref(authStore.userInfo?.name || '')
 const isEditNickNameStatus = ref(false)
 const formRef = ref<FormInst | null>(null)
@@ -152,6 +157,7 @@ async function loadThemeSettings() {
     if (mine.code === 0) {
       selectedThemePackage.value = mine.data.preference.packageId || ''
       themeValue.value = mine.data.preference.mode
+      themeModeValue.value = mine.data.preference.themeMode || 'custom'
     }
   }
   catch {
@@ -161,10 +167,22 @@ async function loadThemeSettings() {
 
 async function handleChangeThemePackage(packageId: string) {
   selectedThemePackage.value = packageId
-  const result = await saveThemePreference({ packageId, mode: themeValue.value })
+  const result = await saveThemePreference({ packageId, mode: themeValue.value, themeMode: themeModeValue.value })
   if (result.code === 0) {
     await refreshMyTheme(appStore)
     ms.success(t('themePackage.saved'))
+  }
+  else {
+    ms.error(result.msg)
+  }
+}
+
+async function handleChangeThemeMode(value: 'custom' | 'follow-space') {
+  themeModeValue.value = value
+  const result = await saveThemePreference({ packageId: selectedThemePackage.value, mode: themeValue.value, themeMode: value })
+  if (result.code === 0) {
+    await refreshMyTheme(appStore)
+    ms.success(t('themeScope.saved'))
   }
   else {
     ms.error(result.msg)
@@ -236,8 +254,12 @@ onMounted(loadThemeSettings)
         <div class="max-w-[200px]">
         <NSelect v-model:value="themeValue" :options="themeOptions" @update-value="handleChangeTheme" />
         <div class="mt-3">
+          <div class="mb-1">{{ $t('themeScope.mode') }}</div>
+          <NSelect v-model:value="themeModeValue" :options="themeModeOptions" @update-value="handleChangeThemeMode" />
+        </div>
+        <div class="mt-3">
           <div class="mb-1">{{ $t('themePackage.label') }}</div>
-          <NSelect v-model:value="selectedThemePackage" :options="themePackageOptions" @update-value="handleChangeThemePackage" />
+          <NSelect v-model:value="selectedThemePackage" :options="themePackageOptions" :disabled="themeModeValue === 'follow-space'" @update-value="handleChangeThemePackage" />
         </div>
         </div>
       </div>

@@ -343,5 +343,13 @@
     "newPassword": "新密码",
     "oldPassword": "旧密码",
     "updatePassword": "修改密码"
+  },
+  "themeScope": {
+    "mode": "主题来源",
+    "modeCustom": "自定义主题",
+    "modeFollowSpace": "跟随空间",
+    "spaceTitle": "空间主题",
+    "followSystem": "跟随系统默认",
+    "saved": "已保存"
   }
 }

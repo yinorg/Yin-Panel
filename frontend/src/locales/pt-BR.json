@@ -390,5 +390,13 @@
     "newPassword": "Neues Passwort",
     "oldPassword": "Altes Passwort",
     "updatePassword": "Passwort ändern"
+  },
+  "themeScope": {
+    "mode": "Origem do tema",
+    "modeCustom": "Meu tema",
+    "modeFollowSpace": "Seguir o espaço",
+    "spaceTitle": "Tema do espaço",
+    "followSystem": "Seguir o padrão do sistema",
+    "saved": "Salvo"
   }
 }

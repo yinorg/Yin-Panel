@@ -81,8 +81,13 @@ type ThemeSettingsRecordV2 struct {
 }
 
 type UserThemePreferenceV2 struct {
-	UserID    uint   `gorm:"primaryKey;autoIncrement:false"`
-	Mode      string `gorm:"size:8;not null"`
+	UserID uint `gorm:"primaryKey;autoIncrement:false"`
+	// Mode is the colour scheme (light/dark/auto).
+	Mode string `gorm:"size:8;not null"`
+	// ThemeMode is the theme-choice behaviour: "custom" (use the user's own
+	// theme) or "follow-space" (inherit the space's theme). Existing rows default
+	// to "custom"; a user with no row follows the space.
+	ThemeMode string `gorm:"size:16;not null;default:'custom'"`
 	UpdatedAt time.Time
 }
 
@@ -389,7 +394,7 @@ func SetUserThemeSelectionV2(db *gorm.DB, userID uint, packageID, revisionID, mo
 		if err := tx.Save(&activation).Error; err != nil {
 			return err
 		}
-		preference := UserThemePreferenceV2{UserID: userID, Mode: mode, UpdatedAt: time.Now()}
+		preference := UserThemePreferenceV2{UserID: userID, Mode: mode, ThemeMode: "custom", UpdatedAt: time.Now()}
 		if err := tx.Save(&preference).Error; err != nil {
 			return err
 		}
@@ -443,12 +448,18 @@ func ResolveThemeV2(db *gorm.DB, userID, spaceID uint) (ThemeResolutionV2, error
 		}
 	}
 	if userID != 0 {
-		revision, err := ActivePackageRevisionV2(db, ActivationScopeForUserV2(userID), "")
-		if err == nil {
-			return ThemeResolutionV2{Revision: revision, Source: "user"}, nil
-		}
-		if !errors.Is(err, gorm.ErrRecordNotFound) {
+		choice, err := UserThemeChoiceModeV2(db, userID)
+		if err != nil {
 			return ThemeResolutionV2{}, err
+		}
+		if choice == "custom" {
+			revision, err := ActivePackageRevisionV2(db, ActivationScopeForUserV2(userID), "")
+			if err == nil {
+				return ThemeResolutionV2{Revision: revision, Source: "user"}, nil
+			}
+			if !errors.Is(err, gorm.ErrRecordNotFound) {
+				return ThemeResolutionV2{}, err
+			}
 		}
 	}
 	if spaceID != 0 {
@@ -496,6 +507,100 @@ func presentRevisionV2(db *gorm.DB, revisionID string) (RevisionRecordV2, bool, 
 		return RevisionRecordV2{}, false, err
 	}
 	return revision, true, nil
+}
+
+// UserThemeChoiceModeV2 reports whether the user follows their own theme
+// ("custom") or the space's ("follow-space"). A user who never selected a theme
+// has no preference row and follows the space, which matches their previous
+// behaviour of falling through to the instance default.
+func UserThemeChoiceModeV2(db *gorm.DB, userID uint) (string, error) {
+	var preference UserThemePreferenceV2
+	err := db.First(&preference, "user_id = ?", userID).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return "follow-space", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	if preference.ThemeMode == "custom" || preference.ThemeMode == "follow-space" {
+		return preference.ThemeMode, nil
+	}
+	return "custom", nil
+}
+
+// SetUserThemeChoiceV2 changes only the theme-choice behaviour, leaving the
+// colour scheme and the selected theme untouched.
+func SetUserThemeChoiceV2(db *gorm.DB, userID uint, themeMode string) error {
+	if userID == 0 || (themeMode != "custom" && themeMode != "follow-space") {
+		return errors.New("themeMode must be custom or follow-space")
+	}
+	var preference UserThemePreferenceV2
+	err := db.First(&preference, "user_id = ?", userID).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		preference = UserThemePreferenceV2{UserID: userID, Mode: "auto"}
+	} else if err != nil {
+		return err
+	}
+	preference.ThemeMode = themeMode
+	preference.UpdatedAt = time.Now()
+	return db.Save(&preference).Error
+}
+
+func validateThemeRevisionV2(db *gorm.DB, packageID, revisionID string) error {
+	if packageID == "" || revisionID == "" {
+		return errors.New("a theme package and revision are required")
+	}
+	var packageRecord PackageRecordV2
+	if err := db.First(&packageRecord, "id = ? AND removed = ?", packageID, false).Error; err != nil {
+		return err
+	}
+	var revision RevisionRecordV2
+	return db.First(&revision, "id = ? AND package_id = ?", revisionID, packageID).Error
+}
+
+// SetSpaceThemeV2 sets the theme a space shows. Absence (ClearSpaceThemeV2) means
+// the space inherits the system default.
+func SetSpaceThemeV2(db *gorm.DB, spaceID uint, packageID, revisionID string, actorID uint) error {
+	if spaceID == 0 {
+		return errors.New("a space is required")
+	}
+	if err := validateThemeRevisionV2(db, packageID, revisionID); err != nil {
+		return err
+	}
+	preference := SpaceThemePreferenceV2{SpaceID: spaceID, PackageID: packageID, RevisionID: revisionID, UpdatedBy: actorID, UpdatedAt: time.Now()}
+	return db.Save(&preference).Error
+}
+
+func ClearSpaceThemeV2(db *gorm.DB, spaceID uint) error {
+	return db.Delete(&SpaceThemePreferenceV2{}, "space_id = ?", spaceID).Error
+}
+
+func SpaceThemePreferenceForV2(db *gorm.DB, spaceID uint) (SpaceThemePreferenceV2, error) {
+	var preference SpaceThemePreferenceV2
+	err := db.First(&preference, "space_id = ?", spaceID).Error
+	return preference, err
+}
+
+// SetUserSpaceThemeV2 stores a user's per-space override.
+func SetUserSpaceThemeV2(db *gorm.DB, userID, spaceID uint, packageID, revisionID string) error {
+	if userID == 0 || spaceID == 0 {
+		return errors.New("a user and a space are required")
+	}
+	if err := validateThemeRevisionV2(db, packageID, revisionID); err != nil {
+		return err
+	}
+	preference := UserSpaceThemePreferenceV2{UserID: userID, SpaceID: spaceID, PackageID: packageID, RevisionID: revisionID, UpdatedAt: time.Now()}
+	return db.Save(&preference).Error
+}
+
+func ClearUserSpaceThemeV2(db *gorm.DB, userID, spaceID uint) error {
+	return db.Delete(&UserSpaceThemePreferenceV2{}, "user_id = ? AND space_id = ?", userID, spaceID).Error
+}
+
+func UserSpaceThemePreferenceForV2(db *gorm.DB, userID, spaceID uint) (UserSpaceThemePreferenceV2, error) {
+	var preference UserSpaceThemePreferenceV2
+	err := db.First(&preference, "user_id = ? AND space_id = ?", userID, spaceID).Error
+	return preference, err
 }
 
 func validThemeModeV2(mode string) bool {

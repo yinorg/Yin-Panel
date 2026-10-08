@@ -5,6 +5,8 @@ export interface ThemePreference {
   packageId: string
   mode: 'light' | 'dark' | 'auto'
   revision?: string
+  /** 'custom' uses the user's own theme; 'follow-space' inherits the space's. */
+  themeMode?: 'custom' | 'follow-space'
 }
 
 export interface ThemeRuntimeGrant {
@@ -83,6 +85,26 @@ export function getThemeRevision(revision: string) {
 	return request.get<{ code: number; data: ThemePackageV2 }>(`/theme/v2/revisions/${encodeURIComponent(revision)}`).then((res) => {
 		return { ...res.data, data: normalizeThemePackageV2(res.data.data) }
 	})
+}
+
+export function getSpaceTheme(spaceId: number) {
+  return request.get<{ code: number; data: { spaceId: number; theme: { packageId: string; revision: string } | null; override: { packageId: string; revision: string } | null } }>(`/theme/v2/space/${spaceId}`).then(res => res.data)
+}
+
+export function setSpaceTheme(spaceId: number, selection: { packageId?: string; revision?: string }) {
+  return request.put<{ code: number; msg: string }>(`/theme/v2/space/${spaceId}`, selection).then(res => res.data)
+}
+
+export function clearSpaceTheme(spaceId: number) {
+  return request.delete<{ code: number; msg: string }>(`/theme/v2/space/${spaceId}`).then(res => res.data)
+}
+
+export function setUserSpaceTheme(spaceId: number, selection: { packageId?: string; revision?: string }) {
+  return request.put<{ code: number; msg: string }>(`/theme/v2/space/${spaceId}/mine`, selection).then(res => res.data)
+}
+
+export function clearUserSpaceTheme(spaceId: number) {
+  return request.delete<{ code: number; msg: string }>(`/theme/v2/space/${spaceId}/mine`).then(res => res.data)
 }
 
 export function saveThemePreference(preference: ThemePreference) {

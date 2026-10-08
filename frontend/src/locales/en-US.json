@@ -343,5 +343,13 @@
     "newPassword": "New password",
     "oldPassword": "Old password",
     "updatePassword": "Change password"
+  },
+  "themeScope": {
+    "mode": "Theme source",
+    "modeCustom": "My own theme",
+    "modeFollowSpace": "Follow the space",
+    "spaceTitle": "Space theme",
+    "followSystem": "Follow the system default",
+    "saved": "Saved"
   }
 }

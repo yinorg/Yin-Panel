@@ -44,6 +44,11 @@ func (a *ThemeRouter) InitRouter(router *gin.RouterGroup) {
 	user.GET("/theme/v2/grants/:revision", a.ThemeGrantV2)
 	user.POST("/theme/v2/grants/:revision", a.SetThemeGrantV2)
 	user.DELETE("/theme/v2/grants/:revision", a.RevokeThemeGrantV2)
+	user.GET("/theme/v2/space/:spaceId", a.SpaceThemeV2)
+	user.PUT("/theme/v2/space/:spaceId", a.SetSpaceThemeV2)
+	user.DELETE("/theme/v2/space/:spaceId", a.ClearSpaceThemeV2)
+	user.PUT("/theme/v2/space/:spaceId/mine", a.SetUserSpaceThemeV2)
+	user.DELETE("/theme/v2/space/:spaceId/mine", a.ClearUserSpaceThemeV2)
 	admin := router.Group("")
 	admin.Use(interceptor.Auth, themeJWTOnly, interceptor.AdminInterceptor)
 	admin.GET("/theme/v2/admin/packages", a.RevisionsV2)
@@ -140,6 +145,182 @@ func (a *ThemeRouter) EffectiveV2(c *gin.Context) {
 	response.SuccessData(c, gin.H{"package": pkg, "revision": resolution.Revision.ID, "source": resolution.Source, "mode": mode})
 }
 
+func parseSpaceIDParam(c *gin.Context) (uint, bool) {
+	parsed, err := strconv.ParseUint(c.Param("spaceId"), 10, 32)
+	if err != nil || parsed == 0 {
+		response.ErrorParamFomat(c, "spaceId must be a positive integer")
+		return 0, false
+	}
+	return uint(parsed), true
+}
+
+// spaceAdminUserID returns the acting user when they may manage the space's
+// theme (owner or space admin); otherwise it writes the refusal and returns false.
+func spaceAdminUserID(c *gin.Context, spaceID uint) (uint, bool) {
+	user, ok := base.GetCurrentUserInfo(c)
+	if !ok || user.ID == 0 {
+		response.ErrorByCode(c, constant.CodeNotLogin)
+		return 0, false
+	}
+	var space repository.Space
+	if err := repository.Db.Select("id, owner_user_id").Where("id = ?", spaceID).First(&space).Error; err != nil {
+		response.ErrorDataNotFound(c)
+		return 0, false
+	}
+	if space.OwnerUserID == user.ID {
+		return user.ID, true
+	}
+	var member repository.SpaceMember
+	if err := repository.Db.Where("space_id = ? AND user_id = ? AND role = ?", spaceID, user.ID, repository.SpaceRoleAdmin).First(&member).Error; err == nil {
+		return user.ID, true
+	}
+	response.ErrorNoAccess(c)
+	return 0, false
+}
+
+// bindThemeSelection reads a package/revision pair from the body, resolving
+// whichever half is missing. It writes the refusal and returns ok=false on error.
+func bindThemeSelection(c *gin.Context) (packageID, revisionID string, ok bool) {
+	var req struct {
+		Revision  string `json:"revision"`
+		PackageID string `json:"packageId"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.ErrorParamFomat(c, err.Error())
+		return "", "", false
+	}
+	packageID, revisionID = req.PackageID, req.Revision
+	if revisionID == "" && packageID != "" {
+		latest, err := theme.LatestPackageRevisionV2(repository.Db, packageID)
+		if err != nil {
+			response.ErrorDataNotFound(c)
+			return "", "", false
+		}
+		revisionID = latest.ID
+	}
+	if packageID == "" && revisionID != "" {
+		revision, err := theme.GetPackageRevisionV2(repository.Db, revisionID)
+		if err != nil {
+			response.ErrorDataNotFound(c)
+			return "", "", false
+		}
+		packageID = revision.PackageID
+	}
+	if packageID == "" || revisionID == "" {
+		response.ErrorParamFomat(c, "packageId or revision is required")
+		return "", "", false
+	}
+	return packageID, revisionID, true
+}
+
+// SpaceThemeV2 reports a space's theme and the caller's per-space override.
+func (a *ThemeRouter) SpaceThemeV2(c *gin.Context) {
+	user, ok := base.GetCurrentUserInfo(c)
+	if !ok || user.ID == 0 {
+		response.ErrorByCode(c, constant.CodeNotLogin)
+		return
+	}
+	spaceID, ok := parseSpaceIDParam(c)
+	if !ok {
+		return
+	}
+	result := gin.H{"spaceId": spaceID, "theme": nil, "override": nil}
+	if preference, err := theme.SpaceThemePreferenceForV2(repository.Db, spaceID); err == nil {
+		result["theme"] = gin.H{"packageId": preference.PackageID, "revision": preference.RevisionID}
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		response.ErrorDatabase(c, err.Error())
+		return
+	}
+	if preference, err := theme.UserSpaceThemePreferenceForV2(repository.Db, user.ID, spaceID); err == nil {
+		result["override"] = gin.H{"packageId": preference.PackageID, "revision": preference.RevisionID}
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		response.ErrorDatabase(c, err.Error())
+		return
+	}
+	response.SuccessData(c, result)
+}
+
+func (a *ThemeRouter) SetSpaceThemeV2(c *gin.Context) {
+	spaceID, ok := parseSpaceIDParam(c)
+	if !ok {
+		return
+	}
+	actorID, ok := spaceAdminUserID(c, spaceID)
+	if !ok {
+		return
+	}
+	packageID, revisionID, ok := bindThemeSelection(c)
+	if !ok {
+		return
+	}
+	if err := theme.SetSpaceThemeV2(repository.Db, spaceID, packageID, revisionID, actorID); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			response.ErrorDataNotFound(c)
+			return
+		}
+		response.ErrorParamFomat(c, err.Error())
+		return
+	}
+	response.Success(c)
+}
+
+func (a *ThemeRouter) ClearSpaceThemeV2(c *gin.Context) {
+	spaceID, ok := parseSpaceIDParam(c)
+	if !ok {
+		return
+	}
+	if _, ok := spaceAdminUserID(c, spaceID); !ok {
+		return
+	}
+	if err := theme.ClearSpaceThemeV2(repository.Db, spaceID); err != nil {
+		response.ErrorDatabase(c, err.Error())
+		return
+	}
+	response.Success(c)
+}
+
+func (a *ThemeRouter) SetUserSpaceThemeV2(c *gin.Context) {
+	user, ok := base.GetCurrentUserInfo(c)
+	if !ok || user.ID == 0 {
+		response.ErrorByCode(c, constant.CodeNotLogin)
+		return
+	}
+	spaceID, ok := parseSpaceIDParam(c)
+	if !ok {
+		return
+	}
+	packageID, revisionID, ok := bindThemeSelection(c)
+	if !ok {
+		return
+	}
+	if err := theme.SetUserSpaceThemeV2(repository.Db, user.ID, spaceID, packageID, revisionID); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			response.ErrorDataNotFound(c)
+			return
+		}
+		response.ErrorParamFomat(c, err.Error())
+		return
+	}
+	response.Success(c)
+}
+
+func (a *ThemeRouter) ClearUserSpaceThemeV2(c *gin.Context) {
+	user, ok := base.GetCurrentUserInfo(c)
+	if !ok || user.ID == 0 {
+		response.ErrorByCode(c, constant.CodeNotLogin)
+		return
+	}
+	spaceID, ok := parseSpaceIDParam(c)
+	if !ok {
+		return
+	}
+	if err := theme.ClearUserSpaceThemeV2(repository.Db, user.ID, spaceID); err != nil {
+		response.ErrorDatabase(c, err.Error())
+		return
+	}
+	response.Success(c)
+}
+
 func (a *ThemeRouter) PublicListV2(c *gin.Context) {
 	packages, err := theme.ListPackagesV2(repository.Db)
 	if err != nil {
@@ -190,7 +371,12 @@ func (a *ThemeRouter) Mine(c *gin.Context) {
 		response.ErrorDatabase(c, err.Error())
 		return
 	}
-	response.SuccessData(c, gin.H{"package": pkg, "preference": gin.H{"revision": revision.ID, "packageId": selectedPackageID, "mode": mode}})
+	themeMode, err := theme.UserThemeChoiceModeV2(repository.Db, user.ID)
+	if err != nil {
+		response.ErrorDatabase(c, err.Error())
+		return
+	}
+	response.SuccessData(c, gin.H{"package": pkg, "preference": gin.H{"revision": revision.ID, "packageId": selectedPackageID, "mode": mode, "themeMode": themeMode}})
 }
 
 func (a *ThemeRouter) SetPreference(c *gin.Context) {
@@ -203,48 +389,61 @@ func (a *ThemeRouter) SetPreference(c *gin.Context) {
 		Revision  string `json:"revision"`
 		PackageID string `json:"packageId"`
 		Mode      string `json:"mode"`
+		ThemeMode string `json:"themeMode"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.ErrorParamFomat(c, err.Error())
 		return
 	}
-	if req.Mode == "" {
-		req.Mode = "auto"
-	}
-	if req.Mode != "light" && req.Mode != "dark" && req.Mode != "auto" {
-		response.ErrorParamFomat(c, "mode must be light, dark, or auto")
-		return
-	}
-	revisionID := req.Revision
-	if revisionID == "" && req.PackageID != "" {
-		latest, latestErr := theme.LatestPackageRevisionV2(repository.Db, req.PackageID)
-		if latestErr != nil {
+	// A request that carries no selection (only a themeMode change) must not
+	// reset the user's chosen theme to the instance default.
+	if req.Revision != "" || req.PackageID != "" || req.Mode != "" {
+		if req.Mode == "" {
+			req.Mode = "auto"
+		}
+		if req.Mode != "light" && req.Mode != "dark" && req.Mode != "auto" {
+			response.ErrorParamFomat(c, "mode must be light, dark, or auto")
+			return
+		}
+		revisionID := req.Revision
+		if revisionID == "" && req.PackageID != "" {
+			latest, latestErr := theme.LatestPackageRevisionV2(repository.Db, req.PackageID)
+			if latestErr != nil {
+				response.ErrorDataNotFound(c)
+				return
+			}
+			revisionID = latest.ID
+		}
+		if revisionID == "" {
+			yin, yinErr := theme.InstanceDefaultRevisionV2(repository.Db)
+			if yinErr != nil {
+				response.ErrorDatabase(c, yinErr.Error())
+				return
+			}
+			instanceRevision, instanceErr := theme.ActivePackageRevisionV2(repository.Db, theme.InstanceThemeScopeV2, yin.ID)
+			if instanceErr != nil {
+				response.ErrorDatabase(c, instanceErr.Error())
+				return
+			}
+			revisionID = instanceRevision.ID
+		}
+		revision, err := theme.GetPackageRevisionV2(repository.Db, revisionID)
+		if err != nil {
 			response.ErrorDataNotFound(c)
 			return
 		}
-		revisionID = latest.ID
-	}
-	if revisionID == "" {
-		yin, yinErr := theme.InstanceDefaultRevisionV2(repository.Db)
-		if yinErr != nil {
-			response.ErrorDatabase(c, yinErr.Error())
+		if err := theme.SetUserThemeSelectionV2(repository.Db, user.ID, revision.PackageID, revision.ID, req.Mode); err != nil {
+			response.ErrorParamFomat(c, err.Error())
 			return
 		}
-		instanceRevision, instanceErr := theme.ActivePackageRevisionV2(repository.Db, theme.InstanceThemeScopeV2, yin.ID)
-		if instanceErr != nil {
-			response.ErrorDatabase(c, instanceErr.Error())
+	}
+	// Applied last so an explicit themeMode wins over the "custom" implied by a
+	// theme selection in the same request.
+	if req.ThemeMode != "" {
+		if err := theme.SetUserThemeChoiceV2(repository.Db, user.ID, req.ThemeMode); err != nil {
+			response.ErrorParamFomat(c, err.Error())
 			return
 		}
-		revisionID = instanceRevision.ID
-	}
-	revision, err := theme.GetPackageRevisionV2(repository.Db, revisionID)
-	if err != nil {
-		response.ErrorDataNotFound(c)
-		return
-	}
-	if err := theme.SetUserThemeSelectionV2(repository.Db, user.ID, revision.PackageID, revision.ID, req.Mode); err != nil {
-		response.ErrorParamFomat(c, err.Error())
-		return
 	}
 	response.Success(c)
 }
@@ -260,7 +459,12 @@ func (a *ThemeRouter) Preference(c *gin.Context) {
 		response.ErrorDatabase(c, err.Error())
 		return
 	}
-	response.SuccessData(c, gin.H{"mode": mode})
+	themeMode, err := theme.UserThemeChoiceModeV2(repository.Db, user.ID)
+	if err != nil {
+		response.ErrorDatabase(c, err.Error())
+		return
+	}
+	response.SuccessData(c, gin.H{"mode": mode, "themeMode": themeMode})
 }
 
 func (a *ThemeRouter) ThemeGrantV2(c *gin.Context) {

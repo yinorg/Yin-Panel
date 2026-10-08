@@ -62,6 +62,20 @@ func TestResolveThemeV2FollowsPrecedenceChain(t *testing.T) {
 		t.Fatalf("user resolution = %s/%s, want user/%s", got.Source, got.Revision.ID, userTheme.ID)
 	}
 
+	// follow-space skips the user's own theme and uses the space theme.
+	if err := SetUserThemeChoiceV2(db, 42, "follow-space"); err != nil {
+		t.Fatal(err)
+	}
+	if got := resolve(42, 5); got.Source != "space" || got.Revision.ID != spaceTheme.ID {
+		t.Fatalf("follow-space resolution = %s/%s, want space/%s", got.Source, got.Revision.ID, spaceTheme.ID)
+	}
+	if err := SetUserThemeChoiceV2(db, 42, "custom"); err != nil {
+		t.Fatal(err)
+	}
+	if got := resolve(42, 5); got.Source != "user" {
+		t.Fatalf("custom mode did not restore the user theme: got %s", got.Source)
+	}
+
 	if err := db.Create(&UserSpaceThemePreferenceV2{UserID: 42, SpaceID: 5, PackageID: "org.yin.default", RevisionID: system.ID}).Error; err != nil {
 		t.Fatal(err)
 	}

@@ -390,5 +390,13 @@
     "newPassword": "새 비밀번호",
     "oldPassword": "현재 비밀번호",
     "updatePassword": "비밀번호 변경"
+  },
+  "themeScope": {
+    "mode": "테마 출처",
+    "modeCustom": "내 테마",
+    "modeFollowSpace": "공간 따르기",
+    "spaceTitle": "공간 테마",
+    "followSystem": "시스템 기본값 따르기",
+    "saved": "저장됨"
   }
 }

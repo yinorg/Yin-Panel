@@ -390,5 +390,13 @@
     "newPassword": "新密碼",
     "oldPassword": "舊密碼",
     "updatePassword": "修改密碼"
+  },
+  "themeScope": {
+    "mode": "主題來源",
+    "modeCustom": "自訂主題",
+    "modeFollowSpace": "跟隨空間",
+    "spaceTitle": "空間主題",
+    "followSystem": "跟隨系統預設",
+    "saved": "已儲存"
   }
 }

@@ -343,5 +343,13 @@
     "newPassword": "新しいパスワード",
     "oldPassword": "現在のパスワード",
     "updatePassword": "パスワードを変更"
+  },
+  "themeScope": {
+    "mode": "テーマの取得元",
+    "modeCustom": "自分のテーマ",
+    "modeFollowSpace": "スペースに従う",
+    "spaceTitle": "スペースのテーマ",
+    "followSystem": "システム既定に従う",
+    "saved": "保存しました"
   }
 }

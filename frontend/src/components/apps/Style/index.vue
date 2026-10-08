@@ -10,7 +10,7 @@ import { getEnableStatus } from '@/api/system/systemMonitor'
 import { getSearchConfig, getSpaces, setSearchConfig, spaceOptions, type Space, type SpaceSearchConfig } from '@/api/panel/space'
 import { readSpaceCache, writeSpaceCache } from '@/utils/spaceCache'
 import { searchEngineList } from '@/components/deskModule/SearchBox/engines'
-import { beginThemeTrial, confirmThemeTrial, getThemePackages, getThemeRevision, getTrustedThemeRuntimePolicy, installThemePackage, previewThemePackage, removeThemePackage, rollbackThemeTrial, setTrustedThemeRuntimePolicy, uploadWebWallpaper } from '@/api/theme'
+import { beginThemeTrial, clearSpaceTheme, confirmThemeTrial, getSpaceTheme, getThemePackages, getThemeRevision, getTrustedThemeRuntimePolicy, installThemePackage, previewThemePackage, removeThemePackage, rollbackThemeTrial, setSpaceTheme, setTrustedThemeRuntimePolicy, uploadWebWallpaper } from '@/api/theme'
 import type { ThemePackage } from '@/utils/theme'
 import { activeThemePackageId, refreshMyTheme } from '@/hooks/useTheme'
 
@@ -227,6 +227,47 @@ async function rollbackThemeSelection() {
   }
   else ms.error(msg)
 }
+
+const spaceThemeSpaces = computed(() => spaces.value.filter(space => space.canEdit))
+const spaceThemeSpaceId = ref<number | null>(null)
+const spaceThemeSelection = ref<string>('')
+const spaceThemeLoading = ref(false)
+
+async function loadSpaceTheme() {
+  if (!spaceThemeSpaceId.value) {
+    spaceThemeSelection.value = ''
+    return
+  }
+  spaceThemeLoading.value = true
+  try {
+    const result = await getSpaceTheme(spaceThemeSpaceId.value)
+    if (result.code === 0)
+      spaceThemeSelection.value = result.data.theme?.packageId || ''
+  }
+  finally {
+    spaceThemeLoading.value = false
+  }
+}
+
+async function saveSpaceThemeSelection() {
+  if (!spaceThemeSpaceId.value) return
+  const result = spaceThemeSelection.value
+    ? await setSpaceTheme(spaceThemeSpaceId.value, { packageId: spaceThemeSelection.value })
+    : await clearSpaceTheme(spaceThemeSpaceId.value)
+  if (result.code === 0) {
+    ms.success(t('themeScope.saved'))
+    await loadSpaceTheme()
+  }
+  else {
+    ms.error(result.msg)
+  }
+}
+
+watch(spaceThemeSpaceId, () => { void loadSpaceTheme() })
+watch(spaceThemeSpaces, (list) => {
+  if (spaceThemeSpaceId.value === null && list.length)
+    spaceThemeSpaceId.value = list[0].id
+}, { immediate: true })
 
 async function deleteTheme(id: string) {
   if (!window.confirm(t('themePackage.removeConfirm')))
@@ -749,6 +790,21 @@ function adoptThemeDefaults() {
         type="textarea"
         clearable
       />
+    </NCard>
+
+    <NCard v-if="spaceThemeSpaces.length" style="border-radius:10px" class="mt-[10px]" size="small">
+      <div class="text-slate-500 mb-[5px] font-bold">
+        {{ $t('themeScope.spaceTitle') }}
+      </div>
+      <div class="max-w-[240px]">
+        <NSelect v-model:value="spaceThemeSpaceId" :options="spaceThemeSpaces.map(space => ({ label: space.name, value: space.id }))" />
+        <div class="mt-3">
+          <NSelect v-model:value="spaceThemeSelection" :options="[{ label: $t('themeScope.followSystem'), value: '' }, ...themeOptions]" />
+        </div>
+        <NButton class="mt-3" size="small" type="primary" :loading="spaceThemeLoading" @click="saveSpaceThemeSelection">
+          {{ $t('common.save') }}
+        </NButton>
+      </div>
     </NCard>
 
     <NCard style="border-radius:10px" class="mt-[10px]" size="small">
