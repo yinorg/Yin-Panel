@@ -72,9 +72,24 @@ func registerExtensionRoutes(routerGroup *gin.RouterGroup, modules []extension.M
 	}
 }
 
+// securityHeaders sets stable document hardening headers. The Content-Security-
+// Policy itself lives in `index.html` as a meta tag: the PWA service worker
+// precaches the entry document with its response headers, so a header-based CSP
+// would go stale until the next frontend build. A meta policy travels with the
+// document content and can never be older than the shell that carries it.
+func securityHeaders() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Header("X-Content-Type-Options", "nosniff")
+		c.Header("Referrer-Policy", "strict-origin-when-cross-origin")
+		c.Header("X-Frame-Options", "SAMEORIGIN")
+		c.Next()
+	}
+}
+
 func InitRouters(addr string) error {
 	router := gin.Default()
 	rootRouter := router.Group("/")
+	rootRouter.Use(securityHeaders())
 
 	// 注册标准 API 路由
 	routerGroup := rootRouter.Group("api")

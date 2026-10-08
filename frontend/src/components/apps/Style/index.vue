@@ -496,9 +496,6 @@ function adoptThemeDefaults() {
             action="/api/file/uploadImg"
             :show-file-list="false"
             name="imgfile"
-            :headers="{
-              Authorization: `Bearer ${authStore.token}`,
-            }"
             accept=".ico,.png,.svg"
             @finish="handleUploadFaviconFinish"
           >
@@ -650,9 +647,6 @@ function adoptThemeDefaults() {
         action="/api/file/uploadImg"
         :show-file-list="false"
         name="imgfile"
-        :headers="{
-          Authorization: `Bearer ${authStore.token}`,
-        }"
         :directory-dnd="true"
         :accept="panelState.panelConfig.wallpaperKind === 'video' ? '.mp4,.webm' : '.png,.jpg,.jpeg,.gif,.webp'"
         @finish="handleUploadBackgroundFinish"

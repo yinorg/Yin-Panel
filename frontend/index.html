@@ -3,6 +3,20 @@
 <head>
 	<meta charset="UTF-8">
 
+	<!--
+		The exfiltration guard for the "theme = app" model. `connect-src`/`img-src`
+		are locked to this origin so a theme cannot beacon data to an arbitrary
+		host; `api.iconify.design` is the only legitimate cross-origin API (item
+		icon resolution). `script-src` keeps 'unsafe-inline' and `blob:` because the
+		untrusted sandbox preview runs an inline bootstrap in a srcdoc frame that
+		inherits this policy and the trusted theme module is imported from a blob
+		URL; under model 3 the theme's own code is trusted, so egress is the
+		boundary, not script execution. `frame-src` allows the in-panel window to
+		open external bookmarks. A meta policy is used instead of a response header
+		so the PWA service worker cannot cache a stale policy with the shell.
+	-->
+	<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://api.iconify.design; frame-src 'self' https: http: about: data: blob:; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'self'; manifest-src 'self'">
+
 	<link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
 	<link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
 

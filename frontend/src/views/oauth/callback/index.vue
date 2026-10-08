@@ -22,21 +22,21 @@ const errorMessage: Record<string, string> = {
 
 onMounted(async () => {
   const callbackURL = new URL(window.location.href)
-  const token = callbackURL.searchParams.get('token')
   const reason = callbackURL.searchParams.get('error')
   window.history.replaceState({}, document.title, callbackURL.pathname)
 
-  if (!token || reason) {
+  if (reason) {
     status.value = 'error'
     error.value = t(`login.${errorMessage[reason || ''] || 'oauthCallbackFailed'}`)
     return
   }
 
-  authStore.setToken(token)
-  authStore.saveStorage()
+  // The session token is set by the backend as an httpOnly cookie on the
+  // redirect, so this page only needs to confirm the session with it.
   try {
     const { data } = await getUser()
     if (!data) throw new Error('user information is missing')
+    authStore.setLoggedIn(true)
     authStore.setUserInfo(data)
     authStore.saveStorage()
     status.value = 'success'
@@ -44,8 +44,7 @@ onMounted(async () => {
     await new Promise(resolve => setTimeout(resolve, 400))
     await router.replace('/')
   } catch {
-    authStore.setToken('')
-    authStore.saveStorage()
+    authStore.removeStorage()
     status.value = 'error'
     error.value = t('login.oauthCallbackFailed')
   }

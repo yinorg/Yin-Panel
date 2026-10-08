@@ -9,6 +9,7 @@ import (
 	"github.com/yinorg/Yin-Panel/backend/internal/infra/zaplog"
 	"github.com/yinorg/Yin-Panel/backend/internal/util"
 	"github.com/yinorg/Yin-Panel/backend/internal/util/jwt"
+	"github.com/yinorg/Yin-Panel/backend/internal/web/interceptor"
 	"github.com/yinorg/Yin-Panel/backend/internal/web/model/response"
 	"net/http"
 	"net/url"
@@ -128,8 +129,9 @@ func (r *OAuthRouter) OAuthCallback(c *gin.Context) {
 		return
 	}
 
-	redirectUrl := config.AppConfig.Base.RootURL + "/oauth/callback?token=" + url.QueryEscape(token)
-	c.Redirect(302, redirectUrl)
+	// 会话令牌写入 httpOnly Cookie，不再经 URL 传递（避免历史记录/日志泄漏）。
+	interceptor.SetAuthCookie(c, token)
+	c.Redirect(302, config.AppConfig.Base.RootURL+"/oauth/callback")
 }
 
 func (r *OAuthRouter) setOAuthStateCookie(c *gin.Context, provider, state string, maxAge int) {

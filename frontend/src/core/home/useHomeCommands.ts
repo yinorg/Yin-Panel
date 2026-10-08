@@ -236,7 +236,7 @@ export function useHomeCommands(input: {
     // A signed-in visitor and a public-link visitor both get the shortcut; a
     // public link only once its access has been resolved, so typing into the
     // access-code prompt never opens the palette behind it.
-    if (commandCenterVisible.value || (!authStore.token && !input.publicCode) || (input.publicCode && !input.publicAccessReady.value)) return false
+    if (commandCenterVisible.value || (!authStore.loggedIn && !input.publicCode) || (input.publicCode && !input.publicAccessReady.value)) return false
     if (hasBlockingLayer()) return false
     if (key.length !== 1) return false
     openCommandCenter(key)

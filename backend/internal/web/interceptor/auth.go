@@ -4,9 +4,12 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"net/http"
+	"net/url"
 	"github.com/yinorg/Yin-Panel/backend/internal/biz/repository"
 	"github.com/yinorg/Yin-Panel/backend/internal/constant"
 	"github.com/yinorg/Yin-Panel/backend/internal/global"
+	"github.com/yinorg/Yin-Panel/backend/internal/infra/config"
 	"github.com/yinorg/Yin-Panel/backend/internal/infra/zaplog"
 	"github.com/yinorg/Yin-Panel/backend/internal/util/jwt"
 	"github.com/yinorg/Yin-Panel/backend/internal/util/publiccode"
@@ -17,6 +20,48 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
+
+// AuthCookieName is the httpOnly session cookie. The session token lives here so
+// same-origin theme code cannot read it from localStorage; the Authorization
+// header is still accepted for non-browser clients.
+const AuthCookieName = "yin_token"
+
+// SetAuthCookie stores the session token in an httpOnly cookie the frontend
+// cannot read. SameSite=Lax blocks cross-site writes while still allowing the
+// top-level OAuth redirect back into the app.
+func SetAuthCookie(c *gin.Context, token string) {
+	c.SetSameSite(http.SameSiteLaxMode)
+	c.SetCookie(AuthCookieName, token, authCookieMaxAge(), "/", "", requestIsHTTPS(c), true)
+}
+
+// ClearAuthCookie expires the session cookie on logout.
+func ClearAuthCookie(c *gin.Context) {
+	c.SetSameSite(http.SameSiteLaxMode)
+	c.SetCookie(AuthCookieName, "", -1, "/", "", requestIsHTTPS(c), true)
+}
+
+func authCookieMaxAge() int {
+	hours := 0
+	if config.AppConfig != nil {
+		hours = config.AppConfig.JWT.Expire
+	}
+	if hours <= 0 {
+		hours = jwt.DefaultExpireHours
+	}
+	return hours * 3600
+}
+
+func requestIsHTTPS(c *gin.Context) bool {
+	if c.Request != nil && c.Request.TLS != nil {
+		return true
+	}
+	if config.AppConfig == nil {
+		return false
+	}
+	root, err := url.Parse(config.AppConfig.Base.RootURL)
+	return err == nil && root.Scheme == "https"
+}
+
 
 // Auth 认证中间件
 func Auth(c *gin.Context) {
@@ -41,7 +86,11 @@ func Auth(c *gin.Context) {
 			publicSpaceID = space.ID
 		}
 	} else {
-		claims, err = ParseJwtClaims(c.GetHeader("Authorization"))
+		token := c.GetHeader("Authorization")
+		if token == "" {
+			token, _ = c.Cookie(AuthCookieName)
+		}
+		claims, err = ParseJwtClaims(token)
 		if err == nil {
 			userId = claims.UserID
 			authMethod = "jwt"

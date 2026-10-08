@@ -130,7 +130,7 @@ export function useThemeRuntime(input: {
     // A public link may still be waiting on the access-code prompt; the Core has
     // not decided the visitor may see anything yet, so do not mount the theme.
     && (!input.publicCode || input.publicAccessReady.value))
-  const themeRuntimeNeedsConsent = computed(() => input.homeReady.value && !themeSafeMode.value && themeHomeContribution.value && !!authStore.token && !input.publicCode && !themeRuntimeGrantLoading.value && !themeGrantMatches.value)
+  const themeRuntimeNeedsConsent = computed(() => input.homeReady.value && !themeSafeMode.value && themeHomeContribution.value && !!authStore.loggedIn && !input.publicCode && !themeRuntimeGrantLoading.value && !themeGrantMatches.value)
 
   /** Boundary C3: the theme cannot render the home, so the minimum viable list
    *  takes over instead of leaving a blank page.
@@ -244,7 +244,7 @@ export function useThemeRuntime(input: {
     presentation: {
       ...panelState.panelConfig,
       networkMode: panelState.networkMode === PanelStateNetworkModeEnum.lan ? 'lan' : 'wan',
-      signedIn: !!authStore.token,
+      signedIn: !!authStore.loggedIn,
     },
     monitorReservedHeight: input.getMonitorReservedHeight(),
     searchConfiguration: input.getSearchConfiguration(),
@@ -253,7 +253,7 @@ export function useThemeRuntime(input: {
   // Resolve the grant whenever the package revision, the session or the route mode
   // changes. A trusted route additionally polls, because losing the policy while it
   // runs must drop back to the normal home rather than keep a privileged frame alive.
-  watch([() => themeRuntimePackage.value?.revision, () => authStore.token, trustedRouteRevision], async ([revision, token, trustedRoute]) => {
+  watch([() => themeRuntimePackage.value?.revision, () => authStore.loggedIn, trustedRouteRevision], async ([revision, loggedIn, trustedRoute]) => {
     if (trustedThemeRestoreTimer) clearTimeout(trustedThemeRestoreTimer)
     trustedThemeRestoreTimer = undefined
     const requestGeneration = ++themeGrantRequestGeneration
@@ -263,7 +263,7 @@ export function useThemeRuntime(input: {
     themeRuntimeGrant.value = { revision: revision || '', executionMode, available: false, granted: false, permissions: [] }
     trustedRuntimeAvailable.value = false
     themeRuntimeGrantLoading.value = false
-    if (trustedRoute && (!token || input.publicCode || input.previewTheme)) {
+    if (trustedRoute && (!loggedIn || input.publicCode || input.previewTheme)) {
       window.location.replace('/')
       return
     }
@@ -274,7 +274,7 @@ export function useThemeRuntime(input: {
       }, 10000)
       return
     }
-    if (!revision || !token || !themeHomeContribution.value || input.publicCode || input.previewTheme) {
+    if (!revision || !loggedIn || !themeHomeContribution.value || input.publicCode || input.previewTheme) {
       if (trustedRoute) window.location.replace('/')
       return
     }
@@ -308,10 +308,10 @@ export function useThemeRuntime(input: {
     }
   }, { immediate: true })
 
-  watch([trustedRouteRevision, () => authStore.token], ([revision, token]) => {
+  watch([trustedRouteRevision, () => authStore.loggedIn], ([revision, loggedIn]) => {
     if (trustedPolicyPollTimer) clearInterval(trustedPolicyPollTimer)
     trustedPolicyPollTimer = undefined
-    if (!revision || !token) return
+    if (!revision || !loggedIn) return
     trustedPolicyPollTimer = setInterval(async () => {
       try {
         const result = await getThemeRuntimeGrant(revision, 'trusted')

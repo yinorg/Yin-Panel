@@ -1,5 +1,4 @@
 import axios, { type AxiosResponse } from 'axios'
-import { useAuthStore } from '../../store'
 
 export function parsePublicCodeFromPath(): string {
   let publiccode = ''
@@ -20,13 +19,13 @@ function getPublicAccessCode(): string {
 
 const service = axios.create({
   baseURL: import.meta.env.VITE_GLOB_API_URL,
+  // The session token now travels in an httpOnly cookie, so requests must send
+  // credentials. The API is same-origin, so this only makes that explicit.
+  withCredentials: true,
 })
 
 service.interceptors.request.use(
   (config) => {
-    const authStore = useAuthStore()
-    const token = authStore.token
-    
     // 从 URL 路径中获取 public code
     const publiccode = parsePublicCodeFromPath()
 
@@ -38,9 +37,9 @@ service.interceptors.request.use(
       if (accessCode)
         config.headers['Public-Access-Code'] = accessCode
     }
-    else
-      config.headers.Authorization = `Bearer ${token}`
-    
+    // Signed-in requests carry no Authorization header: the httpOnly session
+    // cookie is attached by the browser and cannot be read or forged by script.
+
     return config
   },
   (error) => {

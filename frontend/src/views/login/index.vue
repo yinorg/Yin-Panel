@@ -50,7 +50,7 @@ const loginPost = async () => {
   try {
     const res = await login<Login.LoginResponse>(form.value)
     if (res.code === 0) {
-      authStore.setToken(res.data.token)
+      authStore.setLoggedIn(true)
       authStore.setUserInfo(res.data)
       authStore.saveStorage()
 

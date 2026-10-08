@@ -21,7 +21,7 @@ export const activeThemeSlots = ref<Record<string, string>>({})
 export const activeThemePackageId = ref('')
 export const activeThemeWallpaper = ref<ReturnType<typeof resolveWallpaper>>(null)
 let themeLoad: Promise<void> | undefined
-let loadedUserToken = ''
+let loadedUserLoggedIn = false
 const previewToken = new URLSearchParams(window.location.search).get('themePreview')
 const previewMode = new URLSearchParams(window.location.search).get('themePreviewMode')
 let appliedSlots: string[] = []
@@ -58,7 +58,7 @@ async function refreshCurrentTheme() {
   }
 }
 
-function initializeTheme(appStore: ReturnType<typeof useAppStore>, token: string) {
+function initializeTheme(appStore: ReturnType<typeof useAppStore>, loggedIn: boolean) {
   if (window.location.pathname === '/__yin/theme-recovery')
     return Promise.resolve()
   if (!themeLoad) {
@@ -81,14 +81,14 @@ function initializeTheme(appStore: ReturnType<typeof useAppStore>, token: string
       }
     })()
   }
-  if (!previewToken && token && token !== loadedUserToken && !parsePublicCodeFromPath() && !isThemeSafeMode()) {
-    loadedUserToken = token
+  if (!previewToken && loggedIn && !loadedUserLoggedIn && !parsePublicCodeFromPath() && !isThemeSafeMode()) {
+    loadedUserLoggedIn = true
     themeLoad = themeLoad.then(async () => {
       try {
         await refreshMyTheme(appStore)
       }
       catch {
-        loadedUserToken = ''
+        loadedUserLoggedIn = false
       }
     })
   }
@@ -100,14 +100,14 @@ export function useTheme() {
   const authStore = useAuthStore()
   const OsTheme = useOsTheme()
 
-  initializeTheme(appStore, authStore.token || '')
-  watch(() => authStore.token, (token) => {
+  initializeTheme(appStore, authStore.loggedIn)
+  watch(() => authStore.loggedIn, (loggedIn) => {
     if (previewToken) return
-    if (token) {
-      initializeTheme(appStore, token)
+    if (loggedIn) {
+      initializeTheme(appStore, loggedIn)
     }
     else {
-      loadedUserToken = ''
+      loadedUserLoggedIn = false
       appStore.setTheme('auto')
       void refreshCurrentTheme()
     }

@@ -82,6 +82,9 @@ func (l *LoginRouter) Login(c *gin.Context) {
 		return
 	}
 
+	// 会话令牌放进 httpOnly Cookie，前端脚本读不到它。
+	interceptor.SetAuthCookie(c, user.Token)
+
 	// 将用户信息存储到上下文
 	userInfo := base.UserInfo{
 		ID:         user.ID,
@@ -110,5 +113,6 @@ func (l *LoginRouter) Logout(c *gin.Context) {
 		response.Error(c, "退出登录失败")
 		return
 	}
+	interceptor.ClearAuthCookie(c)
 	response.Success(c)
 }
