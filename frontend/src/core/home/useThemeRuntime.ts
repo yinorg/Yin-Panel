@@ -3,7 +3,7 @@ import { useDialog } from 'naive-ui'
 import { useAuthStore, usePanelState } from '@/store'
 import { useRoute } from 'vue-router'
 import { getThemeRuntimeGrant, setThemeRuntimeGrant } from '@/api/theme'
-import { activeThemePackage, activeThemeSlots } from '@/hooks/useTheme'
+import { activeThemePackage, activeThemeSlots, themePackageResolved } from '@/hooks/useTheme'
 import { createThemePersistence } from '@/core/home/themePersistence'
 import { createThemeSettingsSchemaValidator } from '@/core/home/themeSettingsSchema'
 import { createIconifyResourceResolver } from '@/core/home/iconifyResource'
@@ -129,7 +129,10 @@ export function useThemeRuntime(input: {
    *  and could not" and left that case to the Core home, which still existed then;
    *  P4a removed that home, so this is now the only remaining owner of the home
    *  when the theme cannot take it. */
-  const homeFallbackVisible = computed(() => input.homeReady.value && !themeRuntimeActive.value
+  // Only decide "the theme cannot render the home" once the package load has
+  // settled. Before that the package is simply still in flight, and treating it
+  // as a missing home view flashed the fallback on every cold load.
+  const homeFallbackVisible = computed(() => input.homeReady.value && themePackageResolved.value && !themeRuntimeActive.value
     && (themeSafeMode.value || themeRuntimeFailed.value || !themeHomeContribution.value))
   /** Why the theme is not rendering, in the user's language. Shown under the
    *  fallback's notice so the state is never unexplained. */

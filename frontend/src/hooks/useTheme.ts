@@ -9,6 +9,14 @@ import { resolveThemeSlots, resolveWallpaper, selectThemeScheme, type ThemePacka
 import { isThemeSafeMode } from '../theme/recovery/safeMode'
 
 export const activeThemePackage = ref<ThemePackage | null>(null)
+/**
+ * Whether the initial theme-package load has settled — success *or* failure.
+ * The home must not read "still loading" as "no home view": the theme package
+ * arrives after the data, so an unresolved package briefly looked like a theme
+ * with no home contribution and flashed the C3 fallback before the real theme
+ * mounted. False until the first load resolves, then true for good.
+ */
+export const themePackageResolved = ref(false)
 export const activeThemeSlots = ref<Record<string, string>>({})
 export const activeThemePackageId = ref('')
 export const activeThemeWallpaper = ref<ReturnType<typeof resolveWallpaper>>(null)
@@ -55,15 +63,22 @@ function initializeTheme(appStore: ReturnType<typeof useAppStore>, token: string
     return Promise.resolve()
   if (!themeLoad) {
     themeLoad = (async () => {
-      if (isThemeSafeMode()) {
-        const yin = await getThemePackage('org.yin.default')
-        if (yin.code === 0) activeThemePackage.value = yin.data
+      try {
+        if (isThemeSafeMode()) {
+          const yin = await getThemePackage('org.yin.default')
+          if (yin.code === 0) activeThemePackage.value = yin.data
+        }
+        else if (previewToken) {
+          const preview = await getPreviewTheme(previewToken)
+          if (preview.code === 0) activeThemePackage.value = preview.data
+        }
+        else await refreshCurrentTheme()
       }
-      else if (previewToken) {
-        const preview = await getPreviewTheme(previewToken)
-        if (preview.code === 0) activeThemePackage.value = preview.data
+      finally {
+        // Settle even when the request failed: an unresolved flag would hide the
+        // C3 fallback forever, which is exactly the state it exists to cover.
+        themePackageResolved.value = true
       }
-      else await refreshCurrentTheme()
     })()
   }
   if (!previewToken && token && token !== loadedUserToken && !parsePublicCodeFromPath() && !isThemeSafeMode()) {
