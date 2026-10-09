@@ -316,8 +316,31 @@ export type ThemeComponentFactory = (
   snapshot: ThemeHomeSnapshot,
 ) => ThemeMountedView | Promise<ThemeMountedView>
 
+/**
+ * The views a theme can contribute.
+ *
+ * `home`, `public-home`, `theme-settings` and `theme-page` are the Core-defined
+ * names. The Core surfaces — `user-info`, `space-manage`, `users`, `about` and
+ * `apps` — let a theme render a Core page itself (usually by embedding the Core's
+ * own component through the component bridge); `ui.openCoreSurface(name)` routes to
+ * them and falls back to the Core's own surface when the theme does not contribute
+ * the view. Any other name is allowed too: it becomes an addressable
+ * `/theme/<name>` route.
+ */
+export type ThemeViewName =
+  | 'home'
+  | 'public-home'
+  | 'theme-settings'
+  | 'theme-page'
+  | 'user-info'
+  | 'space-manage'
+  | 'users'
+  | 'about'
+  | 'apps'
+  | (string & {})
+
 export interface ThemeDefinition {
-  views?: Partial<Record<'home' | 'public-home' | 'theme-settings' | 'theme-page', ThemeViewFactory>>
+  views?: Partial<Record<ThemeViewName, ThemeViewFactory>>
   regions?: Record<string, ThemeViewFactory>
   components?: Record<string, ThemeComponentFactory>
   dispose?: () => void | Promise<void>
