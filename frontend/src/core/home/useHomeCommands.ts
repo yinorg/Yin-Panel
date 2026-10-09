@@ -307,11 +307,10 @@ export function useHomeCommands(input: {
     setStorage: input.themePersistence.setStorage,
     removeStorage: input.themePersistence.removeStorage,
     openCoreSurface: async (surface) => {
+      // A theme-contributed view wins; otherwise the Core keeps its own surface.
+      if (await input.openThemeSurface(surface))
+        return
       if (surface === 'theme-settings') {
-        // A theme that contributes the settings surface renders it; otherwise the
-        // Core keeps its own settings page.
-        if (await input.openThemeSurface('theme-settings'))
-          return
         await router.push('/settings/style')
         return
       }
