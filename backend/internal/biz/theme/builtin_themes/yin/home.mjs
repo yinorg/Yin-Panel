@@ -165,6 +165,35 @@ export default {
       return button
     }
 
+    // Compact icon buttons for the per-group controls: a glyph plus a hover tooltip
+    // (native `title`) instead of a text label that competes with the group title.
+    const ICON_PATHS = {
+      add: 'M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z',
+      edit: 'M3 17.25V21h3.75L17.81 9.94l-3.75-3.75zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75z',
+      remove: 'M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6zM19 4h-3.5l-1-1h-5l-1 1H5v2h14z',
+      up: 'M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8z',
+      down: 'M20 12l-1.41-1.41L13 16.17V4h-2v12.17l-5.58-5.59L4 12l8 8z',
+    }
+    const addIconButton = (container, icon, testId, label, action) => {
+      const button = element('button', 'yin-icon-button')
+      button.type = 'button'
+      button.dataset.testid = testId
+      button.setAttribute('aria-label', label)
+      button.setAttribute('title', label)
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+      svg.setAttribute('viewBox', '0 0 24 24')
+      svg.setAttribute('aria-hidden', 'true')
+      svg.setAttribute('focusable', 'false')
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+      path.setAttribute('fill', 'currentColor')
+      path.setAttribute('d', icon)
+      svg.append(path)
+      button.append(svg)
+      button.addEventListener('click', () => action(button))
+      container.append(button)
+      return button
+    }
+
     const showGroupDialog = (mode, group) => {
       groupDialogOpener = document.activeElement
       groupDialogValue = { mode, group }
@@ -677,22 +706,22 @@ export default {
       const heading = element('div', 'yin-group-heading')
       const title = element('h2', 'yin-group-title')
       const controls = element('div', 'yin-group-controls')
-      const addItem = addActionButton(controls, envLabel('group.addItem', 'Add item'), 'theme-add-item', 'Add item', button => {
+      const addItem = addIconButton(controls, ICON_PATHS.add, 'theme-add-item', envLabel('group.addItem', 'Add item'), button => {
         const groupId = section.dataset.groupId
         void openEditor(`editor-new-item-${groupId}`, { groupId }, button)
       })
-      const editGroup = addActionButton(controls, envLabel('group.edit', 'Edit group'), 'theme-edit-group', 'Edit group', () => {
+      const editGroup = addIconButton(controls, ICON_PATHS.edit, 'theme-edit-group', envLabel('group.edit', 'Edit group'), () => {
         const current = (snapshot?.groups || []).find(candidate => String(candidate.id) === section.dataset.groupId)
         if (current) showGroupDialog('edit', current)
       })
-      const deleteGroup = addActionButton(controls, envLabel('group.delete', 'Delete group'), 'theme-delete-group', 'Delete group', button => {
+      const deleteGroup = addIconButton(controls, ICON_PATHS.remove, 'theme-delete-group', envLabel('group.delete', 'Delete group'), button => {
         void mutate(`group-delete-${section.dataset.groupId}`, button, 'group.delete', { groupId: section.dataset.groupId })
       })
-      const moveGroupUp = addActionButton(controls, envLabel('group.moveUp', 'Move group up'), 'theme-reorder-group-up', 'Move group up', button => {
+      const moveGroupUp = addIconButton(controls, ICON_PATHS.up, 'theme-reorder-group-up', envLabel('group.moveUp', 'Move group up'), button => {
         const current = (snapshot?.groups || []).find(candidate => String(candidate.id) === section.dataset.groupId)
         if (current) reorderGroup(current, -1, button)
       })
-      const moveGroupDown = addActionButton(controls, envLabel('group.moveDown', 'Move group down'), 'theme-reorder-group-down', 'Move group down', button => {
+      const moveGroupDown = addIconButton(controls, ICON_PATHS.down, 'theme-reorder-group-down', envLabel('group.moveDown', 'Move group down'), button => {
         const current = (snapshot?.groups || []).find(candidate => String(candidate.id) === section.dataset.groupId)
         if (current) reorderGroup(current, 1, button)
       })

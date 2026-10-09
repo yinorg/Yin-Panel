@@ -367,7 +367,7 @@ func TestBuiltinPackagesV2AreCompleteDTCGAndRepeatable(t *testing.T) {
 		}
 		wantVersion := "2.3.2"
 		if summary.ID == "org.yin.default" {
-			wantVersion = "2.3.69"
+			wantVersion = "2.3.70"
 		}
 		if pkg.Manifest.Version != wantVersion {
 			t.Errorf("%s builtin version = %q, want %q", summary.ID, pkg.Manifest.Version, wantVersion)
@@ -423,8 +423,8 @@ func TestBuiltinHomeResourceHashesOnlyChangeForDefaultYin(t *testing.T) {
 		"org.yin.default": {
 			// 手机宽度下第一个书签分组的上间距与桌面统一，去掉视口比例额外间距。
 			// 改动的是 Yin 主题的分组定位，所以只有它的哈希变。
-			"views/home.mjs": "e75bb781af412eeafcc060882323d9e38cb4ea9ad47314a829b19e5473c47dc3",
-			"styles/home.css": "8a493f9cb0baed6556117b62cb2d087cc42d87128ea1d43fe2e19eb0d01ae815",
+			"views/home.mjs": "f0ffe67d3e267019e1ba51a38e3033927777c50c1ba06f609b7ee3269c8c420c",
+			"styles/home.css": "eb5fd81ee64eea179c5a3d0bd69dbe593a00ac476496253d54cfddd96ce15f53",
 		},
 		"org.yin.glass": {
 			"views/home.mjs":  "6f380f2079ba8f523ad4ce149b9f9faa7b5f7d11a9053e8a336b0624e0b1a091",
@@ -495,7 +495,7 @@ func TestEnsureBuiltinV2UpgradesOnlyActivationForSelectedBuiltin(t *testing.T) {
 		t.Fatal(err)
 	}
 	latest, err := LatestPackageRevisionV2(db, "org.yin.default")
-	if err != nil || latest.Version != "2.3.69" || activation.ActiveRevisionID != latest.ID {
+	if err != nil || latest.Version != "2.3.70" || activation.ActiveRevisionID != latest.ID {
 		t.Fatalf("selected builtin activation = %+v, latest=%s, err=%v", activation, latest.ID, err)
 	}
 	if latest.ID == old.Revision {

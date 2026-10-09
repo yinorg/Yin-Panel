@@ -1198,3 +1198,37 @@ select {
 @media (prefers-reduced-motion: reduce) {
   [data-editing='true'] .yin-item:not(.is-dragging) { animation: none; }
 }
+
+/* Per-group controls: an icon plus a hover tooltip (native `title`), so they stay
+   compact next to the group title instead of a row of text buttons. */
+.yin-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--yin-radiusControl, 8px);
+  background: transparent;
+  color: var(--yin-textMuted, #64737a);
+  cursor: pointer;
+}
+
+.yin-icon-button svg { width: 18px; height: 18px; }
+
+.yin-icon-button:hover:not(:disabled) {
+  border-color: var(--yin-border, #d8e0e3);
+  background: color-mix(in srgb, var(--yin-surface, #fff) 88%, transparent);
+  color: var(--yin-primary, #176b80);
+}
+
+.yin-icon-button:focus-visible {
+  outline: 3px solid var(--yin-focusRing, var(--yin-primary, #176b80));
+  outline-offset: 2px;
+}
+
+.yin-icon-button:disabled {
+  cursor: wait;
+  opacity: .6;
+}
