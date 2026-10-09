@@ -1388,7 +1388,7 @@ export default {
       const header = document.createElement('div')
       header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px'
       const heading = document.createElement('h1')
-      heading.textContent = envLabel('appLauncher.title', '应用')
+      heading.textContent = envLabel('apps.title', '应用')
       heading.style.cssText = 'margin:0;font-size:20px'
       const back = document.createElement('button')
       back.type = 'button'
@@ -1400,11 +1400,11 @@ export default {
       const list = document.createElement('ul')
       list.style.cssText = 'margin:0;padding:0;list-style:none;display:grid;gap:8px;max-width:420px'
       const entries = [
-        ['user-info', 'apps.userInfo.appName', '我的信息'],
-        ['theme-settings', 'apps.baseSettings.appName', '风格设置'],
-        ['space-manage', 'spaceManage.title', '空间管理'],
-        ['users', 'adminSettingUsers.appName', '账号管理'],
-        ['about', 'apps.about.appName', '关于'],
+        ['user-info', 'apps.userInfo', '我的信息'],
+        ['theme-settings', 'apps.style', '风格设置'],
+        ['space-manage', 'apps.spaceManage', '空间管理'],
+        ['users', 'apps.users', '账号管理'],
+        ['about', 'apps.about', '关于'],
       ]
       for (const [name, key, fallback] of entries) {
         const li = document.createElement('li')
@@ -1491,7 +1491,7 @@ export default {
         },
         // The style-settings page, rendered by the theme itself with the Core's own
         // base-settings component embedded through the bridge.
-        'theme-settings': coreSurfaceView('yin-style', 'apps.baseSettings.appName', '风格设置', 'theme-settings-view'),
+        'theme-settings': coreSurfaceView('yin-style', 'apps.style', '风格设置', 'theme-settings-view'),
         'theme-page'(elementRoot, api, initialSnapshot) {
           // A whole page owned by the theme. The Core only provides the container
           // and the data channel; the layout below is the theme's. It drives the
@@ -1597,10 +1597,10 @@ export default {
           }
         },
         // Core pages the theme renders itself, embedding the Core's own components.
-        'user-info': coreSurfaceView('yin-user-info', 'apps.userInfo.appName', '我的信息', 'theme-user-info-view'),
-        'space-manage': coreSurfaceView('yin-space-manage', 'spaceManage.title', '空间管理', 'theme-space-manage-view'),
-        'users': coreSurfaceView('yin-users', 'adminSettingUsers.appName', '账号管理', 'theme-users-view'),
-        'about': coreSurfaceView('yin-about', 'apps.about.appName', '关于', 'theme-about-view'),
+        'user-info': coreSurfaceView('yin-user-info', 'apps.userInfo', '我的信息', 'theme-user-info-view'),
+        'space-manage': coreSurfaceView('yin-space-manage', 'apps.spaceManage', '空间管理', 'theme-space-manage-view'),
+        'users': coreSurfaceView('yin-users', 'apps.users', '账号管理', 'theme-users-view'),
+        'about': coreSurfaceView('yin-about', 'apps.about', '关于', 'theme-about-view'),
         // The app hub (launcher), the theme's replacement for the Core modal.
         'apps': appsHubView,
         // The item editor, rendered by the theme with the Core's component embedded;

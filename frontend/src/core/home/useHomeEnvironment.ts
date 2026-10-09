@@ -104,6 +104,15 @@ export function useHomeEnvironment(input: {
       'actions.cancel': t('common.cancel'),
       'status.layoutSaved': t('themeHome.layoutSaved'),
       'status.layoutSaveFailed': t('themeHome.layoutSaveFailed'),
+      // The Core app pages a theme can render, and the app hub that lists them.
+      'actions.apps': t('appLauncher.title'),
+      'actions.back': t('themeRecovery.home'),
+      'apps.title': t('appLauncher.title'),
+      'apps.userInfo': t('apps.userInfo.appName'),
+      'apps.style': t('apps.baseSettings.appName'),
+      'apps.spaceManage': t('spaceManage.title'),
+      'apps.users': t('adminSettingUsers.appName'),
+      'apps.about': t('apps.about.appName'),
     },
   }))
 
