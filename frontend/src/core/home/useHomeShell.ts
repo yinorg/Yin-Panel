@@ -1,4 +1,4 @@
-import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { computed, getCurrentInstance, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { parsePublicCodeFromPath } from '@/utils/request/axios'
 import { useAuthStore, usePanelState } from '@/store'
 import { PanelStateNetworkModeEnum } from '@/enums'
@@ -13,6 +13,10 @@ import { useHomeModals } from '@/core/home/useHomeModals'
 import { useThemeRuntime } from '@/core/home/useThemeRuntime'
 import { useThemeMonitor } from '@/core/home/useThemeMonitor'
 import { useHomeCommands } from '@/core/home/useHomeCommands'
+import { setThemeMonitorBridge } from '@/core/home/monitorBridge'
+// Registers the `<yin-system-monitor>` custom element so a theme can embed the
+// Core's own monitor component. See `theme/bridge/systemMonitor.ts`.
+import '@/theme/bridge/systemMonitor'
 
 /**
  * The home page's view model.
@@ -394,6 +398,22 @@ export function useHomeShell() {
   const contentTopVh = computed(() => panelState.panelConfig.marginTop ?? 10)
   const monitorShowTitle = computed(() => panelState.panelConfig.systemMonitorShowTitle)
   const brandText = computed(() => panelState.panelConfig.logoText || 'Yin-Panel')
+
+  // Publish the Core-owned monitor data for the `<yin-system-monitor>` component
+  // bridge, so a theme can embed the monitor itself and get the same rendering.
+  // Cleared with the shell so the element never holds a stale controller.
+  const appContext = getCurrentInstance()?.appContext
+  if (appContext) {
+    watch([monitorShowTitle, panelIconTextColor], () => {
+      setThemeMonitorBridge({
+        controller: monitorSnapshotController,
+        showTitle: monitorShowTitle.value,
+        iconTextColor: panelIconTextColor.value,
+        appContext,
+      })
+    }, { immediate: true })
+    onUnmounted(() => setThemeMonitorBridge(undefined))
+  }
 
   const theme = reactive({
     useThemeColors,

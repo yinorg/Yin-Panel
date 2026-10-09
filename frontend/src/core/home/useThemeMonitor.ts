@@ -2,6 +2,7 @@ import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { getDiskStateByPath, getSnapshot } from '@/api/system/systemMonitor'
 import { usePanelState } from '@/store'
 import { createMonitorSnapshotController } from '@/core/monitor/snapshotController'
+import { createSharedMonitorController } from '@/core/home/monitorBridge'
 import { normalizeMonitorSnapshot } from '@/core/monitor/themeSnapshot'
 import type { CoreMonitorSnapshot } from '@/core/monitor/themeSnapshot'
 
@@ -32,7 +33,7 @@ export function useThemeMonitor(input: {
     monitorResultRefreshInterval.value = status.refreshInterval
   }
 
-  const monitorSnapshotController = createMonitorSnapshotController<CoreMonitorSnapshot, SystemMonitor.DiskInfo>({
+  const monitorSnapshotController = createSharedMonitorController(createMonitorSnapshotController<CoreMonitorSnapshot, SystemMonitor.DiskInfo>({
     fetchSnapshot: async () => {
       const result = await getSnapshot<CoreMonitorSnapshot>()
       if (result.code !== 0) throw Object.assign(new Error('Monitor data is unavailable'), { code: 'UNSUPPORTED_CAPABILITY' })
@@ -40,7 +41,7 @@ export function useThemeMonitor(input: {
     },
     fetchDisk: path => getDiskStateByPath<SystemMonitor.DiskInfo>(path),
     getInterval: async () => Math.max(250, (monitorResultRefreshInterval.value || 10) * 1000),
-  })
+  }))
 
   const layerRef = ref<HTMLElement>()
   const reservedHeight = ref(0)

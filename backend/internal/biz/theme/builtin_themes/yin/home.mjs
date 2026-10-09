@@ -1452,6 +1452,13 @@ export default {
             intro.textContent = '此整页由主题渲染（theme-page 面），Core 只提供数据与权限。'
             intro.style.cssText = 'margin:0 0 16px;color:#64737a'
 
+            // The Core's own monitor component, embedded through the component bridge
+            // (`<yin-system-monitor>`). It mounts the exact Core component, so it
+            // renders identically to the Core's own band.
+            const monitor = document.createElement('yin-system-monitor')
+            monitor.setAttribute('data-testid', 'theme-page-monitor')
+            monitor.style.cssText = 'display:block;margin:0 0 22px'
+
             const list = document.createElement('ul')
             list.style.cssText = 'margin:0 0 22px;padding:0;list-style:none;display:grid;gap:8px'
             for (const space of snapshot?.spaces || []) {
@@ -1493,13 +1500,13 @@ export default {
                 row.append(button)
                 itemsList.append(row)
               }
-              page.append(header, intro, list, itemsHeading, itemsList)
+              page.append(header, intro, monitor, list, itemsHeading, itemsList)
             }
             else {
               const empty = document.createElement('p')
               empty.textContent = '当前空间没有书签。'
               empty.style.cssText = 'margin:0;color:#8a969b'
-              page.append(header, intro, list, itemsHeading, empty)
+              page.append(header, intro, monitor, list, itemsHeading, empty)
             }
             elementRoot.append(page)
           }
