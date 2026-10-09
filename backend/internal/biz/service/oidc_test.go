@@ -205,15 +205,7 @@ func (r *memoryUserRepo) Get(id uint) (repository.User, error) {
 	return repository.User{}, gorm.ErrRecordNotFound
 }
 func (r *memoryUserRepo) Count() (uint, error) { return uint(len(r.users)), nil }
-func (r *memoryUserRepo) GetByMailAndPassword(string, string, string) (repository.User, error) {
-	return repository.User{}, gorm.ErrRecordNotFound
-}
-func (r *memoryUserRepo) GetByOAuthID(provider, oauthID string) (repository.User, error) {
-	for _, user := range r.users {
-		if user.OauthProvider == provider && user.OauthID == oauthID {
-			return user, nil
-		}
-	}
+func (r *memoryUserRepo) GetByMailAndPassword(string, string) (repository.User, error) {
 	return repository.User{}, gorm.ErrRecordNotFound
 }
 
@@ -230,10 +222,7 @@ func (r *memoryUserRepo) GetList(repository.PagedParam) ([]repository.User, uint
 }
 func (r *memoryUserRepo) Update(uint, *repository.User) error       { return nil }
 func (r *memoryUserRepo) UpdateUserInfo(uint, map[string]any) error { return nil }
-func (r *memoryUserRepo) Delete(uint) ([]string, error)             { return nil, nil }
-func (r *memoryUserRepo) GetByPubliccode(string) (repository.User, error) {
-	return repository.User{}, gorm.ErrRecordNotFound
-}
+func (r *memoryUserRepo) Delete(uint) ([]string, error) { return nil, nil }
 func (r *memoryUserRepo) InvalidateTokens(userID uint) error {
 	for index := range r.users {
 		if r.users[index].ID == userID {

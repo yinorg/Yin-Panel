@@ -292,24 +292,8 @@ func (s *UserService) findOrCreateOAuthUser(provider string, providerConfig conf
 		}
 	}
 
-	// Check if user already exists
-	user, err := s.userRepo.GetByOAuthID(provider, identifier)
-	if err == nil {
-		if user.Status != 1 {
-			return nil, errors.New("user account is disabled or inactive")
-		}
-		if email != "" && user.Mail != email {
-			if err := s.userRepo.UpdateUserInfo(user.ID, map[string]any{"mail": email}); err != nil {
-				return nil, err
-			}
-			user.Mail = email
-		}
-		s.syncOIDCGroups(user.ID, provider, userInfo)
-		return &user, nil
-	}
-
 	// A new provider identity is automatically merged by verified email.
-	user, err = s.userRepo.GetByMail(email)
+	user, err := s.userRepo.GetByMail(email)
 	if err == nil {
 		identity := &repository.OAuthIdentity{UserID: user.ID, Provider: provider, Subject: identifier, Email: email}
 		if repository.Db != nil {

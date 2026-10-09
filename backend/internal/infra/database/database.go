@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/yinorg/Yin-Panel/backend/internal/biz/repository"
 	"github.com/yinorg/Yin-Panel/backend/internal/biz/theme"
-	"github.com/yinorg/Yin-Panel/backend/internal/constant"
 	"github.com/yinorg/Yin-Panel/backend/internal/global"
 	"github.com/yinorg/Yin-Panel/backend/internal/util"
 	"log"
@@ -65,7 +64,6 @@ func initDatabase(db *gorm.DB) (err error) {
 		&repository.OAuthIdentity{},
 		&repository.Space{},
 		&repository.SpaceMember{},
-		&repository.Team{},
 		&repository.SpaceOIDCGroup{},
 		&repository.SystemSetting{},
 		&repository.ItemIcon{},
@@ -98,11 +96,6 @@ func initDatabase(db *gorm.DB) (err error) {
 		return err
 	}
 	if err := EnsurePersonalSpaces(db); err != nil {
-		return err
-	}
-	// SQLite unique indexes reject multiple empty strings; NULL clears legacy
-	// public links while allowing every user to remain link-free.
-	if err := db.Exec("UPDATE user SET publiccode = NULL WHERE publiccode <> ''").Error; err != nil {
 		return err
 	}
 	if !global.Config.Base.EnableMonitor {
@@ -319,7 +312,7 @@ func ensureSpacePairs(db *gorm.DB) error {
 		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return err
 		}
-		yang = repository.Space{Type: yin.Type, Name: yin.Name + "-B", OwnerUserID: yin.OwnerUserID, TeamID: yin.TeamID, PairID: yin.ID, Side: "yang"}
+		yang = repository.Space{Type: yin.Type, Name: yin.Name + "-B", OwnerUserID: yin.OwnerUserID, PairID: yin.ID, Side: "yang"}
 		if err := db.Create(&yang).Error; err != nil {
 			return err
 		}
@@ -451,7 +444,6 @@ func CreateDefaultUser() error {
 		mUser.Status = 1
 		mUser.Role = 1
 		mUser.Password = util.PasswordEncryption("admin@yiniot.com")
-		mUser.OauthProvider = constant.OAuthProviderBuildin
 		if errCreate := global.UserService.CreateUser(&mUser); errCreate != nil {
 			return errCreate
 		}

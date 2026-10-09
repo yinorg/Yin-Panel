@@ -9,7 +9,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func TestMigrationPreservesLegacyRowsAndOnlyMigratesColorMode(t *testing.T) {
+func TestMigrationPreservesLegacyRowsWithoutActivation(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open("file:theme-v2-only-migration?mode=memory&cache=shared"), &gorm.Config{})
 	if err != nil {
 		t.Fatal(err)
@@ -21,8 +21,6 @@ func TestMigrationPreservesLegacyRowsAndOnlyMigratesColorMode(t *testing.T) {
 		`INSERT INTO asset_records (package_id, path, content) VALUES ('community.old', 'assets/old.png', X'010203')`,
 		`CREATE TABLE instance_settings (id INTEGER PRIMARY KEY, default_package TEXT)`,
 		`INSERT INTO instance_settings (id, default_package) VALUES (1, 'community.old')`,
-		`CREATE TABLE preferences (user_id INTEGER PRIMARY KEY, package_id TEXT, mode TEXT, updated_at DATETIME)`,
-		`INSERT INTO preferences (user_id, package_id, mode) VALUES (42, 'community.old', 'dark')`,
 	} {
 		if err := db.Exec(statement).Error; err != nil {
 			t.Fatal(err)
@@ -61,10 +59,6 @@ func TestMigrationPreservesLegacyRowsAndOnlyMigratesColorMode(t *testing.T) {
 	}
 	if legacyDefault != "community.old" {
 		t.Fatalf("legacy default row was changed: %q", legacyDefault)
-	}
-	mode, err := UserThemeModeV2(db, 42)
-	if err != nil || mode != "dark" {
-		t.Fatalf("migrated mode = %q err=%v", mode, err)
 	}
 	if _, err := GetActivationV2(db, ActivationScopeForUserV2(42)); err == nil {
 		t.Fatal("legacy package selection was activated")

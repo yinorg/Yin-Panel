@@ -12,7 +12,6 @@ import (
 	"github.com/yinorg/Yin-Panel/backend/internal/infra/config"
 	"github.com/yinorg/Yin-Panel/backend/internal/infra/zaplog"
 	"github.com/yinorg/Yin-Panel/backend/internal/util/jwt"
-	"github.com/yinorg/Yin-Panel/backend/internal/util/publiccode"
 	"github.com/yinorg/Yin-Panel/backend/internal/web/model/base"
 	"github.com/yinorg/Yin-Panel/backend/internal/web/model/response"
 	"github.com/yinorg/Yin-Panel/backend/pkg/extension"
@@ -126,12 +125,11 @@ func Auth(c *gin.Context) {
 
 	// 将用户信息存储到上下文
 	userInfo := base.UserInfo{
-		ID:         user.ID,
-		Name:       user.Name,
-		Role:       user.Role,
-		Mail:       user.Mail,
-		Publiccode: user.Publiccode,
-		Token:      user.Token,
+		ID:    user.ID,
+		Name:  user.Name,
+		Role:  user.Role,
+		Mail:  user.Mail,
+		Token: user.Token,
 	}
 	c.Set("userInfo", userInfo)
 	c.Set("authMethod", authMethod)
@@ -170,7 +168,7 @@ func OptionalAuth(c *gin.Context) {
 		c.Next()
 		return
 	}
-	c.Set("userInfo", base.UserInfo{ID: user.ID, Name: user.Name, Role: user.Role, Mail: user.Mail, Publiccode: user.Publiccode})
+	c.Set("userInfo", base.UserInfo{ID: user.ID, Name: user.Name, Role: user.Role, Mail: user.Mail})
 	c.Set("authMethod", "jwt")
 	c.Next()
 }
@@ -203,16 +201,4 @@ func ParseJwtClaims(authHeader string) (*jwt.Claims, error) {
 	}
 
 	return claims, nil
-}
-
-// ParseUserIdFromPubliccode 解析公开访问代码，获取用户ID
-func ParseUserIdFromPubliccode(code string) (uint, error) {
-	// 解析公开访问代码，获取用户ID
-	userID, err := publiccode.ParseCode(code)
-	if err != nil {
-		zaplog.Logger.Infof("invalid public access code. %v", err)
-		return 0, errors.New("invalid public access code")
-	}
-
-	return userID, nil
 }

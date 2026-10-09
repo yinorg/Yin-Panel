@@ -20,11 +20,11 @@ func TestUserRenameSynchronizesPersonalSpaces(t *testing.T) {
 	Db = db
 	t.Cleanup(func() { Db = previousDB })
 
-	user := User{Name: "Old Nickname", Mail: "user@example.com", Publiccode: "user-code"}
+	user := User{Name: "Old Nickname", Mail: "user@example.com"}
 	if err := db.Create(&user).Error; err != nil {
 		t.Fatal(err)
 	}
-	otherUser := User{Name: "Other", Mail: "other@example.com", Publiccode: "other-code"}
+	otherUser := User{Name: "Other", Mail: "other@example.com"}
 	if err := db.Create(&otherUser).Error; err != nil {
 		t.Fatal(err)
 	}

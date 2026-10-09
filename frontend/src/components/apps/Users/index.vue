@@ -50,13 +50,6 @@ const createColumns = ({
       },
     },
     {
-      title: t('adminSettingUsers.provider'),
-      key: 'oauthProvider',
-      render(row) {
-        return h('span', row.oauthProvider)
-      },
-    },
-    {
       title: t('common.action'),
       key: '',
       render(row) {

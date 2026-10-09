@@ -10,8 +10,5 @@ declare namespace User{
 		role?:number
         mail?:string
 		token?:string
-		oauthProvider?:string
-		oauthId?:string
-		publiccode?:string
 	}
 }

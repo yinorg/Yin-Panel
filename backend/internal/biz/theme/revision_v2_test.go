@@ -251,37 +251,6 @@ func TestRevisionV2RollbackRequiresInstalledFallback(t *testing.T) {
 	}
 }
 
-func TestLegacyThemePreferenceMigrationPreservesModeButNotPackageSelection(t *testing.T) {
-	db, err := gorm.Open(sqlite.Open("file:theme-preference-v2-migration?mode=memory&cache=shared"), &gorm.Config{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := Migrate(db); err != nil {
-		t.Fatal(err)
-	}
-	legacy := LegacyPreferenceRecord{UserID: 41, PackageID: "community.legacy-theme", Mode: "dark"}
-	if err := db.Create(&legacy).Error; err != nil {
-		t.Fatal(err)
-	}
-	if err := EnsureBuiltinV2(db); err != nil {
-		t.Fatal(err)
-	}
-	mode, err := UserThemeModeV2(db, legacy.UserID)
-	if err != nil || mode != "dark" {
-		t.Fatalf("migrated theme mode = %q, err=%v", mode, err)
-	}
-	if _, err := GetActivationV2(db, ActivationScopeForUserV2(legacy.UserID)); !errors.Is(err, gorm.ErrRecordNotFound) {
-		t.Fatalf("legacy package selection was unexpectedly activated: %v", err)
-	}
-	if err := EnsureBuiltinV2(db); err != nil {
-		t.Fatal(err)
-	}
-	mode, err = UserThemeModeV2(db, legacy.UserID)
-	if err != nil || mode != "dark" {
-		t.Fatalf("repeated migration changed theme mode = %q, err=%v", mode, err)
-	}
-}
-
 func TestSetUserThemeSelectionV2IsAtomicWithAudit(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open("file:theme-preference-v2-atomic?mode=memory&cache=shared"), &gorm.Config{})
 	if err != nil {

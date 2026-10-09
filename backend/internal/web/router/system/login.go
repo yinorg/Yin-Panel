@@ -55,7 +55,7 @@ func (l *LoginRouter) Login(c *gin.Context) {
 	}
 
 	param.Mail = strings.ToLower(strings.TrimSpace(param.Mail))
-	user, err := global.UserRepo.GetByMailAndPassword(param.Mail, util.PasswordEncryption(param.Password), constant.OAuthProviderBuildin)
+	user, err := global.UserRepo.GetByMailAndPassword(param.Mail, util.PasswordEncryption(param.Password))
 	if err != nil {
 		// 未找到记录 账号或密码错误
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -87,12 +87,11 @@ func (l *LoginRouter) Login(c *gin.Context) {
 
 	// 将用户信息存储到上下文
 	userInfo := base.UserInfo{
-		ID:         user.ID,
-		Name:       user.Name,
-		Role:       user.Role,
-		Mail:       user.Mail,
-		Publiccode: user.Publiccode,
-		Token:      user.Token,
+		ID:    user.ID,
+		Name:  user.Name,
+		Role:  user.Role,
+		Mail:  user.Mail,
+		Token: user.Token,
 	}
 	response.SuccessData(c, userInfo)
 }

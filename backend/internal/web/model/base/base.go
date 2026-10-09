@@ -13,12 +13,11 @@ import (
 )
 
 type UserInfo struct {
-	ID         uint   `json:"id"`
-	Name       string `json:"name"`
-	Role       int8   `json:"role"`
-	Mail       string `json:"mail"`
-	Publiccode string `json:"publiccode"`
-	Token      string `json:"token"`
+	ID    uint   `json:"id"`
+	Name  string `json:"name"`
+	Role  int8   `json:"role"`
+	Mail  string `json:"mail"`
+	Token string `json:"token"`
 }
 
 type PageLimitVerify struct {

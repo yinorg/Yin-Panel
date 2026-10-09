@@ -54,7 +54,6 @@ func RouterArray() []IRouter {
 		panel.NewItemIconRouter(),
 		panel.NewUserConfigRouter(),
 		panel.NewUsersRouter(),
-		panel.NewPublicVisitRouter(),
 		panel.NewSpaceRouter(),
 	}
 }

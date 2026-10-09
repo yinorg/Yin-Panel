@@ -4,11 +4,13 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/yinorg/Yin-Panel/backend/internal/biz/repository"
 	"github.com/yinorg/Yin-Panel/backend/internal/biz/theme"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // This file implements the schema-upgrade steps around the new unique
@@ -50,6 +52,14 @@ func finalizeSchemaUpgrade(db *gorm.DB) error {
 	}
 	if err := mergeDuplicateUserAccounts(db); err != nil {
 		return fmt.Errorf("merge duplicate user accounts: %w", err)
+	}
+	if err := finalizeLegacyThemePreferences(db); err != nil {
+		return fmt.Errorf("finalize legacy theme preferences: %w", err)
+	}
+	// dropLegacySchema rebuilds the user/space tables on SQLite, which also
+	// drops the manually created mail index; recreate it afterwards.
+	if err := dropLegacySchema(db); err != nil {
+		return fmt.Errorf("drop legacy schema: %w", err)
 	}
 	if err := ensureUserMailIndex(db); err != nil {
 		return fmt.Errorf("ensure user mail index: %w", err)
@@ -175,17 +185,31 @@ func normalizeUserMails(db *gorm.DB) error {
 	return nil
 }
 
+// legacyOAuthIdentityRow reads the retired provider columns that still exist on
+// old databases.
+type legacyOAuthIdentityRow struct {
+	ID       uint
+	Provider string
+	OauthID  string
+	Mail     string
+}
+
 // backfillOAuthIdentities copies legacy provider columns into the canonical
 // identity table before duplicate accounts are merged or the columns retire.
 func backfillOAuthIdentities(db *gorm.DB) error {
-	var users []repository.User
-	if err := db.Where("oauth_provider IS NOT NULL AND oauth_provider <> '' AND oauth_provider <> ? AND oauth_id IS NOT NULL AND oauth_id <> ''", builtinAuthMarker).
+	if !db.Migrator().HasColumn("user", "oauth_provider") || !db.Migrator().HasColumn("user", "oauth_id") {
+		return nil
+	}
+	var users []legacyOAuthIdentityRow
+	if err := db.Table("user").
+		Select("id, oauth_provider AS provider, oauth_id, mail").
+		Where("oauth_provider IS NOT NULL AND oauth_provider <> '' AND oauth_provider <> ? AND oauth_id IS NOT NULL AND oauth_id <> ''", builtinAuthMarker).
 		Find(&users).Error; err != nil {
 		return err
 	}
 	for _, user := range users {
-		identity := repository.OAuthIdentity{UserID: user.ID, Provider: user.OauthProvider, Subject: user.OauthID, Email: user.Mail}
-		if err := db.Where("provider = ? AND subject = ?", user.OauthProvider, user.OauthID).FirstOrCreate(&identity).Error; err != nil {
+		identity := repository.OAuthIdentity{UserID: user.ID, Provider: user.Provider, Subject: user.OauthID, Email: user.Mail}
+		if err := db.Where("provider = ? AND subject = ?", user.Provider, user.OauthID).FirstOrCreate(&identity).Error; err != nil {
 			return err
 		}
 	}
@@ -227,9 +251,6 @@ func mergeUserAccount(tx *gorm.DB, canonical, duplicate repository.User) error {
 		return nil
 	}
 	if err := tx.Model(&repository.Space{}).Where("owner_user_id = ?", duplicate.ID).Update("owner_user_id", canonical.ID).Error; err != nil {
-		return err
-	}
-	if err := tx.Model(&repository.Team{}).Where("owner_user_id = ?", duplicate.ID).Update("owner_user_id", canonical.ID).Error; err != nil {
 		return err
 	}
 	if err := mergeUserSpaceMemberships(tx, canonical.ID, duplicate.ID); err != nil {
@@ -441,16 +462,104 @@ func mergeUserThemeSettings(tx *gorm.DB, canonicalID, duplicateID uint) error {
 	return nil
 }
 
+// legacyThemePreferenceRow reads the retired preferences table.
+type legacyThemePreferenceRow struct {
+	UserID    uint
+	Mode      string
+	UpdatedAt time.Time
+}
+
 func mergeUserLegacyPreferences(tx *gorm.DB, canonicalID, duplicateID uint) error {
-	var preference theme.LegacyPreferenceRecord
-	err := tx.First(&preference, "user_id = ?", canonicalID).Error
+	if !tx.Migrator().HasTable("preferences") {
+		return nil
+	}
+	var preference legacyThemePreferenceRow
+	err := tx.Table("preferences").Where("user_id = ?", canonicalID).First(&preference).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return tx.Model(&theme.LegacyPreferenceRecord{}).Where("user_id = ?", duplicateID).Update("user_id", canonicalID).Error
+		return tx.Exec("UPDATE preferences SET user_id = ? WHERE user_id = ?", canonicalID, duplicateID).Error
 	}
 	if err != nil {
 		return err
 	}
-	return tx.Where("user_id = ?", duplicateID).Delete(&theme.LegacyPreferenceRecord{}).Error
+	return tx.Exec("DELETE FROM preferences WHERE user_id = ?", duplicateID).Error
+}
+
+// finalizeLegacyThemePreferences copies the retired preferences table into the
+// v2 preference table and then drops it.
+func finalizeLegacyThemePreferences(db *gorm.DB) error {
+	if !db.Migrator().HasTable("preferences") {
+		return nil
+	}
+	var rows []legacyThemePreferenceRow
+	if err := db.Table("preferences").Select("user_id, mode, updated_at").Find(&rows).Error; err != nil {
+		return err
+	}
+	for _, row := range rows {
+		mode := row.Mode
+		if !validLegacyThemeMode(mode) {
+			mode = "auto"
+		}
+		preference := theme.UserThemePreferenceV2{UserID: row.UserID, Mode: mode, UpdatedAt: row.UpdatedAt}
+		if preference.UpdatedAt.IsZero() {
+			preference.UpdatedAt = time.Now()
+		}
+		if err := db.Clauses(clause.OnConflict{DoNothing: true}).Create(&preference).Error; err != nil {
+			return err
+		}
+	}
+	return db.Migrator().DropTable("preferences")
+}
+
+func validLegacyThemeMode(mode string) bool {
+	return mode == "light" || mode == "dark" || mode == "auto"
+}
+
+// dropLegacySchema removes retired columns, tables and SQLite foreign keys once
+// their data has been migrated. Every step is guarded, so it is a no-op on
+// fresh databases and on every start after the first one.
+func dropLegacySchema(db *gorm.DB) error {
+	// Foreign keys must go first: rebuilding the user table while another table
+	// still references it fails under SQLite's foreign_keys pragma.
+	constraints := []struct {
+		model interface{}
+		name  string
+	}{
+		{&repository.ItemIcon{}, "fk_item_icon_user"},
+		{&repository.ItemIconGroup{}, "fk_item_icon_group_user"},
+	}
+	for _, constraint := range constraints {
+		if db.Migrator().HasConstraint(constraint.model, constraint.name) {
+			if err := db.Migrator().DropConstraint(constraint.model, constraint.name); err != nil {
+				return fmt.Errorf("drop constraint %s: %w", constraint.name, err)
+			}
+		}
+	}
+	columns := []struct {
+		model interface{}
+		table string
+		name  string
+	}{
+		{&repository.User{}, "user", "publiccode"},
+		{&repository.User{}, "user", "oauth_provider"},
+		{&repository.User{}, "user", "oauth_id"},
+		{&repository.Space{}, "space", "team_id"},
+	}
+	for _, column := range columns {
+		// Detect by table name (the retired field is no longer part of the
+		// model, which HasColumn(model, name) would miss) and drop by model
+		// (the SQLite driver needs a parsed schema to rebuild the table).
+		if db.Migrator().HasColumn(column.table, column.name) {
+			if err := db.Migrator().DropColumn(column.model, column.name); err != nil {
+				return fmt.Errorf("drop column %s.%s: %w", column.table, column.name, err)
+			}
+		}
+	}
+	if db.Migrator().HasTable("team") {
+		if err := db.Migrator().DropTable("team"); err != nil {
+			return fmt.Errorf("drop table team: %w", err)
+		}
+	}
+	return nil
 }
 
 // ensureUserMailIndex creates the unique mail index once the data is clean.

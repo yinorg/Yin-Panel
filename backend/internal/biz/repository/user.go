@@ -8,17 +8,14 @@ import (
 
 type User struct {
 	BaseModel
-	Password      string `gorm:"type:varchar(255)" json:"password"`                            // 密码
-	Name          string `gorm:"type:varchar(20)" json:"name"`                                 // 名称
-	HeadImage     string `gorm:"type:varchar(255)" json:"headImage"`                           // 头像地址
-	Status        int8   `gorm:"type:tinyint" json:"status"`                                   // 状态 1.启用 2.停用 3.未激活
-	Role          int8   `gorm:"type:tinyint" json:"role"`                                     // 角色 1.管理员 2.普通用户
-	Mail          string `gorm:"type:varchar(255)" json:"mail"`                                // 邮箱
-	Token         string `gorm:"-" json:"token"`                                               // 仅用于API返回
-	OauthProvider string `gorm:"type:varchar(50)" json:"oauthProvider"`                        // OAuth来源 (github, google)
-	OauthID       string `gorm:"type:varchar(255);index" json:"oauthId"`                       // OAuth提供商中的用户ID
-	Publiccode    string `gorm:"type:varchar(50);uniqueIndex:uk_publiccode" json:"publiccode"` // 公开访问代码
-	TokenVersion  uint   `gorm:"not null;default:0" json:"-"`                                  // 用于撤销已签发的JWT
+	Password     string `gorm:"type:varchar(255)" json:"password"`  // 密码
+	Name         string `gorm:"type:varchar(20)" json:"name"`       // 名称
+	HeadImage    string `gorm:"type:varchar(255)" json:"headImage"` // 头像地址
+	Status       int8   `gorm:"type:tinyint" json:"status"`         // 状态 1.启用 2.停用 3.未激活
+	Role         int8   `gorm:"type:tinyint" json:"role"`           // 角色 1.管理员 2.普通用户
+	Mail         string `gorm:"type:varchar(255)" json:"mail"`      // 邮箱
+	Token        string `gorm:"-" json:"token"`                     // 仅用于API返回
+	TokenVersion uint   `gorm:"not null;default:0" json:"-"`        // 用于撤销已签发的JWT
 }
 
 func (r *UserRepo) GetByMail(mail string) (User, error) {
@@ -33,15 +30,13 @@ type UserRepo struct {
 type IUserRepo interface {
 	Get(id uint) (User, error)
 	Count() (uint, error)
-	GetByMailAndPassword(mail, password, oauthProvider string) (User, error)
-	GetByOAuthID(source, oauthID string) (User, error)
+	GetByMailAndPassword(mail, password string) (User, error)
 	GetByMail(mail string) (User, error)
 	GetList(pagedParam PagedParam) ([]User, uint, error)
 	Update(id uint, user *User) error
 	UpdateUserInfo(id uint, updateInfo map[string]any) error
 	Create(user *User) error
 	Delete(userId uint) ([]string, error)
-	GetByPubliccode(publiccode string) (User, error)
 	InvalidateTokens(userID uint) error
 }
 
@@ -61,17 +56,10 @@ func (r *UserRepo) Count() (uint, error) {
 	return uint(count), err
 }
 
-func (r *UserRepo) GetByMailAndPassword(mail, password, oauthProvider string) (User, error) {
+func (r *UserRepo) GetByMailAndPassword(mail, password string) (User, error) {
 	user := User{}
-	err := Db.Where("mail=?", mail).Where("oauth_provider=?", oauthProvider).
-		Where("password=?", password).First(&user).Error
+	err := Db.Where("mail=?", mail).Where("password=?", password).First(&user).Error
 	return user, err
-}
-
-func (r *UserRepo) GetByOAuthID(oauthProvider, oauthID string) (User, error) {
-	info := User{}
-	err := Db.Where("oauth_provider=?", oauthProvider).Where("oauth_id=?", oauthID).First(&info).Error
-	return info, err
 }
 
 func (r *UserRepo) GetList(pagedParam PagedParam) ([]User, uint, error) {
@@ -118,9 +106,6 @@ func (r *UserRepo) UpdateUserInfo(userId uint, updateInfo map[string]any) error 
 	if v, ok := updateInfo["role"]; ok {
 		data["role"] = v
 	}
-	if v, ok := updateInfo["publiccode"]; ok {
-		data["publiccode"] = v
-	}
 
 	if v, ok := updateInfo["mail"]; ok {
 		hasUser := User{}
@@ -162,11 +147,9 @@ func updatePersonalSpaceNames(tx *gorm.DB, userId uint, name string) error {
 		Update("name", name+"-B").Error
 }
 
-// Create persists a new account. Publiccode is intentionally omitted: the
-// legacy column is being retired and leaving it NULL keeps the old unique
-// index from rejecting a second empty string.
+// Create persists a new account.
 func (r *UserRepo) Create(user *User) error {
-	return Db.Omit("Publiccode").Create(user).Error
+	return Db.Create(user).Error
 }
 
 func (r *UserRepo) Delete(userId uint) ([]string, error) {
@@ -256,13 +239,6 @@ func (r *UserRepo) DeleteWithSpaces(userId uint, force bool) ([]string, error) {
 	})
 
 	return fileNames, err
-}
-
-// GetByPubliccode 根据 public visit 代码获取用户
-func (r *UserRepo) GetByPubliccode(publiccode string) (User, error) {
-	user := User{}
-	err := Db.Where("publiccode=?", publiccode).First(&user).Error
-	return user, err
 }
 
 // InvalidateTokens revokes all sessions for a user, including sessions created

@@ -58,13 +58,12 @@ func (a UsersRouter) Create(c *gin.Context) {
 	}
 
 	mUser := repository.User{
-		Mail:          param.Mail,
-		Password:      util.PasswordEncryption(param.Password),
-		Name:          param.Name,
-		HeadImage:     param.HeadImage,
-		Status:        1,
-		Role:          param.Role,
-		OauthProvider: constant.OAuthProviderBuildin,
+		Mail:      param.Mail,
+		Password:  util.PasswordEncryption(param.Password),
+		Name:      param.Name,
+		HeadImage: param.HeadImage,
+		Status:    1,
+		Role:      param.Role,
 	}
 	err := global.UserService.CreateUser(&mUser)
 	if err != nil {

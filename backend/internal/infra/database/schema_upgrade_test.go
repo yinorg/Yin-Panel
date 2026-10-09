@@ -23,6 +23,14 @@ func openSchemaUpgradeDB(t *testing.T, name string) *gorm.DB {
 	if err != nil {
 		t.Fatal(err)
 	}
+	sqlDB, err := db.DB()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Mirror the production SQLite pool: one connection keeps per-connection
+	// pragmas (such as foreign_keys) effective for the whole test.
+	sqlDB.SetMaxOpenConns(1)
+	sqlDB.SetMaxIdleConns(1)
 	return db
 }
 
@@ -33,14 +41,12 @@ func migrateSchemaUpgradeModels(t *testing.T, db *gorm.DB) {
 		&repository.OAuthIdentity{},
 		&repository.Space{},
 		&repository.SpaceMember{},
-		&repository.Team{},
 		&repository.ItemIcon{},
 		&repository.ItemIconGroup{},
 		&repository.File{},
 		&repository.UserConfig{},
 		&repository.ModuleConfig{},
 		&repository.SystemSetting{},
-		&theme.LegacyPreferenceRecord{},
 		&theme.AuditRecord{},
 		&theme.WebWallpaperRecord{},
 		&theme.GrantRecordV2{},
@@ -143,12 +149,15 @@ func TestFinalizeSchemaUpgradeMergesDuplicateAccounts(t *testing.T) {
 	db := openSchemaUpgradeDB(t, "finalize-schema-upgrade.db")
 	migrateSchemaUpgradeModels(t, db)
 
-	canonical := repository.User{Mail: "shared@example.com", Name: "Canonical", Status: 1, Role: 1, Publiccode: "code-canonical"}
-	duplicate := repository.User{Mail: "Shared@Example.COM ", Name: "Duplicate", Status: 1, Role: 2, Publiccode: "code-duplicate", OauthProvider: "github", OauthID: "gh-123"}
+	canonical := repository.User{Mail: "shared@example.com", Name: "Canonical", Status: 1, Role: 1}
+	duplicate := repository.User{Mail: "Shared@Example.COM ", Name: "Duplicate", Status: 1, Role: 2}
 	for _, user := range []*repository.User{&canonical, &duplicate} {
 		if err := db.Create(user).Error; err != nil {
 			t.Fatal(err)
 		}
+	}
+	if err := db.Create(&repository.OAuthIdentity{UserID: duplicate.ID, Provider: "github", Subject: "gh-123", Email: duplicate.Mail}).Error; err != nil {
+		t.Fatal(err)
 	}
 
 	shared := repository.Space{Type: repository.SpaceTypeShared, Name: "Shared", OwnerUserID: canonical.ID, Side: "yin"}
@@ -213,7 +222,10 @@ func TestFinalizeSchemaUpgradeMergesDuplicateAccounts(t *testing.T) {
 	if err := db.Create(&theme.UserSpaceThemePreferenceV2{UserID: duplicate.ID, SpaceID: shared.ID, PackageID: "org.demo", RevisionID: "rev-1"}).Error; err != nil {
 		t.Fatal(err)
 	}
-	if err := db.Create(&theme.LegacyPreferenceRecord{UserID: duplicate.ID, PackageID: "org.demo", Mode: "dark"}).Error; err != nil {
+	if err := db.Exec(`CREATE TABLE preferences (user_id integer primary key, package_id varchar(128), mode varchar(8), updated_at datetime)`).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Exec(`INSERT INTO preferences (user_id, package_id, mode) VALUES (?, 'org.demo', 'dark')`, duplicate.ID).Error; err != nil {
 		t.Fatal(err)
 	}
 	if err := db.Create(&theme.AuditRecord{ActorID: duplicate.ID, Action: "install-v2", PackageID: "org.demo"}).Error; err != nil {
@@ -341,9 +353,8 @@ func TestFinalizeSchemaUpgradeMergesDuplicateAccounts(t *testing.T) {
 	if err := db.Where("user_id = ? AND space_id = ?", canonical.ID, shared.ID).First(&movedSpacePreference).Error; err != nil {
 		t.Fatal(err)
 	}
-	var movedLegacy theme.LegacyPreferenceRecord
-	if err := db.First(&movedLegacy, "user_id = ?", canonical.ID).Error; err != nil {
-		t.Fatal(err)
+	if db.Migrator().HasTable("preferences") {
+		t.Fatal("preferences table was not dropped")
 	}
 	var movedAudit theme.AuditRecord
 	if err := db.First(&movedAudit, "actor_id = ?", canonical.ID).Error; err != nil {
@@ -375,8 +386,8 @@ func TestFinalizeSchemaUpgradePlaceholdersAndUniqueMailIndex(t *testing.T) {
 	if err := db.AutoMigrate(&repository.User{}, &repository.OAuthIdentity{}); err != nil {
 		t.Fatal(err)
 	}
-	first := repository.User{Mail: "", Name: "First", Status: 1, Publiccode: "code-1"}
-	second := repository.User{Mail: "  ", Name: "Second", Status: 1, Publiccode: "code-2"}
+	first := repository.User{Mail: "", Name: "First", Status: 1}
+	second := repository.User{Mail: "  ", Name: "Second", Status: 1}
 	for _, user := range []*repository.User{&first, &second} {
 		if err := db.Create(user).Error; err != nil {
 			t.Fatal(err)
@@ -404,12 +415,147 @@ func TestFinalizeSchemaUpgradePlaceholdersAndUniqueMailIndex(t *testing.T) {
 	if !exists {
 		t.Fatal("unique mail index was not created")
 	}
-	if err := db.Omit("Publiccode").Create(&repository.User{Mail: "orphan-1@local.invalid", Name: "Copy", Status: 1}).Error; err == nil {
+	if err := db.Create(&repository.User{Mail: "orphan-1@local.invalid", Name: "Copy", Status: 1}).Error; err == nil {
 		t.Fatal("duplicate mail insert unexpectedly succeeded")
 	}
 
 	// A second run with a clean database must succeed.
 	if err := finalizeSchemaUpgrade(db); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestFinalizeSchemaUpgradeCopiesAndDropsLegacyPreferences(t *testing.T) {
+	db := openSchemaUpgradeDB(t, "finalize-schema-upgrade-preferences.db")
+	if err := db.AutoMigrate(&repository.User{}, &theme.UserThemePreferenceV2{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Exec(`CREATE TABLE preferences (user_id integer primary key, package_id varchar(128), mode varchar(8), updated_at datetime)`).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Exec(`INSERT INTO preferences (user_id, package_id, mode) VALUES (41, 'old', 'dark')`).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Exec(`INSERT INTO preferences (user_id, package_id, mode) VALUES (42, 'old', 'bogus')`).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := finalizeSchemaUpgrade(db); err != nil {
+		t.Fatal(err)
+	}
+	if db.Migrator().HasTable("preferences") {
+		t.Fatal("preferences table was not dropped")
+	}
+	var dark theme.UserThemePreferenceV2
+	if err := db.First(&dark, "user_id = ?", 41).Error; err != nil {
+		t.Fatal(err)
+	}
+	if dark.Mode != "dark" {
+		t.Fatalf("user 41 mode = %q, want dark", dark.Mode)
+	}
+	var fallback theme.UserThemePreferenceV2
+	if err := db.First(&fallback, "user_id = ?", 42).Error; err != nil {
+		t.Fatal(err)
+	}
+	if fallback.Mode != "auto" {
+		t.Fatalf("user 42 mode = %q, want auto", fallback.Mode)
+	}
+}
+
+func TestBackfillOAuthIdentitiesFromLegacyColumns(t *testing.T) {
+	db := openSchemaUpgradeDB(t, "backfill-oauth-identities.db")
+	if err := db.Exec(`CREATE TABLE user (id integer primary key, mail text, oauth_provider text, oauth_id text)`).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.AutoMigrate(&repository.OAuthIdentity{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Exec(`INSERT INTO user (id, mail, oauth_provider, oauth_id) VALUES (1, 'a@example.com', 'github', 'gh-1')`).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Exec(`INSERT INTO user (id, mail, oauth_provider, oauth_id) VALUES (2, 'b@example.com', 'buildin', '')`).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := backfillOAuthIdentities(db); err != nil {
+		t.Fatal(err)
+	}
+	var identity repository.OAuthIdentity
+	if err := db.Where("provider = ? AND subject = ?", "github", "gh-1").First(&identity).Error; err != nil {
+		t.Fatal(err)
+	}
+	if identity.UserID != 1 {
+		t.Fatalf("identity user = %d, want 1", identity.UserID)
+	}
+	var count int64
+	if err := db.Model(&repository.OAuthIdentity{}).Count(&count).Error; err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 {
+		t.Fatalf("identity rows = %d, want 1 (the built-in marker must be skipped)", count)
+	}
+}
+
+func TestDropLegacySchemaRemovesRetiredColumnsAndTables(t *testing.T) {
+	db := openSchemaUpgradeDB(t, "drop-legacy-schema.db")
+	if err := db.AutoMigrate(&repository.User{}, &repository.Space{}); err != nil {
+		t.Fatal(err)
+	}
+	for _, statement := range []string{
+		"CREATE TABLE `item_icon` (`id` integer PRIMARY KEY AUTOINCREMENT, `user_id` integer, CONSTRAINT `fk_item_icon_user` FOREIGN KEY (`user_id`) REFERENCES `user`(`id`))",
+		"CREATE TABLE `item_icon_group` (`id` integer PRIMARY KEY AUTOINCREMENT, `user_id` integer, CONSTRAINT `fk_item_icon_group_user` FOREIGN KEY (`user_id`) REFERENCES `user`(`id`))",
+		"ALTER TABLE `user` ADD COLUMN `publiccode` varchar(50)",
+		"ALTER TABLE `user` ADD COLUMN `oauth_provider` varchar(50)",
+		"ALTER TABLE `user` ADD COLUMN `oauth_id` varchar(255)",
+		"ALTER TABLE `space` ADD COLUMN `team_id` integer",
+		`CREATE TABLE team (id integer primary key, name varchar(100), owner_user_id integer, created_at datetime, updated_at datetime)`,
+	} {
+		if err := db.Exec(statement).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := db.Exec("PRAGMA foreign_keys = ON").Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&repository.User{Mail: "x@example.com", Name: "n", Status: 1}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := ensureUserMailIndex(db); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := dropLegacySchema(db); err != nil {
+		t.Fatal(err)
+	}
+	for _, column := range []string{"publiccode", "oauth_provider", "oauth_id"} {
+		if db.Migrator().HasColumn(&repository.User{}, column) {
+			t.Fatalf("user.%s was not dropped", column)
+		}
+	}
+	if db.Migrator().HasColumn(&repository.Space{}, "team_id") {
+		t.Fatal("space.team_id was not dropped")
+	}
+	if db.Migrator().HasTable("team") {
+		t.Fatal("team table was not dropped")
+	}
+	if db.Migrator().HasConstraint(&repository.ItemIcon{}, "fk_item_icon_user") {
+		t.Fatal("item_icon foreign key was not dropped")
+	}
+	if db.Migrator().HasConstraint(&repository.ItemIconGroup{}, "fk_item_icon_group_user") {
+		t.Fatal("item_icon_group foreign key was not dropped")
+	}
+	var user repository.User
+	if err := db.First(&user, "mail = ?", "x@example.com").Error; err != nil {
+		t.Fatal(err)
+	}
+	if user.Name != "n" {
+		t.Fatalf("user data was lost during the table rebuild: %+v", user)
+	}
+	// Rebuilding the user table drops the manually created mail index, so the
+	// upgrade re-creates it afterwards.
+	if err := ensureUserMailIndex(db); err != nil {
+		t.Fatal(err)
+	}
+	exists, err := schemaIndexExists(db, "user", userMailIndexName)
+	if err != nil || !exists {
+		t.Fatalf("mail index missing after rebuild: exists=%v err=%v", exists, err)
 	}
 }

@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 const InstanceThemeScopeV2 = "instance"
@@ -616,27 +615,6 @@ func validThemeModeV2(mode string) bool {
 	return mode == "light" || mode == "dark" || mode == "auto"
 }
 
-func migrateLegacyThemeModesV2(db *gorm.DB) error {
-	var legacy []LegacyPreferenceRecord
-	if err := db.Select("user_id", "mode").Find(&legacy).Error; err != nil {
-		return err
-	}
-	for _, old := range legacy {
-		mode := old.Mode
-		if !validThemeModeV2(mode) {
-			mode = "auto"
-		}
-		preference := UserThemePreferenceV2{UserID: old.UserID, Mode: mode, UpdatedAt: old.UpdatedAt}
-		if preference.UpdatedAt.IsZero() {
-			preference.UpdatedAt = time.Now()
-		}
-		if err := db.Clauses(clause.OnConflict{DoNothing: true}).Create(&preference).Error; err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func ActiveRevisionIDV2(db *gorm.DB, scope string) (string, error) {
 	var activation ActivationRecordV2
 	if err := db.First(&activation, "scope = ?", scope).Error; err != nil {
@@ -946,7 +924,7 @@ func EnsureBuiltinV2(db *gorm.DB) error {
 	}); err != nil {
 		return err
 	}
-	return migrateLegacyThemeModesV2(db)
+	return nil
 }
 
 func builtinPackagesV2() []*PackageV2 {
