@@ -33,15 +33,6 @@ type ItemIcon struct {
 
 type ItemIconRepo struct{}
 
-type IItemIconRepo interface {
-	Get(userId, id uint) (*ItemIcon, error)
-	Save(itemIcon *ItemIcon) error
-	BatchSave(itemIcons []ItemIcon) error
-	GetList(userId, groupId uint) ([]ItemIcon, error)
-	Delete(userId, id uint) error
-	BatchSaveSort(userId, groupId uint, sortItems []commonApi.SortRequestItem) error
-}
-
 func NewItemIconRepo() *ItemIconRepo {
 	return &ItemIconRepo{}
 }
@@ -64,10 +55,6 @@ func (itemIconRepo *ItemIconRepo) Save(itemIcon *ItemIcon) error {
 		Db.Create(&itemIcon)
 	}
 	return nil
-}
-
-func (itemIconRepo *ItemIconRepo) BatchSave(itemIcons []ItemIcon) error {
-	return Db.Create(&itemIcons).Error
 }
 
 func (itemIconRepo *ItemIconRepo) GetList(userId, groupId uint) ([]ItemIcon, error) {

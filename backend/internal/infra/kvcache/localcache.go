@@ -1,7 +1,6 @@
 package kvcache
 
 import (
-	"encoding/json"
 	"time"
 
 	"github.com/patrickmn/go-cache"
@@ -89,12 +88,4 @@ func (c *LocalCache[T]) ItemCount() (int64, error) {
 // Flush 删除当前已存在的所有key
 func (c *LocalCache[T]) Flush() {
 	c.gocahce.Flush()
-}
-
-func (c *LocalCache[T]) encode(value T) ([]byte, error) {
-	return json.Marshal(value)
-}
-
-func (c *LocalCache[T]) decode(valueByte []byte, value T) error {
-	return json.Unmarshal(valueByte, value)
 }

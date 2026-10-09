@@ -173,15 +173,6 @@ func OptionalAuth(c *gin.Context) {
 	c.Next()
 }
 
-// ParseUserIdFromJwtToken 解析JWT Token，获取用户ID
-func ParseUserIdFromJwtToken(authHeader string) (uint, error) {
-	claims, err := ParseJwtClaims(authHeader)
-	if err != nil {
-		return 0, err
-	}
-	return claims.UserID, nil
-}
-
 func ParseJwtClaims(authHeader string) (*jwt.Claims, error) {
 	if authHeader == "" {
 		return nil, errors.New("authHeader is empty")

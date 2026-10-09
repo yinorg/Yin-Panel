@@ -29,7 +29,6 @@ var (
 	FileRepo          = repository.NewFileRepo()
 	ModuleConfigRepo  = repository.NewModuleConfigRepo()
 	UserConfigRepo    = repository.NewUserConfigRepo()
-	SystemSettingRepo = repository.NewSystemSettingRepo()
 )
 
 // services
@@ -39,10 +38,6 @@ var (
 
 // caches
 var (
-	CacheSystemSetting = &cache.SystemSetting{
-		Cache:             kvcache.NewLocalCache[any](5*time.Hour, -1),
-		SystemSettingRepo: SystemSettingRepo,
-	}
 	CacheMonitor = &cache.Monitor{
 		Cache: kvcache.NewLocalCache[any](5*time.Hour, -1),
 	}

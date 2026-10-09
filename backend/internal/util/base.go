@@ -2,23 +2,12 @@ package util
 
 import (
 	"crypto/md5"
-	"crypto/rand"
-	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"os"
 	"slices"
 	"sort"
-	"time"
 )
-
-const (
-	TimeFormatMode1 = "2006-01-02 15:04:05" // 标准格式
-)
-
-func GetTime() string {
-	return time.Unix(time.Now().Unix(), 0).Format(TimeFormatMode1)
-}
 
 func Md5(str string) string {
 	md5Byte := md5.Sum([]byte(str))
@@ -64,11 +53,4 @@ func ToJSONString(v any) string {
 
 func RedirectURL(rootUrl, provider string) string {
 	return rootUrl + "/api/oauth/" + provider + "/callback"
-}
-
-// GenerateRandomString 生成指定长度的随机字符串
-func GenerateRandomString(length int) string {
-	b := make([]byte, length)
-	rand.Read(b)
-	return base64.URLEncoding.EncodeToString(b)[:length]
 }

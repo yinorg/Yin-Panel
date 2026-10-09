@@ -49,15 +49,6 @@ func (l *LangStructObj) Get(key string) string {
 	}
 }
 
-// 获取并替换字段
-func (l *LangStructObj) GetWithFields(key string, fields map[string]string) string {
-	c := l.Get(key)
-	for k, v := range fields {
-		c = strings.ReplaceAll(c, `{`+k+`}`, v)
-	}
-	return c
-}
-
 // 获取值并向后追加
 func (l *LangStructObj) GetAndInsert(key string, insertContent ...string) string {
 	content := l.Get(key) + " "

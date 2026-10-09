@@ -32,14 +32,6 @@ func Success(ctx *gin.Context) {
 	ApiReturn(ctx, 0, "OK", nil)
 }
 
-func ListData(ctx *gin.Context, list interface{}, count int64) {
-	data := map[string]interface{}{
-		"list":  list,
-		"count": count,
-	}
-	ApiReturn(ctx, 0, "OK", data)
-}
-
 // 返回错误 需要个性化定义的错误|带返回数据的错误
 func ErrorCode(ctx *gin.Context, code int, errMsg string, data interface{}) {
 	ApiReturn(ctx, code, errMsg, data)

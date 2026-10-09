@@ -10,22 +10,12 @@ import (
 	"net/http"
 	"net/url"
 	"path"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
 )
-
-func IsHTTPURL(url string) bool {
-	httpPattern := `^(http://|https://|//)`
-	match, err := regexp.MatchString(httpPattern, url)
-	if err != nil {
-		return false
-	}
-	return match
-}
 
 func GetOneFaviconURL(urlStr string) (string, error) {
 	iconURLs, err := getFaviconURL(urlStr)
@@ -49,58 +39,6 @@ func GetOneFaviconURL(urlStr string) (string, error) {
 		}
 	}
 	return "", fmt.Errorf("not found ico")
-}
-
-// 获取远程文件的大小
-func GetRemoteFileSize(url string) (int64, error) {
-	// 创建一个自定义的 HTTP 客户端
-	client := &http.Client{
-		Timeout: 10 * time.Second,
-		// 启用自动重定向
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			return nil
-		},
-	}
-
-	// 创建请求
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return 0, err
-	}
-
-	// 添加浏览器模拟头信息
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
-	req.Header.Set("Accept", "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8")
-	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
-	req.Header.Set("Connection", "keep-alive")
-
-	// 发送请求
-	resp, err := client.Do(req)
-	if err != nil {
-		return 0, err
-	}
-	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			zaplog.Logger.Errorf("failed to close resp.Body. error : %v", err)
-		}
-	}()
-
-	// 检查HTTP响应状态
-	if resp.StatusCode != http.StatusOK {
-		return 0, fmt.Errorf("HTTP request failed, status code: %d", resp.StatusCode)
-	}
-
-	// 获取Content-Length字段，即文件大小
-	size := resp.ContentLength
-
-	// 如果服务器没有提供 Content-Length，尝试读取响应体来确定大小
-	if size <= 0 {
-		zaplog.Logger.Infof("Content-Length not provided for %s, using alternative method", url)
-		// 不实际读取整个响应体，因为我们已经有了连接，可以直接关闭
-		return 0, fmt.Errorf("Content-Length not provided by server")
-	}
-
-	return size, nil
 }
 
 // 下载图片
