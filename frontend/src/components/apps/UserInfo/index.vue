@@ -195,7 +195,7 @@ onMounted(loadThemeSettings)
 
 <template>
   <div class="theme-page p-2 h-full">
-    <NCard style="border-radius:10px;box-shadow:none" size="small">
+    <NCard style="border-radius:10px" size="small">
       <div>
         <div class="text-slate-500 font-bold">
           {{ $t('spaceManage.userEmail') }}
@@ -268,7 +268,7 @@ onMounted(loadThemeSettings)
 
     </NCard>
 
-    <NCard style="border-radius:10px;box-shadow:none" class="mt-[10px]" size="small">
+    <NCard style="border-radius:10px" class="mt-[10px]" size="small">
       <NButton size="small" text type="error" @click="handleLogout">
         <template #icon>
           <SvgIcon icon="tabler:logout" />

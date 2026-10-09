@@ -227,4 +227,9 @@ onUnmounted(() => {
 .dark .app-starter-modal-content .n-layout{
     background-color: #2c2c32;
 }
+/* The settings modal's app pages read as one flat surface: their cards drop the
+   drop shadow (the users page had none, so the others looked inconsistent). */
+.app-starter-modal-content .n-card {
+    box-shadow: none;
+}
 </style>
