@@ -433,9 +433,7 @@ select {
 }
 
 .yin-group-controls {
-  position: absolute;
-  top: 0;
-  right: 36px;
+  /* Left-aligned, right after the group title rather than floated to the right. */
   opacity: 0;
   transition: opacity 120ms ease;
 }
@@ -513,9 +511,7 @@ select {
 }
 
 .yin-group-controls {
-  position: absolute;
-  top: 0;
-  right: 36px;
+  /* Left-aligned, right after the group title rather than floated to the right. */
   opacity: 0;
   transition: opacity 120ms ease;
 }
@@ -1087,12 +1083,8 @@ select {
   }
 
   /* The pre-theme heading kept the collapse chevron immediately after the title
-     (an 8px gap, no justify-between), so the title must stay content-sized; only
-     the hover controls drop to their own line. */
-  .yin-group-controls {
-    order: 3;
-    flex-basis: 100%;
-  }
+     (an 8px gap, no justify-between), so the title stays content-sized and the
+     hover controls stay on the same line, left-aligned after the title. */
 }
 
 /* The pre-theme build had a dedicated narrow-viewport block (max-width: 500px):
@@ -1199,27 +1191,22 @@ select {
   [data-editing='true'] .yin-item:not(.is-dragging) { animation: none; }
 }
 
-/* Per-group controls: an icon plus a hover tooltip (native `title`), so they stay
-   compact next to the group title instead of a row of text buttons. */
+/* Per-group controls: the same plain-icon style as the monitor's add control —
+   no box, a 20px glyph and a hover tooltip — left-aligned after the group title. */
 .yin-icon-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
   padding: 0;
-  border: 1px solid transparent;
-  border-radius: var(--yin-radiusControl, 8px);
+  border: 0;
   background: transparent;
-  color: var(--yin-textMuted, #64737a);
+  color: var(--yin-text, #20282c);
   cursor: pointer;
 }
 
-.yin-icon-button svg { width: 18px; height: 18px; }
+.yin-icon-button svg { width: 20px; height: 20px; }
 
 .yin-icon-button:hover:not(:disabled) {
-  border-color: var(--yin-border, #d8e0e3);
-  background: color-mix(in srgb, var(--yin-surface, #fff) 88%, transparent);
   color: var(--yin-primary, #176b80);
 }
 
