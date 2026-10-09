@@ -443,7 +443,7 @@ export function useHomeShell() {
     watch([monitorShowTitle, panelIconTextColor], () => {
       setThemeMonitorBridge({
         controller: monitorSnapshotController,
-        showTitle: monitorShowTitle.value,
+        showTitle: monitorShowTitle.value !== false,
         iconTextColor: panelIconTextColor.value,
         allowEdit: authStore.loggedIn,
       })

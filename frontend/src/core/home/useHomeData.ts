@@ -13,6 +13,7 @@ import { buildHomeGroupTree } from '@/core/home/groupTree'
 import { createHomeSearchService } from '@/core/home/search'
 import { createHomeSpaceController } from '@/core/home/spaceController'
 import type { ThemeCollectionStatus } from '@/theme/api/v1'
+import type { Response as ApiResponse } from '@/utils/request'
 
 /** Mirrors the host's local group shape (a group tree node with its items). */
 export interface HomeGroupNode extends Panel.ItemIconGroup {
@@ -23,6 +24,12 @@ export interface HomeGroupNode extends Panel.ItemIconGroup {
 export interface HomeMonitorStatus {
   enabled: boolean
   refreshInterval?: number
+}
+
+/** The `data` payload of the monitor enable-status endpoint. */
+interface MonitorEnableData {
+  enabled: boolean
+  refresh_interval?: number
 }
 
 const HOME_REQUEST_TIMEOUT = 3000
@@ -116,8 +123,8 @@ export function useHomeData(input: {
     // and its data endpoint are both JWT-only, so a public link can never render
     // the band; probing anyway only earns a 1005 on every open.
     getMonitor: signal => input.publicCode
-      ? Promise.resolve({ code: 0, msg: '', data: { enabled: false } })
-      : getEnableStatus<{ enabled: boolean, refresh_interval?: number }>(signal),
+      ? Promise.resolve<ApiResponse<MonitorEnableData>>({ code: 0, msg: '', data: { enabled: false } })
+      : getEnableStatus<MonitorEnableData>(signal),
     getSpaces: signal => getSpaces<Space[]>(signal),
     refreshConfig: signal => panelState.updatePanelConfigByCloud(signal),
     timeoutMs: HOME_REQUEST_TIMEOUT,

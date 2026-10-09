@@ -200,7 +200,7 @@ test('Trusted Theme CSS maps document roots to the Shadow DOM host', async () =>
     [],
     {},
     undefined,
-    true,
+    { shadow: true },
   )
   assert.match(result, /:host/)
   assert.doesNotMatch(result, /(^|[,\s])html([,\s{]|$)|(^|[,\s])body([,\s{]|$)|:root/)

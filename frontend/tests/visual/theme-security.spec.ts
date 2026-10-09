@@ -11,7 +11,9 @@ test.describe('Theme Sandbox: Network Isolation', () => {
         let attempted = false
         const originalFetch = window.fetch
         window.fetch = async (...args) => {
-          if (args[0]?.includes?.('evil.com')) {
+          const target = args[0]
+          const requestUrl = typeof target === 'string' ? target : target instanceof URL ? target.href : target.url
+          if (requestUrl.includes('evil.com')) {
             attempted = true
           }
           return originalFetch.apply(this, args)
@@ -45,10 +47,9 @@ test.describe('Theme Sandbox: Prototype Pollution Prevention', () => {
   })
 
   test('Prototype pollution is prevented in sandbox', async ({ page }) => {
-    const pollutionResult = await page.evaluate(() => {
+    const pollutionResult = await page.evaluate<{ polluted?: boolean, error?: string | null }>(() => {
       const iframe = document.createElement('iframe')
       iframe.sandbox = 'allow-scripts'
-      let result = { polluted: false, error: null }
 
       iframe.srcdoc = `
         <script>
@@ -136,7 +137,9 @@ test.describe('Theme CSS: Injection Prevention', () => {
         const originalFetch = window.fetch
         let fetched = false
         window.fetch = async (...args) => {
-          if (args[0]?.includes?.('evil.com')) {
+          const target = args[0]
+          const requestUrl = typeof target === 'string' ? target : target instanceof URL ? target.href : target.url
+          if (requestUrl.includes('evil.com')) {
             fetched = true
           }
           return originalFetch.apply(this, args)
@@ -159,7 +162,7 @@ test.describe('Theme CSS: Style Isolation', () => {
   })
 
   test('Theme CSS cannot access parent page styles', async ({ page }) => {
-    const styleLeak = await page.evaluate(() => {
+    const styleLeak = await page.evaluate<{ backgroundColor: string }>(() => {
       const iframe = document.createElement('iframe')
       iframe.sandbox = 'allow-scripts'
       iframe.srcdoc = `

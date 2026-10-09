@@ -25,7 +25,7 @@ export async function rewriteThemeStylesheet(
   baseURL?: string,
   scope: ThemeCssScope = {},
 ): Promise<string> {
-  const { default: cssTree } = await import('css-tree')
+  const cssTree = await import('css-tree')
   const stylesheet = new URL(stylesheetURL, baseURL)
   const tree = cssTree.parse(source, { positions: true, parseValue: true })
 
@@ -41,8 +41,7 @@ export async function rewriteThemeStylesheet(
       throw new Error('Theme stylesheets cannot use escaped functions or image-set string fetches')
     if (node.type !== 'Url') return
 
-    const value = node.value?.value.trim()
-    const rawURL = value && node.value?.type === 'String' ? value.slice(1, -1) : value
+    const rawURL = typeof node.value === 'string' ? node.value.trim() : ''
     if (!rawURL || rawURL.includes('\\'))
       throw new Error('Theme stylesheet contains an invalid asset URL')
 
@@ -61,7 +60,7 @@ export async function rewriteThemeStylesheet(
     if (!resource || !assetURLs[resource.path])
       throw new Error(`Theme stylesheet references an undeclared asset: ${rawURL}`)
 
-    node.value!.value = resource.mediaType === 'image/svg+xml'
+    node.value = resource.mediaType === 'image/svg+xml'
       ? new URL(resource.url!, stylesheet).href
       : assetURLs[resource.path]
   })

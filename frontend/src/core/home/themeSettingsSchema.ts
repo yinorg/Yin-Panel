@@ -41,8 +41,8 @@ export function createThemeSettingsSchemaValidator(options: {
     if (!validate) {
       const schema = JSON.parse(new TextDecoder().decode(bytes))
       rejectExternalSchemaRefs(schema)
-      const module = await (options.loadAjv || (() => import('ajv/dist/2020.js')))()
-      const ajv = new module.default({ allErrors: true, strict: true, validateSchema: true })
+      const { default: Ajv } = await (options.loadAjv || (() => import('ajv/dist/2020.js')))()
+      const ajv = new Ajv({ allErrors: true, strict: true, validateSchema: true })
       validate = ajv.compile(schema) as Validator
       validators.set(cacheKey, validate)
     }

@@ -105,7 +105,7 @@ const VIEWPORTS = [
   { name: 'mobile', width: 375, height: 667 },
 ]
 
-const THEMES = ['light', 'dark']
+const THEMES = ['light', 'dark'] as const
 
 for (const viewport of VIEWPORTS) {
   for (const theme of THEMES) {
