@@ -65,7 +65,6 @@ func (a UsersRouter) Create(c *gin.Context) {
 		Status:        1,
 		Role:          param.Role,
 		OauthProvider: constant.OAuthProviderBuildin,
-		Publiccode:    util.GenerateRandomString(10),
 	}
 	err := global.UserService.CreateUser(&mUser)
 	if err != nil {

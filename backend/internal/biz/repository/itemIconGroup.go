@@ -25,12 +25,11 @@ type ItemIconGroup struct {
 	BaseModel
 	Icon        string `gorm:"type:varchar(50)" json:"icon"`
 	Title       string `gorm:"type:varchar(50)" json:"title"`
-	Description string `gorm:"type:varchar(1000)" json:"description"`
-	Sort        int    `gorm:"type:int(11)" json:"sort"`
+	Description string `gorm:"type:text" json:"description"`
+	Sort        int    `gorm:"type:int(11);index:idx_group_space_sort,priority:2" json:"sort"`
 	UserId      uint   `gorm:"index" json:"userId"`
-	SpaceID     uint   `gorm:"index" json:"spaceId"`
+	SpaceID     uint   `gorm:"index:idx_group_space_sort,priority:1" json:"spaceId"`
 	ParentID    *uint  `gorm:"index" json:"parentId,omitempty"`
-	User        User   `json:"user"`
 }
 
 func (r *ItemIconGroupRepo) Save(itemIconGroup *ItemIconGroup) error {

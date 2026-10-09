@@ -17,19 +17,18 @@ type ItemIconIconInfo struct {
 
 type ItemIcon struct {
 	BaseModel
-	IconJson        string           `gorm:"type:varchar(1000)" json:"-"`
+	IconJson        string           `gorm:"type:text" json:"-"`
 	Icon            ItemIconIconInfo `gorm:"-" json:"icon"`
 	Title           string           `gorm:"type:varchar(50)" json:"title"`
-	Url             string           `gorm:"type:varchar(1000)" json:"url"`
-	LanUrl          string           `gorm:"type:varchar(1000)" json:"lanUrl"`
-	MobileUrl       string           `gorm:"type:varchar(1000)" json:"mobileUrl"`
-	Description     string           `gorm:"type:varchar(1000)" json:"description"`
+	Url             string           `gorm:"type:text" json:"url"`
+	LanUrl          string           `gorm:"type:text" json:"lanUrl"`
+	MobileUrl       string           `gorm:"type:text" json:"mobileUrl"`
+	Description     string           `gorm:"type:text" json:"description"`
 	OpenMethod      int              `gorm:"type:tinyint(1)" json:"openMethod"`
-	Sort            int              `gorm:"type:int(11)" json:"sort"`
-	ItemIconGroupId int              `json:"itemIconGroupId"`
+	Sort            int              `gorm:"type:int(11);index:idx_item_space_sort,priority:2" json:"sort"`
+	ItemIconGroupId uint             `gorm:"index:idx_item_space_group,priority:2" json:"itemIconGroupId"`
 	UserId          uint             `gorm:"index" json:"userId"`
-	SpaceID         uint             `gorm:"index" json:"spaceId"`
-	User            User             `json:"user"`
+	SpaceID         uint             `gorm:"index:idx_item_space_group,priority:1;index:idx_item_space_sort,priority:1" json:"spaceId"`
 }
 
 type ItemIconRepo struct{}

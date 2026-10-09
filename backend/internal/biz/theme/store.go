@@ -22,7 +22,7 @@ type AuditRecord struct {
 	ActorID   uint      `json:"actorId"`
 	Action    string    `gorm:"size:32" json:"action"`
 	PackageID string    `gorm:"size:128" json:"packageId"`
-	CreatedAt time.Time `json:"createdAt"`
+	CreatedAt time.Time `gorm:"index:idx_audit_record_created_at" json:"createdAt"`
 }
 
 func Migrate(db *gorm.DB) error {

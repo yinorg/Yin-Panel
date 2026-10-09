@@ -42,8 +42,8 @@ func setupArrangeLayoutDB(t *testing.T) (spaceID, groupA, groupB, itemA, itemB u
 			t.Fatal(err)
 		}
 	}
-	item1 := repository.ItemIcon{Title: "1", ItemIconGroupId: int(a.ID), SpaceID: space.ID, UserId: 1, Sort: 1}
-	item2 := repository.ItemIcon{Title: "2", ItemIconGroupId: int(b.ID), SpaceID: space.ID, UserId: 1, Sort: 1}
+	item1 := repository.ItemIcon{Title: "1", ItemIconGroupId: a.ID, SpaceID: space.ID, UserId: 1, Sort: 1}
+	item2 := repository.ItemIcon{Title: "2", ItemIconGroupId: b.ID, SpaceID: space.ID, UserId: 1, Sort: 1}
 	for _, item := range []*repository.ItemIcon{&item1, &item2} {
 		if err := db.Create(item).Error; err != nil {
 			t.Fatal(err)
@@ -84,7 +84,7 @@ func TestArrangeLayoutMovesItemsAcrossGroupsAndSorts(t *testing.T) {
 	if err := repository.Db.First(&moved, itemA).Error; err != nil {
 		t.Fatal(err)
 	}
-	if moved.ItemIconGroupId != int(groupB) || moved.Sort != 1 {
+	if moved.ItemIconGroupId != groupB || moved.Sort != 1 {
 		t.Fatalf("item %d = group %d sort %d, want group %d sort 1", itemA, moved.ItemIconGroupId, moved.Sort, groupB)
 	}
 	var group repository.ItemIconGroup

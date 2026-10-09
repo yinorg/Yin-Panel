@@ -270,7 +270,7 @@ func (r *SpaceRouter) ImportBookmarksBatch(c *gin.Context) {
 				if icon.ItemType == 0 {
 					icon.ItemType = 4
 				}
-				item := repository.ItemIcon{Title: limitTitle(b.Title), Url: b.URL, OpenMethod: 2, ItemIconGroupId: int(target.ID), UserId: user.ID, SpaceID: id, Icon: icon}
+				item := repository.ItemIcon{Title: limitTitle(b.Title), Url: b.URL, OpenMethod: 2, ItemIconGroupId: target.ID, UserId: user.ID, SpaceID: id, Icon: icon}
 				ensureItemIcon(&item)
 				data, _ := json.Marshal(icon)
 				item.IconJson = string(data)
@@ -352,7 +352,7 @@ func bookmarkHTMLForParent(groups []repository.ItemIconGroup, items []repository
 		}
 		result += "<DT><H3>" + html.EscapeString(group.Title) + "</H3><DL><p>"
 		for _, item := range items {
-			if item.ItemIconGroupId == int(group.ID) {
+			if item.ItemIconGroupId == group.ID {
 				result += "<DT><A HREF=\"" + html.EscapeString(item.Url) + "\">" + html.EscapeString(item.Title) + "</A>"
 			}
 		}
@@ -394,7 +394,7 @@ func (r *SpaceRouter) ImportBookmarks(c *gin.Context) {
 				if strings.TrimSpace(imported.URL) == "" {
 					continue
 				}
-				item := repository.ItemIcon{Title: limitTitle(imported.Title), Url: imported.URL, OpenMethod: 2, ItemIconGroupId: int(target.ID), UserId: user.ID, SpaceID: id}
+				item := repository.ItemIcon{Title: limitTitle(imported.Title), Url: imported.URL, OpenMethod: 2, ItemIconGroupId: target.ID, UserId: user.ID, SpaceID: id}
 				item.Icon = imported.Icon
 				if item.Icon.ItemType == 0 {
 					item.Icon.ItemType = 4
@@ -604,7 +604,7 @@ func (r *SpaceRouter) Transfer(c *gin.Context) {
 		return
 	}
 	var targetUser repository.User
-	if repository.Db.Where("lower(mail) = ?", strings.ToLower(strings.TrimSpace(req.Email))).First(&targetUser).Error != nil {
+	if repository.Db.Where("mail = ?", strings.ToLower(strings.TrimSpace(req.Email))).First(&targetUser).Error != nil {
 		response.ErrorDataNotFound(c)
 		return
 	}
@@ -671,7 +671,7 @@ func (r *SpaceRouter) Copy(c *gin.Context) {
 				item.ID = 0
 				item.SpaceID = dst.ID
 				item.UserId = user.ID
-				item.ItemIconGroupId = int(g.ID)
+				item.ItemIconGroupId = g.ID
 				if err := tx.Create(&item).Error; err != nil {
 					return err
 				}
@@ -1010,7 +1010,7 @@ func (r *SpaceRouter) AddMember(c *gin.Context) {
 		return
 	}
 	var targetUser repository.User
-	if repository.Db.Where("lower(mail) = ?", strings.ToLower(strings.TrimSpace(req.Email))).First(&targetUser).Error != nil {
+	if repository.Db.Where("mail = ?", strings.ToLower(strings.TrimSpace(req.Email))).First(&targetUser).Error != nil {
 		response.ErrorDataNotFound(c)
 		return
 	}
@@ -1746,18 +1746,14 @@ func (r *SpaceRouter) CreateSpace(c *gin.Context) {
 		return
 	}
 	err := repository.Db.Transaction(func(tx *gorm.DB) error {
-		team := repository.Team{Name: req.Name, OwnerUserID: user.ID}
-		if err := tx.Create(&team).Error; err != nil {
-			return err
-		}
-		space := repository.Space{Type: repository.SpaceTypeTeam, Name: req.Name, OwnerUserID: user.ID, TeamID: &team.ID, Side: "yin"}
+		space := repository.Space{Type: repository.SpaceTypeTeam, Name: req.Name, OwnerUserID: user.ID, Side: "yin"}
 		if err := tx.Create(&space).Error; err != nil {
 			return err
 		}
 		if err := tx.Model(&space).Update("pair_id", space.ID).Error; err != nil {
 			return err
 		}
-		yang := repository.Space{Type: space.Type, Name: req.Name + "-B", OwnerUserID: user.ID, TeamID: &team.ID, PairID: space.ID, Side: "yang"}
+		yang := repository.Space{Type: space.Type, Name: req.Name + "-B", OwnerUserID: user.ID, PairID: space.ID, Side: "yang"}
 		if err := tx.Create(&yang).Error; err != nil {
 			return err
 		}

@@ -23,7 +23,7 @@ type User struct {
 
 func (r *UserRepo) GetByMail(mail string) (User, error) {
 	var user User
-	err := Db.Where("lower(mail)=?", mail).First(&user).Error
+	err := Db.Where("mail=?", mail).First(&user).Error
 	return user, err
 }
 
@@ -162,9 +162,11 @@ func updatePersonalSpaceNames(tx *gorm.DB, userId uint, name string) error {
 		Update("name", name+"-B").Error
 }
 
+// Create persists a new account. Publiccode is intentionally omitted: the
+// legacy column is being retired and leaving it NULL keeps the old unique
+// index from rejecting a second empty string.
 func (r *UserRepo) Create(user *User) error {
-	err := Db.Create(user).Error
-	return err
+	return Db.Omit("Publiccode").Create(user).Error
 }
 
 func (r *UserRepo) Delete(userId uint) ([]string, error) {

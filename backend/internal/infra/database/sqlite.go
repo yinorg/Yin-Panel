@@ -32,6 +32,10 @@ func (d *SQLiteConfig) Connect() (db *gorm.DB, err error) {
 			NamingStrategy: schema.NamingStrategy{
 				SingularTable: true,
 			},
+			// Referential integrity is enforced by application code. Keeping
+			// foreign keys out of the schema makes SQLite structurally equal
+			// to MySQL, which never creates them.
+			DisableForeignKeyConstraintWhenMigrating: true,
 		})
 		if err != nil {
 			return

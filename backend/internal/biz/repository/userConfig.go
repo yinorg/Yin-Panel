@@ -40,7 +40,9 @@ type PanelConfig struct {
 }
 
 type UserConfig struct {
-	UserId uint `gorm:"index" json:"userId"`
+	// One panel configuration per user. The unique index also closes the
+	// First-then-Create race in SaveUserConfig.
+	UserId uint `gorm:"uniqueIndex:uk_user_config_user_id" json:"userId"`
 
 	// 面板样式数据
 	PanelJson string       `json:"-"`

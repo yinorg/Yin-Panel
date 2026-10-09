@@ -56,6 +56,9 @@ func initDatabase(db *gorm.DB) (err error) {
 	if err := PrepareMigrationBackup(db); err != nil {
 		return fmt.Errorf("prepare migration backup: %w", err)
 	}
+	if err := prepareSchemaUpgrade(db); err != nil {
+		return fmt.Errorf("prepare schema upgrade: %w", err)
+	}
 	// 创建数据表
 	err = db.AutoMigrate(
 		&repository.User{},
@@ -87,6 +90,9 @@ func initDatabase(db *gorm.DB) (err error) {
 		if err := db.Exec("UPDATE user SET mail = username WHERE (mail IS NULL OR mail = '') AND username IS NOT NULL AND username <> ''").Error; err != nil {
 			return err
 		}
+	}
+	if err := finalizeSchemaUpgrade(db); err != nil {
+		return fmt.Errorf("schema upgrade: %w", err)
 	}
 	if err := normalizeEmptyPublicIDs(db); err != nil {
 		return err

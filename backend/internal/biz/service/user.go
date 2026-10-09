@@ -21,7 +21,6 @@ import (
 	"github.com/yinorg/Yin-Panel/backend/internal/infra/config"
 	"github.com/yinorg/Yin-Panel/backend/internal/infra/kvcache"
 	"github.com/yinorg/Yin-Panel/backend/internal/infra/zaplog"
-	"github.com/yinorg/Yin-Panel/backend/internal/util"
 )
 
 type UserService struct {
@@ -337,17 +336,11 @@ func (s *UserService) findOrCreateOAuthUser(provider string, providerConfig conf
 
 	// OAuth users don't need a password as they authenticate through the provider
 	newUser := &repository.User{
-		Password:      "", // No password needed for OAuth users
-		Name:          displayName,
-		Mail:          email,
-		Status:        1, // Active
-		Role:          2, // Regular user
-		OauthProvider: provider,
-		OauthID:       identifier,
-		// SQLite treats the empty string as a value, so multiple OAuth users
-		// would violate the unique publiccode index. The provider identifier is
-		// stable and unique enough for the initial value; users can regenerate it.
-		Publiccode: util.GenerateRandomString(10),
+		Password: "", // No password needed for OAuth users
+		Name:     displayName,
+		Mail:     email,
+		Status:   1, // Active
+		Role:     2, // Regular user
 	}
 
 	if err := s.CreateUser(newUser); err != nil {

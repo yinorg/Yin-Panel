@@ -18,8 +18,8 @@ type Space struct {
 	Type             string  `gorm:"type:varchar(20);not null;index" json:"type"`
 	Name             string  `gorm:"type:varchar(100);not null" json:"name"`
 	OwnerUserID      uint    `gorm:"not null;index" json:"ownerUserId"`
-	PairID           uint    `gorm:"not null;default:0;index" json:"pairId"`
-	Side             string  `gorm:"type:varchar(10);not null;default:'yin'" json:"side"`
+	PairID           uint    `gorm:"not null;default:0;index:idx_space_pair_side,priority:1" json:"pairId"`
+	Side             string  `gorm:"type:varchar(10);not null;default:'yin';index:idx_space_pair_side,priority:2" json:"side"`
 	PairedSpaceID    uint    `gorm:"-" json:"pairedSpaceId,omitempty"`
 	TeamID           *uint   `gorm:"index" json:"teamId,omitempty"`
 	PublicEnabled    bool    `gorm:"not null;default:false" json:"publicEnabled"`
@@ -42,7 +42,7 @@ type SpaceSearchConfig struct {
 type SpaceMember struct {
 	BaseModel
 	SpaceID  uint      `gorm:"not null;uniqueIndex:uk_space_member" json:"spaceId"`
-	UserID   uint      `gorm:"not null;uniqueIndex:uk_space_member" json:"userId"`
+	UserID   uint      `gorm:"not null;uniqueIndex:uk_space_member;index:idx_space_member_user" json:"userId"`
 	Role     string    `gorm:"type:varchar(20);not null" json:"role"`
 	Source   string    `gorm:"type:varchar(20);not null;default:'manual'" json:"source"`
 	JoinedAt time.Time `json:"joinedAt"`
