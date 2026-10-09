@@ -35,6 +35,7 @@ export function registerCoreElement(
   tagName: string,
   loader: () => Promise<{ default: Component }>,
   mapProps: (element: HTMLElement) => Record<string, unknown> | null = () => ({}),
+  hooks: { onConnected?: () => void; onDisconnected?: () => void } = {},
 ) {
   if (customElements.get(tagName))
     return
@@ -44,10 +45,12 @@ export function registerCoreElement(
 
     connectedCallback() {
       this.mount()
+      hooks.onConnected?.()
     }
 
     disconnectedCallback() {
       this.unmount()
+      hooks.onDisconnected?.()
     }
 
     private mount() {

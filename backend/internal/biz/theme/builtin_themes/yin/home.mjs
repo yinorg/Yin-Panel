@@ -295,6 +295,8 @@ export default {
     let collection
     let emptyState
     let footer
+    let monitorSection
+    let monitorElement
 
     const updateClock = () => {
       if (!clock) return
@@ -514,7 +516,17 @@ export default {
       contextMenu.setAttribute('role', 'menu')
       contextMenu.setAttribute('aria-label', 'Item actions')
       headerSection.append(masthead, actionBar, searchSection)
-      page.append(headerSection, directoryNav, status, collection, emptyState, footer, groupDialog, contextMenu)
+      // The system monitor is rendered by the theme itself, in normal flow, through
+      // the Core component bridge (`<yin-system-monitor>`). The Core only keeps its
+      // own overlay as the fallback for a theme that does not embed it, and the
+      // element's presence is what tells the Core to step aside.
+      monitorSection = element('section', 'yin-monitor')
+      monitorSection.dataset.testid = 'theme-home-monitor'
+      monitorSection.hidden = true
+      monitorElement = document.createElement('yin-system-monitor')
+      monitorElement.style.cssText = 'display:block'
+      monitorSection.append(monitorElement)
+      page.append(headerSection, monitorSection, directoryNav, status, collection, emptyState, footer, groupDialog, contextMenu)
       page.addEventListener('keydown', event => {
         if (!groupDialog.hidden && event.key === 'Tab') {
           const focusable = [...groupDialog.querySelectorAll('input:not(:disabled), button:not(:disabled)')]
@@ -1309,6 +1321,10 @@ export default {
       page.style.setProperty('--yin-icon-text-color', presentation.iconTextColor || '#ffffff')
       const reservedHeight = Number(presentation.monitor?.reservedHeight)
       page.style.setProperty('--yin-monitor-reserved-height', `${Number.isFinite(reservedHeight) && reservedHeight > 0 ? reservedHeight : 0}px`)
+      // The theme renders the monitor itself; only show it when the Core says it is
+      // enabled. The element stays connected either way, so the Core keeps its own
+      // overlay hidden even while the monitor is toggled off.
+      monitorSection.hidden = presentation.monitor?.visible !== true
       updateLogo(presentation)
       updateClock()
       addGroupButton.hidden = !canMutateGroup('create')

@@ -1,3 +1,4 @@
+import { ref } from 'vue'
 import type { MonitorSnapshotController } from '@/core/monitor/snapshotController'
 import type { MonitorSnapshot } from '@/components/deskModule/SystemMonitor/snapshot'
 
@@ -18,6 +19,15 @@ export interface ThemeMonitorBridge {
 }
 
 let bridge: ThemeMonitorBridge | undefined
+
+/**
+ * How many `<yin-system-monitor>` elements the theme currently has connected.
+ *
+ * The Core keeps its overlay as the fallback, but stops painting it once the theme
+ * renders the monitor itself. The element is the signal: it is the Core's own
+ * custom element, so its presence means the theme embedded it.
+ */
+export const themeEmbeddedMonitorCount = ref(0)
 
 export function setThemeMonitorBridge(next: ThemeMonitorBridge | undefined) {
   bridge = next

@@ -13,7 +13,7 @@ import { useHomeModals } from '@/core/home/useHomeModals'
 import { useThemeRuntime } from '@/core/home/useThemeRuntime'
 import { useThemeMonitor } from '@/core/home/useThemeMonitor'
 import { useHomeCommands } from '@/core/home/useHomeCommands'
-import { setThemeMonitorBridge } from '@/core/home/monitorBridge'
+import { setThemeMonitorBridge, themeEmbeddedMonitorCount } from '@/core/home/monitorBridge'
 import { setBridgeAppContext } from '@/theme/bridge/registry'
 // Register the Core's embeddable custom elements so a theme can render Core pages
 // itself. See `theme/bridge/systemMonitor.ts` and `theme/bridge/appSurfaces.ts`.
@@ -44,6 +44,9 @@ export function useHomeShell() {
   const authStore = useAuthStore()
   const publicCode = parsePublicCodeFromPath()
   const previewTheme = new URLSearchParams(window.location.search).has('themePreview')
+  // Dev/compare override: force the Core's own monitor overlay even when the theme
+  // embeds the monitor, so the two can be compared and the fallback exercised.
+  const forceCoreMonitor = new URLSearchParams(window.location.search).has('yinCoreMonitor')
 
   const useThemeDefaults = computed(() => previewTheme || !!panelState.panelConfig.useThemeDefaults)
   const useThemeColors = computed(() => useThemeDefaults.value || panelState.panelConfig.wallpaperMode === 'theme')
@@ -401,7 +404,10 @@ export function useHomeShell() {
   /** Root shell classes and the theme frame. */
   // Monitor-layer placement and brand text are derived here so the template never
   // reaches into `panelState` itself.
-  const monitorVisible = computed(() => monitorEnabled.value && panelState.panelConfig.systemMonitorShow)
+  /** True once the theme renders the monitor itself (`<yin-system-monitor>` is
+   *  connected). The Core overlay then steps aside and stays only as the fallback. */
+  const themeEmbedsMonitor = computed(() => themeEmbeddedMonitorCount.value > 0 && !forceCoreMonitor)
+  const monitorVisible = computed(() => monitorEnabled.value && panelState.panelConfig.systemMonitorShow && !themeEmbedsMonitor.value)
   const monitorIsInfo = computed(() => panelState.panelConfig.iconStyle === PanelPanelConfigStyleEnum.info)
   const contentTopVh = computed(() => panelState.panelConfig.marginTop ?? 10)
   const monitorShowTitle = computed(() => panelState.panelConfig.systemMonitorShowTitle)

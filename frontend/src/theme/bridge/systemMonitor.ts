@@ -1,4 +1,4 @@
-import { getThemeMonitorBridge } from '@/core/home/monitorBridge'
+import { getThemeMonitorBridge, themeEmbeddedMonitorCount } from '@/core/home/monitorBridge'
 import { registerCoreElement } from './registry'
 
 /**
@@ -25,4 +25,9 @@ registerCoreElement('yin-system-monitor', () => import('@/components/deskModule/
     iconTextColor: element.getAttribute('icon-text-color') || bridge.iconTextColor,
     snapshotController: bridge.controller,
   }
+}, {
+  // Report presence so the Core hides its own overlay while the theme renders the
+  // monitor (the overlay stays the fallback for a theme that does not embed it).
+  onConnected: () => { themeEmbeddedMonitorCount.value += 1 },
+  onDisconnected: () => { themeEmbeddedMonitorCount.value = Math.max(0, themeEmbeddedMonitorCount.value - 1) },
 })

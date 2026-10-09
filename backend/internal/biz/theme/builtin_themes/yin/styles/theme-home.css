@@ -368,6 +368,27 @@ select {
   display: none;
 }
 
+/* The system monitor band, rendered by the theme itself through the Core
+   component bridge (`<yin-system-monitor>`). The look mirrors the Core's own
+   overlay so the two are interchangeable; the Core keeps that overlay only as the
+   fallback for a theme that does not embed the monitor. */
+.yin-monitor {
+  box-sizing: border-box;
+  width: min(calc(var(--yin-content-max-width, 1200px) - 30px), calc(100vw - 30px));
+  margin: 24px auto 0;
+  padding-top: 26px;
+  max-height: 286px;
+  overflow: auto;
+  --yin-text: #fff;
+  --yin-textMuted: rgb(255 255 255 / 82%);
+  --yin-primary: #fff;
+  --yin-border: transparent;
+  --yin-component-app-icon-surface: rgb(42 42 42 / 42%);
+  --yin-component-system-monitor-heading-size: 18px;
+}
+.yin-monitor .n-progress-graph-circle-rail { stroke: rgb(255 255 255 / 36%) !important; }
+.yin-monitor .n-progress-graph-line-rail { background-color: rgb(255 255 255 / 24%) !important; }
+
 .yin-collection {
   display: block;
   align-items: start;
