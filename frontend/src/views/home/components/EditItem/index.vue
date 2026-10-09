@@ -192,7 +192,7 @@ watch(() => props.visible, (newValue) => {
   }
 
   getGroupListOptions(editingSpaceId.value)
-})
+}, { immediate: true })
 
 function getGroupListOptions(spaceId?: number) {
   if (!spaceId) {

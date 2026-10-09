@@ -1,5 +1,6 @@
 import { createThemeApiExecutionDispatcher } from '../api/dispatcher'
 import { createThemeApiDirectTransport } from '../api/directTransport'
+import { cloneThemeMessage } from './clone'
 import { createThemeApiClient, type ThemeAPI, type ThemeDefinition, type ThemeEnvironment, type ThemeEventName, type ThemeHomeSnapshot, type ThemeModule, type ThemeMountedView, type ThemePermission } from '../../../packages/theme-sdk/src/index'
 
 const START_TIMEOUT = 10_000
@@ -45,8 +46,8 @@ export interface ThemeDirectHandle {
 }
 
 export async function mountThemeDirect(options: ThemeDirectOptions): Promise<ThemeDirectHandle> {
-  let snapshot = structuredClone(options.snapshot)
-  let environment = structuredClone({ ...options.environment, apiVersion: '1.0.0' as const })
+  let snapshot = cloneThemeMessage(options.snapshot)
+  let environment = cloneThemeMessage({ ...options.environment, apiVersion: '1.0.0' as const })
   let disposed = false
   let moduleURL = ''
   let mounted: ThemeMountedView | undefined
@@ -122,7 +123,7 @@ export async function mountThemeDirect(options: ThemeDirectOptions): Promise<The
     validateContributions(definition, options.contributions)
     const view = definition?.views?.home
     if (typeof view !== 'function') throw new Error('Theme does not register the contributed home view')
-    const mountTask = Promise.resolve(view(root, apiClient.api as ThemeAPI, structuredClone(snapshot)))
+    const mountTask = Promise.resolve(view(root, apiClient.api as ThemeAPI, cloneThemeMessage(snapshot)))
     try {
       mounted = await withTimeout(mountTask, START_TIMEOUT, 'Theme home view mount timed out')
     }
@@ -138,7 +139,7 @@ export async function mountThemeDirect(options: ThemeDirectOptions): Promise<The
       root.append(slot)
       const factory = definition?.regions?.[region]
       if (typeof factory !== 'function') throw new Error(`Theme does not register contributed region ${region}`)
-      const regionView = await withTimeout(Promise.resolve(factory(slot, apiClient.api as ThemeAPI, structuredClone(snapshot))), START_TIMEOUT, `Theme region ${region} mount timed out`)
+      const regionView = await withTimeout(Promise.resolve(factory(slot, apiClient.api as ThemeAPI, cloneThemeMessage(snapshot))), START_TIMEOUT, `Theme region ${region} mount timed out`)
       if (!regionView || typeof regionView.unmount !== 'function') throw new Error(`Theme region ${region} must return an unmount function`)
       mountedRegions.push(regionView)
     }
@@ -149,7 +150,7 @@ export async function mountThemeDirect(options: ThemeDirectOptions): Promise<The
       root.append(slot)
       const factory = definition?.components?.[component]
       if (typeof factory !== 'function') throw new Error(`Theme does not register contributed component ${component}`)
-      const componentView = await withTimeout(Promise.resolve(factory(slot, apiClient.api as ThemeAPI, structuredClone(snapshot))), START_TIMEOUT, `Theme component ${component} mount timed out`)
+      const componentView = await withTimeout(Promise.resolve(factory(slot, apiClient.api as ThemeAPI, cloneThemeMessage(snapshot))), START_TIMEOUT, `Theme component ${component} mount timed out`)
       if (!componentView || typeof componentView.unmount !== 'function') throw new Error(`Theme component ${component} must return an unmount function`)
       mountedComponents.push(componentView)
     }
@@ -171,21 +172,21 @@ export async function mountThemeDirect(options: ThemeDirectOptions): Promise<The
   return {
     update(next) {
       if (disposed) return
-      snapshot = structuredClone(next)
+      snapshot = cloneThemeMessage(next)
       apiClient.updateSnapshot(snapshot)
-      void Promise.resolve(mounted?.update?.(structuredClone(snapshot))).catch((error) => {
+      void Promise.resolve(mounted?.update?.(cloneThemeMessage(snapshot))).catch((error) => {
         options.onError(error instanceof Error ? error : new Error(String(error)))
       })
       for (const region of mountedRegions)
-        void Promise.resolve(region.update?.(structuredClone(snapshot))).catch(error => options.onError(error instanceof Error ? error : new Error(String(error))))
+        void Promise.resolve(region.update?.(cloneThemeMessage(snapshot))).catch(error => options.onError(error instanceof Error ? error : new Error(String(error))))
       for (const component of mountedComponents)
-        void Promise.resolve(component.update?.(structuredClone(snapshot))).catch(error => options.onError(error instanceof Error ? error : new Error(String(error))))
+        void Promise.resolve(component.update?.(cloneThemeMessage(snapshot))).catch(error => options.onError(error instanceof Error ? error : new Error(String(error))))
       for (const view of mountedViews)
-        void Promise.resolve(view.update?.(structuredClone(snapshot))).catch(error => options.onError(error instanceof Error ? error : new Error(String(error))))
+        void Promise.resolve(view.update?.(cloneThemeMessage(snapshot))).catch(error => options.onError(error instanceof Error ? error : new Error(String(error))))
     },
     updateEnvironment(next) {
       if (disposed) return
-      environment = structuredClone({ ...next, apiVersion: '1.0.0' as const })
+      environment = cloneThemeMessage({ ...next, apiVersion: '1.0.0' as const })
       apiClient.updateEnvironment(environment)
     },
     updateTokens(cssText) {
@@ -209,7 +210,7 @@ export async function mountThemeDirect(options: ThemeDirectOptions): Promise<The
       const factory = (definition?.views as Record<string, unknown> | undefined)?.[name]
       if (typeof factory !== 'function') throw new Error(`Theme does not register the ${name} view`)
       const view = await withTimeout(
-        Promise.resolve((factory as (root: HTMLElement, api: ThemeAPI, snapshot: ThemeHomeSnapshot) => unknown)(element, apiClient.api as ThemeAPI, structuredClone(snapshot))),
+        Promise.resolve((factory as (root: HTMLElement, api: ThemeAPI, snapshot: ThemeHomeSnapshot) => unknown)(element, apiClient.api as ThemeAPI, cloneThemeMessage(snapshot))),
         START_TIMEOUT,
         `Theme ${name} view mount timed out`,
       ) as ThemeMountedView | undefined

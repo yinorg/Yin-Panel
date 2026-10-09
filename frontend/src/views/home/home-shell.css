@@ -383,6 +383,19 @@ html {
   border-radius: 0 0 3px 3px;
 }
 
+/* The consent prompt has to paint over a live theme: the theme host (and a sandbox
+   frame) fills the viewport at z-index 1, so the notice needs its own stacking
+   context above it and below the top chrome. */
+.theme-runtime-notice-layer {
+  position: fixed;
+  z-index: 10;
+  top: 72px;
+  left: 50%;
+  width: min(92vw, 560px);
+  transform: translateX(-50%);
+  pointer-events: auto;
+}
+
 /* A theme-contributed surface (`/theme/:view`) replaces the home: the runtime host
    stays mounted because it owns the theme's `setup`, but the home's own layers step
    aside and the surface route renders in their place. */

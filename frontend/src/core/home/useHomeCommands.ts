@@ -262,6 +262,14 @@ export function useHomeCommands(input: {
     // Modifier combinations stay browser shortcuts; the forwarded path applies the
     // same rule in the theme before it sends anything.
     if (event.ctrlKey || event.metaKey || event.altKey) return
+    // A directly mounted theme forwards the same key from its own document
+    // listener, which runs before this one, so the palette is already open by the
+    // time the event reaches the window. Consume it here, otherwise the character
+    // is typed into the freshly focused palette input.
+    if (commandCenterVisible.value && event.key.length === 1) {
+      event.preventDefault()
+      return
+    }
     if (!handleShortcutKey(event.key)) return
     event.preventDefault()
   }

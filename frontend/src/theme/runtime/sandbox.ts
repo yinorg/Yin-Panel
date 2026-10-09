@@ -3,6 +3,7 @@ import { isThemeApiRequest, isThemeEventName, type ThemeEnvironment, type ThemeE
 import { createThemeApiClient } from '../../../packages/theme-sdk/src/index'
 import { createThemeRequestGuard } from './requestGuard'
 import { createThemeSandboxDocument } from './sandboxDocument'
+import { cloneThemeMessage } from './clone'
 export { createThemeSandboxDocument } from './sandboxDocument'
 
 const MAX_MESSAGE_BYTES = 1_048_576
@@ -435,11 +436,4 @@ function jsonWithinLimit(value: unknown): boolean {
   catch {
     return false
   }
-}
-
-function cloneThemeMessage<T>(value: T): T {
-  const serialized = JSON.stringify(value)
-  if (serialized === undefined)
-    throw new Error('Theme runtime messages must contain JSON data')
-  return JSON.parse(serialized) as T
 }

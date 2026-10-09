@@ -1010,10 +1010,12 @@ export default {
         section._yin.toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true')
         section.classList.toggle('is-collapsed', collapsed)
         section.style.setProperty('--yin-group-depth', String(depth))
-        // In the directory layout the selected root is already named by the
-        // folder picker above, so its own heading row is redundant. Keep the
-        // items, drop the heading.
-        section._yin.heading.hidden = isDirectory && depth === 0
+        // In the directory layout the selected root is already named by the folder
+        // picker above, so its title is redundant. Keep the heading row, though:
+        // its controls (add item, edit/delete/reorder group) are the only way to
+        // manage the group in that layout.
+        section._yin.heading.hidden = false
+        section._yin.title.hidden = isDirectory && depth === 0
         const siblings = (snapshot.groups || []).filter(candidate => (candidate.parentId ?? null) === (group.parentId ?? null))
         const siblingIndex = siblings.findIndex(candidate => String(candidate.id) === String(group.id))
         section._yin.addItem.hidden = !canCreateItems()
