@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { NButton, NCard, NCheckbox, NDropdown, NInput, NModal, NRadio, NRadioGroup, NSkeleton, NSpin, NSpace } from 'naive-ui'
-import { defineAsyncComponent } from 'vue'
+import { computed, defineAsyncComponent } from 'vue'
+import { useRoute } from 'vue-router'
 import CommandCenter from './components/CommandCenter/index.vue'
 import WallpaperLayer from './components/WallpaperLayer.vue'
 import HomeFallback from './components/HomeFallback.vue'
@@ -31,10 +32,16 @@ defineProps<{
 const SystemMonitor = defineAsyncComponent(() => import('@/components/deskModule/SystemMonitor/index.vue'))
 const AppStarter = defineAsyncComponent(() => import('./components/AppStarter/index.vue'))
 const EditItem = defineAsyncComponent(() => import('./components/EditItem/index.vue'))
+
+// A theme-contributed surface (`/theme/:view`) replaces the home's own layers. The
+// runtime host stays mounted because it owns the theme's `setup`; the surface route
+// mounts into that same runtime.
+const route = useRoute()
+const themeSurfaceRoute = computed(() => route.name === 'themeSurface')
 </script>
 
 <template>
-  <div class="w-full h-full sun-main" :class="{ 'side-switching': home.sideSwitching, 'theme-defaults': theme.useThemeColors, 'wallpaper-active': theme.wallpaperActive, 'theme-runtime-yin': theme.themeRuntimeActive && theme.themeRuntimePackage?.manifest.id === 'org.yin.default' }" :data-panel-side="home.activeSpace?.side || 'yin'">
+  <div class="w-full h-full sun-main" :class="{ 'side-switching': home.sideSwitching, 'theme-defaults': theme.useThemeColors, 'wallpaper-active': theme.wallpaperActive, 'theme-runtime-yin': theme.themeRuntimeActive && theme.themeRuntimePackage?.manifest.id === 'org.yin.default', 'theme-surface-mode': themeSurfaceRoute }" :data-panel-side="home.activeSpace?.side || 'yin'">
     <CommandCenter
       :visible="commands.commandCenterVisible"
       :query="commands.commandCenterQuery"
@@ -120,6 +127,7 @@ const EditItem = defineAsyncComponent(() => import('./components/EditItem/index.
       :title="theme.themeRuntimePackage.manifest.name"
       :execute="theme.executeThemeRequest"
       @failed="theme.handleThemeRuntimeFailure"
+      @ready="theme.handleThemeRuntimeReady"
     >
       <div
         v-if="theme.monitorVisible"
@@ -173,14 +181,9 @@ const EditItem = defineAsyncComponent(() => import('./components/EditItem/index.
       </div>
     </div>
 
-    <!-- A theme-contributed surface (theme-settings) mounted by the Core on
-         demand; the theme renders its own page inside this layer. -->
-    <div v-if="theme.themeSurfaceVisible" class="theme-surface-layer" data-testid="theme-surface">
-      <div class="theme-surface-frame">
-        <div :ref="theme.setThemeSurfaceElement" class="theme-surface-host" data-testid="theme-surface-host" />
-        <button type="button" class="theme-surface-close" :aria-label="$t('common.close')" @click="theme.closeThemeSurface()">✕</button>
-      </div>
-    </div>
+    <!-- A theme-contributed surface is rendered by the child `theme/:view` route.
+         The runtime host above stays mounted; this route mounts into it. -->
+    <RouterView />
 
     <!-- The settings surface stays Core-owned (D5) and is opened by the command
          center's `settings` command, so it must remain mounted now that the

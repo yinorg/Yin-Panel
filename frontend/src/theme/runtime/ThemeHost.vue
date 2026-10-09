@@ -59,6 +59,10 @@ const frame = ref<HTMLIFrameElement>()
 const shell = ref<HTMLElement>()
 const layoutHeight = ref(0)
 const trustedHost = ref<HTMLElement>()
+/** The light-DOM scope class the mounted theme's styles are prefixed with. Surface
+ *  routes mount into their own element and add this class so the theme's own CSS
+ *  (and its tokens) apply there too. Empty for the shadow/sandbox mounts. */
+const scopeClass = ref('')
 let runtime: ThemeSandboxHandle | ThemeDirectHandle | undefined
 let disposed = false
 let generation = 0
@@ -110,6 +114,7 @@ async function start() {
   const createdAssetURLs: string[] = []
   const lightMount = mountMode.value === 'direct' && DIRECT_LIGHT_MOUNT
   const scope = lightMount ? `yin-theme-${Math.random().toString(36).slice(2, 10)}` : ''
+  scopeClass.value = scope
   try {
     const manifest = props.theme.manifest
     const scriptPath = manifest.entrypoints?.script
@@ -344,6 +349,7 @@ function leaveTrustedRuntime() {
 onBeforeUnmount(() => {
   disposed = true
   generation += 1
+  scopeClass.value = ''
   void runtime?.dispose()
   revokeAssetURLs(activeAssetURLs)
   activeAssetURLs = []
@@ -359,7 +365,7 @@ async function mountThemeView(name: string, element: HTMLElement) {
   return runtime.mountView(name, element)
 }
 
-defineExpose({ scrollToTop, hasView: hasThemeView, mountView: mountThemeView })
+defineExpose({ scrollToTop, hasView: hasThemeView, mountView: mountThemeView, getScopeClass: () => scopeClass.value })
 </script>
 
 <!--

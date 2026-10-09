@@ -1,4 +1,4 @@
-import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { parsePublicCodeFromPath } from '@/utils/request/axios'
 import { useAuthStore, usePanelState } from '@/store'
 import { PanelStateNetworkModeEnum } from '@/enums'
@@ -161,7 +161,7 @@ export function useHomeShell() {
   /** Handle to the mounted theme host. It is a function ref because the element is
    *  bound from `HomeChrome`, and the Core cannot reach inside the sandbox to scroll
    *  it itself. */
-  const themeHostRef = ref<{ scrollToTop: () => void; hasView?: (name: string) => boolean; mountView?: (name: string, element: HTMLElement) => Promise<{ unmount: () => void | Promise<void> }> }>()
+  const themeHostRef = ref<{ scrollToTop: () => void; hasView?: (name: string) => boolean; mountView?: (name: string, element: HTMLElement) => Promise<{ unmount: () => void | Promise<void> }>; getScopeClass?: () => string }>()
   function setThemeHostElement(element: Element | { $el?: unknown } | null) {
     themeHostRef.value = element && 'scrollToTop' in element ? element as typeof themeHostRef.value : undefined
   }
@@ -169,38 +169,28 @@ export function useHomeShell() {
     themeHostRef.value?.scrollToTop()
   }
 
+  // The theme runtime mounts asynchronously; `ready` is emitted once the host has
+  // mounted it. Surface routes need this signal because the runtime handle is a
+  // plain variable, so `hasView` going false→true is not reactive on its own.
+  const themeRuntimeReady = ref(false)
+  function handleThemeRuntimeReady() { themeRuntimeReady.value = true }
+
   // A theme can contribute views beyond the home (theme-settings, theme-page).
-  // The Core opens one on demand and falls back to its own surface when the
-  // theme does not provide it.
-  const themeSurfaceVisible = ref(false)
-  const themeSurfaceElement = ref<HTMLElement>()
-  let themeSurfaceView: { unmount: () => void | Promise<void> } | undefined
-  function setThemeSurfaceElement(element: Element | { $el?: unknown } | null) {
-    themeSurfaceElement.value = element instanceof HTMLElement ? element : undefined
-  }
+  // The Core renders one on its own route (`/theme/:view`, mounted by
+  // `ThemeSurface.vue`) and keeps its own page as the fallback when the theme
+  // does not provide the view.
   function themeHasSurface(name: string) {
     return themeHostRef.value?.hasView?.(name) === true
   }
-  async function openThemeSurface(name: string) {
-    if (!themeHasSurface(name))
-      return false
-    themeSurfaceVisible.value = true
-    await nextTick()
-    try {
-      themeSurfaceView = await themeHostRef.value?.mountView?.(name, themeSurfaceElement.value!)
-    }
-    catch {
-      themeSurfaceVisible.value = false
-      return false
-    }
-    return true
+  async function mountThemeSurface(name: string, element: HTMLElement) {
+    const view = await themeHostRef.value?.mountView?.(name, element)
+    if (!view) throw new Error(`Theme does not provide the ${name} surface`)
+    return view
   }
-  async function closeThemeSurface() {
-    themeSurfaceVisible.value = false
-    const view = themeSurfaceView
-    themeSurfaceView = undefined
-    if (view)
-      await Promise.resolve(view.unmount()).catch(() => undefined)
+  /** The light-DOM scope class of the mounted theme, so a surface route can make
+   *  the theme's own styles and tokens apply to its page. Empty when not light-mounted. */
+  function themeScopeClass() {
+    return themeHostRef.value?.getScopeClass?.() ?? ''
   }
 
   const {
@@ -324,7 +314,7 @@ export function useHomeShell() {
     reportSearchBottom,
     getMonitorSnapshot,
     scrollToTop,
-    openThemeSurface,
+    hasThemeSurface: themeHasSurface,
   })
 
   invalidateRemoteCommandItems = () => { remoteCommandItems.value = [] }
@@ -420,9 +410,11 @@ export function useHomeShell() {
     executeThemeRequest,
     handleThemeRuntimeFailure,
     setThemeHostElement,
-    themeSurfaceVisible,
-    setThemeSurfaceElement,
-    closeThemeSurface,
+    hasThemeSurface: themeHasSurface,
+    mountThemeSurface,
+    themeScopeClass,
+    themeRuntimeReady,
+    handleThemeRuntimeReady,
     monitorEnabled,
     monitorVisible,
     monitorIsInfo,

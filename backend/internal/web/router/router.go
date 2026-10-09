@@ -138,6 +138,10 @@ func registerStaticRoutes(rootRouter *gin.RouterGroup) {
 		// must fall back to the SPA entry document.
 		noCacheGroup.StaticFile("/login", webPath+"/index.html")
 		noCacheGroup.StaticFile("/oauth/callback", webPath+"/index.html")
+		// Theme-contributed surfaces (`/theme/:view`) are SPA routes rendered by the
+		// theme on top of the Core shell. They must deep-link and survive a reload,
+		// so they fall back to the SPA entry document like the routes above.
+		noCacheGroup.GET("/theme/:view", func(c *gin.Context) { c.File(webPath + "/index.html") })
 		// Public space links are handled by the SPA router.
 		noCacheGroup.GET("/:publicId", func(c *gin.Context) { c.File(webPath + "/index.html") })
 

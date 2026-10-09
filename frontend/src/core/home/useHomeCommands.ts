@@ -73,9 +73,9 @@ export function useHomeCommands(input: {
   reportSearchBottom: (searchBottom: number) => void
   getMonitorSnapshot: () => Promise<unknown>
   scrollToTop: () => void
-  /** Mount a theme-contributed surface (e.g. theme-settings); returns false when
-   *  the active theme does not provide one, so the caller falls back. */
-  openThemeSurface: (surface: string) => Promise<boolean>
+  /** Whether the active theme contributes a view for a Core surface (e.g.
+   *  theme-settings), so the Core routes it to the theme instead of its own page. */
+  hasThemeSurface: (surface: string) => boolean
 }) {
   const authStore = useAuthStore()
   const router = useRouter()
@@ -307,9 +307,12 @@ export function useHomeCommands(input: {
     setStorage: input.themePersistence.setStorage,
     removeStorage: input.themePersistence.removeStorage,
     openCoreSurface: async (surface) => {
-      // A theme-contributed view wins; otherwise the Core keeps its own surface.
-      if (await input.openThemeSurface(surface))
+      // A theme-contributed view is rendered on its own route; otherwise the Core
+      // keeps its own page as the fallback.
+      if (input.hasThemeSurface(surface)) {
+        await router.push(`/theme/${encodeURIComponent(surface)}`)
         return
+      }
       if (surface === 'theme-settings') {
         await router.push('/settings/style')
         return

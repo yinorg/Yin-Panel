@@ -8,6 +8,16 @@ const routes: RouteRecordRaw[] = [
     path: '/',
     name: 'Home',
     component: () => import('../views/home/index.vue'),
+    children: [
+      {
+        // A theme-contributed surface (theme-settings, theme-page) rendered on its
+        // own route. The Core renders no page of its own here; when the theme does
+        // not contribute the view, `ThemeSurface.vue` returns to the home.
+        path: 'theme/:view',
+        name: 'themeSurface',
+        component: () => import('../views/home/ThemeSurface.vue'),
+      },
+    ],
   },
 
   {
