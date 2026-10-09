@@ -34,6 +34,9 @@ interface CommandGroup {
  * a surface the theme does not contribute still lands on a Core page.
  */
 const CORE_SURFACE_COMPONENTS: Record<string, string> = {
+  // The app launcher itself: the Core modal is the fallback for a theme that does
+  // not render an app menu.
+  'apps': 'UserInfo',
   'theme-settings': 'Style',
   'user-info': 'UserInfo',
   'space-manage': 'SpaceManage',
@@ -95,6 +98,23 @@ export function useHomeCommands(input: {
 }) {
   const authStore = useAuthStore()
   const router = useRouter()
+
+  /** Open a Core surface: the theme's own page when it contributes one, otherwise
+   *  the Core's own surface (the settings modal on the matching app). Returns false
+   *  for an unknown surface so the caller can raise the usual error. */
+  async function openCoreSurfaceByName(surface: string) {
+    if (input.hasThemeSurface(surface)) {
+      await router.push(`/theme/${encodeURIComponent(surface)}`)
+      return true
+    }
+    const component = CORE_SURFACE_COMPONENTS[surface]
+    if (component) {
+      input.settingModalComponent.value = component
+      input.settingModalShow.value = true
+      return true
+    }
+    return false
+  }
 
   const commandCenterVisible = ref(false)
   const commandCenterQuery = ref('')
@@ -179,7 +199,7 @@ export function useHomeCommands(input: {
     if (command === 'add') input.handleAddItem()
     else if (command === 'group') input.groupCreateVisible.value = true
     else if (command === 'space') input.createSpaceVisible.value = true
-    else if (command === 'settings') input.settingModalShow.value = true
+    else if (command === 'settings') void openCoreSurfaceByName('apps')
     else if (command === 'top') input.scrollToTop()
     else {
       const item = findHomeCommandItem(keyword, remoteCommandItems.value, allCommandItems.value)
@@ -324,18 +344,8 @@ export function useHomeCommands(input: {
     setStorage: input.themePersistence.setStorage,
     removeStorage: input.themePersistence.removeStorage,
     openCoreSurface: async (surface) => {
-      // A theme-contributed view is rendered on its own route; otherwise the Core
-      // keeps its own surface as the fallback.
-      if (input.hasThemeSurface(surface)) {
-        await router.push(`/theme/${encodeURIComponent(surface)}`)
+      if (await openCoreSurfaceByName(surface))
         return
-      }
-      const component = CORE_SURFACE_COMPONENTS[surface]
-      if (component) {
-        input.settingModalComponent.value = component
-        input.settingModalShow.value = true
-        return
-      }
       throw input.createThemeRuntimeError('UNSUPPORTED_CAPABILITY', 'Core surface is unavailable')
     },
     // The broker keeps the theme inside the Core's own origin and to read-only

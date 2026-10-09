@@ -78,6 +78,7 @@ export default {
     let commandCenterButton
     let styleButton
     let pageButton
+    let appsButton
     let networkMode = 'wan'
     let reportedSearchBottom = -1
     let groupDialogValue
@@ -393,6 +394,7 @@ export default {
       addGroupButton = addActionButton(actionBar, envLabel('actions.addGroup', 'Add group'), 'theme-add-group', 'Add group', () => showGroupDialog('create'))
       styleButton = addActionButton(actionBar, envLabel('actions.style', 'Style'), 'theme-open-style', 'Open theme style settings', () => run(() => api.ui.openCoreSurface('theme-settings')))
       pageButton = addActionButton(actionBar, envLabel('actions.page', 'Pages'), 'theme-open-page', 'Open a theme-rendered page', () => run(() => api.ui.openCoreSurface('theme-page')))
+      appsButton = addActionButton(actionBar, envLabel('actions.apps', 'Apps'), 'theme-open-apps', 'Open Core apps', () => run(() => api.ui.openCoreSurface('apps')))
       saveButton = addActionButton(actionBar, envLabel('actions.save', 'Save'), 'theme-save-layout', 'Save layout', button => void saveLayout(button))
       cancelButton = addActionButton(actionBar, envLabel('actions.cancel', 'Cancel'), 'theme-cancel-edit', 'Cancel layout editing', () => exitEditMode())
 
@@ -1095,6 +1097,7 @@ export default {
         if (addGroupButton) addGroupButton.hidden = true
         if (styleButton) styleButton.hidden = true
         if (pageButton) pageButton.hidden = true
+        if (appsButton) appsButton.hidden = true
       }
     }
 
@@ -1346,18 +1349,75 @@ export default {
 
     // A Core page the theme renders itself, embedding the Core's own component
     // through the bridge: the theme owns the page, the Core owns the component.
-    const coreSurfaceView = (tag, title, testid) => (elementRoot) => {
+    // A Core page the theme renders itself, embedding the Core's own component
+    // through the bridge: the theme owns the page shell (title, back), the Core
+    // owns the component.
+    const coreSurfaceView = (tag, labelKey, fallbackTitle, testid) => (elementRoot) => {
       elementRoot.replaceChildren()
       const page = document.createElement('section')
       page.setAttribute('data-testid', testid)
       page.style.cssText = 'box-sizing:border-box;min-height:100%;padding:28px 24px;font:400 14px/1.6 system-ui,-apple-system,sans-serif;color:#20282c;background:#f4f7f8'
+      const header = document.createElement('div')
+      header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px'
       const heading = document.createElement('h1')
-      heading.textContent = title
-      heading.style.cssText = 'margin:0 0 16px;font-size:20px'
+      heading.textContent = envLabel(labelKey, fallbackTitle)
+      heading.style.cssText = 'margin:0;font-size:20px'
+      const back = document.createElement('button')
+      back.type = 'button'
+      back.textContent = envLabel('actions.back', '返回首页')
+      back.setAttribute('data-testid', `${testid}-back`)
+      back.style.cssText = 'min-height:32px;padding:0 12px;border:1px solid #c8d2d6;border-radius:6px;background:#fff;color:inherit;font:inherit;cursor:pointer'
+      back.addEventListener('click', () => { void api.navigation.navigate({ view: 'home' }).catch(() => undefined) })
+      header.append(heading, back)
       const embedded = document.createElement(tag)
       embedded.setAttribute('data-testid', `${testid}-core`)
       embedded.style.cssText = 'display:block'
-      page.append(heading, embedded)
+      page.append(header, embedded)
+      elementRoot.append(page)
+      return { update() {}, unmount() { elementRoot.replaceChildren() } }
+    }
+
+    // The Core app hub, rendered by the theme: the launcher the Core keeps as a
+    // modal when the theme does not contribute it. Each entry opens a Core page —
+    // the theme's own view, or the Core's fallback.
+    const appsHubView = (elementRoot) => {
+      elementRoot.replaceChildren()
+      const page = document.createElement('section')
+      page.setAttribute('data-testid', 'theme-apps-view')
+      page.style.cssText = 'box-sizing:border-box;min-height:100%;padding:28px 24px;font:400 14px/1.6 system-ui,-apple-system,sans-serif;color:#20282c;background:#f4f7f8'
+      const header = document.createElement('div')
+      header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px'
+      const heading = document.createElement('h1')
+      heading.textContent = envLabel('appLauncher.title', '应用')
+      heading.style.cssText = 'margin:0;font-size:20px'
+      const back = document.createElement('button')
+      back.type = 'button'
+      back.textContent = envLabel('actions.back', '返回首页')
+      back.setAttribute('data-testid', 'theme-apps-back')
+      back.style.cssText = 'min-height:32px;padding:0 12px;border:1px solid #c8d2d6;border-radius:6px;background:#fff;color:inherit;font:inherit;cursor:pointer'
+      back.addEventListener('click', () => { void api.navigation.navigate({ view: 'home' }).catch(() => undefined) })
+      header.append(heading, back)
+      const list = document.createElement('ul')
+      list.style.cssText = 'margin:0;padding:0;list-style:none;display:grid;gap:8px;max-width:420px'
+      const entries = [
+        ['user-info', 'apps.userInfo.appName', '我的信息'],
+        ['theme-settings', 'apps.baseSettings.appName', '风格设置'],
+        ['space-manage', 'spaceManage.title', '空间管理'],
+        ['users', 'adminSettingUsers.appName', '账号管理'],
+        ['about', 'apps.about.appName', '关于'],
+      ]
+      for (const [name, key, fallback] of entries) {
+        const li = document.createElement('li')
+        const button = document.createElement('button')
+        button.type = 'button'
+        button.textContent = envLabel(key, fallback)
+        button.setAttribute('data-testid', `theme-apps-${name}`)
+        button.style.cssText = 'width:100%;text-align:left;padding:12px 14px;border:1px solid #d8e0e3;border-radius:8px;background:#fff;color:inherit;font:inherit;cursor:pointer'
+        button.addEventListener('click', () => { void api.ui.openCoreSurface(name).catch(() => undefined) })
+        li.append(button)
+        list.append(li)
+      }
+      page.append(header, list)
       elementRoot.append(page)
       return { update() {}, unmount() { elementRoot.replaceChildren() } }
     }
@@ -1431,7 +1491,7 @@ export default {
         },
         // The style-settings page, rendered by the theme itself with the Core's own
         // base-settings component embedded through the bridge.
-        'theme-settings': coreSurfaceView('yin-style', '风格设置', 'theme-settings-view'),
+        'theme-settings': coreSurfaceView('yin-style', 'apps.baseSettings.appName', '风格设置', 'theme-settings-view'),
         'theme-page'(elementRoot, api, initialSnapshot) {
           // A whole page owned by the theme. The Core only provides the container
           // and the data channel; the layout below is the theme's. It drives the
@@ -1537,10 +1597,12 @@ export default {
           }
         },
         // Core pages the theme renders itself, embedding the Core's own components.
-        'user-info': coreSurfaceView('yin-user-info', '我的信息', 'theme-user-info-view'),
-        'space-manage': coreSurfaceView('yin-space-manage', '空间管理', 'theme-space-manage-view'),
-        'users': coreSurfaceView('yin-users', '账号管理', 'theme-users-view'),
-        'about': coreSurfaceView('yin-about', '关于', 'theme-about-view'),
+        'user-info': coreSurfaceView('yin-user-info', 'apps.userInfo.appName', '我的信息', 'theme-user-info-view'),
+        'space-manage': coreSurfaceView('yin-space-manage', 'spaceManage.title', '空间管理', 'theme-space-manage-view'),
+        'users': coreSurfaceView('yin-users', 'adminSettingUsers.appName', '账号管理', 'theme-users-view'),
+        'about': coreSurfaceView('yin-about', 'apps.about.appName', '关于', 'theme-about-view'),
+        // The app hub (launcher), the theme's replacement for the Core modal.
+        'apps': appsHubView,
       },
     }
   },

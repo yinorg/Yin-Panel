@@ -942,7 +942,7 @@ func builtinPackagesV2() []*PackageV2 {
 		if palette.id == "org.yin.default" {
 			// Bump whenever a home resource changes; a published version is
 			// immutable, so reusing it would abort startup.
-			version = "2.3.65"
+			version = "2.3.66"
 			requiredPermissions = append(requiredPermissions,
 				PermissionV2{Name: "items.write"},
 				PermissionV2{Name: "groups.write"},
@@ -957,7 +957,7 @@ func builtinPackagesV2() []*PackageV2 {
 			// The Core pages the theme renders itself. Each falls back to the Core
 			// page when the theme does not contribute the view; `theme-page` is a
 			// whole page the theme owns.
-			contributedViews = append(contributedViews, "theme-settings", "theme-page", "user-info", "space-manage", "users", "about")
+			contributedViews = append(contributedViews, "theme-settings", "theme-page", "user-info", "space-manage", "users", "about", "apps")
 		}
 		resources := make([]ResourceV2, 0, len(files))
 		for name, asset := range files {
