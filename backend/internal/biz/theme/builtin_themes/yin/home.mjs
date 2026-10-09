@@ -1603,6 +1603,20 @@ export default {
         'about': coreSurfaceView('yin-about', 'apps.about.appName', '关于', 'theme-about-view'),
         // The app hub (launcher), the theme's replacement for the Core modal.
         'apps': appsHubView,
+        // The item editor, rendered by the theme with the Core's component embedded;
+        // the Core still performs the write, including the privileged icon upload.
+        // The editor is a modal, so this view only provides the host.
+        'item-editor'(elementRoot) {
+          elementRoot.replaceChildren()
+          const host = document.createElement('div')
+          host.setAttribute('data-testid', 'theme-item-editor-view')
+          host.style.cssText = 'min-height:100%'
+          const editor = document.createElement('yin-item-editor')
+          editor.setAttribute('data-testid', 'theme-item-editor-view-core')
+          host.append(editor)
+          elementRoot.append(host)
+          return { update() {}, unmount() { elementRoot.replaceChildren() } }
+        },
       },
     }
   },

@@ -12,6 +12,8 @@ import { getBridgeHandlers, registerCoreElement } from './registry'
  * - `<yin-space-manage>` → `space-manage`
  * - `<yin-users>`      → `users`
  * - `<yin-about>`      → `about`
+ * - `<yin-item-editor>` → `item-editor` (the Core supplies the target and the
+ *   write commands; the icon upload still runs in the Core)
  */
 registerCoreElement('yin-user-info', () => import('@/components/apps/UserInfo/index.vue'))
 registerCoreElement('yin-style', () => import('@/components/apps/Style/index.vue'))
@@ -22,3 +24,21 @@ registerCoreElement('yin-space-manage', () => import('@/components/apps/SpaceMan
 })
 registerCoreElement('yin-users', () => import('@/components/apps/Users/index.vue'))
 registerCoreElement('yin-about', () => import('@/components/apps/About/index.vue'))
+registerCoreElement('yin-item-editor', () => import('@/views/home/components/EditItem/index.vue'), () => {
+  const state = getBridgeHandlers().getEditorState?.()
+  if (!state)
+    return null
+  return {
+    visible: true,
+    itemInfo: state.itemInfo,
+    itemGroupId: state.itemGroupId,
+    spaceId: state.spaceId,
+    mutations: state.mutations,
+  }
+}, {}, {
+  'update:visible': (visible: unknown) => {
+    if (visible === false)
+      getBridgeHandlers().closeEditor?.()
+  },
+  'done': () => { getBridgeHandlers().closeEditor?.() },
+})

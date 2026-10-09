@@ -74,6 +74,8 @@ export function useHomeCommands(input: {
   getItemOpenUrl: (item: Panel.ItemInfo, forceWan?: boolean) => string
   handleEditItem: (item: Panel.ItemInfo) => void
   handleAddItem: (groupId?: number) => void
+  /** Open the item editor on the theme's own page when it contributes the surface. */
+  openThemeItemEditor: (item?: Panel.ItemInfo, groupId?: number) => void
   handleChangeNetwork: (mode: PanelStateNetworkModeEnum) => void
   homeMutations: ReturnType<typeof createHomeMutationService>
   groupCreateVisible: Ref<boolean>
@@ -296,7 +298,15 @@ export function useHomeCommands(input: {
     canWriteGroups: () => input.themeCanWriteGroups.value,
     selectSpace: spaceId => input.selectSpace(spaceId),
     openItem: item => { input.openPage(item.openMethod, input.getItemOpenUrl(item), item.title) },
-    openEditor: ({ item, groupId }) => item ? input.handleEditItem(item) : input.handleAddItem(groupId),
+    openEditor: ({ item, groupId }) => {
+      // The theme can render the editor itself (embedding the Core's component and
+      // keeping the Core's write); otherwise the Core keeps its own modal.
+      if (input.hasThemeSurface('item-editor')) {
+        input.openThemeItemEditor(item, groupId)
+        return
+      }
+      return item ? input.handleEditItem(item) : input.handleAddItem(groupId)
+    },
     createItem: async (payload) => { await input.homeMutations.createItem(payload) },
     updateItem: async (itemId, payload) => { await input.homeMutations.updateItem(itemId, payload) },
     deleteItem: item => input.confirmThemeDelete(

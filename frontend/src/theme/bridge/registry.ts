@@ -1,5 +1,6 @@
 import { createVNode, defineAsyncComponent, render, type AppContext, type Component, type VNode } from 'vue'
 import { NDialogProvider, NLoadingBarProvider, NMessageProvider, NNotificationProvider } from 'naive-ui'
+import type { HomeItemMutationCommands } from '@/core/home/mutations'
 
 /**
  * The Core component bridge.
@@ -30,8 +31,22 @@ export function getBridgeAppContext() {
  * forwards its component's emit to the matching handler, so an action taken on a
  * theme-rendered Core page updates the Core's own state.
  */
+export interface ThemeBridgeEditorState {
+  itemInfo: Panel.ItemInfo | null
+  itemGroupId?: number
+  spaceId?: number
+  /** The Core's write commands. The theme renders the editor; the Core still owns
+   *  the write, including the privileged icon upload. */
+  mutations: HomeItemMutationCommands
+}
+
 export interface ThemeBridgeHandlers {
   spacesChanged?: () => void
+  /** The item editor target the Core asked the theme to render, or null when no
+   *  edit is pending. */
+  getEditorState?: () => ThemeBridgeEditorState | null
+  /** The theme-rendered item editor closed; the Core returns to the home. */
+  closeEditor?: () => void
 }
 
 let handlers: ThemeBridgeHandlers = {}

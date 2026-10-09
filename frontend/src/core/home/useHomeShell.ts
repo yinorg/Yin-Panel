@@ -1,4 +1,5 @@
 import { computed, getCurrentInstance, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { parsePublicCodeFromPath } from '@/utils/request/axios'
 import { useAuthStore, usePanelState } from '@/store'
 import { PanelStateNetworkModeEnum } from '@/enums'
@@ -42,6 +43,7 @@ import '@/theme/bridge/appSurfaces'
 export function useHomeShell() {
   const panelState = usePanelState()
   const authStore = useAuthStore()
+  const router = useRouter()
   const publicCode = parsePublicCodeFromPath()
   const previewTheme = new URLSearchParams(window.location.search).has('themePreview')
   // Dev/compare override: force the Core's own monitor overlay even when the theme
@@ -189,6 +191,14 @@ export function useHomeShell() {
    *  theme does not contribute the surface, so the Core page is the fallback. */
   const settingModalComponent = ref('UserInfo')
 
+  /** The item editor target a theme-rendered editor page is showing. The Core owns
+   *  the write (including the icon upload); the theme only renders the editor. */
+  const editorTarget = ref<{ itemInfo: Panel.ItemInfo | null, itemGroupId?: number, spaceId?: number } | null>(null)
+  function openThemeItemEditor(item?: Panel.ItemInfo, groupId?: number) {
+    editorTarget.value = { itemInfo: item ? { ...item } : null, itemGroupId: groupId, spaceId: activeSpace.value?.id }
+    void router.push('/theme/item-editor')
+  }
+
   // A theme can contribute views beyond the home (theme-settings, theme-page).
   // The Core renders one on its own route (`/theme/:view`, mounted by
   // `ThemeSurface.vue`) and keeps its own page as the fallback when the theme
@@ -314,6 +324,7 @@ export function useHomeShell() {
     getItemOpenUrl,
     handleEditItem,
     handleAddItem,
+    openThemeItemEditor,
     handleChangeNetwork,
     homeMutations,
     groupCreateVisible,
@@ -421,7 +432,14 @@ export function useHomeShell() {
     setBridgeAppContext(appContext)
     // A bridged Core page can change Core state (for example create a space); the
     // event comes back here so the Core's own home data stays in step.
-    setBridgeHandlers({ spacesChanged: () => handleSpacesChanged() })
+    setBridgeHandlers({
+      spacesChanged: () => handleSpacesChanged(),
+      getEditorState: () => editorTarget.value ? { ...editorTarget.value, mutations: homeMutations } : null,
+      closeEditor: () => {
+        editorTarget.value = null
+        void router.push('/')
+      },
+    })
     watch([monitorShowTitle, panelIconTextColor], () => {
       setThemeMonitorBridge({
         controller: monitorSnapshotController,
