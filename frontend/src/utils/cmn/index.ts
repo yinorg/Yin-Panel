@@ -2,8 +2,6 @@ import moment from 'moment'
 import { useAuthStore } from '@/store'
 import { getUser } from '@/api/system/user'
 
-const authStore = useAuthStore()
-
 /**
  * 生成指定时间格式
  * @param format 时间格式 默认：'YYYY-MM-DD HH:mm:ss'
@@ -32,6 +30,7 @@ export async function updateLocalUserInfo() {
   try {
     const { data } = await getUser()
     if (data) {
+      const authStore = useAuthStore()
       authStore.setUserInfo(data)
       authStore.saveStorage()
     }
