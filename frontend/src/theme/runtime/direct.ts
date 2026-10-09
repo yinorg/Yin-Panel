@@ -52,6 +52,9 @@ export async function mountThemeDirect(options: ThemeDirectOptions): Promise<The
   let mounted: ThemeMountedView | undefined
   const mountedRegions: ThemeMountedView[] = []
   const mountedComponents: ThemeMountedView[] = []
+  /** Views mounted through `mountView` (theme-contributed surfaces). They receive
+   *  snapshot updates like the home view so a surface stays live. */
+  const mountedViews: ThemeMountedView[] = []
   let definition: ThemeDefinition | undefined
   let eventSequence = 0
   const light = options.light === true
@@ -177,6 +180,8 @@ export async function mountThemeDirect(options: ThemeDirectOptions): Promise<The
         void Promise.resolve(region.update?.(structuredClone(snapshot))).catch(error => options.onError(error instanceof Error ? error : new Error(String(error))))
       for (const component of mountedComponents)
         void Promise.resolve(component.update?.(structuredClone(snapshot))).catch(error => options.onError(error instanceof Error ? error : new Error(String(error))))
+      for (const view of mountedViews)
+        void Promise.resolve(view.update?.(structuredClone(snapshot))).catch(error => options.onError(error instanceof Error ? error : new Error(String(error))))
     },
     updateEnvironment(next) {
       if (disposed) return
@@ -209,7 +214,14 @@ export async function mountThemeDirect(options: ThemeDirectOptions): Promise<The
         `Theme ${name} view mount timed out`,
       ) as ThemeMountedView | undefined
       if (!view || typeof view.unmount !== 'function') throw new Error(`Theme ${name} view must return an unmount function`)
-      return { unmount: () => view.unmount() }
+      mountedViews.push(view)
+      return {
+        unmount: () => {
+          const index = mountedViews.indexOf(view)
+          if (index >= 0) mountedViews.splice(index, 1)
+          return view.unmount()
+        },
+      }
     },
     async dispose() {
       if (disposed) return
@@ -218,6 +230,7 @@ export async function mountThemeDirect(options: ThemeDirectOptions): Promise<The
       await Promise.allSettled([
         withTimeout(Promise.all(mountedRegions.map(region => region.unmount())), DISPOSE_TIMEOUT, 'Theme region disposal timed out'),
         withTimeout(Promise.all(mountedComponents.map(component => component.unmount())), DISPOSE_TIMEOUT, 'Theme component disposal timed out'),
+        withTimeout(Promise.all(mountedViews.map(view => view.unmount())), DISPOSE_TIMEOUT, 'Theme surface view disposal timed out'),
         withTimeout(Promise.resolve(mounted?.unmount()), DISPOSE_TIMEOUT, 'Theme view disposal timed out'),
         withTimeout(Promise.resolve(definition?.dispose?.()), DISPOSE_TIMEOUT, 'Theme module disposal timed out'),
       ])

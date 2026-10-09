@@ -1422,29 +1422,85 @@ export default {
             unmount() { elementRoot.replaceChildren() },
           }
         },
-        'theme-page'(elementRoot, _api, initialSnapshot) {
+        'theme-page'(elementRoot, api, initialSnapshot) {
           // A whole page owned by the theme. The Core only provides the container
-          // and the data channel; the layout below is the theme's.
+          // and the data channel; the layout below is the theme's. It drives the
+          // same command layer as the home (`space.select`, `item.open`), which is
+          // what makes a surface a real page and not a static panel.
           const render = (snapshot) => {
             elementRoot.replaceChildren()
             const page = document.createElement('section')
             page.setAttribute('data-testid', 'theme-page-view')
             page.style.cssText = 'box-sizing:border-box;min-height:100%;padding:28px 24px;font:400 14px/1.6 system-ui,-apple-system,sans-serif;color:#20282c;background:#f4f7f8'
+
+            const header = document.createElement('div')
+            header.style.cssText = 'display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:6px'
             const title = document.createElement('h1')
             title.textContent = '空间'
-            title.style.cssText = 'margin:0 0 6px;font-size:20px'
+            title.style.cssText = 'margin:0;font-size:20px'
+            const homeButton = document.createElement('button')
+            homeButton.type = 'button'
+            homeButton.textContent = '返回首页'
+            homeButton.setAttribute('data-testid', 'theme-page-home')
+            homeButton.style.cssText = 'min-height:32px;padding:0 12px;border:1px solid #c8d2d6;border-radius:6px;background:#fff;color:inherit;font:inherit;cursor:pointer'
+            homeButton.addEventListener('click', () => {
+              void api.navigation.navigate({ view: 'home' }).catch(() => undefined)
+            })
+            header.append(title, homeButton)
+
             const intro = document.createElement('p')
             intro.textContent = '此整页由主题渲染（theme-page 面），Core 只提供数据与权限。'
             intro.style.cssText = 'margin:0 0 16px;color:#64737a'
+
             const list = document.createElement('ul')
-            list.style.cssText = 'margin:0;padding:0;list-style:none;display:grid;gap:8px'
+            list.style.cssText = 'margin:0 0 22px;padding:0;list-style:none;display:grid;gap:8px'
             for (const space of snapshot?.spaces || []) {
-              const item = document.createElement('li')
-              item.textContent = `${space.name ?? space.id}`
-              item.style.cssText = 'padding:12px 14px;border:1px solid #d8e0e3;border-radius:8px;background:#fff'
-              list.append(item)
+              const row = document.createElement('li')
+              row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border:1px solid #d8e0e3;border-radius:8px;background:#fff'
+              const active = String(space.id) === String(snapshot?.activeSpaceId)
+              const name = document.createElement('span')
+              name.textContent = `${space.name ?? space.id}${active ? '（当前）' : ''}`
+              const switchButton = document.createElement('button')
+              switchButton.type = 'button'
+              switchButton.textContent = active ? '已选' : '切换'
+              switchButton.disabled = active
+              switchButton.setAttribute('data-testid', `theme-page-space-${space.id}`)
+              switchButton.style.cssText = 'min-height:32px;padding:0 12px;border:1px solid #c8d2d6;border-radius:6px;background:#f2f5f6;color:inherit;font:inherit;cursor:pointer'
+              switchButton.addEventListener('click', () => {
+                void api.commands.execute('space.select', { spaceId: space.id }).catch(() => undefined)
+              })
+              row.append(name, switchButton)
+              list.append(row)
             }
-            page.append(title, intro, list)
+
+            const itemsHeading = document.createElement('h2')
+            itemsHeading.textContent = '书签'
+            itemsHeading.style.cssText = 'margin:0 0 8px;font-size:16px'
+            const items = snapshot?.items || []
+            if (items.length) {
+              const itemsList = document.createElement('ul')
+              itemsList.style.cssText = 'margin:0;padding:0;list-style:none;display:grid;gap:8px'
+              for (const item of items) {
+                const row = document.createElement('li')
+                const button = document.createElement('button')
+                button.type = 'button'
+                button.textContent = item.title
+                button.setAttribute('data-testid', `theme-page-item-${item.id}`)
+                button.style.cssText = 'width:100%;text-align:left;padding:12px 14px;border:1px solid #d8e0e3;border-radius:8px;background:#fff;color:inherit;font:inherit;cursor:pointer'
+                button.addEventListener('click', () => {
+                  void api.commands.execute('item.open', { itemId: item.id }).catch(() => undefined)
+                })
+                row.append(button)
+                itemsList.append(row)
+              }
+              page.append(header, intro, list, itemsHeading, itemsList)
+            }
+            else {
+              const empty = document.createElement('p')
+              empty.textContent = '当前空间没有书签。'
+              empty.style.cssText = 'margin:0;color:#8a969b'
+              page.append(header, intro, list, itemsHeading, empty)
+            }
             elementRoot.append(page)
           }
           render(initialSnapshot)

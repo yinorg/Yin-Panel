@@ -298,8 +298,9 @@ export function useHomeCommands(input: {
       commandCenterSearchEngine.value = { title: engine.title, iconSrc: engine.iconSrc, url: engine.url }
       window.open(replaceOrAppendKeywordToUrl(engine.url, query))
     },
-    navigate: (destination) => {
+    navigate: async (destination) => {
       if (destination.view !== 'home') throw input.createThemeRuntimeError('UNSUPPORTED_CAPABILITY', 'Core navigation destination is unavailable')
+      await router.push('/')
     },
     getSettings: input.themePersistence.getSettings,
     patchSettings: input.themePersistence.patchSettings,
@@ -314,7 +315,9 @@ export function useHomeCommands(input: {
         return
       }
       if (surface === 'theme-settings') {
-        await router.push('/settings/style')
+        // The Core's own settings surface is the fallback when the theme does not
+        // render one. (`/settings/style` was a dead route: it 404s.)
+        input.settingModalShow.value = true
         return
       }
       throw input.createThemeRuntimeError('UNSUPPORTED_CAPABILITY', 'Core surface is unavailable')
