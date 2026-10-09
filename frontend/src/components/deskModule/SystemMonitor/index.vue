@@ -338,7 +338,7 @@ function handleRightMenuSelect(key: string | number) {
 .system-monitor-header { margin: 0 0 var(--yin-component-system-monitor-gap) var(--yin-spaceSm); color: var(--yin-text); font-family: var(--yin-fontDisplay); font-size: var(--yin-component-system-monitor-heading-size); font-weight: var(--yin-component-system-monitor-heading-weight); }
 .system-monitor-buttons { margin-left: var(--yin-spaceSm); transition: opacity var(--yin-component-state-hover-duration) var(--yin-component-state-easing); }
 .system-monitor-buttons > span { margin-right: var(--yin-spaceSm); color: var(--yin-text); cursor: pointer; }
-.system-monitor-action-icon { font-size: var(--yin-component-iconography-size); }
+.system-monitor-action-icon { font-size: 20px; }
 
 .icon-info-box {
   width: 100%;
