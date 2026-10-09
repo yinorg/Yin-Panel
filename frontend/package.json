@@ -28,10 +28,7 @@
     "type-check": "vue-tsc --noEmit",
     "lint": "npm run audit:theme-tokens && eslint .",
     "lint:fix": "eslint . --fix",
-    "bootstrap": "npm install && npm run common:prepare",
-    "bootstrap:pnpm": "pnpm install && pnpm run common:prepare",
-    "common:cleanup": "rimraf node_modules",
-    "common:prepare": "husky install"
+    "common:cleanup": "rimraf node_modules"
   },
   "dependencies": {
     "@iconify/vue": "^5.0.3",
@@ -55,8 +52,6 @@
   },
   "devDependencies": {
     "@antfu/eslint-config": "^9.5.1",
-    "@commitlint/cli": "^21.2.3",
-    "@commitlint/config-conventional": "^21.2.3",
     "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/crypto-js": "^4.2.2",
@@ -70,7 +65,6 @@
     "eslint": "^10.11.0",
     "fast-glob": "^3.3.3",
     "less": "^4.9.1",
-    "lint-staged": "^17.5.1",
     "npm-run-all": "^4.1.5",
     "postcss": "^8.5.28",
     "rimraf": "^6.1.3",
@@ -82,11 +76,6 @@
     "vue-tsc": "^3.3.11",
     "workbox-build": "^7.4.1",
     "workbox-window": "^7.4.1"
-  },
-  "lint-staged": {
-    "*.{ts,tsx,vue}": [
-      "eslint --fix"
-    ]
   },
   "overrides": {
     "workbox-build": "^7.4.1",
