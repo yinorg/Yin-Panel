@@ -188,7 +188,7 @@ const themeSurfaceRoute = computed(() => route.name === 'themeSurface')
     <!-- The settings surface stays Core-owned (D5) and is opened by the command
          center's `settings` command, so it must remain mounted now that the
          floating button group that used to host it is gone. -->
-    <AppStarter :visible="dialogs.settingModalShow" @spaces-changed="dialogs.handleSpacesChanged" @update:visible="dialogs.setSettingModalShow" />
+    <AppStarter :visible="dialogs.settingModalShow" :initial-component="dialogs.settingModalComponent" @spaces-changed="dialogs.handleSpacesChanged" @update:visible="dialogs.setSettingModalShow" />
 
     <!--
       `@update:visible` was missing here, so the modal emitted its close and nobody

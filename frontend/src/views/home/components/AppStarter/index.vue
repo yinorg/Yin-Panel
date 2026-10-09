@@ -15,6 +15,9 @@ interface App {
 }
 const props = defineProps<{
   visible: boolean
+  /** Which app to open on when the modal becomes visible; set by the Core when a
+   *  theme does not contribute a surface and the Core page is the fallback. */
+  initialComponent?: string
 }>()
 
 const emit = defineEmits<{
@@ -49,6 +52,13 @@ const apps = ref<App[]>([
 ])
 
 const authStore = useAuthStore()
+
+// Open on the app the Core asked for (a surface fallback); otherwise keep the
+// last-selected app so reopening the modal is stable.
+watch(() => props.visible, (visible) => {
+  if (visible && props.initialComponent)
+    componentName.value = props.initialComponent
+})
 
 const show = computed({
   get: () => props.visible,

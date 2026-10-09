@@ -29,6 +29,19 @@ interface CommandGroup {
 }
 
 /**
+ * The Core's own surfaces, keyed by the name a theme passes to
+ * `ui.openCoreSurface`. Each maps to the app the Core settings modal opens on, so
+ * a surface the theme does not contribute still lands on a Core page.
+ */
+const CORE_SURFACE_COMPONENTS: Record<string, string> = {
+  'theme-settings': 'Style',
+  'user-info': 'UserInfo',
+  'space-manage': 'SpaceManage',
+  'users': 'Users',
+  'about': 'About',
+}
+
+/**
  * The command centre and the Core-side capability bindings the theme calls into.
  *
  * This is the only place that knows how a theme command maps onto Core actions,
@@ -63,6 +76,9 @@ export function useHomeCommands(input: {
   groupCreateVisible: Ref<boolean>
   createSpaceVisible: Ref<boolean>
   settingModalShow: Ref<boolean>
+  /** Which app the Core settings modal opens on; the fallback for a surface the
+   *  theme does not contribute. */
+  settingModalComponent: Ref<string>
   editItemInfoShow: Ref<boolean>
   windowShow: Ref<boolean>
   // Theme runtime and monitor
@@ -309,14 +325,14 @@ export function useHomeCommands(input: {
     removeStorage: input.themePersistence.removeStorage,
     openCoreSurface: async (surface) => {
       // A theme-contributed view is rendered on its own route; otherwise the Core
-      // keeps its own page as the fallback.
+      // keeps its own surface as the fallback.
       if (input.hasThemeSurface(surface)) {
         await router.push(`/theme/${encodeURIComponent(surface)}`)
         return
       }
-      if (surface === 'theme-settings') {
-        // The Core's own settings surface is the fallback when the theme does not
-        // render one. (`/settings/style` was a dead route: it 404s.)
+      const component = CORE_SURFACE_COMPONENTS[surface]
+      if (component) {
+        input.settingModalComponent.value = component
         input.settingModalShow.value = true
         return
       }

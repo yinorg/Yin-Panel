@@ -1446,7 +1446,17 @@ export default {
             homeButton.addEventListener('click', () => {
               void api.navigation.navigate({ view: 'home' }).catch(() => undefined)
             })
-            header.append(title, homeButton)
+            const manageButton = document.createElement('button')
+            manageButton.type = 'button'
+            manageButton.textContent = '空间管理（Core 兜底）'
+            manageButton.setAttribute('data-testid', 'theme-page-open-space-manage')
+            manageButton.style.cssText = 'min-height:32px;padding:0 12px;border:1px solid #c8d2d6;border-radius:6px;background:#fff;color:inherit;font:inherit;cursor:pointer'
+            manageButton.addEventListener('click', () => {
+              // The theme does not contribute `space-manage`, so the Core opens its
+              // own surface (the settings modal on the space manager).
+              void api.ui.openCoreSurface('space-manage').catch(() => undefined)
+            })
+            header.append(title, homeButton, manageButton)
 
             const intro = document.createElement('p')
             intro.textContent = '此整页由主题渲染（theme-page 面），Core 只提供数据与权限。'

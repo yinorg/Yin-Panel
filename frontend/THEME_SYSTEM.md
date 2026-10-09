@@ -21,7 +21,7 @@ The theme owns all presentation and interaction of the home page: layout, stylin
 | --- | --- | --- |
 | `editor.open` | Item editor dialog | Needs file upload and icon selection, i.e. privileged operations |
 | `commandCenter.open` | Command centre | Cross-module navigation and service aggregation |
-| `ui.openCoreSurface('theme-settings')` | Theme settings page | Application shell (C4) |
+| `ui.openCoreSurface(name)` | A Core page the theme may cover: `theme-settings`, `user-info`, `space-manage`, `users`, `about` | The theme renders it on its own route when it contributes the view; otherwise the Core settings modal opens on the matching app |
 
 **Theme-contributed surfaces render on their own route.** A theme may contribute views beyond the home (`theme-settings`, `theme-page`, or any named view its manifest declares). `ui.openCoreSurface(name)` navigates to `/theme/<name>`, where the Core mounts that view into the same runtime the home uses (`views/home/ThemeSurface.vue`); the Core renders no page of its own there. When the theme does not contribute the view, or has fallen back, the visitor is returned to the home. The backend serves the SPA entry document for `/theme/:view` so the route deep-links and survives a reload. The theme's light-DOM scope class is applied to the surface container, so the theme's own styles and tokens reach the page. Protected surfaces — login, public access code, theme recovery, and the C3 fallback — stay Core-only and are never routed through a theme. Only a same-origin (direct-mounted) theme can render a surface: a sandboxed theme cannot mount into the Core document, so its `ui.openCoreSurface` calls fall back to the Core surface instead.
 

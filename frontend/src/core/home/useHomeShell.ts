@@ -179,6 +179,10 @@ export function useHomeShell() {
   const themeRuntimeReady = ref(false)
   function handleThemeRuntimeReady() { themeRuntimeReady.value = true }
 
+  /** Which app the Core settings modal opens on. Set by `openCoreSurface` when the
+   *  theme does not contribute the surface, so the Core page is the fallback. */
+  const settingModalComponent = ref('UserInfo')
+
   // A theme can contribute views beyond the home (theme-settings, theme-page).
   // The Core renders one on its own route (`/theme/:view`, mounted by
   // `ThemeSurface.vue`) and keeps its own page as the fallback when the theme
@@ -309,6 +313,7 @@ export function useHomeShell() {
     groupCreateVisible,
     createSpaceVisible,
     settingModalShow,
+    settingModalComponent,
     editItemInfoShow,
     windowShow,
     themeCanWriteGroups,
@@ -504,6 +509,7 @@ export function useHomeShell() {
     setSettingModalShow: (value: boolean) => { settingModalShow.value = value },
     setThemeRuntimeConsentVisible: (value: boolean) => { themeRuntimeConsentVisible.value = value },
     settingModalShow,
+    settingModalComponent,
     handleSpacesChanged,
     editItemInfoShow,
     editItemInfoData,
