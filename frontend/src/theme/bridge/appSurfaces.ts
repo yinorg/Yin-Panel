@@ -1,4 +1,4 @@
-import { registerCoreElement } from './registry'
+import { getBridgeHandlers, registerCoreElement } from './registry'
 
 /**
  * The Core's application pages as embeddable custom elements.
@@ -15,6 +15,10 @@ import { registerCoreElement } from './registry'
  */
 registerCoreElement('yin-user-info', () => import('@/components/apps/UserInfo/index.vue'))
 registerCoreElement('yin-style', () => import('@/components/apps/Style/index.vue'))
-registerCoreElement('yin-space-manage', () => import('@/components/apps/SpaceManage/index.vue'))
+registerCoreElement('yin-space-manage', () => import('@/components/apps/SpaceManage/index.vue'), undefined, undefined, {
+  // Creating or deleting a space on the theme-rendered page must refresh the
+  // Core's own home data, exactly as the Core's modal path does.
+  'spaces-changed': () => { getBridgeHandlers().spacesChanged?.() },
+})
 registerCoreElement('yin-users', () => import('@/components/apps/Users/index.vue'))
 registerCoreElement('yin-about', () => import('@/components/apps/About/index.vue'))

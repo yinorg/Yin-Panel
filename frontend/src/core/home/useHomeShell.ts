@@ -14,7 +14,7 @@ import { useThemeRuntime } from '@/core/home/useThemeRuntime'
 import { useThemeMonitor } from '@/core/home/useThemeMonitor'
 import { useHomeCommands } from '@/core/home/useHomeCommands'
 import { setThemeMonitorBridge, themeEmbeddedMonitorCount } from '@/core/home/monitorBridge'
-import { setBridgeAppContext } from '@/theme/bridge/registry'
+import { setBridgeAppContext, setBridgeHandlers } from '@/theme/bridge/registry'
 // Register the Core's embeddable custom elements so a theme can render Core pages
 // itself. See `theme/bridge/systemMonitor.ts` and `theme/bridge/appSurfaces.ts`.
 import '@/theme/bridge/systemMonitor'
@@ -419,6 +419,9 @@ export function useHomeShell() {
   const appContext = getCurrentInstance()?.appContext
   if (appContext) {
     setBridgeAppContext(appContext)
+    // A bridged Core page can change Core state (for example create a space); the
+    // event comes back here so the Core's own home data stays in step.
+    setBridgeHandlers({ spacesChanged: () => handleSpacesChanged() })
     watch([monitorShowTitle, panelIconTextColor], () => {
       setThemeMonitorBridge({
         controller: monitorSnapshotController,
@@ -429,6 +432,7 @@ export function useHomeShell() {
     onUnmounted(() => {
       setThemeMonitorBridge(undefined)
       setBridgeAppContext(undefined)
+      setBridgeHandlers({})
     })
   }
 

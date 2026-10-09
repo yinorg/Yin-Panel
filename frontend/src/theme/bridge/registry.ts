@@ -25,17 +25,40 @@ export function getBridgeAppContext() {
 }
 
 /**
+ * Core handlers a bridged component's events call back into. The Core publishes
+ * them (for example "the spaces changed, reload the home") and a bridge element
+ * forwards its component's emit to the matching handler, so an action taken on a
+ * theme-rendered Core page updates the Core's own state.
+ */
+export interface ThemeBridgeHandlers {
+  spacesChanged?: () => void
+}
+
+let handlers: ThemeBridgeHandlers = {}
+
+export function setBridgeHandlers(next: ThemeBridgeHandlers) {
+  handlers = next
+}
+
+export function getBridgeHandlers() {
+  return handlers
+}
+
+/**
  * Register one Core component as a custom element.
  *
- * `mapProps` reads the element's attributes (and any Core-owned data) into the
- * component's props. Return `null` to defer the mount — the element is not ready
- * yet (for example the Core data it needs is not published).
+ * - `mapProps` reads the element's attributes (and any Core-owned data) into the
+ *   component's props. Return `null` to defer the mount — the element is not ready
+ *   yet (for example the Core data it needs is not published).
+ * - `events` maps a component emit (kebab-case, e.g. `spaces-changed`) to a Core
+ *   callback, so the Core stays in step with what the user did in the embedded page.
  */
 export function registerCoreElement(
   tagName: string,
   loader: () => Promise<{ default: Component }>,
   mapProps: (element: HTMLElement) => Record<string, unknown> | null = () => ({}),
   hooks: { onConnected?: () => void; onDisconnected?: () => void } = {},
+  events: Record<string, (...args: unknown[]) => void> = {},
 ) {
   if (customElements.get(tagName))
     return
@@ -60,11 +83,14 @@ export function registerCoreElement(
       const props = mapProps(this)
       if (!props)
         return
+      const listeners = Object.fromEntries(
+        Object.entries(events).map(([name, handler]) => [toHandlerKey(name), handler]),
+      )
       const vnode = createVNode(NLoadingBarProvider, null, {
         default: () => createVNode(NDialogProvider, null, {
           default: () => createVNode(NNotificationProvider, null, {
             default: () => createVNode(NMessageProvider, null, {
-              default: () => createVNode(Component, props),
+              default: () => createVNode(Component, { ...props, ...listeners }),
             }),
           }),
         }),
@@ -82,4 +108,9 @@ export function registerCoreElement(
     }
   }
   customElements.define(tagName, CoreElement)
+}
+
+/** `spaces-changed` → `onSpacesChanged`, the prop Vue looks up for that emit. */
+function toHandlerKey(name: string) {
+  return `on${name.split('-').map(part => part.charAt(0).toUpperCase() + part.slice(1)).join('')}`
 }
