@@ -16,6 +16,9 @@ export interface ThemeMonitorBridge {
   controller: MonitorSnapshotController<MonitorSnapshot>
   showTitle: boolean
   iconTextColor: string
+  /** Whether the visitor may edit the monitor cards (add/sort/delete). The Core
+   *  owns this decision; a theme never widens it. */
+  allowEdit: boolean
 }
 
 let bridge: ThemeMonitorBridge | undefined

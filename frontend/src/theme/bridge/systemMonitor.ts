@@ -20,7 +20,9 @@ registerCoreElement('yin-system-monitor', () => import('@/components/deskModule/
     ? element.getAttribute('show-title') !== 'false'
     : bridge.showTitle
   return {
-    allowEdit: false,
+    allowEdit: element.hasAttribute('allow-edit')
+      ? element.getAttribute('allow-edit') !== 'false'
+      : bridge.allowEdit,
     showTitle,
     iconTextColor: element.getAttribute('icon-text-color') || bridge.iconTextColor,
     snapshotController: bridge.controller,

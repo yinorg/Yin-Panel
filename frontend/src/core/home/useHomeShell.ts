@@ -445,6 +445,7 @@ export function useHomeShell() {
         controller: monitorSnapshotController,
         showTitle: monitorShowTitle.value,
         iconTextColor: panelIconTextColor.value,
+        allowEdit: authStore.loggedIn,
       })
     }, { immediate: true })
     onUnmounted(() => {
