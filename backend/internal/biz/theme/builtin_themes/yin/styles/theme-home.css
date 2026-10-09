@@ -1191,16 +1191,22 @@ select {
   [data-editing='true'] .yin-item:not(.is-dragging) { animation: none; }
 }
 
-/* Per-group controls: the same plain-icon style as the monitor's add control —
-   no box, a 20px glyph and a hover tooltip — left-aligned after the group title. */
+/* Per-group controls: the same style as the collapse/expand toggle — a plain
+   white glyph with a drop shadow over the wallpaper — left-aligned after the
+   group title, with the label as a hover tooltip. */
 .yin-icon-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
   padding: 0;
   border: 0;
+  border-radius: var(--yin-radiusControl, 8px);
   background: transparent;
-  color: var(--yin-text, #20282c);
+  color: var(--yin-icon-text-color, #fff);
+  text-shadow: 0 2px 4px rgb(0 0 0 / 80%);
   cursor: pointer;
 }
 

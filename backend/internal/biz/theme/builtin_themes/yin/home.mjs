@@ -736,7 +736,7 @@ export default {
         else collapsedGroups.add(groupId)
         renderCollection()
       })
-      heading.append(title, controls, toggle)
+      heading.append(title, toggle, controls)
       const list = element('div', 'yin-group-items')
       section.append(heading, list)
       section._yin = { heading, title, toggle, list, addItem, editGroup, deleteGroup, moveGroupUp, moveGroupDown }
