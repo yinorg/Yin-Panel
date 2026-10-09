@@ -77,6 +77,7 @@ export default {
     let addGroupButton
     let commandCenterButton
     let styleButton
+    let pageButton
     let networkMode = 'wan'
     let reportedSearchBottom = -1
     let groupDialogValue
@@ -389,6 +390,7 @@ export default {
       commandCenterButton = addActionButton(actionBar, envLabel('actions.commands', 'Commands'), 'theme-open-command-center', 'Open command center', () => run(() => api.commands.execute('commandCenter.open')))
       addGroupButton = addActionButton(actionBar, envLabel('actions.addGroup', 'Add group'), 'theme-add-group', 'Add group', () => showGroupDialog('create'))
       styleButton = addActionButton(actionBar, envLabel('actions.style', 'Style'), 'theme-open-style', 'Open theme style settings', () => run(() => api.ui.openCoreSurface('theme-settings')))
+      pageButton = addActionButton(actionBar, envLabel('actions.page', 'Pages'), 'theme-open-page', 'Open a theme-rendered page', () => run(() => api.ui.openCoreSurface('theme-page')))
       saveButton = addActionButton(actionBar, envLabel('actions.save', 'Save'), 'theme-save-layout', 'Save layout', button => void saveLayout(button))
       cancelButton = addActionButton(actionBar, envLabel('actions.cancel', 'Cancel'), 'theme-cancel-edit', 'Cancel layout editing', () => exitEditMode())
 
@@ -1080,6 +1082,7 @@ export default {
         if (commandCenterButton) commandCenterButton.hidden = true
         if (addGroupButton) addGroupButton.hidden = true
         if (styleButton) styleButton.hidden = true
+        if (pageButton) pageButton.hidden = true
       }
     }
 
@@ -1412,6 +1415,37 @@ export default {
             space.style.cssText = 'margin:0'
             panel.append(title, intro, space)
             elementRoot.append(panel)
+          }
+          render(initialSnapshot)
+          return {
+            update: snapshot => render(snapshot),
+            unmount() { elementRoot.replaceChildren() },
+          }
+        },
+        'theme-page'(elementRoot, _api, initialSnapshot) {
+          // A whole page owned by the theme. The Core only provides the container
+          // and the data channel; the layout below is the theme's.
+          const render = (snapshot) => {
+            elementRoot.replaceChildren()
+            const page = document.createElement('section')
+            page.setAttribute('data-testid', 'theme-page-view')
+            page.style.cssText = 'box-sizing:border-box;min-height:100%;padding:28px 24px;font:400 14px/1.6 system-ui,-apple-system,sans-serif;color:#20282c;background:#f4f7f8'
+            const title = document.createElement('h1')
+            title.textContent = '空间'
+            title.style.cssText = 'margin:0 0 6px;font-size:20px'
+            const intro = document.createElement('p')
+            intro.textContent = '此整页由主题渲染（theme-page 面），Core 只提供数据与权限。'
+            intro.style.cssText = 'margin:0 0 16px;color:#64737a'
+            const list = document.createElement('ul')
+            list.style.cssText = 'margin:0;padding:0;list-style:none;display:grid;gap:8px'
+            for (const space of snapshot?.spaces || []) {
+              const item = document.createElement('li')
+              item.textContent = `${space.name ?? space.id}`
+              item.style.cssText = 'padding:12px 14px;border:1px solid #d8e0e3;border-radius:8px;background:#fff'
+              list.append(item)
+            }
+            page.append(title, intro, list)
+            elementRoot.append(page)
           }
           render(initialSnapshot)
           return {
