@@ -1328,6 +1328,24 @@ export default {
       reportLayout()
     }
 
+    // A Core page the theme renders itself, embedding the Core's own component
+    // through the bridge: the theme owns the page, the Core owns the component.
+    const coreSurfaceView = (tag, title, testid) => (elementRoot) => {
+      elementRoot.replaceChildren()
+      const page = document.createElement('section')
+      page.setAttribute('data-testid', testid)
+      page.style.cssText = 'box-sizing:border-box;min-height:100%;padding:28px 24px;font:400 14px/1.6 system-ui,-apple-system,sans-serif;color:#20282c;background:#f4f7f8'
+      const heading = document.createElement('h1')
+      heading.textContent = title
+      heading.style.cssText = 'margin:0 0 16px;font-size:20px'
+      const embedded = document.createElement(tag)
+      embedded.setAttribute('data-testid', `${testid}-core`)
+      embedded.style.cssText = 'display:block'
+      page.append(heading, embedded)
+      elementRoot.append(page)
+      return { update() {}, unmount() { elementRoot.replaceChildren() } }
+    }
+
     return {
       views: {
         home(elementRoot, _api, initialSnapshot) {
@@ -1448,7 +1466,7 @@ export default {
             })
             const manageButton = document.createElement('button')
             manageButton.type = 'button'
-            manageButton.textContent = '空间管理（Core 兜底）'
+            manageButton.textContent = '空间管理（主题内嵌 Core）'
             manageButton.setAttribute('data-testid', 'theme-page-open-space-manage')
             manageButton.style.cssText = 'min-height:32px;padding:0 12px;border:1px solid #c8d2d6;border-radius:6px;background:#fff;color:inherit;font:inherit;cursor:pointer'
             manageButton.addEventListener('click', () => {
@@ -1526,6 +1544,11 @@ export default {
             unmount() { elementRoot.replaceChildren() },
           }
         },
+        // Core pages the theme renders itself, embedding the Core's own components.
+        'user-info': coreSurfaceView('yin-user-info', '我的信息', 'theme-user-info-view'),
+        'space-manage': coreSurfaceView('yin-space-manage', '空间管理', 'theme-space-manage-view'),
+        'users': coreSurfaceView('yin-users', '账号管理', 'theme-users-view'),
+        'about': coreSurfaceView('yin-about', '关于', 'theme-about-view'),
       },
     }
   },

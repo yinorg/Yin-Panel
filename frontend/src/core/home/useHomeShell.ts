@@ -14,9 +14,11 @@ import { useThemeRuntime } from '@/core/home/useThemeRuntime'
 import { useThemeMonitor } from '@/core/home/useThemeMonitor'
 import { useHomeCommands } from '@/core/home/useHomeCommands'
 import { setThemeMonitorBridge } from '@/core/home/monitorBridge'
-// Registers the `<yin-system-monitor>` custom element so a theme can embed the
-// Core's own monitor component. See `theme/bridge/systemMonitor.ts`.
+import { setBridgeAppContext } from '@/theme/bridge/registry'
+// Register the Core's embeddable custom elements so a theme can render Core pages
+// itself. See `theme/bridge/systemMonitor.ts` and `theme/bridge/appSurfaces.ts`.
 import '@/theme/bridge/systemMonitor'
+import '@/theme/bridge/appSurfaces'
 
 /**
  * The home page's view model.
@@ -174,10 +176,11 @@ export function useHomeShell() {
   }
 
   // The theme runtime mounts asynchronously; `ready` is emitted once the host has
-  // mounted it. Surface routes need this signal because the runtime handle is a
-  // plain variable, so `hasView` going false→true is not reactive on its own.
-  const themeRuntimeReady = ref(false)
-  function handleThemeRuntimeReady() { themeRuntimeReady.value = true }
+  // mounted it. A counter, not a flag: the host can remount the runtime (revision or
+  // permission change), and the runtime handle is a plain variable, so only this
+  // signal can tell a surface route to re-mount into the new runtime.
+  const themeRuntimeReady = ref(0)
+  function handleThemeRuntimeReady() { themeRuntimeReady.value += 1 }
 
   /** Which app the Core settings modal opens on. Set by `openCoreSurface` when the
    *  theme does not contribute the surface, so the Core page is the fallback. */
@@ -409,15 +412,18 @@ export function useHomeShell() {
   // Cleared with the shell so the element never holds a stale controller.
   const appContext = getCurrentInstance()?.appContext
   if (appContext) {
+    setBridgeAppContext(appContext)
     watch([monitorShowTitle, panelIconTextColor], () => {
       setThemeMonitorBridge({
         controller: monitorSnapshotController,
         showTitle: monitorShowTitle.value,
         iconTextColor: panelIconTextColor.value,
-        appContext,
       })
     }, { immediate: true })
-    onUnmounted(() => setThemeMonitorBridge(undefined))
+    onUnmounted(() => {
+      setThemeMonitorBridge(undefined)
+      setBridgeAppContext(undefined)
+    })
   }
 
   const theme = reactive({

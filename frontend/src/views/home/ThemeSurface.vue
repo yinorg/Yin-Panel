@@ -74,8 +74,9 @@ async function sync() {
     await router.replace('/')
     return
   }
-  // Wait for the runtime handle; `schedule` re-runs when `ready` flips.
-  if (!shell.theme.themeRuntimeReady || !host.value || !shell.theme.hasThemeSurface(name))
+  // Wait for the runtime handle; `schedule` re-runs when `ready` (the mount counter)
+  // or the handle changes.
+  if (shell.theme.themeRuntimeReady === 0 || !host.value || !shell.theme.hasThemeSurface(name))
     return
   if (mounted && mountedName === name)
     return

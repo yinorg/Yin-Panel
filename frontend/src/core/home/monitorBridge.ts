@@ -1,4 +1,3 @@
-import type { AppContext } from 'vue'
 import type { MonitorSnapshotController } from '@/core/monitor/snapshotController'
 import type { MonitorSnapshot } from '@/components/deskModule/SystemMonitor/snapshot'
 
@@ -16,7 +15,6 @@ export interface ThemeMonitorBridge {
   controller: MonitorSnapshotController<MonitorSnapshot>
   showTitle: boolean
   iconTextColor: string
-  appContext: AppContext
 }
 
 let bridge: ThemeMonitorBridge | undefined
