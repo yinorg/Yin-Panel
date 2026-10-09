@@ -73,6 +73,9 @@ export function useHomeCommands(input: {
   reportSearchBottom: (searchBottom: number) => void
   getMonitorSnapshot: () => Promise<unknown>
   scrollToTop: () => void
+  /** Mount a theme-contributed surface (e.g. theme-settings); returns false when
+   *  the active theme does not provide one, so the caller falls back. */
+  openThemeSurface: (surface: string) => Promise<boolean>
 }) {
   const authStore = useAuthStore()
   const router = useRouter()
@@ -305,6 +308,10 @@ export function useHomeCommands(input: {
     removeStorage: input.themePersistence.removeStorage,
     openCoreSurface: async (surface) => {
       if (surface === 'theme-settings') {
+        // A theme that contributes the settings surface renders it; otherwise the
+        // Core keeps its own settings page.
+        if (await input.openThemeSurface('theme-settings'))
+          return
         await router.push('/settings/style')
         return
       }

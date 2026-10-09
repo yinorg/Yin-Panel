@@ -377,7 +377,7 @@ func TestBuiltinPackagesV2AreCompleteDTCGAndRepeatable(t *testing.T) {
 		if pkg.Manifest.FormatVersion != PackageFormatVersionV2 || pkg.Manifest.Tokens.Version != DTCGVersion || !pkg.Verified {
 			t.Errorf("incomplete builtin package %q: %+v", summary.ID, pkg.Manifest)
 		}
-		if pkg.Manifest.Entrypoints.Script != "views/home.mjs" || len(pkg.Manifest.Entrypoints.Styles) != 1 || len(pkg.Manifest.Contributes.Views) != 1 || pkg.Manifest.Contributes.Views[0] != "home" {
+		if pkg.Manifest.Entrypoints.Script != "views/home.mjs" || len(pkg.Manifest.Entrypoints.Styles) != 1 || !containsString(pkg.Manifest.Contributes.Views, "home") {
 			t.Errorf("builtin %q does not contribute a packaged home view: %+v", summary.ID, pkg.Manifest)
 		}
 		for _, resource := range pkg.Manifest.Resources {
@@ -398,7 +398,7 @@ func TestBuiltinPackagesV2AreCompleteDTCGAndRepeatable(t *testing.T) {
 		}
 		wantVersion := "2.3.2"
 		if summary.ID == "org.yin.default" {
-			wantVersion = "2.3.57"
+			wantVersion = "2.3.58"
 		}
 		if pkg.Manifest.Version != wantVersion {
 			t.Errorf("%s builtin version = %q, want %q", summary.ID, pkg.Manifest.Version, wantVersion)
@@ -454,7 +454,7 @@ func TestBuiltinHomeResourceHashesOnlyChangeForDefaultYin(t *testing.T) {
 		"org.yin.default": {
 			// 手机宽度下第一个书签分组的上间距与桌面统一，去掉视口比例额外间距。
 			// 改动的是 Yin 主题的分组定位，所以只有它的哈希变。
-			"views/home.mjs": "86092315567d95c9af30e7a5bdc4d9cd878acb2aaaba156378e11f27485bd6fd",
+			"views/home.mjs": "80ecfe13ba9a26e8882675ac73f52890e6a80876bcacf955abb7b71af3db9403",
 			"styles/home.css": "3c01b2aed105b337042ab9257ad3b29220220aae2dca2d732730c99317b966c4",
 		},
 		"org.yin.glass": {
@@ -526,7 +526,7 @@ func TestEnsureBuiltinV2UpgradesOnlyActivationForSelectedBuiltin(t *testing.T) {
 		t.Fatal(err)
 	}
 	latest, err := LatestPackageRevisionV2(db, "org.yin.default")
-	if err != nil || latest.Version != "2.3.57" || activation.ActiveRevisionID != latest.ID {
+	if err != nil || latest.Version != "2.3.58" || activation.ActiveRevisionID != latest.ID {
 		t.Fatalf("selected builtin activation = %+v, latest=%s, err=%v", activation, latest.ID, err)
 	}
 	if latest.ID == old.Revision {

@@ -960,10 +960,11 @@ func builtinPackagesV2() []*PackageV2 {
 		files := builtinHomeResourcesV2(palette.id)
 		version := "2.3.2"
 		requiredPermissions := []PermissionV2{{Name: "spaces.read"}, {Name: "groups.read"}, {Name: "items.read"}}
+		contributedViews := []string{"home"}
 		if palette.id == "org.yin.default" {
 			// Bump whenever a home resource changes; a published version is
 			// immutable, so reusing it would abort startup.
-			version = "2.3.57"
+			version = "2.3.58"
 			requiredPermissions = append(requiredPermissions,
 				PermissionV2{Name: "items.write"},
 				PermissionV2{Name: "groups.write"},
@@ -975,6 +976,9 @@ func builtinPackagesV2() []*PackageV2 {
 				// monitor layer from real geometry.
 				PermissionV2{Name: "diagnostics.report"},
 			)
+			// The settings surface is rendered by the theme (theme-settings),
+			// falling back to the Core page when absent.
+			contributedViews = append(contributedViews, "theme-settings")
 		}
 		resources := make([]ResourceV2, 0, len(files))
 		for name, asset := range files {
@@ -986,7 +990,7 @@ func builtinPackagesV2() []*PackageV2 {
 			Format: "yin-theme", FormatVersion: PackageFormatVersionV2, ID: palette.id, Name: palette.name, Version: version, ThemeAPI: "^1.0.0", Core: ">=0.4.0", Author: "Yin", License: "AGPL-3.0",
 			Tokens: TokenSetV2{Format: "DTCG", Version: DTCGVersion, Docs: map[string]string{"light": "tokens/light.json", "dark": "tokens/dark.json"}}, DefaultScheme: "light",
 			Entrypoints: EntrypointsV2{Script: "views/home.mjs", Styles: []string{"styles/home.css"}}, Runtime: RuntimeV2{SupportedModes: []string{"sandbox"}},
-			Contributes: ContributionsV2{Views: []string{"home"}}, Permissions: PermissionsV2{Required: requiredPermissions}, Resources: resources,
+			Contributes: ContributionsV2{Views: contributedViews}, Permissions: PermissionsV2{Required: requiredPermissions}, Resources: resources,
 		}
 		manifestJSON, _ := json.Marshal(manifest)
 		revisionFiles := resourceBytesV2(files)

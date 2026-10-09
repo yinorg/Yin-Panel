@@ -382,3 +382,44 @@ html {
 .home-floating-button:last-child {
   border-radius: 0 0 3px 3px;
 }
+
+/* A theme-contributed surface (e.g. theme-settings): the Core provides the
+   overlay chrome, the theme renders its own page inside it. */
+.theme-surface-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgb(0 0 0 / 45%);
+}
+.theme-surface-frame {
+  position: relative;
+  width: min(960px, 100%);
+  height: min(720px, 100%);
+  overflow: auto;
+  border-radius: 12px;
+  background: var(--yin-surface, #fff);
+  box-shadow: var(--yin-shadowPopup, 0 12px 40px rgb(0 0 0 / 35%));
+}
+.theme-surface-host {
+  min-height: 100%;
+}
+.theme-surface-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: rgb(0 0 0 / 8%);
+  color: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.theme-surface-close:hover {
+  background: rgb(0 0 0 / 16%);
+}

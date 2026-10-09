@@ -350,7 +350,16 @@ onBeforeUnmount(() => {
   activeAssets = {}
 })
 
-defineExpose({ scrollToTop })
+function hasThemeView(name: string) {
+  return runtime?.hasView(name) === true
+}
+
+async function mountThemeView(name: string, element: HTMLElement) {
+  if (!runtime) throw new Error('Theme runtime is not mounted')
+  return runtime.mountView(name, element)
+}
+
+defineExpose({ scrollToTop, hasView: hasThemeView, mountView: mountThemeView })
 </script>
 
 <!--

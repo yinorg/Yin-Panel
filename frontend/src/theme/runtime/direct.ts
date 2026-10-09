@@ -39,6 +39,8 @@ export interface ThemeDirectHandle {
   updateTokens: (cssText: string) => void
   emit: (name: ThemeEventName, payload?: unknown) => void
   scrollToTop: () => void
+  hasView: (name: string) => boolean
+  mountView: (name: string, element: HTMLElement) => Promise<{ unmount: () => void | Promise<void> }>
   dispose: () => Promise<void>
 }
 
@@ -193,6 +195,21 @@ export async function mountThemeDirect(options: ThemeDirectOptions): Promise<The
       const scroller = light ? options.host : shadow!.host
       scroller.scrollTo({ top: 0, behavior: 'smooth' })
       root.scrollTo({ top: 0, behavior: 'smooth' })
+    },
+    hasView(name) {
+      return typeof (definition?.views as Record<string, unknown> | undefined)?.[name] === 'function'
+    },
+    async mountView(name, element) {
+      if (disposed) throw new Error('Theme runtime is disposed')
+      const factory = (definition?.views as Record<string, unknown> | undefined)?.[name]
+      if (typeof factory !== 'function') throw new Error(`Theme does not register the ${name} view`)
+      const view = await withTimeout(
+        Promise.resolve((factory as (root: HTMLElement, api: ThemeAPI, snapshot: ThemeHomeSnapshot) => unknown)(element, apiClient.api as ThemeAPI, structuredClone(snapshot))),
+        START_TIMEOUT,
+        `Theme ${name} view mount timed out`,
+      ) as ThemeMountedView | undefined
+      if (!view || typeof view.unmount !== 'function') throw new Error(`Theme ${name} view must return an unmount function`)
+      return { unmount: () => view.unmount() }
     },
     async dispose() {
       if (disposed) return

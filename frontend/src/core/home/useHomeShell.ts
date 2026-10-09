@@ -1,4 +1,4 @@
-import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { parsePublicCodeFromPath } from '@/utils/request/axios'
 import { useAuthStore, usePanelState } from '@/store'
 import { PanelStateNetworkModeEnum } from '@/enums'
@@ -161,12 +161,46 @@ export function useHomeShell() {
   /** Handle to the mounted theme host. It is a function ref because the element is
    *  bound from `HomeChrome`, and the Core cannot reach inside the sandbox to scroll
    *  it itself. */
-  const themeHostRef = ref<{ scrollToTop: () => void }>()
+  const themeHostRef = ref<{ scrollToTop: () => void; hasView?: (name: string) => boolean; mountView?: (name: string, element: HTMLElement) => Promise<{ unmount: () => void | Promise<void> }> }>()
   function setThemeHostElement(element: Element | { $el?: unknown } | null) {
-    themeHostRef.value = element && 'scrollToTop' in element ? element as { scrollToTop: () => void } : undefined
+    themeHostRef.value = element && 'scrollToTop' in element ? element as typeof themeHostRef.value : undefined
   }
   function scrollToTop() {
     themeHostRef.value?.scrollToTop()
+  }
+
+  // A theme can contribute views beyond the home (theme-settings, theme-page).
+  // The Core opens one on demand and falls back to its own surface when the
+  // theme does not provide it.
+  const themeSurfaceVisible = ref(false)
+  const themeSurfaceElement = ref<HTMLElement>()
+  let themeSurfaceView: { unmount: () => void | Promise<void> } | undefined
+  function setThemeSurfaceElement(element: Element | { $el?: unknown } | null) {
+    themeSurfaceElement.value = element instanceof HTMLElement ? element : undefined
+  }
+  function themeHasSurface(name: string) {
+    return themeHostRef.value?.hasView?.(name) === true
+  }
+  async function openThemeSurface(name: string) {
+    if (!themeHasSurface(name))
+      return false
+    themeSurfaceVisible.value = true
+    await nextTick()
+    try {
+      themeSurfaceView = await themeHostRef.value?.mountView?.(name, themeSurfaceElement.value!)
+    }
+    catch {
+      themeSurfaceVisible.value = false
+      return false
+    }
+    return true
+  }
+  async function closeThemeSurface() {
+    themeSurfaceVisible.value = false
+    const view = themeSurfaceView
+    themeSurfaceView = undefined
+    if (view)
+      await Promise.resolve(view.unmount()).catch(() => undefined)
   }
 
   const {
@@ -290,6 +324,7 @@ export function useHomeShell() {
     reportSearchBottom,
     getMonitorSnapshot,
     scrollToTop,
+    openThemeSurface,
   })
 
   invalidateRemoteCommandItems = () => { remoteCommandItems.value = [] }
@@ -385,6 +420,9 @@ export function useHomeShell() {
     executeThemeRequest,
     handleThemeRuntimeFailure,
     setThemeHostElement,
+    themeSurfaceVisible,
+    setThemeSurfaceElement,
+    closeThemeSurface,
     monitorEnabled,
     monitorVisible,
     monitorIsInfo,

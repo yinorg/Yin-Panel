@@ -1392,6 +1392,33 @@ export default {
             },
           }
         },
+        'theme-settings'(elementRoot, _api, initialSnapshot) {
+          // Rendered by the theme, not the Core: the Core only opens the surface
+          // and hands over the element. Self-styled because the theme's own
+          // stylesheet is scoped to the home container, not this overlay.
+          const render = (snapshot) => {
+            elementRoot.replaceChildren()
+            const panel = document.createElement('section')
+            panel.setAttribute('data-testid', 'theme-settings-view')
+            panel.style.cssText = 'box-sizing:border-box;min-height:100%;padding:28px 24px;font:400 14px/1.6 system-ui,-apple-system,sans-serif;color:#20282c;background:#f4f7f8'
+            const title = document.createElement('h1')
+            title.textContent = 'Yin 主题设置'
+            title.style.cssText = 'margin:0 0 6px;font-size:20px'
+            const intro = document.createElement('p')
+            intro.textContent = '此页面由主题渲染（theme-settings 面）。Core 不再渲染它，只提供数据与权限。'
+            intro.style.cssText = 'margin:0 0 16px;color:#64737a'
+            const space = document.createElement('p')
+            space.textContent = `当前空间：${snapshot?.activeSpaceId ?? '-'}`
+            space.style.cssText = 'margin:0'
+            panel.append(title, intro, space)
+            elementRoot.append(panel)
+          }
+          render(initialSnapshot)
+          return {
+            update: snapshot => render(snapshot),
+            unmount() { elementRoot.replaceChildren() },
+          }
+        },
       },
     }
   },

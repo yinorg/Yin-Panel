@@ -173,6 +173,15 @@ const EditItem = defineAsyncComponent(() => import('./components/EditItem/index.
       </div>
     </div>
 
+    <!-- A theme-contributed surface (theme-settings) mounted by the Core on
+         demand; the theme renders its own page inside this layer. -->
+    <div v-if="theme.themeSurfaceVisible" class="theme-surface-layer" data-testid="theme-surface">
+      <div class="theme-surface-frame">
+        <div :ref="theme.setThemeSurfaceElement" class="theme-surface-host" data-testid="theme-surface-host" />
+        <button type="button" class="theme-surface-close" :aria-label="$t('common.close')" @click="theme.closeThemeSurface()">✕</button>
+      </div>
+    </div>
+
     <!-- The settings surface stays Core-owned (D5) and is opened by the command
          center's `settings` command, so it must remain mounted now that the
          floating button group that used to host it is gone. -->

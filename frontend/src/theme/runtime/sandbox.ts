@@ -206,6 +206,8 @@ export interface ThemeSandboxHandle {
   updateTokens: (cssText: string) => void
   emit: (name: ThemeEventName, payload?: unknown) => void
   scrollToTop: () => void
+  hasView: (name: string) => boolean
+  mountView: (name: string, element: HTMLElement) => Promise<{ unmount: () => void | Promise<void> }>
   dispose: () => Promise<void>
 }
 
@@ -386,6 +388,14 @@ export async function mountThemeSandbox(frame: HTMLIFrameElement, options: Theme
     emit: sendEvent,
     scrollToTop() {
       if (!stopped) channel.port1.postMessage({ type: 'scroll.toTop' })
+    },
+    hasView() {
+      // A sandbox theme runs in another document, so the Core cannot mount its
+      // contributed views into this one; the Core falls back to its own surface.
+      return false
+    },
+    mountView(name) {
+      return Promise.reject(new Error(`A sandbox theme cannot mount the ${name} view into the Core document`))
     },
     dispose() {
       if (stopped) return Promise.resolve()
