@@ -4,22 +4,35 @@ export interface ThemeCssResource {
   mediaType: string
 }
 
+export interface ThemeCssScope {
+  /**
+   * Rewrite `:root`/`html`/`body` to `:host` for a shadow-root mount.
+   */
+  shadow?: boolean
+  /**
+   * Scope every selector to a container selector (for a light-DOM mount), so a
+   * theme's CSS cannot reach the Core chrome outside its own container. `:root`,
+   * `html`, `body`, and `:host` are rewritten to the scope itself.
+   */
+  prefix?: string
+}
+
 export async function rewriteThemeStylesheet(
   source: string,
   stylesheetURL: string,
   resources: readonly ThemeCssResource[],
   assetURLs: Readonly<Record<string, string>>,
   baseURL?: string,
-  shadowRoot = false,
+  scope: ThemeCssScope = {},
 ): Promise<string> {
   const { default: cssTree } = await import('css-tree')
   const stylesheet = new URL(stylesheetURL, baseURL)
   const tree = cssTree.parse(source, { positions: true, parseValue: true })
 
   cssTree.walk(tree, (node) => {
-    if (shadowRoot && node.type === 'PseudoClassSelector' && node.name?.toLowerCase() === 'root')
+    if (scope.shadow && node.type === 'PseudoClassSelector' && node.name?.toLowerCase() === 'root')
       node.name = 'host'
-    if (shadowRoot && node.type === 'TypeSelector' && ['html', 'body'].includes(node.name?.toLowerCase() || '')) {
+    if (scope.shadow && node.type === 'TypeSelector' && ['html', 'body'].includes(node.name?.toLowerCase() || '')) {
       Object.assign(node, { type: 'PseudoClassSelector', name: 'host', children: null })
     }
     if (node.type === 'Atrule' && (node.name?.toLowerCase() === 'import' || node.name?.includes('\\')))
@@ -53,7 +66,41 @@ export async function rewriteThemeStylesheet(
       : assetURLs[resource.path]
   })
 
+  if (scope.prefix)
+    prefixSelectors(cssTree, tree, scope.prefix)
+
   return cssTree.generate(tree)
+}
+
+/**
+ * Prefix every selector with the scope selector. `:root`, `:host`, `html`, and
+ * `body` collapse to the scope itself; anything else becomes a descendant of it.
+ */
+function prefixSelectors(cssTree: any, tree: any, prefix: string) {
+  const lists: any[] = []
+  cssTree.walk(tree, (node: any) => {
+    if (node.type === 'SelectorList')
+      lists.push(node)
+  })
+  for (const list of lists) {
+    const rewritten = list.children.toArray()
+      .map((selector: any) => scopeSelector(cssTree.generate(selector).trim(), prefix))
+      .filter(Boolean)
+    if (!rewritten.length) continue
+    const rebuilt = cssTree.parse(rewritten.join(','), { context: 'selectorList' })
+    list.children = rebuilt.children
+  }
+}
+
+function scopeSelector(selector: string, prefix: string): string {
+  const trimmed = selector.trim()
+  if (!trimmed) return ''
+  const root = trimmed.match(/^(?::root|:host|html|body)(?=$|[\s>+~.:#[(*])/i)
+  if (root) {
+    const rest = trimmed.slice(root[0].length).trim()
+    return rest ? `${prefix} ${rest}` : prefix
+  }
+  return `${prefix} ${trimmed}`
 }
 
 function isThemeMediaResource(mediaType: string): boolean {

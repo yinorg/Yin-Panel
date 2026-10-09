@@ -23,6 +23,14 @@ export interface ThemeDirectOptions {
    * scrolling with the theme exactly as it did over the sandbox frame.
    */
   takeover?: boolean
+  /**
+   * Mount the theme into the document (light DOM) instead of a shadow root, so
+   * Core components it embeds are styled by the document's own CSS. The theme's
+   * stylesheet must already be scoped with `scope` (see `rewriteThemeStylesheet`).
+   */
+  light?: boolean
+  /** The container class the light-DOM styles are scoped to. */
+  scope?: string
 }
 
 export interface ThemeDirectHandle {
@@ -44,22 +52,40 @@ export async function mountThemeDirect(options: ThemeDirectOptions): Promise<The
   const mountedComponents: ThemeMountedView[] = []
   let definition: ThemeDefinition | undefined
   let eventSequence = 0
-  const shadow = options.host.shadowRoot || options.host.attachShadow({ mode: 'open' })
+  const light = options.light === true
+  const scopeClass = light ? (options.scope || `yin-theme-${Math.random().toString(36).slice(2, 10)}`) : ''
+  const shadow = light ? undefined : (options.host.shadowRoot || options.host.attachShadow({ mode: 'open' }))
   const root = document.createElement('div')
   root.id = 'theme-root'
+  const selector = light ? `.${scopeClass}` : ':host'
+  const rootSelector = light ? `.${scopeClass} #theme-root` : '#theme-root'
+  const universalSelector = light ? `.${scopeClass} *` : '*'
   const baseStyle = document.createElement('style')
   const hostBox = options.takeover
-    ? ':host{display:block;position:absolute;inset:0;overflow:auto}'
-    : ':host{display:block;position:relative;min-height:100%;overflow:visible}'
-  baseStyle.textContent = `${hostBox} :host,#theme-root{box-sizing:border-box;min-height:100%;margin:0}*,*::before,*::after{box-sizing:inherit}#theme-root{min-height:100dvh}`
-  shadow.replaceChildren(baseStyle, root)
+    ? `${selector}{display:block;position:absolute;inset:0;overflow:auto}`
+    : `${selector}{display:block;position:relative;min-height:100%;overflow:visible}`
+  baseStyle.textContent = `${hostBox} ${selector},${rootSelector}{box-sizing:border-box;min-height:100%;margin:0}${universalSelector},${universalSelector}::before,${universalSelector}::after{box-sizing:inherit}${rootSelector}{min-height:100dvh}`
   const tokenStyle = document.createElement('style')
-  tokenStyle.textContent = options.tokens.replace(/:root\b/g, ':host')
-  shadow.append(tokenStyle)
+  tokenStyle.textContent = options.tokens.replace(/:root\b/g, light ? `.${scopeClass}` : ':host')
+  const themeStyleSheets: HTMLStyleElement[] = []
   for (const sheet of options.styles) {
     const style = document.createElement('style')
     style.textContent = sheet.text
-    shadow.append(style)
+    themeStyleSheets.push(style)
+  }
+  if (light) {
+    options.host.classList.add(scopeClass)
+    document.head.append(baseStyle, tokenStyle, ...themeStyleSheets)
+    options.host.append(root)
+  }
+  else {
+    shadow!.replaceChildren(baseStyle, root, tokenStyle, ...themeStyleSheets)
+  }
+  const teardownDom = () => {
+    root.remove()
+    for (const style of [baseStyle, tokenStyle, ...themeStyleSheets]) style.remove()
+    if (light) options.host.classList.remove(scopeClass)
+    else shadow!.replaceChildren()
   }
 
   const dispatcher = createThemeApiExecutionDispatcher({
@@ -132,7 +158,7 @@ export async function mountThemeDirect(options: ThemeDirectOptions): Promise<The
       withTimeout(Promise.resolve(mounted?.unmount()), DISPOSE_TIMEOUT, 'Theme view disposal timed out'),
       withTimeout(Promise.resolve(definition?.dispose?.()), DISPOSE_TIMEOUT, 'Theme module disposal timed out'),
     ])
-    shadow.replaceChildren()
+    teardownDom()
     if (moduleURL) URL.revokeObjectURL(moduleURL)
     throw error
   }
@@ -156,7 +182,7 @@ export async function mountThemeDirect(options: ThemeDirectOptions): Promise<The
       apiClient.updateEnvironment(environment)
     },
     updateTokens(cssText) {
-      if (!disposed) tokenStyle.textContent = cssText.replace(/:root\b/g, ':host')
+      if (!disposed) tokenStyle.textContent = cssText.replace(/:root\b/g, light ? `.${scopeClass}` : ':host')
     },
     emit(name, payload) {
       if (disposed) return
@@ -164,8 +190,9 @@ export async function mountThemeDirect(options: ThemeDirectOptions): Promise<The
     },
     scrollToTop() {
       if (disposed) return
-      shadow.host.scrollTo({ top: 0, behavior: 'smooth' })
-      shadow.querySelector('#theme-root')?.scrollTo({ top: 0, behavior: 'smooth' })
+      const scroller = light ? options.host : shadow!.host
+      scroller.scrollTo({ top: 0, behavior: 'smooth' })
+      root.scrollTo({ top: 0, behavior: 'smooth' })
     },
     async dispose() {
       if (disposed) return
@@ -178,7 +205,7 @@ export async function mountThemeDirect(options: ThemeDirectOptions): Promise<The
         withTimeout(Promise.resolve(definition?.dispose?.()), DISPOSE_TIMEOUT, 'Theme module disposal timed out'),
       ])
       apiClient.dispose()
-      shadow.replaceChildren()
+      teardownDom()
       if (moduleURL) URL.revokeObjectURL(moduleURL)
     },
   }

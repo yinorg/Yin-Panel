@@ -8,6 +8,15 @@ import { rewriteThemeStylesheet } from './resources'
 import { sha256Hex } from '@/utils/sha256.js'
 import { toThemeItemIcon } from '@/core/home/iconifyResource'
 
+/**
+ * Mount trusted themes into the document (light DOM) instead of a shadow root
+ * (model "theme = app, WordPress-style"): Core components the theme embeds are
+ * then styled by the document's own CSS and render pixel-identically. The theme
+ * stylesheet is scoped to its container so it cannot reach the Core chrome.
+ * Set to false to fall back to the previous shadow-root mount.
+ */
+const DIRECT_LIGHT_MOUNT = true
+
 const props = defineProps<{
   theme: ThemePackage
   snapshot: ThemeHomeSnapshot
@@ -99,6 +108,8 @@ function queueStart() {
 async function start() {
   const startGeneration = ++generation
   const createdAssetURLs: string[] = []
+  const lightMount = mountMode.value === 'direct' && DIRECT_LIGHT_MOUNT
+  const scope = lightMount ? `yin-theme-${Math.random().toString(36).slice(2, 10)}` : ''
   try {
     const manifest = props.theme.manifest
     const scriptPath = manifest.entrypoints?.script
@@ -136,7 +147,7 @@ async function start() {
     for (const stylePath of manifest.entrypoints?.styles || []) {
       const resource = findResource(props.theme, stylePath, 'text/css')
       const source = await loadTextResource(props.theme, stylePath, 'text/css')
-      styles.push({ text: await rewriteThemeStylesheet(source, resource.url!, manifest.resources || [], assets, window.location.origin, mountMode.value === 'direct') })
+      styles.push({ text: await rewriteThemeStylesheet(source, resource.url!, manifest.resources || [], assets, window.location.origin, mountMode.value === 'direct' ? (lightMount ? { prefix: `.${scope}` } : { shadow: true }) : {}) })
     }
     const initialSnapshot = scopedSnapshot(props.snapshot)
     runtimeSnapshot = initialSnapshot
@@ -155,6 +166,8 @@ async function start() {
           onError: error => emit('failed', error),
           contributions: manifest.contributes,
           takeover: trustedTakeover.value,
+          light: lightMount,
+          scope,
         })
       : await mountThemeSandbox(frame.value!, {
           script,
