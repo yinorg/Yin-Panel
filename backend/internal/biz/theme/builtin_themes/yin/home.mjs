@@ -1386,6 +1386,7 @@ export default {
     const coreSurfaceView = (tag, labelKey, fallbackTitle, testid) => (elementRoot) => {
       elementRoot.replaceChildren()
       const page = document.createElement('section')
+      page.className = 'yin-core-page'
       page.setAttribute('data-testid', testid)
       page.style.cssText = 'box-sizing:border-box;min-height:100%;padding:28px 24px;font:400 14px/1.6 system-ui,-apple-system,sans-serif;color:#20282c;background:#f4f7f8'
       const header = document.createElement('div')

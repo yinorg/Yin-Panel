@@ -1225,3 +1225,9 @@ select {
   cursor: wait;
   opacity: .6;
 }
+
+/* The Core pages a theme renders should read as one flat page: the embedded
+   components' cards drop their drop shadow (the users page already had none). */
+.yin-core-page .n-card {
+  box-shadow: none;
+}
