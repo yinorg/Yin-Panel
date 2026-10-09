@@ -30,14 +30,18 @@ mysql:
   db_name: sun_panel
   wait_timeout: 100
 
-# Use rclone to store files. Both support local and remote storage
+# File storage. Core supports local storage only; remote/object storage such as
+# S3 is provided by the Enterprise image.
 rclone:
-  # dir path of local or bucket of remote storage. this item config not belong to rclone
+  # `type: local` stores files under `bucket` on the local disk. Any other type
+  # is accepted only by the Enterprise image.
   type: local
   bucket: uploads
   rclone.conf: |-
     type = local
 
+    # Remote storage is an Enterprise feature. The examples below are kept for
+    # the Enterprise image; Core rejects any non-local type at startup.
     # type = s3
     # provider = AWS
     # access_key_id = AK

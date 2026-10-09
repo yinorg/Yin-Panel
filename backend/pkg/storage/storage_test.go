@@ -3,6 +3,7 @@ package storage
 import (
 	"bytes"
 	"context"
+	"strings"
 	"testing"
 )
 
@@ -36,5 +37,30 @@ func TestLocalStorageRejectsTraversalAndRoundTrips(t *testing.T) {
 	}
 	if _, err := store.Get(ctx, "../outside"); err == nil {
 		t.Fatal("expected traversal key to be rejected")
+	}
+}
+
+func TestLocalStorageMissingAndDelete(t *testing.T) {
+	store, err := NewLocal(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	exists, err := store.Exists(ctx, "wallpaper.webm")
+	if err != nil || exists {
+		t.Fatalf("missing object: exists=%v err=%v", exists, err)
+	}
+	if _, err := store.Get(ctx, "wallpaper.webm"); err == nil {
+		t.Fatal("expected an error reading a missing object")
+	}
+	if err := store.Upload(ctx, strings.NewReader("video"), "wallpaper.webm"); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Delete(ctx, "wallpaper.webm"); err != nil {
+		t.Fatal(err)
+	}
+	exists, err = store.Exists(ctx, "wallpaper.webm")
+	if err != nil || exists {
+		t.Fatalf("deleted object: exists=%v err=%v", exists, err)
 	}
 }
