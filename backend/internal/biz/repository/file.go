@@ -32,6 +32,18 @@ func (r *FileRepo) GetAll() ([]File, uint, error) {
 	return list, uint(count), err
 }
 
+// GetPaged returns one page of files and the total count. It bounds the rows
+// read from the database instead of slicing in the handler.
+func (r *FileRepo) GetPaged(pagedParam PagedParam) ([]File, uint, error) {
+	var count int64
+	if err := Db.Model(&File{}).Count(&count).Error; err != nil {
+		return nil, 0, err
+	}
+	var list []File
+	err := Db.Order("created_at desc").Limit(pagedParam.Limit).Offset(CalcOffset(pagedParam)).Find(&list).Error
+	return list, uint(count), err
+}
+
 func (r *FileRepo) GetByID(id uint) (File, error) {
 	var file File
 	err := Db.Where("id = ?", id).First(&file).Error

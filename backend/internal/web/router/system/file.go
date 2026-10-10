@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/md5"
 	"encoding/hex"
+	"github.com/yinorg/Yin-Panel/backend/internal/biz/repository"
 	"github.com/yinorg/Yin-Panel/backend/internal/constant"
 	"github.com/yinorg/Yin-Panel/backend/internal/global"
 	"github.com/yinorg/Yin-Panel/backend/internal/infra/config"
@@ -150,8 +151,31 @@ func (a *FileRouter) UploadImg(c *gin.Context) {
 	})
 }
 
+// maxFileListPageSize caps a single page request so callers cannot ask for an
+// unbounded page.
+const maxFileListPageSize = 200
+
 func (a *FileRouter) GetList(c *gin.Context) {
-	list, count, err := global.FileRepo.GetAll()
+	// Optional pagination; absent params keep the legacy full-list behaviour.
+	var paged repository.PagedParam
+	_ = c.ShouldBindQuery(&paged)
+
+	var (
+		list  []repository.File
+		count uint
+		err   error
+	)
+	if paged.Limit > 0 {
+		if paged.Page < 1 {
+			paged.Page = 1
+		}
+		if paged.Limit > maxFileListPageSize {
+			paged.Limit = maxFileListPageSize
+		}
+		list, count, err = global.FileRepo.GetPaged(paged)
+	} else {
+		list, count, err = global.FileRepo.GetAll()
+	}
 	if err != nil {
 		response.ErrorDatabase(c, err.Error())
 		return
