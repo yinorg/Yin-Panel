@@ -4,7 +4,7 @@ base:
   http_port: 3002
   # Root URL
   root_url: http://192.168.31.132:3002
-  # Database driver [mysql/sqlite(Default)]
+  # Database driver [sqlite(Default)/mysql/postgres]. MariaDB uses `mysql`.
   database_drive: sqlite
   # Enable static file server. Default:true
   enable_static_server: true
@@ -25,13 +25,26 @@ sqlite:
   # Set -1 to disable. Writes, migrations and PRAGMA always stay on the writer.
   read_pool_size: 4
 
-# MySQL configuration (valid when database_drive=mysql)
+# MySQL / MariaDB configuration (valid when database_drive=mysql)
 mysql:
   host: 127.0.0.1
   port: 3306
   username: root
   password: root
   db_name: sun_panel
+  wait_timeout: 100
+
+# PostgreSQL configuration (valid when database_drive=postgres)
+postgres:
+  host: 127.0.0.1
+  port: 5432
+  username: postgres
+  password: postgres
+  db_name: yin_panel
+  # ssl_mode: disable | require | verify-full ... (default: disable)
+  ssl_mode: disable
+  # time_zone: server session time zone (default: UTC)
+  time_zone: UTC
   wait_timeout: 100
 
 # File storage. Core supports local storage only; remote/object storage such as

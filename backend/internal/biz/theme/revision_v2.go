@@ -32,8 +32,8 @@ type RevisionRecordV2 struct {
 	ID           string `gorm:"primaryKey;size:64"`
 	PackageID    string `gorm:"uniqueIndex:uk_theme_package_version_v2,priority:1;size:128;not null"`
 	Version      string `gorm:"uniqueIndex:uk_theme_package_version_v2,priority:2;size:80;not null"`
-	ManifestJSON string `gorm:"type:longtext;not null"`
-	TokensJSON   string `gorm:"type:longtext;not null"`
+	ManifestJSON string `gorm:"not null"`
+	TokensJSON   string `gorm:"not null"`
 	Verified     bool   `gorm:"not null;default:false"`
 	CreatedAt    time.Time
 }
@@ -42,7 +42,7 @@ type AssetRecordV2 struct {
 	RevisionID string `gorm:"primaryKey;size:64"`
 	Path       string `gorm:"primaryKey;size:240"`
 	MediaType  string `gorm:"size:80;not null"`
-	Content    []byte `gorm:"type:longblob;not null"`
+	Content    []byte `gorm:"not null"`
 }
 
 type ActivationRecordV2 struct {
@@ -75,7 +75,7 @@ type ThemeSettingsRecordV2 struct {
 	PackageID     string `gorm:"primaryKey;size:128"`
 	RevisionID    string `gorm:"primaryKey;size:64"`
 	SchemaVersion int    `gorm:"not null"`
-	DataJSON      string `gorm:"type:longtext;not null"`
+	DataJSON      string `gorm:"not null"`
 	UpdatedAt     time.Time
 }
 

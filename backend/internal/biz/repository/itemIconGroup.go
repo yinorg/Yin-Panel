@@ -26,7 +26,7 @@ type ItemIconGroup struct {
 	Icon        string `gorm:"type:varchar(50)" json:"icon"`
 	Title       string `gorm:"type:varchar(50)" json:"title"`
 	Description string `gorm:"type:text" json:"description"`
-	Sort        int    `gorm:"type:int(11)" json:"sort"`
+	Sort        int    `json:"sort"`
 	UserId      uint   `gorm:"index" json:"userId"`
 	SpaceID     uint   `json:"spaceId"`
 	ParentID    *uint  `gorm:"index" json:"parentId,omitempty"`

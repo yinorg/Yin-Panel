@@ -24,8 +24,8 @@ type ItemIcon struct {
 	LanUrl          string           `gorm:"type:text" json:"lanUrl"`
 	MobileUrl       string           `gorm:"type:text" json:"mobileUrl"`
 	Description     string           `gorm:"type:text" json:"description"`
-	OpenMethod      int              `gorm:"type:tinyint(1)" json:"openMethod"`
-	Sort            int              `gorm:"type:int(11)" json:"sort"`
+	OpenMethod      int              `json:"openMethod"`
+	Sort            int              `json:"sort"`
 	ItemIconGroupId uint             `json:"itemIconGroupId"`
 	UserId          uint             `gorm:"index" json:"userId"`
 	SpaceID         uint             `json:"spaceId"`

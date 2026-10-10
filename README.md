@@ -14,7 +14,7 @@ Yin-Panel 是一个轻量、开源、可自托管的个人与共享空间导航�
 - OIDC/OAuth 登录、账号关联和 OIDC 分组授权
 - 邮箱作为登录账号，昵称独立维护
 - 自定义图标、主题、语言、背景、网络模式和网页小窗
-- 支持 SQLite、MySQL、Docker、ARM64 和 Kubernetes
+- 支持 SQLite、MySQL、MariaDB、PostgreSQL、Docker、ARM64 和 Kubernetes
 
 ## 快速开始
 
@@ -93,6 +93,27 @@ docker pull ghcr.io/yinorg/yin-panel-ce:latest
 2. **写入频率**：SQLite 同一时刻只有一个写者，写吞吐受磁盘 fsync 限制（数百次写/秒量级）。写密集或多实例场景建议改用 MySQL。
 3. **峰值而非平均**：按峰值选型，通常预留均值 2–5 倍的余量。
 4. **静态资源**：建议由反向代理或 CDN 承载 `/assets/*` 和带 hash 的资源，见「Cloudflare 缓存」。
+
+## 数据库
+
+支持 SQLite（默认）、MySQL、MariaDB 和 PostgreSQL。
+
+- `base.database_drive`：`sqlite`（默认）| `mysql` | `postgres`。**MariaDB 使用 `mysql`**。
+- SQLite：`sqlite.file_path`（另见 `read_pool_size`）。
+- MySQL / MariaDB：`mysql.{host,port,username,password,db_name,wait_timeout}`。
+- PostgreSQL：`postgres.{host,port,username,password,db_name,ssl_mode,time_zone,wait_timeout}`。
+
+SQLite 专属能力（WAL、只读连接池、基于文件快照的迁移备份）只适用于 SQLite；MySQL/MariaDB/PostgreSQL 请使用各自工具备份。
+
+### 从 SQLite 迁移到 MySQL/MariaDB/PostgreSQL
+
+```bash
+# conf.yaml        —— 现有 SQLite 配置
+# conf.target.yaml —— 指向 mysql 或 postgres 的目标配置（目标库须为空）
+./yin-panel migrate-db -source conf.yaml -target conf.target.yaml
+```
+
+迁移会在目标库创建完整 schema、按表复制全部数据并**保留主键**（PostgreSQL 会同步重置自增序列），可重复执行（每次替换目标表内容）。完成后把 `conf.yaml` 的 `database_drive` 指向目标库即可。
 
 ## 配置与 OAuth/OIDC
 

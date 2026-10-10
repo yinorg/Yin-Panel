@@ -16,6 +16,7 @@ type Config struct {
 	Base      BaseConfig      `yaml:"base"`
 	SQLite    SQLiteConfig    `yaml:"sqlite"`
 	MySQL     MySQLConfig     `yaml:"mysql"`
+	Postgres  PostgresConfig  `yaml:"postgres"`
 	Rclone    RcloneConfig    `yaml:"rclone"`
 	JWT       JWTConfig       `yaml:"jwt"`
 	OAuth     OAuthConfig     `yaml:"oauth"`
@@ -57,6 +58,19 @@ type MySQLConfig struct {
 	Username    string `yaml:"username"`
 	Password    string `yaml:"password"`
 	DBName      string `yaml:"db_name"`
+	WaitTimeout int    `yaml:"wait_timeout"`
+}
+
+// PostgresConfig represents the postgres section configuration. MariaDB uses
+// the mysql section and driver.
+type PostgresConfig struct {
+	Host        string `yaml:"host"`
+	Port        string `yaml:"port"`
+	Username    string `yaml:"username"`
+	Password    string `yaml:"password"`
+	DBName      string `yaml:"db_name"`
+	SSLMode     string `yaml:"ssl_mode"`
+	TimeZone    string `yaml:"time_zone"`
 	WaitTimeout int    `yaml:"wait_timeout"`
 }
 

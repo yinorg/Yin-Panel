@@ -50,9 +50,9 @@ func ensureQueryIndexes(db *gorm.DB) error {
 		if db.Migrator().HasIndex(idx.model, idx.name) {
 			continue
 		}
-		ddl := fmt.Sprintf("CREATE INDEX %s ON %s (%s)", idx.name, idx.table, idx.columns)
+		ddl := fmt.Sprintf("CREATE INDEX %s ON %s (%s)", quoteIdent(db, idx.name), quoteIdent(db, idx.table), idx.columns)
 		if db.Dialector.Name() == SQLITE {
-			ddl = fmt.Sprintf("CREATE INDEX IF NOT EXISTS %s ON %s (%s)", idx.name, idx.table, idx.columns)
+			ddl = fmt.Sprintf("CREATE INDEX IF NOT EXISTS %s ON %s (%s)", quoteIdent(db, idx.name), quoteIdent(db, idx.table), idx.columns)
 		}
 		if err := db.Exec(ddl).Error; err != nil {
 			return fmt.Errorf("create index %s: %w", idx.name, err)

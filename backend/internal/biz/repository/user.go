@@ -11,8 +11,8 @@ type User struct {
 	Password     string `gorm:"type:varchar(255)" json:"password"`  // 密码
 	Name         string `gorm:"type:varchar(20)" json:"name"`       // 名称
 	HeadImage    string `gorm:"type:varchar(255)" json:"headImage"` // 头像地址
-	Status       int8   `gorm:"type:tinyint" json:"status"`         // 状态 1.启用 2.停用 3.未激活
-	Role         int8   `gorm:"type:tinyint" json:"role"`           // 角色 1.管理员 2.普通用户
+	Status       int8   `json:"status"`        // 状态 1.启用 2.停用 3.未激活
+	Role         int8   `json:"role"`          // 角色 1.管理员 2.普通用户
 	Mail         string `gorm:"type:varchar(255)" json:"mail"`      // 邮箱
 	Token        string `gorm:"-" json:"token"`                     // 仅用于API返回
 	TokenVersion uint   `gorm:"not null;default:0" json:"-"`        // 用于撤销已签发的JWT

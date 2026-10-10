@@ -67,6 +67,17 @@ func databaseConnect() error {
 		client = &database.MySQLConfig{Username: config.AppConfig.MySQL.Username, Password: config.AppConfig.MySQL.Password, Host: config.AppConfig.MySQL.Host, Port: config.AppConfig.MySQL.Port, Database: config.AppConfig.MySQL.DBName, WaitTimeout: config.AppConfig.MySQL.WaitTimeout}
 	case database.SQLITE:
 		client = &database.SQLiteConfig{Filename: config.AppConfig.SQLite.FilePath}
+	case database.POSTGRES:
+		client = &database.PostgresConfig{
+			Host:        config.AppConfig.Postgres.Host,
+			Port:        config.AppConfig.Postgres.Port,
+			Username:    config.AppConfig.Postgres.Username,
+			Password:    config.AppConfig.Postgres.Password,
+			Database:    config.AppConfig.Postgres.DBName,
+			SSLMode:     config.AppConfig.Postgres.SSLMode,
+			TimeZone:    config.AppConfig.Postgres.TimeZone,
+			WaitTimeout: config.AppConfig.Postgres.WaitTimeout,
+		}
 	default:
 		return fmt.Errorf("unsupported database drive: %s", config.AppConfig.Base.DatabaseDrive)
 	}

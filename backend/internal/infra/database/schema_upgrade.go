@@ -220,7 +220,7 @@ func backfillOAuthIdentities(db *gorm.DB) error {
 // the oldest account with that address.
 func mergeDuplicateUserAccounts(db *gorm.DB) error {
 	var mails []string
-	if err := db.Raw("SELECT mail FROM user GROUP BY mail HAVING count(*) > 1").Scan(&mails).Error; err != nil {
+	if err := db.Raw("SELECT mail FROM " + quoteIdent(db, "user") + " GROUP BY mail HAVING count(*) > 1").Scan(&mails).Error; err != nil {
 		return err
 	}
 	for _, mail := range mails {
@@ -574,7 +574,7 @@ func ensureUserMailIndex(db *gorm.DB) error {
 	if exists {
 		return nil
 	}
-	return db.Exec("CREATE UNIQUE INDEX " + userMailIndexName + " ON user (mail)").Error
+	return db.Exec("CREATE UNIQUE INDEX " + userMailIndexName + " ON " + quoteIdent(db, "user") + " (mail)").Error
 }
 
 func schemaIndexExists(db *gorm.DB, table, index string) (bool, error) {
@@ -585,6 +585,9 @@ func schemaIndexExists(db *gorm.DB, table, index string) (bool, error) {
 		return count > 0, err
 	case MYSQL:
 		err := db.Raw("SELECT count(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = ? AND index_name = ?", table, index).Scan(&count).Error
+		return count > 0, err
+	case POSTGRES:
+		err := db.Raw("SELECT count(*) FROM pg_indexes WHERE schemaname = current_schema() AND tablename = ? AND indexname = ?", table, index).Scan(&count).Error
 		return count > 0, err
 	default:
 		return false, fmt.Errorf("unsupported database drive: %s", db.Dialector.Name())

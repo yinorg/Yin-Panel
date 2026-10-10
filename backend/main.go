@@ -4,12 +4,21 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"os"
 
 	"github.com/yinorg/Yin-Panel/backend/internal/global"
+	"github.com/yinorg/Yin-Panel/backend/internal/infra/database"
 	"github.com/yinorg/Yin-Panel/backend/pkg/app"
 )
 
 func main() {
+	// `migrate-db` copies an existing SQLite deployment into MySQL/MariaDB or
+	// PostgreSQL, then exits. It never starts the HTTP server.
+	if len(os.Args) > 1 && os.Args[1] == "migrate-db" {
+		runMigrateDB(os.Args[2:])
+		return
+	}
+
 	// Parse command line arguments
 	configPath := flag.String("c", "conf.yaml", "Path to configuration file")
 	flag.Parse()
@@ -21,6 +30,24 @@ func main() {
 	if err := app.Init(*configPath); err != nil {
 		log.Panicln("初始化错误:", err)
 	}
+}
+
+// runMigrateDB copies every table from a SQLite configuration into a target
+// MySQL/MariaDB or PostgreSQL configuration.
+func runMigrateDB(args []string) {
+	fs := flag.NewFlagSet("migrate-db", flag.ExitOnError)
+	source := fs.String("source", "conf.yaml", "source SQLite configuration file")
+	target := fs.String("target", "", "target MySQL/PostgreSQL configuration file")
+	_ = fs.Parse(args)
+	if *target == "" {
+		fmt.Println("usage: yin-panel migrate-db -source conf.yaml -target conf.target.yaml")
+		os.Exit(2)
+	}
+	fmt.Printf("Migrating from %s to %s ...\n", *source, *target)
+	if err := database.MigrateDB(*source, *target); err != nil {
+		log.Fatalln("migrate-db failed:", err)
+	}
+	fmt.Println("Migration complete.")
 }
 
 func Logo() {

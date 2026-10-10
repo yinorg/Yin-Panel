@@ -20,8 +20,8 @@ const MaxWebWallpaper = 6 << 20
 type WebWallpaperRecord struct {
 	ID         string `gorm:"primaryKey;size:64"`
 	OwnerID    uint   `gorm:"index"`
-	HTML       []byte `gorm:"type:longblob"`
-	Poster     []byte `gorm:"type:longblob"`
+	HTML       []byte
+	Poster     []byte
 	PosterType string `gorm:"size:32"`
 	CreatedAt  time.Time
 }

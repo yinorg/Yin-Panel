@@ -19,8 +19,9 @@ import (
 )
 
 const (
-	MYSQL  = "mysql"
-	SQLITE = "sqlite"
+	MYSQL    = "mysql"
+	SQLITE   = "sqlite"
+	POSTGRES = "postgres"
 )
 
 type DbClient interface {
@@ -85,7 +86,7 @@ func initDatabase(db *gorm.DB) (err error) {
 	// Backfill email accounts from the legacy username column before the
 	// application stops reading username.
 	if db.Migrator().HasColumn("user", "username") {
-		if err := db.Exec("UPDATE user SET mail = username WHERE (mail IS NULL OR mail = '') AND username IS NOT NULL AND username <> ''").Error; err != nil {
+		if err := db.Exec("UPDATE " + quoteIdent(db, "user") + " SET mail = username WHERE (mail IS NULL OR mail = '') AND username IS NOT NULL AND username <> ''").Error; err != nil {
 			return err
 		}
 	}
