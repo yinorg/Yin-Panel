@@ -137,6 +137,7 @@ TODO.md
 opencode-proxy.sh
 .gitignore
 opencode.jsonc
+.opencode/
 
 # Docker build artifact (produced by CI, never committed)
 /build-output/
