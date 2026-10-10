@@ -32,7 +32,12 @@ interface MonitorEnableData {
   refresh_interval?: number
 }
 
-const HOME_REQUEST_TIMEOUT = 3000
+// Long enough to survive a slow remote round trip (the panel is often reached
+// over a proxy or a long-haul link, where a single API call can take well over a
+// second), short enough that a genuinely offline panel still falls back to the
+// cached home promptly. Every request has its own cached fallback, so a longer
+// budget only delays the "offline" verdict, never blocks the view.
+const HOME_REQUEST_TIMEOUT = 5000
 const SIDE_SWITCH_ANIMATION_MS = 1000
 
 /**

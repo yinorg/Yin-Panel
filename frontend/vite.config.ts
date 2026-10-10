@@ -107,12 +107,14 @@ function setupPlugins(env: ImportMetaEnv): PluginOption[] {
           },
         }],
       },
-      includeAssets: [
-        'assets/favicon.svg',
-        'assets/apple-touch-icon.png',
-        'assets/bg-forest.webp',
-        'assets/search_engine_svg/*.{png,svg}',
-      ],
+      // Deliberately empty. The shell only needs `index.html`, the entry JS,
+      // `vue-vendor` and the CSS above; every other asset is fetched on demand and
+      // cached by the `/assets/` runtime rule. Precaching the wallpaper
+      // (`bg-forest.webp`, ~400 KB), the favicon/apple-touch icon and the fifteen
+      // search-engine icons added ~460 KB across ~15 extra requests, and on a slow
+      // link those requests competed with the shell itself — the worker only
+      // claimed the page once they finished, so the offline shell arrived late.
+      includeAssets: [],
       manifest: {
         name: 'Yin-Panel',
         short_name: 'Yin-Panel',
