@@ -25,10 +25,10 @@ type ItemIcon struct {
 	MobileUrl       string           `gorm:"type:text" json:"mobileUrl"`
 	Description     string           `gorm:"type:text" json:"description"`
 	OpenMethod      int              `gorm:"type:tinyint(1)" json:"openMethod"`
-	Sort            int              `gorm:"type:int(11);index:idx_item_space_sort,priority:2" json:"sort"`
-	ItemIconGroupId uint             `gorm:"index:idx_item_space_group,priority:2" json:"itemIconGroupId"`
+	Sort            int              `gorm:"type:int(11)" json:"sort"`
+	ItemIconGroupId uint             `json:"itemIconGroupId"`
 	UserId          uint             `gorm:"index" json:"userId"`
-	SpaceID         uint             `gorm:"index:idx_item_space_group,priority:1;index:idx_item_space_sort,priority:1" json:"spaceId"`
+	SpaceID         uint             `json:"spaceId"`
 }
 
 type ItemIconRepo struct{}

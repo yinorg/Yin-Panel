@@ -92,6 +92,9 @@ func initDatabase(db *gorm.DB) (err error) {
 	if err := finalizeSchemaUpgrade(db); err != nil {
 		return fmt.Errorf("schema upgrade: %w", err)
 	}
+	if err := ensureQueryIndexes(db); err != nil {
+		return fmt.Errorf("query indexes: %w", err)
+	}
 	if err := normalizeEmptyPublicIDs(db); err != nil {
 		return err
 	}

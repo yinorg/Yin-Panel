@@ -964,11 +964,23 @@ func (r *SpaceRouter) Members(c *gin.Context) {
 		response.ErrorDatabase(c, err.Error())
 		return
 	}
+	// Resolve member emails in one batched query instead of one per member.
+	userIDs := make([]uint, 0, len(records))
+	for _, record := range records {
+		userIDs = append(userIDs, record.UserID)
+	}
+	emailByID := make(map[uint]string, len(userIDs))
+	if len(userIDs) > 0 {
+		var users []repository.User
+		if err := repository.Db.Select("id", "mail").Where("id IN ?", userIDs).Find(&users).Error; err == nil {
+			for _, u := range users {
+				emailByID[u.ID] = u.Mail
+			}
+		}
+	}
 	members := make([]map[string]any, 0, len(records))
 	for _, record := range records {
-		var memberUser repository.User
-		repository.Db.First(&memberUser, record.UserID)
-		members = append(members, map[string]any{"id": record.ID, "spaceId": record.SpaceID, "userId": record.UserID, "email": memberUser.Mail, "role": record.Role, "source": record.Source, "joinedAt": record.JoinedAt})
+		members = append(members, map[string]any{"id": record.ID, "spaceId": record.SpaceID, "userId": record.UserID, "email": emailByID[record.UserID], "role": record.Role, "source": record.Source, "joinedAt": record.JoinedAt})
 	}
 	response.SuccessData(c, members)
 }
@@ -1237,13 +1249,41 @@ func (r *SpaceRouter) List(c *gin.Context) {
 		response.ErrorDatabase(c, err.Error())
 		return
 	}
+
+	// Resolve the paired space and the caller's role in two batched queries
+	// instead of two queries per space.
+	spaceIDs := make([]uint, 0, len(spaces))
+	for i := range spaces {
+		spaceIDs = append(spaceIDs, spaces[i].ID)
+	}
+	pairedByID := make(map[uint]uint, len(spaces))
+	roleByID := make(map[uint]string, len(spaces))
+	if len(spaceIDs) > 0 {
+		var paired []repository.Space
+		if err := repository.Db.Select("id", "pair_id").Where("pair_id IN ? AND side = ?", spaceIDs, "yang").Find(&paired).Error; err == nil {
+			for _, p := range paired {
+				pairedByID[p.PairID] = p.ID
+			}
+		}
+		var members []repository.SpaceMember
+		if err := repository.Db.Select("space_id", "role").Where("user_id = ? AND space_id IN ?", user.ID, spaceIDs).Find(&members).Error; err == nil {
+			for _, m := range members {
+				roleByID[m.SpaceID] = m.Role
+			}
+		}
+	}
+
 	result := make([]spaceListDTO, 0, len(spaces))
 	for i := range spaces {
-		var paired repository.Space
-		if repository.Db.Where("pair_id = ? AND side = ?", spaces[i].ID, "yang").First(&paired).Error == nil {
-			spaces[i].PairedSpaceID = paired.ID
+		if pairedID, ok := pairedByID[spaces[i].ID]; ok {
+			spaces[i].PairedSpaceID = pairedID
 		}
-		result = append(result, spaceListDTO{Space: spaces[i], CanEdit: canEditSpace(user.ID, spaces[i].ID)})
+		role := roleByID[spaces[i].ID]
+		if spaces[i].OwnerUserID == user.ID {
+			role = repository.SpaceRoleAdmin
+		}
+		canEdit := role == repository.SpaceRoleAdmin || role == repository.SpaceRoleEditor
+		result = append(result, spaceListDTO{Space: spaces[i], CanEdit: canEdit})
 	}
 	response.SuccessData(c, result)
 }

@@ -69,7 +69,7 @@ func (r *UserRepo) GetList(pagedParam PagedParam) ([]User, uint, error) {
 	}
 
 	var list []User
-	if err := Db.Omit("Password").Limit(pagedParam.Limit).Offset(CalcOffset(pagedParam)).Find(&list).Error; err != nil {
+	if err := Db.Omit("Password").Order("id").Limit(pagedParam.Limit).Offset(CalcOffset(pagedParam)).Find(&list).Error; err != nil {
 		return nil, 0, err
 	}
 
