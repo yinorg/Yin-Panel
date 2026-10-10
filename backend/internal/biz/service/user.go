@@ -98,60 +98,57 @@ func (s *UserService) createProxyContext(timeout time.Duration) (context.Context
 }
 
 func (s *UserService) CreateUser(user *repository.User) error {
-	if err := s.userRepo.Create(user); err != nil {
-		return err
+	// The account, its personal space pair, the two memberships and the default
+	// groups are one logical operation; a failure part-way would leave a user
+	// without a usable space. Run them in a single transaction.
+	if repository.Db == nil {
+		// No database handle (unit fakes): keep the prior minimal behaviour.
+		if err := s.userRepo.Create(user); err != nil {
+			return err
+		}
+		defaultGroup := repository.ItemIconGroup{
+			Title:  "APP",
+			UserId: user.ID,
+			Icon:   "material-symbols:ad-group-outline",
+		}
+		return s.itemGroupRepo.Save(&defaultGroup)
 	}
 
-	personalSpace := repository.Space{}
-	yang := repository.Space{}
-	if repository.Db != nil {
-		personalSpace = repository.Space{
+	return repository.Db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(user).Error; err != nil {
+			return err
+		}
+
+		personalSpace := repository.Space{
 			Type:        repository.SpaceTypePersonal,
 			Name:        user.Name,
 			OwnerUserID: user.ID,
 			Side:        "yin",
 		}
-		if err := repository.Db.Create(&personalSpace).Error; err != nil {
+		if err := tx.Create(&personalSpace).Error; err != nil {
 			return err
 		}
-		if err := repository.Db.Model(&personalSpace).Update("pair_id", personalSpace.ID).Error; err != nil {
+		if err := tx.Model(&personalSpace).Update("pair_id", personalSpace.ID).Error; err != nil {
 			return err
 		}
-		yang = repository.Space{Type: repository.SpaceTypePersonal, Name: user.Name + "-B", OwnerUserID: user.ID, PairID: personalSpace.ID, Side: "yang"}
-		if err := repository.Db.Create(&yang).Error; err != nil {
+		yang := repository.Space{Type: repository.SpaceTypePersonal, Name: user.Name + "-B", OwnerUserID: user.ID, PairID: personalSpace.ID, Side: "yang"}
+		if err := tx.Create(&yang).Error; err != nil {
 			return err
 		}
-		member := repository.SpaceMember{
-			SpaceID:  personalSpace.ID,
-			UserID:   user.ID,
-			Role:     repository.SpaceRoleAdmin,
-			JoinedAt: time.Now(),
-		}
-		if err := repository.Db.Create(&member).Error; err != nil {
+		if err := tx.Create(&repository.SpaceMember{SpaceID: personalSpace.ID, UserID: user.ID, Role: repository.SpaceRoleAdmin, JoinedAt: time.Now()}).Error; err != nil {
 			return err
 		}
-		if err := repository.Db.Create(&repository.SpaceMember{SpaceID: yang.ID, UserID: user.ID, Role: repository.SpaceRoleAdmin, JoinedAt: time.Now()}).Error; err != nil {
+		if err := tx.Create(&repository.SpaceMember{SpaceID: yang.ID, UserID: user.ID, Role: repository.SpaceRoleAdmin, JoinedAt: time.Now()}).Error; err != nil {
 			return err
 		}
-	}
-
-	defaultGroup := repository.ItemIconGroup{
-		Title:   "APP",
-		UserId:  user.ID,
-		SpaceID: personalSpace.ID,
-		Icon:    "material-symbols:ad-group-outline",
-	}
-
-	if err := s.itemGroupRepo.Save(&defaultGroup); err != nil {
-		return err
-	}
-	if repository.Db != nil {
-		if err := s.itemGroupRepo.Save(&repository.ItemIconGroup{Title: "APP", UserId: user.ID, SpaceID: yang.ID, Icon: "material-symbols:ad-group-outline"}); err != nil {
+		if err := tx.Create(&repository.ItemIconGroup{Title: "APP", UserId: user.ID, SpaceID: personalSpace.ID, Icon: "material-symbols:ad-group-outline"}).Error; err != nil {
 			return err
 		}
-	}
-
-	return nil
+		if err := tx.Create(&repository.ItemIconGroup{Title: "APP", UserId: user.ID, SpaceID: yang.ID, Icon: "material-symbols:ad-group-outline"}).Error; err != nil {
+			return err
+		}
+		return nil
+	})
 }
 
 // GetOAuthLoginURL generates the OAuth login URL for the specified provider
