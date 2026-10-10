@@ -1,5 +1,5 @@
 <div align="center">
-    <img src="frontend/public/assets/apple-touch-icon.png" alt="Логотип Yin-Panel" width="128" height="128">
+    <img src="../../frontend/public/assets/apple-touch-icon.png" alt="Логотип Yin-Panel" width="128" height="128">
 
 <h1>Yin-Panel</h1>
 
@@ -7,7 +7,7 @@
 [![Лицензия: BUSL-1.1](https://img.shields.io/badge/license-BUSL--1.1-brightgreen.svg?style=flat-square)](LICENSE)
 ![Проверки фронтенда](https://github.com/yinorg/Yin-Panel/workflows/Frontend%20Checks/badge.svg)
 
-[English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja-JP.md) | [한국어](README.ko-KR.md) | [Deutsch](README.de-DE.md) | [Français](README.fr-FR.md) | [Español](README.es-ES.md) | [Português (Brasil)](README.pt-BR.md) | **Русский**
+[English](../../README.md) | [简体中文](../zh-CN/README.md) | [繁體中文](../zh-TW/README.md) | [日本語](../ja-JP/README.md) | [한국어](../ko-KR/README.md) | [Deutsch](../de-DE/README.md) | [Français](../fr-FR/README.md) | [Español](../es-ES/README.md) | [Português (Brasil)](../pt-BR/README.md) | **Русский**
 
 </div>
 
@@ -16,13 +16,13 @@ Yin-Panel — это лёгкая панель навигации для сам�
 ## Демо
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="doc/images/readme-home-dark.jpg">
-  <img alt="Главная страница Yin-Panel: группы закладок, состояние системы и поиск" src="doc/images/readme-home-light.jpg">
+  <source media="(prefers-color-scheme: dark)" srcset="../images/readme-home-dark.jpg">
+  <img alt="Главная страница Yin-Panel: группы закладок, состояние системы и поиск" src="../images/readme-home-light.jpg">
 </picture>
 
 | Редактор элементов | Управление пространствами |
 | --- | --- |
-| ![Добавление закладки с помощью редактора значков](doc/images/readme-editor-light.jpg) | ![Управление пространствами с публичным доступом и импортом/экспортом закладок](doc/images/readme-spaces-light.jpg) |
+| ![Добавление закладки с помощью редактора значков](../images/readme-editor-light.jpg) | ![Управление пространствами с публичным доступом и импортом/экспортом закладок](../images/readme-spaces-light.jpg) |
 
 ## Возможности
 
@@ -196,7 +196,7 @@ go build ./...
 
 Скрипт по умолчанию использует `backend/` репозитория как рабочий каталог и требует локальный `conf.yaml` в нём; `YIN_PANEL_RUNTIME_DIR` в `.env.local` может это переопределить. После успешных сборок и тестов он останавливает только слушатель Yin-Panel, заменяет старый бинарник и статические файлы через `sudo` и никогда не трогает базу данных, загрузки и файлы конфигурации.
 
-Система тем главной страницы описана в [`frontend/THEME_SYSTEM.md`](frontend/THEME_SYSTEM.md); создать новую тему можно командой `npm run create:theme -- init "<имя>"`. Полные соглашения по ИИ-разработке, выпуску и перезапуску — в [AGENTS.md](./AGENTS.md).
+Система тем главной страницы описана в [`frontend/THEME_SYSTEM.md`](../../frontend/THEME_SYSTEM.md); создать новую тему можно командой `npm run create:theme -- init "<имя>"`. Полные соглашения по ИИ-разработке, выпуску и перезапуску — в [AGENTS.md](../../AGENTS.md).
 
 ## Резервное копирование и обновление
 
@@ -228,4 +228,4 @@ Yin-Panel вырос из open-source проекта [hslr-s/sun-panel](https://
 
 ## Лицензия
 
-Yin-Panel распространяется по [Business Source License 1.1](./LICENSE): продакшн-использование бесплатно для личных целей или внутренних бизнес-операций организации. Через три года после первой публичной публикации каждой версии она переходит на лицензию AGPL-3.0-or-later.
+Yin-Panel распространяется по [Business Source License 1.1](../../LICENSE): продакшн-использование бесплатно для личных целей или внутренних бизнес-операций организации. Через три года после первой публичной публикации каждой версии она переходит на лицензию AGPL-3.0-or-later.

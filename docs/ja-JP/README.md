@@ -1,5 +1,5 @@
 <div align="center">
-    <img src="frontend/public/assets/apple-touch-icon.png" alt="Yin-Panel ロゴ" width="128" height="128">
+    <img src="../../frontend/public/assets/apple-touch-icon.png" alt="Yin-Panel ロゴ" width="128" height="128">
 
 <h1>Yin-Panel</h1>
 
@@ -7,7 +7,7 @@
 [![ライセンス：BUSL-1.1](https://img.shields.io/badge/license-BUSL--1.1-brightgreen.svg?style=flat-square)](LICENSE)
 ![フロントエンドチェック](https://github.com/yinorg/Yin-Panel/workflows/Frontend%20Checks/badge.svg)
 
-[English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | **日本語** | [한국어](README.ko-KR.md) | [Deutsch](README.de-DE.md) | [Français](README.fr-FR.md) | [Español](README.es-ES.md) | [Português (Brasil)](README.pt-BR.md) | [Русский](README.ru-RU.md)
+[English](../../README.md) | [简体中文](../zh-CN/README.md) | [繁體中文](../zh-TW/README.md) | **日本語** | [한국어](../ko-KR/README.md) | [Deutsch](../de-DE/README.md) | [Français](../fr-FR/README.md) | [Español](../es-ES/README.md) | [Português (Brasil)](../pt-BR/README.md) | [Русский](../ru-RU/README.md)
 
 </div>
 
@@ -16,13 +16,13 @@ Yin-Panel は、個人用と共有のスペースのための軽量でセルフ�
 ## デモ
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="doc/images/readme-home-dark.jpg">
-  <img alt="Yin-Panel のホーム画面：ブックマークのグループ、システム状態、検索" src="doc/images/readme-home-light.jpg">
+  <source media="(prefers-color-scheme: dark)" srcset="../images/readme-home-dark.jpg">
+  <img alt="Yin-Panel のホーム画面：ブックマークのグループ、システム状態、検索" src="../images/readme-home-light.jpg">
 </picture>
 
 | 項目エディター | スペース管理 |
 | --- | --- |
-| ![アイコンエディターでブックマークを追加](doc/images/readme-editor-light.jpg) | ![公開アクセスとブックマークのインポート/エクスポートを備えたスペース管理](doc/images/readme-spaces-light.jpg) |
+| ![アイコンエディターでブックマークを追加](../images/readme-editor-light.jpg) | ![公開アクセスとブックマークのインポート/エクスポートを備えたスペース管理](../images/readme-spaces-light.jpg) |
 
 ## 機能
 
@@ -196,7 +196,7 @@ go build ./...
 
 スクリプトは既定でリポジトリ内の `backend/` を実行ディレクトリとし、そこにローカルの `conf.yaml` が必要です。`.env.local` の `YIN_PANEL_RUNTIME_DIR` で上書きできます。ビルドとテストがすべて成功した後、Yin-Panel のリスナーのみを停止し、`sudo` で旧バイナリと静的ファイルを置き換えます。データベース、アップロードファイル、設定ファイルには触れません。
 
-ホームページのテーマシステムは [`frontend/THEME_SYSTEM.md`](frontend/THEME_SYSTEM.md) を参照してください。`npm run create:theme -- init "<名前>"` で新しいテーマの雛形を作成できます。AI 開発・リリース・再起動の規約は [AGENTS.md](./AGENTS.md) にあります。
+ホームページのテーマシステムは [`frontend/THEME_SYSTEM.md`](../../frontend/THEME_SYSTEM.md) を参照してください。`npm run create:theme -- init "<名前>"` で新しいテーマの雛形を作成できます。AI 開発・リリース・再起動の規約は [AGENTS.md](../../AGENTS.md) にあります。
 
 ## バックアップとアップグレード
 
@@ -228,4 +228,4 @@ Yin-Panel はオープンソースプロジェクト [hslr-s/sun-panel](https://
 
 ## ライセンス
 
-Yin-Panel は [Business Source License 1.1](./LICENSE) でライセンスされています。個人利用または組織の内部業務での本番利用は無償です。各バージョンは初回公開から 3 年後、AGPL-3.0-or-later ライセンスに移行します。
+Yin-Panel は [Business Source License 1.1](../../LICENSE) でライセンスされています。個人利用または組織の内部業務での本番利用は無償です。各バージョンは初回公開から 3 年後、AGPL-3.0-or-later ライセンスに移行します。

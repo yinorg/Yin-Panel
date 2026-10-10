@@ -1,5 +1,5 @@
 <div align="center">
-    <img src="frontend/public/assets/apple-touch-icon.png" alt="Yin-Panel 標誌" width="128" height="128">
+    <img src="../../frontend/public/assets/apple-touch-icon.png" alt="Yin-Panel 標誌" width="128" height="128">
 
 <h1>Yin-Panel</h1>
 
@@ -7,7 +7,7 @@
 [![授權條款：BUSL-1.1](https://img.shields.io/badge/license-BUSL--1.1-brightgreen.svg?style=flat-square)](LICENSE)
 ![前端檢查](https://github.com/yinorg/Yin-Panel/workflows/Frontend%20Checks/badge.svg)
 
-[English](README.md) | [简体中文](README.zh-CN.md) | **繁體中文** | [日本語](README.ja-JP.md) | [한국어](README.ko-KR.md) | [Deutsch](README.de-DE.md) | [Français](README.fr-FR.md) | [Español](README.es-ES.md) | [Português (Brasil)](README.pt-BR.md) | [Русский](README.ru-RU.md)
+[English](../../README.md) | [简体中文](../zh-CN/README.md) | **繁體中文** | [日本語](../ja-JP/README.md) | [한국어](../ko-KR/README.md) | [Deutsch](../de-DE/README.md) | [Français](../fr-FR/README.md) | [Español](../es-ES/README.md) | [Português (Brasil)](../pt-BR/README.md) | [Русский](../ru-RU/README.md)
 
 </div>
 
@@ -16,13 +16,13 @@ Yin-Panel 是一個輕量、可自架的個人與共享空間導覽面板，適�
 ## 示範
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="doc/images/readme-home-dark.jpg">
-  <img alt="Yin-Panel 首頁：書籤分組、系統狀態與搜尋" src="doc/images/readme-home-light.jpg">
+  <source media="(prefers-color-scheme: dark)" srcset="../images/readme-home-dark.jpg">
+  <img alt="Yin-Panel 首頁：書籤分組、系統狀態與搜尋" src="../images/readme-home-light.jpg">
 </picture>
 
 | 項目編輯器 | 空間管理 |
 | --- | --- |
-| ![使用圖示編輯器新增書籤](doc/images/readme-editor-light.jpg) | ![空間管理：公開存取與書籤匯入匯出](doc/images/readme-spaces-light.jpg) |
+| ![使用圖示編輯器新增書籤](../images/readme-editor-light.jpg) | ![空間管理：公開存取與書籤匯入匯出](../images/readme-spaces-light.jpg) |
 
 ## 功能
 
@@ -196,7 +196,7 @@ go build ./...
 
 腳本預設將儲存庫內的 `backend/` 作為執行目錄，要求其中存在本機 `conf.yaml`；可透過 `.env.local` 中的 `YIN_PANEL_RUNTIME_DIR` 覆寫。腳本會在建置與測試全部通過後，僅停止 Yin-Panel 監聽程序，使用 `sudo` 替換舊二進位檔與靜態檔案，不會修改資料庫、上傳檔案或設定檔。
 
-首頁主題系統見 [`frontend/THEME_SYSTEM.md`](frontend/THEME_SYSTEM.md)；使用 `npm run create:theme -- init "<名稱>"` 可建立新主題骨架。完整的 AI 開發、發佈與重新啟動慣例見 [AGENTS.md](./AGENTS.md)。
+首頁主題系統見 [`frontend/THEME_SYSTEM.md`](../../frontend/THEME_SYSTEM.md)；使用 `npm run create:theme -- init "<名稱>"` 可建立新主題骨架。完整的 AI 開發、發佈與重新啟動慣例見 [AGENTS.md](../../AGENTS.md)。
 
 ## 備份與升級
 
@@ -228,4 +228,4 @@ Yin-Panel 基於開源專案 [hslr-s/sun-panel](https://github.com/hslr-s/sun-pa
 
 ## 授權條款
 
-Yin-Panel 採用 [Business Source License 1.1](./LICENSE) 授權：個人使用或組織內部營運可免費用於正式環境。每個版本首次公開發佈三年後，該版本將轉為 AGPL-3.0-or-later 授權。
+Yin-Panel 採用 [Business Source License 1.1](../../LICENSE) 授權：個人使用或組織內部營運可免費用於正式環境。每個版本首次公開發佈三年後，該版本將轉為 AGPL-3.0-or-later 授權。

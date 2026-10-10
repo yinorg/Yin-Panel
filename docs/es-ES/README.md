@@ -1,5 +1,5 @@
 <div align="center">
-    <img src="frontend/public/assets/apple-touch-icon.png" alt="Logotipo de Yin-Panel" width="128" height="128">
+    <img src="../../frontend/public/assets/apple-touch-icon.png" alt="Logotipo de Yin-Panel" width="128" height="128">
 
 <h1>Yin-Panel</h1>
 
@@ -7,7 +7,7 @@
 [![Licencia: BUSL-1.1](https://img.shields.io/badge/license-BUSL--1.1-brightgreen.svg?style=flat-square)](LICENSE)
 ![Comprobaciones del frontend](https://github.com/yinorg/Yin-Panel/workflows/Frontend%20Checks/badge.svg)
 
-[English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja-JP.md) | [한국어](README.ko-KR.md) | [Deutsch](README.de-DE.md) | [Français](README.fr-FR.md) | **Español** | [Português (Brasil)](README.pt-BR.md) | [Русский](README.ru-RU.md)
+[English](../../README.md) | [简体中文](../zh-CN/README.md) | [繁體中文](../zh-TW/README.md) | [日本語](../ja-JP/README.md) | [한국어](../ko-KR/README.md) | [Deutsch](../de-DE/README.md) | [Français](../fr-FR/README.md) | **Español** | [Português (Brasil)](../pt-BR/README.md) | [Русский](../ru-RU/README.md)
 
 </div>
 
@@ -16,13 +16,13 @@ Yin-Panel es un panel de navegación ligero y autoalojable para espacios persona
 ## Demostración
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="doc/images/readme-home-dark.jpg">
-  <img alt="Página de inicio de Yin-Panel con grupos de marcadores, estado del sistema y búsqueda" src="doc/images/readme-home-light.jpg">
+  <source media="(prefers-color-scheme: dark)" srcset="../images/readme-home-dark.jpg">
+  <img alt="Página de inicio de Yin-Panel con grupos de marcadores, estado del sistema y búsqueda" src="../images/readme-home-light.jpg">
 </picture>
 
 | Editor de elementos | Gestión de espacios |
 | --- | --- |
-| ![Añadir un marcador con el editor de iconos](doc/images/readme-editor-light.jpg) | ![Gestión de espacios con acceso público e importación/exportación de marcadores](doc/images/readme-spaces-light.jpg) |
+| ![Añadir un marcador con el editor de iconos](../images/readme-editor-light.jpg) | ![Gestión de espacios con acceso público e importación/exportación de marcadores](../images/readme-spaces-light.jpg) |
 
 ## Funciones
 
@@ -196,7 +196,7 @@ Actualización local completa (compilación del frontend, pruebas y compilación
 
 El script usa `backend/` del repositorio como directorio de ejecución de forma predeterminada y requiere un `conf.yaml` local allí; `YIN_PANEL_RUNTIME_DIR` en `.env.local` puede sobrescribirlo. Tras pasar todas las compilaciones y pruebas, detiene solo el listener de Yin-Panel, reemplaza el binario antiguo y los archivos estáticos con `sudo`, y nunca toca la base de datos, las subidas ni los archivos de configuración.
 
-El sistema de temas de la página de inicio está documentado en [`frontend/THEME_SYSTEM.md`](frontend/THEME_SYSTEM.md); cree un tema nuevo con `npm run create:theme -- init "<nombre>"`. Las convenciones completas de desarrollo con IA, publicación y reinicio están en [AGENTS.md](./AGENTS.md).
+El sistema de temas de la página de inicio está documentado en [`frontend/THEME_SYSTEM.md`](../../frontend/THEME_SYSTEM.md); cree un tema nuevo con `npm run create:theme -- init "<nombre>"`. Las convenciones completas de desarrollo con IA, publicación y reinicio están en [AGENTS.md](../../AGENTS.md).
 
 ## Copia de seguridad y actualización
 
@@ -228,4 +228,4 @@ Gracias a todos los autores originales, colaboradores y usuarios.
 
 ## Licencia
 
-Yin-Panel se distribuye bajo la [Business Source License 1.1](./LICENSE): el uso en producción es gratuito para uso personal o para las operaciones internas de su organización. Tres años después de la primera distribución pública de cada versión, esa versión pasa a la licencia AGPL-3.0-or-later.
+Yin-Panel se distribuye bajo la [Business Source License 1.1](../../LICENSE): el uso en producción es gratuito para uso personal o para las operaciones internas de su organización. Tres años después de la primera distribución pública de cada versión, esa versión pasa a la licencia AGPL-3.0-or-later.

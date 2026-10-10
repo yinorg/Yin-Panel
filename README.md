@@ -7,7 +7,7 @@
 [![License: BUSL-1.1](https://img.shields.io/badge/license-BUSL--1.1-brightgreen.svg?style=flat-square)](LICENSE)
 ![Frontend Checks](https://github.com/yinorg/Yin-Panel/workflows/Frontend%20Checks/badge.svg)
 
-**English** | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja-JP.md) | [한국어](README.ko-KR.md) | [Deutsch](README.de-DE.md) | [Français](README.fr-FR.md) | [Español](README.es-ES.md) | [Português (Brasil)](README.pt-BR.md) | [Русский](README.ru-RU.md)
+**English** | [简体中文](docs/zh-CN/README.md) | [繁體中文](docs/zh-TW/README.md) | [日本語](docs/ja-JP/README.md) | [한국어](docs/ko-KR/README.md) | [Deutsch](docs/de-DE/README.md) | [Français](docs/fr-FR/README.md) | [Español](docs/es-ES/README.md) | [Português (Brasil)](docs/pt-BR/README.md) | [Русский](docs/ru-RU/README.md)
 
 </div>
 
@@ -16,13 +16,13 @@ Yin-Panel is a lightweight, self-hostable navigation panel for personal and shar
 ## Demo
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="doc/images/readme-home-dark.jpg">
-  <img alt="Yin-Panel home page with bookmark groups, the system monitor, and search" src="doc/images/readme-home-light.jpg">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/readme-home-dark.jpg">
+  <img alt="Yin-Panel home page with bookmark groups, the system monitor, and search" src="docs/images/readme-home-light.jpg">
 </picture>
 
 | Item editor | Space management |
 | --- | --- |
-| ![Adding a bookmark with the icon editor](doc/images/readme-editor-light.jpg) | ![Space management with public access and bookmark import/export](doc/images/readme-spaces-light.jpg) |
+| ![Adding a bookmark with the icon editor](docs/images/readme-editor-light.jpg) | ![Space management with public access and bookmark import/export](docs/images/readme-spaces-light.jpg) |
 
 ## Features
 

@@ -1,5 +1,5 @@
 <div align="center">
-    <img src="frontend/public/assets/apple-touch-icon.png" alt="Yin-Panel 标识" width="128" height="128">
+    <img src="../../frontend/public/assets/apple-touch-icon.png" alt="Yin-Panel 标识" width="128" height="128">
 
 <h1>Yin-Panel</h1>
 
@@ -7,7 +7,7 @@
 [![许可证：BUSL-1.1](https://img.shields.io/badge/license-BUSL--1.1-brightgreen.svg?style=flat-square)](LICENSE)
 ![前端检查](https://github.com/yinorg/Yin-Panel/workflows/Frontend%20Checks/badge.svg)
 
-[English](README.md) | **简体中文** | [繁體中文](README.zh-TW.md) | [日本語](README.ja-JP.md) | [한국어](README.ko-KR.md) | [Deutsch](README.de-DE.md) | [Français](README.fr-FR.md) | [Español](README.es-ES.md) | [Português (Brasil)](README.pt-BR.md) | [Русский](README.ru-RU.md)
+[English](../../README.md) | **简体中文** | [繁體中文](../zh-TW/README.md) | [日本語](../ja-JP/README.md) | [한국어](../ko-KR/README.md) | [Deutsch](../de-DE/README.md) | [Français](../fr-FR/README.md) | [Español](../es-ES/README.md) | [Português (Brasil)](../pt-BR/README.md) | [Русский](../ru-RU/README.md)
 
 </div>
 
@@ -16,13 +16,13 @@ Yin-Panel 是一个轻量、可自托管的个人与共享空间导航面板，�
 ## 演示
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="doc/images/readme-home-dark.jpg">
-  <img alt="Yin-Panel 首页：书签分组、系统状态与搜索" src="doc/images/readme-home-light.jpg">
+  <source media="(prefers-color-scheme: dark)" srcset="../images/readme-home-dark.jpg">
+  <img alt="Yin-Panel 首页：书签分组、系统状态与搜索" src="../images/readme-home-light.jpg">
 </picture>
 
 | 项目编辑器 | 空间管理 |
 | --- | --- |
-| ![用图标编辑器添加书签](doc/images/readme-editor-light.jpg) | ![空间管理：公开访问与书签导入导出](doc/images/readme-spaces-light.jpg) |
+| ![用图标编辑器添加书签](../images/readme-editor-light.jpg) | ![空间管理：公开访问与书签导入导出](../images/readme-spaces-light.jpg) |
 
 ## 功能
 
@@ -196,7 +196,7 @@ go build ./...
 
 脚本默认将仓库内的 `backend/` 作为运行目录，要求其中存在本地 `conf.yaml`；可通过 `.env.local` 中的 `YIN_PANEL_RUNTIME_DIR` 覆盖。脚本会在构建和测试全部通过后，仅停止 Yin-Panel 监听进程，使用 `sudo` 替换旧二进制与静态文件，不会修改数据库、上传文件或配置文件。
 
-主页主题系统见 [`frontend/THEME_SYSTEM.md`](frontend/THEME_SYSTEM.md)；使用 `npm run create:theme -- init "<名称>"` 可脚手架一个新主题。完整的 AI 开发、发布和重启约定见 [AGENTS.md](./AGENTS.md)。
+主页主题系统见 [`frontend/THEME_SYSTEM.md`](../../frontend/THEME_SYSTEM.md)；使用 `npm run create:theme -- init "<名称>"` 可脚手架一个新主题。完整的 AI 开发、发布和重启约定见 [AGENTS.md](../../AGENTS.md)。
 
 ## 备份与升级
 
@@ -228,4 +228,4 @@ Yin-Panel 基于开源项目 [hslr-s/sun-panel](https://github.com/hslr-s/sun-pa
 
 ## 许可证
 
-Yin-Panel 使用 [Business Source License 1.1](./LICENSE) 授权：个人使用或组织内部业务运营可免费用于生产环境。每个版本首次公开发布三年后，该版本将转为 AGPL-3.0-or-later 许可。
+Yin-Panel 使用 [Business Source License 1.1](../../LICENSE) 授权：个人使用或组织内部业务运营可免费用于生产环境。每个版本首次公开发布三年后，该版本将转为 AGPL-3.0-or-later 许可。

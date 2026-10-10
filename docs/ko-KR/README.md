@@ -1,5 +1,5 @@
 <div align="center">
-    <img src="frontend/public/assets/apple-touch-icon.png" alt="Yin-Panel 로고" width="128" height="128">
+    <img src="../../frontend/public/assets/apple-touch-icon.png" alt="Yin-Panel 로고" width="128" height="128">
 
 <h1>Yin-Panel</h1>
 
@@ -7,7 +7,7 @@
 [![라이선스: BUSL-1.1](https://img.shields.io/badge/license-BUSL--1.1-brightgreen.svg?style=flat-square)](LICENSE)
 ![프런트엔드 검사](https://github.com/yinorg/Yin-Panel/workflows/Frontend%20Checks/badge.svg)
 
-[English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja-JP.md) | **한국어** | [Deutsch](README.de-DE.md) | [Français](README.fr-FR.md) | [Español](README.es-ES.md) | [Português (Brasil)](README.pt-BR.md) | [Русский](README.ru-RU.md)
+[English](../../README.md) | [简体中文](../zh-CN/README.md) | [繁體中文](../zh-TW/README.md) | [日本語](../ja-JP/README.md) | **한국어** | [Deutsch](../de-DE/README.md) | [Français](../fr-FR/README.md) | [Español](../es-ES/README.md) | [Português (Brasil)](../pt-BR/README.md) | [Русский](../ru-RU/README.md)
 
 </div>
 
@@ -16,13 +16,13 @@ Yin-Panel은 개인 및 공유 공간을 위한 가볍고 셀프 호스팅 가�
 ## 데모
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="doc/images/readme-home-dark.jpg">
-  <img alt="Yin-Panel 홈 화면: 북마크 그룹, 시스템 상태, 검색" src="doc/images/readme-home-light.jpg">
+  <source media="(prefers-color-scheme: dark)" srcset="../images/readme-home-dark.jpg">
+  <img alt="Yin-Panel 홈 화면: 북마크 그룹, 시스템 상태, 검색" src="../images/readme-home-light.jpg">
 </picture>
 
 | 항목 편집기 | 공간 관리 |
 | --- | --- |
-| ![아이콘 편집기로 북마크 추가](doc/images/readme-editor-light.jpg) | ![공개 액세스와 북마크 가져오기/내보내기가 있는 공간 관리](doc/images/readme-spaces-light.jpg) |
+| ![아이콘 편집기로 북마크 추가](../images/readme-editor-light.jpg) | ![공개 액세스와 북마크 가져오기/내보내기가 있는 공간 관리](../images/readme-spaces-light.jpg) |
 
 ## 기능
 
@@ -196,7 +196,7 @@ go build ./...
 
 스크립트는 기본적으로 저장소의 `backend/`를 실행 디렉터리로 사용하며 로컬 `conf.yaml`이 필요합니다. `.env.local`의 `YIN_PANEL_RUNTIME_DIR`로 재정의할 수 있습니다. 빌드와 테스트가 모두 통과하면 Yin-Panel 리스너만 중지하고 `sudo`로 이전 바이너리와 정적 파일을 교체하며 데이터베이스, 업로드 파일, 구성 파일은 건드리지 않습니다.
 
-홈 페이지 테마 시스템은 [`frontend/THEME_SYSTEM.md`](frontend/THEME_SYSTEM.md)에 문서화되어 있습니다. `npm run create:theme -- init "<이름>"`으로 새 테마 뼈대를 만들 수 있습니다. AI 개발·릴리스·재시작 규칙은 [AGENTS.md](./AGENTS.md)에 있습니다.
+홈 페이지 테마 시스템은 [`frontend/THEME_SYSTEM.md`](../../frontend/THEME_SYSTEM.md)에 문서화되어 있습니다. `npm run create:theme -- init "<이름>"`으로 새 테마 뼈대를 만들 수 있습니다. AI 개발·릴리스·재시작 규칙은 [AGENTS.md](../../AGENTS.md)에 있습니다.
 
 ## 백업과 업그레이드
 
@@ -228,4 +228,4 @@ Yin-Panel은 오픈 소스 프로젝트 [hslr-s/sun-panel](https://github.com/hs
 
 ## 라이선스
 
-Yin-Panel은 [Business Source License 1.1](./LICENSE)에 따라 라이선스됩니다. 개인 사용 또는 조직의 내부 비즈니스 운영을 위한 프로덕션 사용은 무료입니다. 각 버전은 최초 공개 배포 후 3년이 지나면 AGPL-3.0-or-later 라이선스로 전환됩니다.
+Yin-Panel은 [Business Source License 1.1](../../LICENSE)에 따라 라이선스됩니다. 개인 사용 또는 조직의 내부 비즈니스 운영을 위한 프로덕션 사용은 무료입니다. 각 버전은 최초 공개 배포 후 3년이 지나면 AGPL-3.0-or-later 라이선스로 전환됩니다.
