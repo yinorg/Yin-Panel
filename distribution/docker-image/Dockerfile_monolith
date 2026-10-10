@@ -1,20 +1,30 @@
-FROM alpine:3.19
+FROM alpine:3.22
 
 WORKDIR /app
 
 ARG VERSION
-ENV TZ=Asia/Shanghai
+ARG COMMIT
 
-RUN apk add --no-cache bash curl tzdata && \
-    ln -sf /usr/share/zoneinfo/$TZ /etc/localtime && \
-    echo "$TZ" > /etc/timezone && \
-    mkdir -p /app/lang
+# ca-certificates is required for outbound HTTPS (OAuth, favicon, theme
+# downloads). tzdata is embedded in the binary via `-tags timetzdata`, and
+# busybox wget (already in the base) powers the healthcheck, so neither the
+# tzdata package nor curl is needed.
+RUN apk add --no-cache ca-certificates
 
 COPY build-output/yin-panel /app/yin-panel
 COPY backend/web /app/web
 COPY backend/lang /app/lang
 COPY backend/conf.yaml.example /app/conf.yaml
 
+ENV TZ=Asia/Shanghai
+
+LABEL org.opencontainers.image.title="Yin-Panel" \
+      org.opencontainers.image.version=$VERSION \
+      org.opencontainers.image.revision=$COMMIT
+
 EXPOSE 3002
-RUN chmod +x /app/yin-panel
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD wget -q -O /dev/null http://127.0.0.1:3002/ || exit 1
+
 CMD ["/app/yin-panel"]

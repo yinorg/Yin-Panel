@@ -17,6 +17,8 @@ func NewAboutRouter() *AboutRouter {
 func (a *AboutRouter) Get(c *gin.Context) {
 	response.SuccessData(c, gin.H{
 		"versionName": global.VERSION,
+		"commit":      global.COMMIT,
+		"buildTime":   global.BUILD_TIME,
 	})
 }
 

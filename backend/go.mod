@@ -2,6 +2,8 @@ module github.com/yinorg/Yin-Panel/backend
 
 go 1.27.1
 
+toolchain go1.27.2
+
 require (
 	github.com/PuerkitoBio/goquery v1.13.0
 	github.com/gin-gonic/gin v1.12.0

@@ -4,3 +4,13 @@ frontend
 .idea
 .vscode
 .github
+
+# Local runtime data and secrets must never enter the build context.
+backend/conf.yaml
+backend/database
+backend/uploads
+backend/logs
+backend/backup
+backend/yin-panel
+backend/*.log
+backend/*.zaplog

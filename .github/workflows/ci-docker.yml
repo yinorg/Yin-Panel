@@ -44,6 +44,30 @@ jobs:
           path: backend/web
           retention-days: 1
 
+  backend-check:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: '1.27.2'
+          cache: true
+          cache-dependency-path: backend/go.sum
+      - name: Verify modules
+        working-directory: backend
+        run: go mod verify
+      - name: Vet
+        working-directory: backend
+        run: go vet ./...
+      - name: Test
+        working-directory: backend
+        run: go test ./...
+      - name: Vulnerability scan
+        working-directory: backend
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
   backend:
     strategy:
       matrix:
@@ -59,7 +83,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v7
         with:
-          go-version: '1.27.1'
+          go-version: '1.27.2'
           cache: true
           cache-dependency-path: backend/go.sum
       - name: Install musl compiler
@@ -72,10 +96,12 @@ jobs:
           GOOS: linux
           GOARCH: ${{ matrix.arch }}
           VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          COMMIT: ${{ github.sha }}
         run: |
           mkdir -p ../build-output
-          go build -o ../build-output/yin-panel \
-            -ldflags="-X github.com/yinorg/Yin-Panel/backend/internal/global.RUNCODE=release -X github.com/yinorg/Yin-Panel/backend/internal/global.VERSION=${VERSION}" \
+          BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          go build -trimpath -buildvcs=true -tags timetzdata -o ../build-output/yin-panel \
+            -ldflags="-s -w -X github.com/yinorg/Yin-Panel/backend/internal/global.RUNCODE=release -X github.com/yinorg/Yin-Panel/backend/internal/global.VERSION=${VERSION} -X github.com/yinorg/Yin-Panel/backend/internal/global.COMMIT=${COMMIT} -X github.com/yinorg/Yin-Panel/backend/internal/global.BUILD_TIME=${BUILD_TIME}" \
             main.go
 
       - name: Upload backend build
@@ -124,9 +150,12 @@ jobs:
           file: ./distribution/docker-image/Dockerfile_monolith
           platforms: linux/${{ matrix.arch }}
           push: true
+          provenance: mode=max
+          sbom: true
           outputs: type=image,name=ghcr.io/yinorg/yin-panel-ce,push-by-digest=true,name-canonical=false,push=true
           build-args: |
             VERSION=${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+            COMMIT=${{ github.sha }}
       - name: Save image digest
         run: echo "${{ steps.build-image.outputs.digest }}" > digest
       - name: Upload image digest

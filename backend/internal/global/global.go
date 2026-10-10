@@ -12,8 +12,10 @@ import (
 
 // 构建时，通过 --ldflags 注入
 var (
-	RUNCODE = "debug" // 运行模式：debug | release
-	VERSION = "v0.4.0"
+	RUNCODE    = "debug"   // 运行模式：debug | release
+	VERSION    = "v0.4.0"  // 语义化版本
+	COMMIT     = "unknown" // 构建注入：Git commit
+	BUILD_TIME = "unknown" // 构建注入：构建时间（RFC3339, UTC）
 )
 
 var (
