@@ -83,7 +83,7 @@ async function handleUpload({ file, onFinish, onError }: UploadCustomRequestOpti
   <div>
     <div class="mb-[10px]">
       <NRadio :checked="itemIconInfo.itemType === 4" :value="4" name="iconType" @change="handleIconTypeRadioChange(4)">
-        自动
+        {{ $t('iconItem.auto') }}
       </NRadio>
       <NRadio
         :checked="itemIconInfo.itemType === 1 "
