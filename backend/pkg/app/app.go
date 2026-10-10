@@ -75,6 +75,16 @@ func databaseConnect() error {
 		return fmt.Errorf("database initialization: %w", err)
 	}
 	repository.Db = db
+	if config.AppConfig.Base.DatabaseDrive == database.SQLITE {
+		// Migrations have already run on the single writer; now split reads
+		// onto a read-only pool. A negative size disables the split; failure is
+		// non-fatal so the service keeps the single writer pool.
+		if size := config.AppConfig.SQLite.ReadPoolSize; size >= 0 {
+			if err = database.EnableSQLiteReadPool(db, config.AppConfig.SQLite.FilePath, size); err != nil {
+				zaplog.Logger.Warnf("sqlite read pool disabled, using a single connection: %v", err)
+			}
+		}
+	}
 	if err = database.CreateDefaultUser(); err != nil {
 		return fmt.Errorf("create default user: %w", err)
 	}

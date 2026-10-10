@@ -20,6 +20,10 @@ base:
 # SQLite configuration (valid when database_drive=sqlite)
 sqlite:
   file_path: ./database/database.db
+  # Read-only connection pool for non-transactional SELECTs. Reads run in
+  # parallel with the single writer instead of waiting behind it. Default: 4.
+  # Set -1 to disable. Writes, migrations and PRAGMA always stay on the writer.
+  read_pool_size: 4
 
 # MySQL configuration (valid when database_drive=mysql)
 mysql:

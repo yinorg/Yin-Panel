@@ -43,6 +43,11 @@ type BaseConfig struct {
 // SQLiteConfig represents the sqlite section configuration
 type SQLiteConfig struct {
 	FilePath string `yaml:"file_path"`
+	// ReadPoolSize opens a read-only connection pool for non-transactional
+	// SELECTs so reads run in parallel with the single writer instead of being
+	// serialized behind it. Defaults to 4 when unset; set -1 to disable the
+	// pool entirely (reads and writes share the single writer connection).
+	ReadPoolSize int `yaml:"read_pool_size"`
 }
 
 // MySQLConfig represents the mysql section configuration
