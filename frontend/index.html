@@ -24,35 +24,278 @@
 	<meta content="yes" name="mobile-web-app-capable"/>
 	<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 	<title>Yin-Panel</title>
+
+	<!--
+		The pre-bundle boot layer.
+
+		It lives outside `#app`, so Vue's mount cannot clear it, and the shell
+		removes it (`useBootOverlay`) once the theme — or the C3 fallback — has
+		painted. Without it the first frames fall through to the Core's default
+		light canvas, which flashed a white page and a white space-selector pill
+		before the theme's own colours arrived.
+
+		Foreground and background always come from the same scheme, so the brand is
+		never white-on-white. The scheme and palette are the theme's own when a
+		previous load left a snapshot (`yinBootSnapshot`), otherwise the stored
+		preference plus the OS. It sits below Naive's modal layer (2000+) and above
+		every Core chrome surface.
+	-->
+	<style>
+		:root {
+			--boot-canvas: #f4f7f8;
+			--boot-bg: #f4f7f8;
+			--boot-fg: #20282c;
+			--boot-fg-muted: #64737a;
+			--boot-accent: #176b80;
+		}
+		:root[data-yin-boot-scheme='dark'] {
+			--boot-canvas: #171d20;
+			--boot-bg: #171d20;
+			--boot-fg: #f2f5f6;
+			--boot-fg-muted: #b7c1c4;
+			--boot-accent: #78c5d4;
+		}
+
+		body { background-color: var(--boot-bg); }
+
+		#yin-boot {
+			position: fixed;
+			inset: 0;
+			z-index: 1900;
+			display: grid;
+			place-items: center;
+			background: var(--boot-bg);
+			color: var(--boot-fg);
+			transition: opacity 240ms ease, transform 240ms ease;
+		}
+		#yin-boot.yin-boot--leaving { opacity: 0; transform: scale(1.02); pointer-events: none; }
+
+		/* The canvas treatment is always painted, so the wallpaper version keeps the
+		   same framing (bright centre, dimmed edges) and the two never read as
+		   different screens — the wallpaper is an extra layer over the same design,
+		   not a second design. */
+		.yin-boot-backdrop {
+			position: absolute;
+			inset: 0;
+			background: radial-gradient(120% 90% at 50% 42%, color-mix(in srgb, var(--boot-canvas) 92%, #fff) 0%, var(--boot-canvas) 55%, color-mix(in srgb, var(--boot-canvas) 86%, #000) 100%);
+		}
+		.yin-boot-wallpaper {
+			position: absolute;
+			inset: 0;
+			background-image: var(--boot-wallpaper);
+			background-position: center;
+			background-size: cover;
+			filter: blur(40px) saturate(1.05);
+			transform: scale(1.15);
+			opacity: 0;
+		}
+		:root[data-yin-boot-variant='wallpaper'] .yin-boot-wallpaper { opacity: 1; }
+		.yin-boot-veil { position: absolute; inset: 0; opacity: 0; }
+		:root[data-yin-boot-variant='wallpaper'] .yin-boot-veil {
+			opacity: 1;
+			/* A scrim for legibility, plus the same vignette tinted with the theme's own
+			   canvas, so the photo reads as this theme's backdrop rather than a stock
+			   image dropped behind the logo. */
+			background:
+				radial-gradient(120% 90% at 50% 42%, rgb(0 0 0 / 16%) 0%, rgb(0 0 0 / 58%) 100%),
+				color-mix(in srgb, var(--boot-canvas) 18%, transparent);
+		}
+
+		.yin-boot-stage { position: relative; z-index: 1; display: grid; justify-items: center; gap: 20px; padding: 24px; }
+
+		/* The mark is the identity; the arc is the loading signal. Only the arc
+		   moves fast enough to read as "working" — the disc turns slowly and the
+		   whole mark breathes so the screen never looks frozen. */
+		.yin-boot-mark {
+			position: relative;
+			width: clamp(72px, 12vw, 104px);
+			aspect-ratio: 1;
+			display: grid;
+			place-items: center;
+			animation: yin-boot-breathe 2.6s ease-in-out infinite;
+		}
+		.yin-boot-ring { position: absolute; inset: 0; border: 1px solid color-mix(in srgb, var(--boot-fg) 20%, transparent); border-radius: 50%; }
+		.yin-boot-arc {
+			position: absolute;
+			inset: 0;
+			border-radius: 50%;
+			background: conic-gradient(from 0deg, transparent 0deg, transparent 280deg, var(--boot-accent) 356deg, transparent 360deg);
+			-webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px));
+			mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px));
+			animation: yin-boot-spin 1.1s linear infinite;
+		}
+		.yin-boot-bagua { position: absolute; inset: 0; border-radius: 50%; }
+		.yin-boot-bagua i {
+			position: absolute;
+			top: 50%;
+			left: 50%;
+			width: 15%;
+			height: 2px;
+			transform: rotate(calc(var(--i) * 45deg)) translateX(262%);
+			transform-origin: left center;
+			background: color-mix(in srgb, var(--boot-fg) 38%, transparent);
+		}
+		.yin-boot-bagua i:nth-child(1) { --i: 0; }
+		.yin-boot-bagua i:nth-child(2) { --i: 1; }
+		.yin-boot-bagua i:nth-child(3) { --i: 2; }
+		.yin-boot-bagua i:nth-child(4) { --i: 3; }
+		.yin-boot-bagua i:nth-child(5) { --i: 4; }
+		.yin-boot-bagua i:nth-child(6) { --i: 5; }
+		.yin-boot-bagua i:nth-child(7) { --i: 6; }
+		.yin-boot-bagua i:nth-child(8) { --i: 7; }
+		.yin-boot-taiji {
+			position: relative;
+			width: 46%;
+			aspect-ratio: 1;
+			overflow: hidden;
+			border-radius: 50%;
+			background: linear-gradient(90deg, var(--boot-fg) 0 50%, var(--boot-bg) 50%);
+			box-shadow: 0 0 18px color-mix(in srgb, var(--boot-accent) 45%, transparent);
+			animation: yin-boot-spin 8s linear infinite;
+		}
+		.yin-boot-taiji i { position: absolute; border-radius: 50%; }
+		.yin-boot-taiji-up { top: 0; left: 25%; width: 50%; height: 50%; background: var(--boot-bg); }
+		.yin-boot-taiji-down { bottom: 0; left: 25%; width: 50%; height: 50%; background: var(--boot-fg); }
+		.yin-boot-taiji-dot-up { top: 25%; left: 44%; width: 12%; aspect-ratio: 1; background: var(--boot-fg); }
+		.yin-boot-taiji-dot-down { bottom: 25%; left: 44%; width: 12%; aspect-ratio: 1; background: var(--boot-bg); }
+
+		.yin-boot-brand { font: 600 clamp(1rem, 2.2vw, 1.35rem)/1.3 system-ui, sans-serif; letter-spacing: .14em; color: var(--boot-fg); }
+		.yin-boot-status { font: 400 12px/1.4 system-ui, sans-serif; letter-spacing: .04em; color: var(--boot-fg-muted); }
+		.yin-boot-progress { width: clamp(140px, 26vw, 220px); height: 2px; overflow: hidden; border-radius: 2px; background: color-mix(in srgb, var(--boot-fg) 14%, transparent); }
+		.yin-boot-progress span { display: block; width: 12%; height: 100%; border-radius: inherit; background: var(--boot-accent); transition: width 220ms cubic-bezier(0.2, 0, 0, 1); }
+
+		@keyframes yin-boot-spin { to { transform: rotate(360deg); } }
+		@keyframes yin-boot-breathe {
+			0%, 100% { opacity: .85; transform: scale(.97); }
+			50% { opacity: 1; transform: scale(1); }
+		}
+
+		/* Reduced motion keeps the real progress bar and the status copy, so the
+		   screen still reads as "loading" without any rotation. */
+		@media (prefers-reduced-motion: reduce) {
+			.yin-boot-mark, .yin-boot-arc, .yin-boot-taiji { animation: none; }
+			#yin-boot { transition: none; }
+		}
+	</style>
+	<noscript><style>#yin-boot { display: none; }</style></noscript>
+
+	<!--
+		Runs before the body is parsed, so the very first paint already carries the
+		right scheme and variant (no one-frame flash of the wrong palette). The
+		status copy and the brand text are filled in after the markup exists.
+
+		`?boot=taiji|wallpaper` forces a variant for comparison, `?bootHold=<ms>`
+		keeps the layer up so the design can be reviewed (capped, click dismisses).
+	-->
+	<script>
+		(function () {
+			try {
+				var root = document.documentElement
+				var params = new URLSearchParams(window.location.search)
+				var read = function (key) {
+					try { return JSON.parse(window.localStorage.getItem(key) || 'null') } catch (error) { return null }
+				}
+				var settings = (read('appSetting') || {}).data || {}
+				var panel = ((read('panelStorage') || {}).data || {}).panelConfig || {}
+				var snapshot = read('yinBootSnapshot') || {}
+
+				var scheme = snapshot.scheme === 'dark' || snapshot.scheme === 'light'
+					? snapshot.scheme
+					: settings.theme === 'dark' ? 'dark'
+						: settings.theme === 'light' ? 'light'
+							: window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+				root.dataset.yinBootScheme = scheme
+				if (snapshot.canvas) {
+					root.style.setProperty('--boot-canvas', snapshot.canvas)
+					root.style.setProperty('--boot-bg', snapshot.canvas)
+				}
+				if (snapshot.primary) root.style.setProperty('--boot-accent', snapshot.primary)
+
+				// The boot layer can only paint a still, and a GIF frame would look like
+				// a broken home rather than a loading screen.
+				var source = panel.wallpaperMode === 'none' ? '' : panel.wallpaperSource || panel.backgroundImageSrc || ''
+				if (/\.gif(?:[?#]|$)/i.test(source)) source = ''
+
+				var requested = params.get('boot')
+				var variant = requested === 'taiji' || requested === 'wallpaper'
+					? requested
+					: source ? 'wallpaper' : 'taiji'
+				if (variant === 'wallpaper' && !source) variant = 'taiji'
+				root.dataset.yinBootVariant = variant
+
+				if (variant === 'wallpaper') {
+					// The scrim is always dark, so the copy follows the dark scheme whatever
+					// the theme's own is — veiling a photo with the light canvas washes it out
+					// and leaves the brand unreadable. The accent follows the same logic.
+					root.style.setProperty('--boot-bg', '#171d20')
+					root.style.setProperty('--boot-fg', '#f2f5f6')
+					root.style.setProperty('--boot-fg-muted', '#cdd6d9')
+					root.style.setProperty('--boot-accent', '#78c5d4')
+					root.style.setProperty('--boot-wallpaper', 'url(' + JSON.stringify(source) + ')')
+				}
+				else {
+					if (snapshot.text) root.style.setProperty('--boot-fg', snapshot.text)
+					if (snapshot.muted) root.style.setProperty('--boot-fg-muted', snapshot.muted)
+				}
+
+				window.__yinBootStart = performance.now()
+				// `?bootHold` pins the layer for review. A pointer press retires it
+				// immediately, so the cap only bounds how long an untouched screen can
+				// stay covered.
+				var hold = Math.min(Math.max(Number(params.get('bootHold')) || 0, 0), 60000)
+				if (hold > 0) window.__yinBootHold = hold
+			}
+			catch (error) { /* the neutral defaults stay */ }
+		})()
+	</script>
 </head>
 
 <body class="dark:bg-black">
-	<div id="app">
-		<style>
-			.loading-wrap {
-				display: flex;
-				justify-content: center;
-				align-items: center;
-				height: 100vh;
-				color: #fff;
-				background: #363636;
-			}
-
-			.initial-brand {
-				font: 700 clamp(1.35rem, 5vw, 3.75rem)/1.2 system-ui, sans-serif;
-				text-shadow: 2px 2px 50px #000;
-			}
-
-			@media (prefers-color-scheme: dark) {
-				body {
-					background: #121212;
-				}
-			}
-		</style>
-		<div class="loading-wrap">
-			<div class="initial-brand" data-lcp="brand">Yin-Panel</div>
+	<div id="yin-boot" role="status" aria-live="polite">
+		<div class="yin-boot-backdrop" aria-hidden="true"></div>
+		<div class="yin-boot-wallpaper" aria-hidden="true"></div>
+		<div class="yin-boot-veil" aria-hidden="true"></div>
+		<div class="yin-boot-stage">
+			<div class="yin-boot-mark" aria-hidden="true">
+				<span class="yin-boot-ring"></span>
+				<span class="yin-boot-arc"></span>
+				<span class="yin-boot-bagua"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+				<span class="yin-boot-taiji">
+					<i class="yin-boot-taiji-up"></i>
+					<i class="yin-boot-taiji-down"></i>
+					<i class="yin-boot-taiji-dot-up"></i>
+					<i class="yin-boot-taiji-dot-down"></i>
+				</span>
+			</div>
+			<div class="yin-boot-brand" data-lcp="brand">Yin-Panel</div>
+			<div class="yin-boot-status" data-boot-status>Loading…</div>
+			<div class="yin-boot-progress"><span data-boot-bar></span></div>
 		</div>
 	</div>
+	<div id="app"></div>
+	<script>
+		(function () {
+			try {
+				var read = function (key) {
+					try { return JSON.parse(window.localStorage.getItem(key) || 'null') } catch (error) { return null }
+				}
+				var settings = (read('appSetting') || {}).data || {}
+				var panel = ((read('panelStorage') || {}).data || {}).panelConfig || {}
+
+				var language = String(settings.language && settings.language !== 'auto' ? settings.language : navigator.language || 'en').toLowerCase()
+				var copy = { zh: '正在加载…', ja: '読み込み中…', ko: '불러오는 중…', de: 'Wird geladen…', fr: 'Chargement…', es: 'Cargando…', pt: 'Carregando…', ru: 'Загрузка…' }
+				var status = copy[language.slice(0, 2)] || 'Loading…'
+				var statusNode = document.querySelector('[data-boot-status]')
+				if (statusNode) statusNode.textContent = status
+
+				if (panel.logoText) {
+					var brandNode = document.querySelector('.yin-boot-brand')
+					if (brandNode) brandNode.textContent = panel.logoText
+				}
+			}
+			catch (error) { /* keep the defaults */ }
+		})()
+	</script>
 	<script type="module" src="/src/main.ts"></script>
 </body>
 

@@ -114,6 +114,29 @@ export function useThemeRuntime(input: {
     return !!revision && themeRuntimeGrant.value.revision === revision && themeRuntimeGrant.value.executionMode === themeExecutionMode.value && themeRuntimeGrant.value.granted && themeRequiredPermissions.value.every(permission => themeRuntimeGrant.value.permissions.includes(permission))
   })
 
+  /** Hold the first mount until the grant has settled.
+   *
+   *  The theme host keys its runtime on the permission set, and starts a second
+   *  runtime when that set changes. Mounting before the grant resolves therefore
+   *  runs the theme twice — two script fetches, two stylesheet rewrites, two
+   *  `setup()` runs — which is pure latency before the first paint. Waiting for the
+   *  grant costs one round trip and removes the duplicate.
+   *
+   *  Only the cases that actually expect a grant wait: a public link has no user to
+   *  grant anything, and preview/safe-mode resolve a package directly. The timeout
+   *  keeps a slow or hung grant from blocking the mount forever — past it the theme
+   *  starts read-only, exactly as it would have without the wait. */
+  const themePreparingExpired = ref(false)
+  let themePreparingTimer: ReturnType<typeof setTimeout> | undefined
+  watch(themeRuntimeGrantLoading, (loading) => {
+    if (themePreparingTimer) { clearTimeout(themePreparingTimer); themePreparingTimer = undefined }
+    themePreparingExpired.value = false
+    if (loading)
+      themePreparingTimer = setTimeout(() => { themePreparingExpired.value = true }, 1500)
+  }, { immediate: true })
+  const themeRuntimePreparing = computed(() => themeRuntimeGrantLoading.value && !themePreparingExpired.value && !themeGrantMatches.value
+    && !!authStore.loggedIn && !input.publicCode && !input.previewTheme)
+
   /** Whether the theme may render at all.
    *
    *  `trusted` runs in the page's own origin, so it keeps the full grant
@@ -127,6 +150,8 @@ export function useThemeRuntime(input: {
    *  grant-free theme is strictly read-only. */
   const themeRuntimeAuthorized = computed(() => themeExecutionMode.value === 'sandbox' || themeGrantMatches.value)
   const themeRuntimeActive = computed(() => input.homeReady.value && !themeSafeMode.value && themeHomeContribution.value && themeRuntimeAuthorized.value && !themeRuntimeFailed.value
+    // Wait for the grant so the theme mounts once, with its real permission set.
+    && !themeRuntimePreparing.value
     // A public link may still be waiting on the access-code prompt; the Core has
     // not decided the visitor may see anything yet, so do not mount the theme.
     && (!input.publicCode || input.publicAccessReady.value))
@@ -408,6 +433,7 @@ export function useThemeRuntime(input: {
   onUnmounted(() => {
     if (trustedPolicyPollTimer) clearInterval(trustedPolicyPollTimer)
     if (trustedThemeRestoreTimer) clearTimeout(trustedThemeRestoreTimer)
+    if (themePreparingTimer) clearTimeout(themePreparingTimer)
   })
 
   return {

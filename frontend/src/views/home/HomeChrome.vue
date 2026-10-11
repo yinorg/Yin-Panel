@@ -7,6 +7,7 @@ import WallpaperLayer from './components/WallpaperLayer.vue'
 import HomeFallback from './components/HomeFallback.vue'
 import ThemeHost from '@/theme/runtime/ThemeHost.vue'
 import type { useHomeShell } from '@/core/home/useHomeShell'
+import { useBootOverlay } from '@/core/home/useBootOverlay'
 // Shell chrome styles live beside the host rather than inline. See that file's
 // header for the scoping note.
 import './home-shell.css'
@@ -22,12 +23,27 @@ type Shell = ReturnType<typeof useHomeShell>
  * props rather than one object so each section's dependencies are legible; nothing
  * here reaches into a store or a composable directly.
  */
-defineProps<{
+const props = defineProps<{
   theme: Shell['theme']
   home: Shell['home']
   dialogs: Shell['dialogs']
   commands: Shell['commands']
 }>()
+
+// Retire the pre-bundle boot layer once the home can actually paint: the theme
+// host has rendered, or the Core has decided it never will (fallback), or a modal
+// must take focus first. The layer also self-dismisses on a timeout, so a slow or
+// stuck theme can never leave the app unreachable.
+useBootOverlay({
+  dataReady: () => props.home.homeReady,
+  themeResolved: () => !!props.theme.themeRuntimePackage,
+  themeReady: () => props.theme.themeRuntimeReady > 0,
+  fallbackVisible: () => props.theme.homeFallbackVisible,
+  offlineUnavailable: () => props.home.offlineUnavailable,
+  modalPending: () => props.dialogs.themeRuntimeNeedsConsent
+    || props.dialogs.themeRuntimeConsentVisible
+    || (!!props.home.publicCode && !props.home.publicAccessReady),
+})
 
 const SystemMonitor = defineAsyncComponent(() => import('@/components/deskModule/SystemMonitor/index.vue'))
 const AppStarter = defineAsyncComponent(() => import('./components/AppStarter/index.vue'))
@@ -114,7 +130,7 @@ const themeSurfaceRoute = computed(() => route.name === 'themeSurface')
     <WallpaperLayer v-if="home.homeReady" />
     <ThemeHost
       v-if="theme.themeRuntimeActive && theme.themeRuntimePackage"
-      :key="`${theme.themeRuntimePackage.revision}:${theme.themeExecutionMode}:${theme.themeRuntimeGrant.permissions.join(',')}`"
+      :key="`${theme.themeRuntimePackage.revision}:${theme.themeExecutionMode}`"
       class="theme-home-host"
       :ref="theme.setThemeHostElement"
       :theme="theme.themeRuntimePackage"

@@ -26,6 +26,35 @@ const previewToken = new URLSearchParams(window.location.search).get('themePrevi
 const previewMode = new URLSearchParams(window.location.search).get('themePreviewMode')
 let appliedSlots: string[] = []
 let fontStyle: HTMLStyleElement | null = null
+let prefetchedThemeRevision = ''
+
+/**
+ * Where the resolved palette is cached for the next page load.
+ *
+ * The boot layer in `index.html` runs before the bundle and cannot ask the theme
+ * for its colours, so it reads this snapshot instead of guessing from the OS
+ * preference — that is what removes the tone jump between the boot screen and the
+ * home. A blocked or full `localStorage` only costs the exact match.
+ */
+const BOOT_SNAPSHOT_KEY = 'yinBootSnapshot'
+
+function persistBootSnapshot(scheme: string, slots: Record<string, string>) {
+  try {
+    const canvas = slots.canvas || ''
+    if (!canvas)
+      return
+    window.localStorage.setItem(BOOT_SNAPSHOT_KEY, JSON.stringify({
+      scheme,
+      canvas,
+      text: slots.text || '',
+      muted: slots.textMuted || '',
+      primary: slots.primary || '',
+    }))
+  }
+  catch {
+    // Keep whatever snapshot is already stored.
+  }
+}
 
 function toNaiveDimension(value: string | undefined, fallback: string): string {
   if (!value) return fallback
@@ -115,6 +144,39 @@ function initializeTheme(appStore: ReturnType<typeof useAppStore>, loggedIn: boo
     })
   }
   return themeLoad
+}
+
+/**
+ * Warm the HTTP cache for the theme's own entry assets.
+ *
+ * They are revision-addressed and served `immutable` (see `AssetV2`), so requesting
+ * them as soon as the package resolves overlaps the network with the grant round
+ * trip that has to finish before the host would otherwise ask for them; the host's
+ * own `fetch` then resolves from cache. Fire-and-forget: a failure here changes
+ * nothing, because the host still loads and verifies every resource itself.
+ */
+function prefetchThemeEntrypoints(pkg: ThemePackage | null) {
+  if (!pkg)
+    return
+  // The package ref is reassigned by each resolver (`current`, then `mine`,
+  // then the per-space `effective`), so dedupe on the revision the assets carry.
+  const revision = pkg.revision || ''
+  if (revision && revision === prefetchedThemeRevision)
+    return
+  prefetchedThemeRevision = revision
+  const urls = new Set<string>()
+  const collect = (path?: string) => {
+    if (!path)
+      return
+    const resource = pkg.manifest.resources?.find(item => item.path === path)
+    if (resource?.url)
+      urls.add(new URL(resource.url, window.location.origin).href)
+  }
+  collect(pkg.manifest.entrypoints?.script)
+  for (const style of pkg.manifest.entrypoints?.styles || [])
+    collect(style)
+  for (const url of urls)
+    void fetch(url, { credentials: 'omit', redirect: 'error' }).catch(() => {})
 }
 
 export function useTheme() {
@@ -215,9 +277,14 @@ export function useTheme() {
     const pkg = activeThemePackage.value
     if (!pkg) return
     try {
+      // Resolve into locals first: reading the refs back after writing them would
+      // make this effect depend on its own output and re-run forever.
+      const slots = resolveThemeSlots(pkg, selectedScheme.value)
+      const wallpaper = resolveWallpaper(pkg, selectedScheme.value)
       activeThemePackageId.value = pkg.manifest.id
-      activeThemeSlots.value = resolveThemeSlots(pkg, selectedScheme.value)
-      activeThemeWallpaper.value = resolveWallpaper(pkg, selectedScheme.value)
+      activeThemeSlots.value = slots
+      activeThemeWallpaper.value = wallpaper
+      persistBootSnapshot(selectedScheme.value, slots)
     }
     catch {
       activeThemeSlots.value = {}
@@ -261,6 +328,7 @@ export function useTheme() {
       fontStyle.textContent += `@font-face { font-family: ${JSON.stringify(font.family)}; src: url(${JSON.stringify(url)}) format('woff2'); font-weight: ${font.weight}; font-style: ${font.style}; font-display: swap; }`
     }
     document.head.appendChild(fontStyle)
+    prefetchThemeEntrypoints(pkg)
   }, { immediate: true })
 
   watch(
