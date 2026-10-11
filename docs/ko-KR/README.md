@@ -4,10 +4,10 @@
 <h1>Yin-Panel</h1>
 
 [![최신 릴리스](https://img.shields.io/github/v/release/yinorg/Yin-Panel?style=flat-square)](https://github.com/yinorg/Yin-Panel/releases)
-[![라이선스: BUSL-1.1](https://img.shields.io/badge/license-BUSL--1.1-brightgreen.svg?style=flat-square)](LICENSE)
+[![라이선스: BUSL-1.1](https://img.shields.io/badge/license-BUSL--1.1-brightgreen.svg?style=flat-square)](../../LICENSE)
 ![프런트엔드 검사](https://github.com/yinorg/Yin-Panel/workflows/Frontend%20Checks/badge.svg)
 
-[English](../../README.md) | [简体中文](../zh-CN/README.md) | [繁體中文](../zh-TW/README.md) | [日本語](../ja-JP/README.md) | **한국어** | [Deutsch](../de-DE/README.md) | [Français](../fr-FR/README.md) | [Español](../es-ES/README.md) | [Português (Brasil)](../pt-BR/README.md) | [Русский](../ru-RU/README.md)
+[English](../../README.md) | [简体中文](../zh-CN/README.md) | [繁體中文](../zh-TW/README.md) | [日本語](../ja-JP/README.md) | **한국어** | [Deutsch](../de-DE/README.md) | [Français](../fr-FR/README.md) | [Español](../es-ES/README.md) | [Português (Brasil)](../pt-BR/README.md) | [Русский](../ru-RU/README.md) | [Bahasa Indonesia](../id-ID/README.md) | [Türkçe](../tr-TR/README.md) | [Polski](../pl-PL/README.md) | [Italiano](../it-IT/README.md) | [Nederlands](../nl-NL/README.md) | [हिन्दी](../hi-IN/README.md) | [ไทย](../th-TH/README.md)
 
 </div>
 
@@ -33,7 +33,7 @@ Yin-Panel은 개인 및 공유 공간을 위한 가볍고 셀프 호스팅 가�
 - 공간 멤버 역할: 관리자, 편집자, 뷰어
 - OAuth 2.0 / OIDC 로그인, 계정 연결, OIDC 그룹 권한 부여
 - 이메일을 로그인 계정으로 사용하고 닉네임은 별도로 관리
-- 사용자 지정 아이콘, 설치 가능한 테마 패키지, 10개 UI 언어, 배경 화면, WAN/LAN 및 모바일 URL 모드, 페이지 내 팝업 열기
+- 사용자 지정 아이콘, 설치 가능한 테마 패키지, 17개 UI 언어, 배경 화면, WAN/LAN 및 모바일 URL 모드, 페이지 내 팝업 열기
 - SQLite, MySQL, MariaDB, PostgreSQL 스토리지, amd64/arm64 Docker 이미지, Kubernetes용 Helm 차트
 
 ## 빠른 시작

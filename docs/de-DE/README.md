@@ -4,10 +4,10 @@
 <h1>Yin-Panel</h1>
 
 [![Neuestes Release](https://img.shields.io/github/v/release/yinorg/Yin-Panel?style=flat-square)](https://github.com/yinorg/Yin-Panel/releases)
-[![Lizenz: BUSL-1.1](https://img.shields.io/badge/license-BUSL--1.1-brightgreen.svg?style=flat-square)](LICENSE)
+[![Lizenz: BUSL-1.1](https://img.shields.io/badge/license-BUSL--1.1-brightgreen.svg?style=flat-square)](../../LICENSE)
 ![Frontend-Prüfungen](https://github.com/yinorg/Yin-Panel/workflows/Frontend%20Checks/badge.svg)
 
-[English](../../README.md) | [简体中文](../zh-CN/README.md) | [繁體中文](../zh-TW/README.md) | [日本語](../ja-JP/README.md) | [한국어](../ko-KR/README.md) | **Deutsch** | [Français](../fr-FR/README.md) | [Español](../es-ES/README.md) | [Português (Brasil)](../pt-BR/README.md) | [Русский](../ru-RU/README.md)
+[English](../../README.md) | [简体中文](../zh-CN/README.md) | [繁體中文](../zh-TW/README.md) | [日本語](../ja-JP/README.md) | [한국어](../ko-KR/README.md) | **Deutsch** | [Français](../fr-FR/README.md) | [Español](../es-ES/README.md) | [Português (Brasil)](../pt-BR/README.md) | [Русский](../ru-RU/README.md) | [Bahasa Indonesia](../id-ID/README.md) | [Türkçe](../tr-TR/README.md) | [Polski](../pl-PL/README.md) | [Italiano](../it-IT/README.md) | [Nederlands](../nl-NL/README.md) | [हिन्दी](../hi-IN/README.md) | [ไทย](../th-TH/README.md)
 
 </div>
 
@@ -33,7 +33,7 @@ Yin-Panel ist ein leichtgewichtiges, selbst hostbares Navigationspanel für pers
 - Bereichsmitglieder mit den Rollen Administrator, Bearbeiter und Betrachter
 - OAuth 2.0-/OIDC-Anmeldung, Kontoverknüpfung und OIDC-Gruppenautorisierung
 - E-Mail als Anmeldekonto, Nickname separat gepflegt
-- Eigene Symbole, installierbare Theme-Pakete, 10 UI-Sprachen, Hintergründe, WAN/LAN- und Mobil-URL-Modus, Pop-up-Fenster innerhalb der Seite
+- Eigene Symbole, installierbare Theme-Pakete, 17 UI-Sprachen, Hintergründe, WAN/LAN- und Mobil-URL-Modus, Pop-up-Fenster innerhalb der Seite
 - SQLite-, MySQL-, MariaDB- oder PostgreSQL-Speicher, Docker-Images für amd64 und arm64 und ein Helm-Chart für Kubernetes
 
 ## Schnellstart

@@ -4,10 +4,10 @@
 <h1>Yin-Panel</h1>
 
 [![Dernière version](https://img.shields.io/github/v/release/yinorg/Yin-Panel?style=flat-square)](https://github.com/yinorg/Yin-Panel/releases)
-[![Licence : BUSL-1.1](https://img.shields.io/badge/license-BUSL--1.1-brightgreen.svg?style=flat-square)](LICENSE)
+[![Licence : BUSL-1.1](https://img.shields.io/badge/license-BUSL--1.1-brightgreen.svg?style=flat-square)](../../LICENSE)
 ![Vérifications frontend](https://github.com/yinorg/Yin-Panel/workflows/Frontend%20Checks/badge.svg)
 
-[English](../../README.md) | [简体中文](../zh-CN/README.md) | [繁體中文](../zh-TW/README.md) | [日本語](../ja-JP/README.md) | [한국어](../ko-KR/README.md) | [Deutsch](../de-DE/README.md) | **Français** | [Español](../es-ES/README.md) | [Português (Brasil)](../pt-BR/README.md) | [Русский](../ru-RU/README.md)
+[English](../../README.md) | [简体中文](../zh-CN/README.md) | [繁體中文](../zh-TW/README.md) | [日本語](../ja-JP/README.md) | [한국어](../ko-KR/README.md) | [Deutsch](../de-DE/README.md) | **Français** | [Español](../es-ES/README.md) | [Português (Brasil)](../pt-BR/README.md) | [Русский](../ru-RU/README.md) | [Bahasa Indonesia](../id-ID/README.md) | [Türkçe](../tr-TR/README.md) | [Polski](../pl-PL/README.md) | [Italiano](../it-IT/README.md) | [Nederlands](../nl-NL/README.md) | [हिन्दी](../hi-IN/README.md) | [ไทย](../th-TH/README.md)
 
 </div>
 
@@ -33,7 +33,7 @@ Yin-Panel est un panneau de navigation léger et auto-hébergeable pour les espa
 - Membres d'espace avec les rôles administrateur, éditeur et lecteur
 - Connexion OAuth 2.0 / OIDC, liaison de comptes et autorisation par groupes OIDC
 - L'adresse e-mail comme identifiant de connexion, pseudonyme géré séparément
-- Icônes personnalisées, thèmes installables, 10 langues d'interface, arrière-plans, modes d'URL WAN/LAN et mobile, fenêtres contextuelles dans la page
+- Icônes personnalisées, thèmes installables, 17 langues d'interface, arrière-plans, modes d'URL WAN/LAN et mobile, fenêtres contextuelles dans la page
 - Stockage SQLite, MySQL, MariaDB ou PostgreSQL, images Docker amd64 et arm64, chart Helm pour Kubernetes
 
 ## Démarrage rapide

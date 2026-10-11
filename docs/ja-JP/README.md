@@ -4,10 +4,10 @@
 <h1>Yin-Panel</h1>
 
 [![最新リリース](https://img.shields.io/github/v/release/yinorg/Yin-Panel?style=flat-square)](https://github.com/yinorg/Yin-Panel/releases)
-[![ライセンス：BUSL-1.1](https://img.shields.io/badge/license-BUSL--1.1-brightgreen.svg?style=flat-square)](LICENSE)
+[![ライセンス：BUSL-1.1](https://img.shields.io/badge/license-BUSL--1.1-brightgreen.svg?style=flat-square)](../../LICENSE)
 ![フロントエンドチェック](https://github.com/yinorg/Yin-Panel/workflows/Frontend%20Checks/badge.svg)
 
-[English](../../README.md) | [简体中文](../zh-CN/README.md) | [繁體中文](../zh-TW/README.md) | **日本語** | [한국어](../ko-KR/README.md) | [Deutsch](../de-DE/README.md) | [Français](../fr-FR/README.md) | [Español](../es-ES/README.md) | [Português (Brasil)](../pt-BR/README.md) | [Русский](../ru-RU/README.md)
+[English](../../README.md) | [简体中文](../zh-CN/README.md) | [繁體中文](../zh-TW/README.md) | **日本語** | [한국어](../ko-KR/README.md) | [Deutsch](../de-DE/README.md) | [Français](../fr-FR/README.md) | [Español](../es-ES/README.md) | [Português (Brasil)](../pt-BR/README.md) | [Русский](../ru-RU/README.md) | [Bahasa Indonesia](../id-ID/README.md) | [Türkçe](../tr-TR/README.md) | [Polski](../pl-PL/README.md) | [Italiano](../it-IT/README.md) | [Nederlands](../nl-NL/README.md) | [हिन्दी](../hi-IN/README.md) | [ไทย](../th-TH/README.md)
 
 </div>
 
@@ -33,7 +33,7 @@ Yin-Panel は、個人用と共有のスペースのための軽量でセルフ�
 - スペースメンバーの役割：管理者、編集者、閲覧者
 - OAuth 2.0 / OIDC ログイン、アカウント連携、OIDC グループ認可
 - ログイン ID はメールアドレス、ニックネームは独立して管理
-- カスタムアイコン、インストール可能なテーマパッケージ、10 種類の UI 言語、壁紙、WAN/LAN・モバイル URL モード、ページ内ポップアップ表示
+- カスタムアイコン、インストール可能なテーマパッケージ、17 種類の UI 言語、壁紙、WAN/LAN・モバイル URL モード、ページ内ポップアップ表示
 - SQLite、MySQL、MariaDB、PostgreSQL に対応し、amd64 / arm64 の Docker イメージと Kubernetes 用 Helm チャートを提供
 
 ## クイックスタート

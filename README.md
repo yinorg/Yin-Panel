@@ -7,7 +7,7 @@
 [![License: BUSL-1.1](https://img.shields.io/badge/license-BUSL--1.1-brightgreen.svg?style=flat-square)](LICENSE)
 ![Frontend Checks](https://github.com/yinorg/Yin-Panel/workflows/Frontend%20Checks/badge.svg)
 
-**English** | [简体中文](docs/zh-CN/README.md) | [繁體中文](docs/zh-TW/README.md) | [日本語](docs/ja-JP/README.md) | [한국어](docs/ko-KR/README.md) | [Deutsch](docs/de-DE/README.md) | [Français](docs/fr-FR/README.md) | [Español](docs/es-ES/README.md) | [Português (Brasil)](docs/pt-BR/README.md) | [Русский](docs/ru-RU/README.md)
+**English** | [简体中文](docs/zh-CN/README.md) | [繁體中文](docs/zh-TW/README.md) | [日本語](docs/ja-JP/README.md) | [한국어](docs/ko-KR/README.md) | [Deutsch](docs/de-DE/README.md) | [Français](docs/fr-FR/README.md) | [Español](docs/es-ES/README.md) | [Português (Brasil)](docs/pt-BR/README.md) | [Русский](docs/ru-RU/README.md) | [Bahasa Indonesia](docs/id-ID/README.md) | [Türkçe](docs/tr-TR/README.md) | [Polski](docs/pl-PL/README.md) | [Italiano](docs/it-IT/README.md) | [Nederlands](docs/nl-NL/README.md) | [हिन्दी](docs/hi-IN/README.md) | [ไทย](docs/th-TH/README.md)
 
 </div>
 
@@ -33,7 +33,7 @@ Yin-Panel is a lightweight, self-hostable navigation panel for personal and shar
 - Space members with administrator, editor, and viewer roles
 - OAuth 2.0 / OIDC login, account linking, and OIDC group authorization
 - Email as the login identity, with an independent nickname
-- Custom icons, installable theme packages, 10 UI languages, wallpapers, WAN/LAN and mobile URL modes, and in-page popup windows
+- Custom icons, installable theme packages, 17 UI languages, wallpapers, WAN/LAN and mobile URL modes, and in-page popup windows
 - SQLite, MySQL, MariaDB, or PostgreSQL storage, Docker images for amd64 and arm64, and a Helm chart for Kubernetes
 
 ## Quick start

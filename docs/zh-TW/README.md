@@ -4,10 +4,10 @@
 <h1>Yin-Panel</h1>
 
 [![最新版本](https://img.shields.io/github/v/release/yinorg/Yin-Panel?style=flat-square)](https://github.com/yinorg/Yin-Panel/releases)
-[![授權條款：BUSL-1.1](https://img.shields.io/badge/license-BUSL--1.1-brightgreen.svg?style=flat-square)](LICENSE)
+[![授權條款：BUSL-1.1](https://img.shields.io/badge/license-BUSL--1.1-brightgreen.svg?style=flat-square)](../../LICENSE)
 ![前端檢查](https://github.com/yinorg/Yin-Panel/workflows/Frontend%20Checks/badge.svg)
 
-[English](../../README.md) | [简体中文](../zh-CN/README.md) | **繁體中文** | [日本語](../ja-JP/README.md) | [한국어](../ko-KR/README.md) | [Deutsch](../de-DE/README.md) | [Français](../fr-FR/README.md) | [Español](../es-ES/README.md) | [Português (Brasil)](../pt-BR/README.md) | [Русский](../ru-RU/README.md)
+[English](../../README.md) | [简体中文](../zh-CN/README.md) | **繁體中文** | [日本語](../ja-JP/README.md) | [한국어](../ko-KR/README.md) | [Deutsch](../de-DE/README.md) | [Français](../fr-FR/README.md) | [Español](../es-ES/README.md) | [Português (Brasil)](../pt-BR/README.md) | [Русский](../ru-RU/README.md) | [Bahasa Indonesia](../id-ID/README.md) | [Türkçe](../tr-TR/README.md) | [Polski](../pl-PL/README.md) | [Italiano](../it-IT/README.md) | [Nederlands](../nl-NL/README.md) | [हिन्दी](../hi-IN/README.md) | [ไทย](../th-TH/README.md)
 
 </div>
 
@@ -33,7 +33,7 @@ Yin-Panel 是一個輕量、可自架的個人與共享空間導覽面板，適�
 - 空間成員角色：管理員、編輯者、檢視者
 - OAuth 2.0 / OIDC 登入、帳號連結與 OIDC 群組授權
 - 電子郵件作為登入帳號，暱稱獨立維護
-- 自訂圖示、可安裝的主題套件、10 種介面語言、背景、WAN/LAN 與手機網址模式、頁面內彈窗開啟
+- 自訂圖示、可安裝的主題套件、17 種介面語言、背景、WAN/LAN 與手機網址模式、頁面內彈窗開啟
 - 支援 SQLite、MySQL、MariaDB 與 PostgreSQL，提供 amd64 與 arm64 Docker 映像與 Kubernetes Helm Chart
 
 ## 快速開始

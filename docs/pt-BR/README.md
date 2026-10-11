@@ -4,10 +4,10 @@
 <h1>Yin-Panel</h1>
 
 [![Última versão](https://img.shields.io/github/v/release/yinorg/Yin-Panel?style=flat-square)](https://github.com/yinorg/Yin-Panel/releases)
-[![Licença: BUSL-1.1](https://img.shields.io/badge/license-BUSL--1.1-brightgreen.svg?style=flat-square)](LICENSE)
+[![Licença: BUSL-1.1](https://img.shields.io/badge/license-BUSL--1.1-brightgreen.svg?style=flat-square)](../../LICENSE)
 ![Verificações do frontend](https://github.com/yinorg/Yin-Panel/workflows/Frontend%20Checks/badge.svg)
 
-[English](../../README.md) | [简体中文](../zh-CN/README.md) | [繁體中文](../zh-TW/README.md) | [日本語](../ja-JP/README.md) | [한국어](../ko-KR/README.md) | [Deutsch](../de-DE/README.md) | [Français](../fr-FR/README.md) | [Español](../es-ES/README.md) | **Português (Brasil)** | [Русский](../ru-RU/README.md)
+[English](../../README.md) | [简体中文](../zh-CN/README.md) | [繁體中文](../zh-TW/README.md) | [日本語](../ja-JP/README.md) | [한국어](../ko-KR/README.md) | [Deutsch](../de-DE/README.md) | [Français](../fr-FR/README.md) | [Español](../es-ES/README.md) | **Português (Brasil)** | [Русский](../ru-RU/README.md) | [Bahasa Indonesia](../id-ID/README.md) | [Türkçe](../tr-TR/README.md) | [Polski](../pl-PL/README.md) | [Italiano](../it-IT/README.md) | [Nederlands](../nl-NL/README.md) | [हिन्दी](../hi-IN/README.md) | [ไทย](../th-TH/README.md)
 
 </div>
 
@@ -33,7 +33,7 @@ O Yin-Panel é um painel de navegação leve e auto-hospedável para espaços pe
 - Membros do espaço com papéis de administrador, editor e visualizador
 - Login OAuth 2.0 / OIDC, vinculação de contas e autorização por grupos OIDC
 - E-mail como conta de login, apelido mantido separadamente
-- Ícones personalizados, temas instaláveis, 10 idiomas de interface, papéis de parede, modos de URL WAN/LAN e móvel, janelas pop-up dentro da página
+- Ícones personalizados, temas instaláveis, 17 idiomas de interface, papéis de parede, modos de URL WAN/LAN e móvel, janelas pop-up dentro da página
 - Armazenamento SQLite, MySQL, MariaDB ou PostgreSQL, imagens Docker para amd64 e arm64 e chart Helm para Kubernetes
 
 ## Início rápido

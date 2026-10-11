@@ -4,10 +4,10 @@
 <h1>Yin-Panel</h1>
 
 [![Última versión](https://img.shields.io/github/v/release/yinorg/Yin-Panel?style=flat-square)](https://github.com/yinorg/Yin-Panel/releases)
-[![Licencia: BUSL-1.1](https://img.shields.io/badge/license-BUSL--1.1-brightgreen.svg?style=flat-square)](LICENSE)
+[![Licencia: BUSL-1.1](https://img.shields.io/badge/license-BUSL--1.1-brightgreen.svg?style=flat-square)](../../LICENSE)
 ![Comprobaciones del frontend](https://github.com/yinorg/Yin-Panel/workflows/Frontend%20Checks/badge.svg)
 
-[English](../../README.md) | [简体中文](../zh-CN/README.md) | [繁體中文](../zh-TW/README.md) | [日本語](../ja-JP/README.md) | [한국어](../ko-KR/README.md) | [Deutsch](../de-DE/README.md) | [Français](../fr-FR/README.md) | **Español** | [Português (Brasil)](../pt-BR/README.md) | [Русский](../ru-RU/README.md)
+[English](../../README.md) | [简体中文](../zh-CN/README.md) | [繁體中文](../zh-TW/README.md) | [日本語](../ja-JP/README.md) | [한국어](../ko-KR/README.md) | [Deutsch](../de-DE/README.md) | [Français](../fr-FR/README.md) | **Español** | [Português (Brasil)](../pt-BR/README.md) | [Русский](../ru-RU/README.md) | [Bahasa Indonesia](../id-ID/README.md) | [Türkçe](../tr-TR/README.md) | [Polski](../pl-PL/README.md) | [Italiano](../it-IT/README.md) | [Nederlands](../nl-NL/README.md) | [हिन्दी](../hi-IN/README.md) | [ไทย](../th-TH/README.md)
 
 </div>
 
@@ -33,7 +33,7 @@ Yin-Panel es un panel de navegación ligero y autoalojable para espacios persona
 - Miembros del espacio con roles de administrador, editor y lector
 - Inicio de sesión OAuth 2.0 / OIDC, vinculación de cuentas y autorización por grupos OIDC
 - El correo electrónico como cuenta de inicio de sesión, con apodo gestionado por separado
-- Iconos personalizados, temas instalables, 10 idiomas de interfaz, fondos, modos de URL WAN/LAN y móvil, ventanas emergentes dentro de la página
+- Iconos personalizados, temas instalables, 17 idiomas de interfaz, fondos, modos de URL WAN/LAN y móvil, ventanas emergentes dentro de la página
 - Almacenamiento SQLite, MySQL, MariaDB o PostgreSQL, imágenes Docker para amd64 y arm64 y chart de Helm para Kubernetes
 
 ## Inicio rápido

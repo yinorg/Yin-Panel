@@ -4,10 +4,10 @@
 <h1>Yin-Panel</h1>
 
 [![Последний релиз](https://img.shields.io/github/v/release/yinorg/Yin-Panel?style=flat-square)](https://github.com/yinorg/Yin-Panel/releases)
-[![Лицензия: BUSL-1.1](https://img.shields.io/badge/license-BUSL--1.1-brightgreen.svg?style=flat-square)](LICENSE)
+[![Лицензия: BUSL-1.1](https://img.shields.io/badge/license-BUSL--1.1-brightgreen.svg?style=flat-square)](../../LICENSE)
 ![Проверки фронтенда](https://github.com/yinorg/Yin-Panel/workflows/Frontend%20Checks/badge.svg)
 
-[English](../../README.md) | [简体中文](../zh-CN/README.md) | [繁體中文](../zh-TW/README.md) | [日本語](../ja-JP/README.md) | [한국어](../ko-KR/README.md) | [Deutsch](../de-DE/README.md) | [Français](../fr-FR/README.md) | [Español](../es-ES/README.md) | [Português (Brasil)](../pt-BR/README.md) | **Русский**
+[English](../../README.md) | [简体中文](../zh-CN/README.md) | [繁體中文](../zh-TW/README.md) | [日本語](../ja-JP/README.md) | [한국어](../ko-KR/README.md) | [Deutsch](../de-DE/README.md) | [Français](../fr-FR/README.md) | [Español](../es-ES/README.md) | [Português (Brasil)](../pt-BR/README.md) | **Русский** | [Bahasa Indonesia](../id-ID/README.md) | [Türkçe](../tr-TR/README.md) | [Polski](../pl-PL/README.md) | [Italiano](../it-IT/README.md) | [Nederlands](../nl-NL/README.md) | [हिन्दी](../hi-IN/README.md) | [ไทย](../th-TH/README.md)
 
 </div>
 
@@ -33,7 +33,7 @@ Yin-Panel — это лёгкая панель навигации для сам�
 - Участники пространства с ролями администратор, редактор и наблюдатель
 - Вход через OAuth 2.0 / OIDC, связывание аккаунтов и авторизация по группам OIDC
 - Электронная почта как учётная запись для входа, никнейм хранится отдельно
-- Настраиваемые значки, устанавливаемые темы, 10 языков интерфейса, обои, режимы WAN/LAN и мобильного URL, всплывающие окна на странице
+- Настраиваемые значки, устанавливаемые темы, 17 языков интерфейса, обои, режимы WAN/LAN и мобильного URL, всплывающие окна на странице
 - Хранение в SQLite, MySQL, MariaDB или PostgreSQL, Docker-образы для amd64 и arm64 и Helm-чарт для Kubernetes
 
 ## Быстрый старт
