@@ -11,7 +11,12 @@ ARG COMMIT
 # tzdata package nor curl is needed.
 RUN apk add --no-cache ca-certificates
 
-COPY build-output/yin-panel /app/yin-panel
+# The binary is built in one CI job and packaged in another, and it travels
+# through a GitHub Actions artifact. Artifacts do not preserve the executable
+# bit, so it arrives 0644 and the container refuses to start ("exists but it is
+# not executable"). Setting the mode at COPY time restores it without a
+# `RUN chmod` layer, which would duplicate the whole binary.
+COPY --chmod=755 build-output/yin-panel /app/yin-panel
 COPY backend/web /app/web
 COPY backend/lang /app/lang
 COPY backend/conf.yaml.example /app/conf.yaml

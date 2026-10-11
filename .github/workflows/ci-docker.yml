@@ -134,6 +134,11 @@ jobs:
         with:
           name: backend-build-${{ matrix.arch }}
           path: build-output
+      # Artifacts do not preserve file modes, so the binary lands here 0644. Fix it
+      # at the source too: the image must stay buildable even if the Dockerfile's
+      # COPY stops forcing the mode.
+      - name: Restore the executable bit
+        run: chmod +x build-output/yin-panel
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
       - name: Log in to GHCR
