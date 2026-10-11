@@ -207,6 +207,23 @@ test('Trusted Theme CSS maps document roots to the Shadow DOM host', async () =>
   assert.match(result, /\.panel/)
 })
 
+test('Theme CSS scoping leaves @keyframes untouched', async () => {
+  const css = '.panel { color: red } @keyframes wobble { 0% { transform: rotate(-1deg) } 100% { transform: rotate(1deg) } }'
+  const result = await rewriteThemeStylesheet(
+    css,
+    'https://yin.test/api/theme/v2/assets/revision/styles/home.css',
+    [],
+    {},
+    undefined,
+    { prefix: '.yin-theme-hash' },
+  )
+  assert.match(result, /\.yin-theme-hash\s+\.panel/)
+  assert.match(result, /@keyframes wobble/)
+  assert.doesNotMatch(result, /\.yin-theme-hash\s+(?:from|to|\d+(?:\.\d+)?%)/)
+  assert.match(result, /0%/)
+  assert.match(result, /100%/)
+})
+
 test('Theme CSS rejects imports, undeclared URLs and image-set string fetches', async () => {
   const args = ['.panel { color: red }', 'https://yin.test/api/theme/v2/assets/revision/styles/home.css', [], {}]
   await assert.rejects(rewriteThemeStylesheet('@import url("/theme.css");', ...args.slice(1)), /@import/)

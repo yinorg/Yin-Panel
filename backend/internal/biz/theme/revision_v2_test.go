@@ -367,7 +367,7 @@ func TestBuiltinPackagesV2AreCompleteDTCGAndRepeatable(t *testing.T) {
 		}
 		wantVersion := "2.3.2"
 		if summary.ID == "org.yin.default" {
-			wantVersion = "2.3.75"
+			wantVersion = "2.3.77"
 		}
 		if pkg.Manifest.Version != wantVersion {
 			t.Errorf("%s builtin version = %q, want %q", summary.ID, pkg.Manifest.Version, wantVersion)
@@ -421,10 +421,10 @@ func TestBuiltinHomeAssetsLoadFromPackagedThemeSources(t *testing.T) {
 func TestBuiltinHomeResourceHashesOnlyChangeForDefaultYin(t *testing.T) {
 	expected := map[string]map[string]string{
 		"org.yin.default": {
-			// 手机宽度下第一个书签分组的上间距与桌面统一，去掉视口比例额外间距。
-			// 改动的是 Yin 主题的分组定位，所以只有它的哈希变。
-			"views/home.mjs": "b09b86568d85a29d7ef671833f9dc65bb5c2baa9a1bd8603714f01a08286545f",
-			"styles/home.css": "4c6e6f8f410dfb00c8a2cad7ab47d8857aa188abdb5a19a72e9aa44a39428823",
+			// 编辑模式：首页内容整体缩到 85% 并用一条虚线框包裹。改了 home.mjs 与
+			// 样式，所以两者哈希都变。
+			"views/home.mjs": "51363af7ebd1c86c5415e07f9479e2ce1d88486f78476097d0ec95e8b1a1629a",
+			"styles/home.css": "b0ffa4bbd4f82bfce115e8a949954301261b3ea2dd139827b7cb2e907140263f",
 		},
 		"org.yin.glass": {
 			"views/home.mjs":  "6f380f2079ba8f523ad4ce149b9f9faa7b5f7d11a9053e8a336b0624e0b1a091",
@@ -495,7 +495,7 @@ func TestEnsureBuiltinV2UpgradesOnlyActivationForSelectedBuiltin(t *testing.T) {
 		t.Fatal(err)
 	}
 	latest, err := LatestPackageRevisionV2(db, "org.yin.default")
-	if err != nil || latest.Version != "2.3.75" || activation.ActiveRevisionID != latest.ID {
+	if err != nil || latest.Version != "2.3.77" || activation.ActiveRevisionID != latest.ID {
 		t.Fatalf("selected builtin activation = %+v, latest=%s, err=%v", activation, latest.ID, err)
 	}
 	if latest.ID == old.Revision {

@@ -557,7 +557,12 @@ export default {
       monitorElement = document.createElement('yin-system-monitor')
       monitorElement.style.cssText = 'display:block'
       monitorSection.append(monitorElement)
-      page.append(headerSection, monitorSection, directoryNav, status, collection, emptyState, footer, groupDialog, contextMenu)
+      // The edit-mode zoom/outline wraps this content block, so keep the
+      // fixed-position overlays (dialog, context menu) as siblings of it: a
+      // transformed ancestor would otherwise become their containing block.
+      const content = element('div', 'yin-content')
+      content.append(headerSection, monitorSection, directoryNav, status, collection, emptyState, footer)
+      page.append(content, groupDialog, contextMenu)
       page.addEventListener('keydown', event => {
         if (!groupDialog.hidden && event.key === 'Tab') {
           const focusable = [...groupDialog.querySelectorAll('input:not(:disabled), button:not(:disabled)')]

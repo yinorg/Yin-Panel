@@ -78,6 +78,12 @@ export async function rewriteThemeStylesheet(
 function prefixSelectors(cssTree: any, tree: any, prefix: string) {
   const lists: any[] = []
   cssTree.walk(tree, (node: any) => {
+    // Keyframe offset selectors (`0%`, `from`, `to`, ...) are not element
+    // selectors. Prefixing them corrupts the `@keyframes` block, which the
+    // browser then drops entirely, silently disabling the animation. Skip the
+    // whole at-rule so animation names and offsets stay untouched.
+    if (node.type === 'Atrule' && ['keyframes', '-webkit-keyframes'].includes(node.name?.toLowerCase() || ''))
+      return cssTree.walk.skip
     if (node.type === 'SelectorList')
       lists.push(node)
   })
