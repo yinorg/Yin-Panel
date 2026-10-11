@@ -936,13 +936,13 @@ func builtinPackagesV2() []*PackageV2 {
 	for _, palette := range palettes {
 		docs := map[string]json.RawMessage{"light": builtinDTCGDocumentV2(palette.light, palette), "dark": builtinDTCGDocumentV2(palette.dark, palette)}
 		files := builtinHomeResourcesV2(palette.id)
-		version := "2.3.2"
+		version := "2.3.3"
 		requiredPermissions := []PermissionV2{{Name: "spaces.read"}, {Name: "groups.read"}, {Name: "items.read"}}
 		contributedViews := []string{"home"}
 		if palette.id == "org.yin.default" {
 			// Bump whenever a home resource changes; a published version is
 			// immutable, so reusing it would abort startup.
-			version = "2.3.77"
+			version = "2.3.78"
 			requiredPermissions = append(requiredPermissions,
 				PermissionV2{Name: "items.write"},
 				PermissionV2{Name: "groups.write"},

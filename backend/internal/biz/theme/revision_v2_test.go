@@ -365,9 +365,9 @@ func TestBuiltinPackagesV2AreCompleteDTCGAndRepeatable(t *testing.T) {
 		if err != nil || !builtin || !knownBuiltin || strings.Join(permissions, ",") != strings.Join(wantPermissions, ",") {
 			t.Errorf("%s implicit permissions = %v, want %v, builtin=%v, err=%v", summary.ID, permissions, wantPermissions, builtin, err)
 		}
-		wantVersion := "2.3.2"
+		wantVersion := "2.3.3"
 		if summary.ID == "org.yin.default" {
-			wantVersion = "2.3.77"
+			wantVersion = "2.3.78"
 		}
 		if pkg.Manifest.Version != wantVersion {
 			t.Errorf("%s builtin version = %q, want %q", summary.ID, pkg.Manifest.Version, wantVersion)
@@ -418,17 +418,22 @@ func TestBuiltinHomeAssetsLoadFromPackagedThemeSources(t *testing.T) {
 	}
 }
 
-func TestBuiltinHomeResourceHashesOnlyChangeForDefaultYin(t *testing.T) {
+// The built-in themes are published from the embedded filesystem, so their
+// resource digests are part of the immutable package. Pin them here: editing a
+// home view or stylesheet changes the digest, which must be accompanied by a
+// manifest version bump.
+func TestBuiltinHomeResourceHashesPinTheEmbeddedThemes(t *testing.T) {
 	expected := map[string]map[string]string{
 		"org.yin.default": {
-			// 编辑模式：首页内容整体缩到 85% 并用一条虚线框包裹。改了 home.mjs 与
-			// 样式，所以两者哈希都变。
-			"views/home.mjs": "51363af7ebd1c86c5415e07f9479e2ce1d88486f78476097d0ec95e8b1a1629a",
+			// 图片加载失败时回退到文字，改了 yin 的 home.mjs，所以视图哈希变；
+			// yin 的样式表没动，哈希保持不变。
+			"views/home.mjs":  "9d1661633254693b649ff356cfef0c562063ccf203aec6c0fdd7db2fe64d2d87",
 			"styles/home.css": "b0ffa4bbd4f82bfce115e8a949954301261b3ea2dd139827b7cb2e907140263f",
 		},
 		"org.yin.glass": {
-			"views/home.mjs":  "6f380f2079ba8f523ad4ce149b9f9faa7b5f7d11a9053e8a336b0624e0b1a091",
-			"styles/home.css": "a46ef90408799b5fafad0f26a59faea0d8c54f29d1f5518f6335b81bf87559cc",
+			// Glass 复用 shared/home.mjs 与 shared/home.css，两者都改了。
+			"views/home.mjs":  "acb831920df5f23ac73a3d6c8f16d76925f76a52872d8308569770d0624d6bb8",
+			"styles/home.css": "c4d48356dde9a1d9cff3105c2105c1f1e8535cb1dd98677bcb5bed03cb3612e9",
 		},
 	}
 	for id, want := range expected {
@@ -495,7 +500,7 @@ func TestEnsureBuiltinV2UpgradesOnlyActivationForSelectedBuiltin(t *testing.T) {
 		t.Fatal(err)
 	}
 	latest, err := LatestPackageRevisionV2(db, "org.yin.default")
-	if err != nil || latest.Version != "2.3.77" || activation.ActiveRevisionID != latest.ID {
+	if err != nil || latest.Version != "2.3.78" || activation.ActiveRevisionID != latest.ID {
 		t.Fatalf("selected builtin activation = %+v, latest=%s, err=%v", activation, latest.ID, err)
 	}
 	if latest.ID == old.Revision {

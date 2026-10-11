@@ -74,18 +74,21 @@ export default {
           button.setAttribute('aria-label', `Open ${item.title}`)
           const icon = node('span', 'item-icon')
           icon.setAttribute('aria-hidden', 'true')
-          if (item.icon && typeof item.icon === 'object' && item.icon.src) {
+          const itemIcon = item.icon && typeof item.icon === 'object' ? item.icon : undefined
+          if (itemIcon?.backgroundColor) icon.style.backgroundColor = itemIcon.backgroundColor
+          // The letters render first and stay until the image proves it loads, so a
+          // missing or broken image degrades to text instead of an empty tile.
+          const letters = node('span', 'item-icon-letters', itemIcon?.text || (item.title || '?').slice(0, 1))
+          icon.append(letters)
+          if (itemIcon?.src) {
             const image = node('img', 'item-icon-image')
-            image.src = item.icon.src
             image.alt = ''
             image.loading = 'lazy'
             image.referrerPolicy = 'no-referrer'
+            image.addEventListener('load', () => letters.remove())
+            image.addEventListener('error', () => image.remove())
+            image.src = itemIcon.src
             icon.append(image)
-            if (item.icon.backgroundColor) icon.style.backgroundColor = item.icon.backgroundColor
-          }
-          else {
-            icon.textContent = item.icon && (item.icon.text || item.icon.fileName) || '↗'
-            if (item.icon?.backgroundColor) icon.style.backgroundColor = item.icon.backgroundColor
           }
           const copy = node('span', 'item-copy')
           copy.append(node('strong', 'item-title', item.title), node('span', 'item-description', item.description || ''))

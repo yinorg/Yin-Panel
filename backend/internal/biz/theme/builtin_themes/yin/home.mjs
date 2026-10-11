@@ -833,19 +833,23 @@ export default {
       icon.removeAttribute('style')
       const itemIcon = item.icon
       if (itemIcon?.backgroundColor) icon.style.backgroundColor = itemIcon.backgroundColor
+      // The letter sits on its own 70x70 layer so it centres on the full tile
+      // box, not on the 1px-inset content area left by the transparent border.
+      // It is always the base layer: the item only shows the image once that
+      // image has actually loaded, so a missing, blocked or broken image falls
+      // back to the letter instead of leaving an empty or broken tile.
+      const letters = element('span', 'yin-item-icon-letters')
+      letters.textContent = itemIcon?.text || (item.title || '?').slice(0, 1)
+      icon.append(letters)
       if (itemIcon?.src) {
         const image = element('img', 'yin-item-icon-image')
-        image.src = itemIcon.src
         image.alt = ''
         image.loading = 'lazy'
         image.referrerPolicy = 'no-referrer'
+        image.addEventListener('load', () => letters.remove())
+        image.addEventListener('error', () => image.remove())
+        image.src = itemIcon.src
         icon.append(image)
-      } else {
-        // The letter sits on its own 70x70 layer so it centres on the full tile
-        // box, not on the 1px-inset content area left by the transparent border.
-        const letters = element('span', 'yin-item-icon-letters')
-        letters.textContent = itemIcon?.text || itemIcon?.fileName || (item.title || '?').slice(0, 1)
-        icon.append(letters)
       }
       const infoStyle = layout === 'standard' && presentation?.iconStyle === 'info'
       link.classList.toggle('yin-item--info', infoStyle)

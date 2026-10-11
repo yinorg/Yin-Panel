@@ -18,6 +18,7 @@ button { font: inherit; color: inherit; }
 .item-button:active { transform: scale(.985); }
 .item-button:focus-visible, .home-title[role="button"]:focus-visible { outline: 3px solid var(--yin-focusRing, var(--yin-primary)); outline-offset: 3px; }
 .item-icon { display: grid; place-items: center; flex: 0 0 38px; height: 38px; overflow: hidden; border-radius: var(--yin-radiusControl, 8px); background: color-mix(in srgb, var(--yin-primary) 12%, var(--yin-surface)); color: var(--yin-primary); font-weight: 700; white-space: nowrap; }
+.item-icon > * { grid-area: 1 / 1; }
 .item-icon-image { width: 100%; height: 100%; object-fit: contain; }
 .item-copy { display: grid; min-width: 0; }
 .item-title, .item-description { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

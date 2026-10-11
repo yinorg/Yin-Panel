@@ -240,7 +240,7 @@ function getGroupListOptions(spaceId?: number) {
         </NGrid>
 
         <NFormItem path="icon" :label="$t('common.icon')">
-          <IconEditor v-model:item-icon="model.icon" :upload-image="uploadItemIcon" />
+          <IconEditor v-model:item-icon="model.icon" :upload-image="uploadItemIcon" :title="model.title" />
         </NFormItem>
         <NFormItem path="url" :label="$t('iconItem.url')">
           <!-- <NSelect :style="{ width: '100px' }" :options="urlProtocolOptions" /> -->

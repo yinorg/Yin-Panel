@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { NAvatar } from 'naive-ui'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { SvgIconOnline } from '../index'
 
 interface Prop {
   itemIcon?: Panel.ItemIcon | null
   size?: number // 默认70
   forceBackground?: string // 强制背景色
+  title?: string // 图片没有加载出来时，文字回退取标题首字
 }
 
 const props = withDefaults(defineProps<Prop>(), { size: 70 })
@@ -16,8 +17,22 @@ const defaultStyle = ref({
   height: `${props.size}px`,
 })
 const imageSrc = computed(() => props.itemIcon?.src?.trim() || '')
+const imageLoaded = ref(false)
+// 文字是垫底层：图片真正加载成功前先显示文字，失败则一直显示文字。
+const fallbackText = computed(() =>
+  props.itemIcon?.text?.trim() || (props.title || '').trim().slice(0, 1) || '?',
+)
+
+watch(imageSrc, () => {
+  imageLoaded.value = false
+})
+
+const handleImageLoad = () => {
+  imageLoaded.value = true
+}
 
 const handleImageError = (event: Event) => {
+  imageLoaded.value = false
   ;(event.target as HTMLImageElement).style.display = 'none'
 }
 </script>
@@ -33,14 +48,16 @@ const handleImageError = (event: Event) => {
         </template>
 
         <template v-else-if="itemIcon?.itemType === 2">
-          <div :style="{ backgroundColor: (forceBackground ?? itemIcon?.backgroundColor) || defaultBackground, ...defaultStyle }" class="flex justify-center items-center">
+          <div :style="{ position: 'relative', backgroundColor: (forceBackground ?? itemIcon?.backgroundColor) || defaultBackground, ...defaultStyle }" class="flex justify-center items-center">
+            <span v-if="!imageLoaded" class="leading-none">{{ fallbackText }}</span>
             <img
               v-if="imageSrc"
               :src="imageSrc"
-              class="w-full h-full max-w-full max-h-full object-contain"
+              :style="{ position: 'absolute', inset: '0', width: '100%', height: '100%', objectFit: 'contain', opacity: imageLoaded ? '1' : '0' }"
               alt=""
               loading="lazy"
               decoding="async"
+              @load="handleImageLoad"
               @error="handleImageError"
             >
           </div>

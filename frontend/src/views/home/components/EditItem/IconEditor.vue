@@ -8,6 +8,7 @@ import { t } from '../../../../locales'
 const props = defineProps<{
   itemIcon: Panel.ItemIcon | null
   uploadImage: (file: File) => Promise<{ imageUrl: string; fileName: string }>
+  title?: string
 }>()
 const emit = defineEmits<{
   (e: 'update:itemIcon', visible: Panel.ItemIcon): void // 定义修改父组件（prop内）的值的事件
@@ -117,7 +118,7 @@ async function handleUpload({ file, onFinish, onError }: UploadCustomRequestOpti
       <div class="flex">
         <div>
           <div class="border rounded-2xl bg-slate-200 overflow-hidden rounded-2xl transparent-grid">
-            <ItemIcon :item-icon="itemIconInfo" />
+            <ItemIcon :item-icon="itemIconInfo" :title="title" />
           </div>
         </div>
         <!-- 文字 -->
