@@ -83,6 +83,7 @@
       "homeLayout": "Indeling van de startpagina",
       "homeLayoutStandard": "Standaard",
       "homeLayoutDirectory": "Map",
+      "homeLayoutUnavailable": "Alleen beschikbaar met de ingebouwde home-thema's.",
       "hideDescription": "Beschrijving verbergen",
       "hideTitle": "Titel verbergen",
       "leftRightMargin": "Linker- en rechtermarge",

@@ -83,6 +83,7 @@
       "homeLayout": "Home layout",
       "homeLayoutStandard": "Standard",
       "homeLayoutDirectory": "Directory",
+      "homeLayoutUnavailable": "Available with the built-in home themes only.",
       "hideDescription": "Hide description information",
       "hideTitle": "Hide title",
       "leftRightMargin": "Left-right margin",

@@ -3,9 +3,9 @@ import { useRouter } from 'vue-router'
 import { parsePublicCodeFromPath } from '@/utils/request/axios'
 import { useAuthStore, usePanelState } from '@/store'
 import { PanelStateNetworkModeEnum } from '@/enums'
-import { resolvePanelValue } from '@/utils/theme'
+import { homeLayoutForThemePackage, resolvePanelValue } from '@/utils/theme'
 import { PanelPanelConfigStyleEnum } from '@/enums'
-import { activeThemeWallpaper, reconcileSpaceTheme } from '@/hooks/useTheme'
+import { activeThemePackage, activeThemeWallpaper, reconcileSpaceTheme } from '@/hooks/useTheme'
 import { spaceDisplayName } from '@/api/panel/space'
 import { useHomeEnvironment } from '@/core/home/useHomeEnvironment'
 import { useHomePublicAccess } from '@/core/home/useHomePublicAccess'
@@ -65,7 +65,10 @@ export function useHomeShell() {
       || !!activeThemeWallpaper.value
   })
   const panelIconTextColor = computed(() => resolvePanelValue('var(--yin-text)', panelState.panelConfig.iconTextColor, useThemeDefaults.value))
-  const directoryLayout = computed(() => panelState.panelConfig.homeLayout === 'directory')
+  // The home layout follows the mounted package: each built-in home package
+  // renders exactly one layout, so the Core reads it from the theme rather than
+  // from a separate panel preference.
+  const directoryLayout = computed(() => homeLayoutForThemePackage(activeThemePackage.value?.manifest.id) === 'directory')
 
   // The data composable must drop the command layer's cached remote items when the
   // collection is invalidated, but the command layer is created further down. A
@@ -228,6 +231,7 @@ export function useHomeShell() {
     homeFallbackReason,
     themeRuntimePermissions,
     themeCanWriteGroups,
+    themeCanEditHomeLayout,
     themeRuntimeSlots,
     themeRuntimeSnapshot,
     themeRuntimeGrant,
@@ -385,10 +389,11 @@ export function useHomeShell() {
     handleChangeNetwork(networkMode.value === 'lan' ? PanelStateNetworkModeEnum.wan : PanelStateNetworkModeEnum.lan)
   }
 
+  // The Core chrome (body transparency, the space status bar) keys off this
+  // attribute. The theme sees the same layout through the snapshot, so the two
+  // cannot disagree.
   watch(directoryLayout, (enabled) => {
     document.documentElement.dataset.yinLayout = enabled ? 'directory' : 'standard'
-    if (enabled)
-      items.value = []
   }, { immediate: true })
 
   onMounted(() => {
@@ -466,6 +471,7 @@ export function useHomeShell() {
     themeRuntimeSnapshot,
     themeRuntimeEnvironment,
     themeRuntimePermissions,
+    themeCanEditHomeLayout,
     themeRuntimeSlots,
     executeThemeRequest,
     handleThemeRuntimeFailure,

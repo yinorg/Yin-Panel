@@ -5,7 +5,7 @@ import { useAppStore } from '../store'
 import { useAuthStore } from '../store'
 import { getCurrentTheme, getEffectiveTheme, getMyTheme, getPreviewTheme, getThemePackage } from '../api/theme'
 import { parsePublicCodeFromPath } from '../utils/request/axios'
-import { resolveThemeSlots, resolveWallpaper, selectThemeScheme, type ThemePackage } from '../utils/theme'
+import { isYinThemePackage, resolveThemeSlots, resolveWallpaper, selectThemeScheme, type ThemePackage } from '../utils/theme'
 import { isThemeSafeMode } from '../theme/recovery/safeMode'
 
 export const activeThemePackage = ref<ThemePackage | null>(null)
@@ -217,7 +217,7 @@ export function useTheme() {
     // Injecting the theme package's Naive overrides changes control heights,
     // borders and text colours (the login form drifted by several pixels), so
     // the built-in default theme in light mode keeps Naive's own tokens.
-    if (!isDark.value && !previewToken && activeThemePackageId.value === 'org.yin.default')
+    if (!isDark.value && !previewToken && isYinThemePackage(activeThemePackageId.value))
       return {}
     const controlHeight = toNaiveDimension(slots.controlHeight, '36px')
     return {

@@ -8,6 +8,7 @@ import HomeFallback from './components/HomeFallback.vue'
 import ThemeHost from '@/theme/runtime/ThemeHost.vue'
 import type { useHomeShell } from '@/core/home/useHomeShell'
 import { useBootOverlay } from '@/core/home/useBootOverlay'
+import { isYinThemePackage } from '@/utils/theme'
 // Shell chrome styles live beside the host rather than inline. See that file's
 // header for the scoping note.
 import './home-shell.css'
@@ -57,7 +58,7 @@ const themeSurfaceRoute = computed(() => route.name === 'themeSurface')
 </script>
 
 <template>
-  <div class="w-full h-full sun-main" :class="{ 'side-switching': home.sideSwitching, 'theme-defaults': theme.useThemeColors, 'wallpaper-active': theme.wallpaperActive, 'theme-runtime-yin': theme.themeRuntimeActive && theme.themeRuntimePackage?.manifest.id === 'org.yin.default', 'theme-surface-mode': themeSurfaceRoute }" :data-panel-side="home.activeSpace?.side || 'yin'">
+  <div class="w-full h-full sun-main" :class="{ 'side-switching': home.sideSwitching, 'theme-defaults': theme.useThemeColors, 'wallpaper-active': theme.wallpaperActive, 'theme-runtime-yin': theme.themeRuntimeActive && isYinThemePackage(theme.themeRuntimePackage?.manifest.id), 'theme-surface-mode': themeSurfaceRoute }" :data-panel-side="home.activeSpace?.side || 'yin'">
     <CommandCenter
       :visible="commands.commandCenterVisible"
       :query="commands.commandCenterQuery"
@@ -149,7 +150,7 @@ const themeSurfaceRoute = computed(() => route.name === 'themeSurface')
         v-if="theme.monitorVisible"
         :ref="theme.setMonitorLayerElement"
         class="theme-runtime-monitor-layer"
-        :class="{ 'theme-runtime-monitor-layer--info': theme.monitorIsInfo, 'theme-runtime-monitor-layer--yin': theme.themeRuntimePackage?.manifest.id === 'org.yin.default' }"
+        :class="{ 'theme-runtime-monitor-layer--info': theme.monitorIsInfo, 'theme-runtime-monitor-layer--yin': isYinThemePackage(theme.themeRuntimePackage?.manifest.id) }"
         data-testid="theme-runtime-monitor"
         :data-panel-side="home.activeSpace?.side || 'yin'"
         :style="{ '--yin-theme-content-top': `${theme.contentTopVh}vh`, '--yin-theme-monitor-top': theme.themeMonitorTop }"
@@ -307,7 +308,7 @@ const themeSurfaceRoute = computed(() => route.name === 'themeSurface')
   -->
   <div v-if="home.showFloatingBar" class="home-floating" role="group" :aria-label="$t('panelHome.floatingActions')" data-testid="home-floating-bar">
     <!-- Edit layout: a one-shot signal the theme turns into its own edit mode. -->
-    <button v-if="home.canWrite && theme.themeRuntimeActive" type="button" class="home-floating-button" data-testid="floating-edit-layout-button" :title="$t('themeHome.edit')" :aria-label="$t('themeHome.edit')" @click="home.requestLayoutEdit()">
+    <button v-if="home.canWrite && theme.themeRuntimeActive && theme.themeCanEditHomeLayout" type="button" class="home-floating-button" data-testid="floating-edit-layout-button" :title="$t('themeHome.edit')" :aria-label="$t('themeHome.edit')" @click="home.requestLayoutEdit()">
       <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75z"/></svg>
     </button>
     <button type="button" class="home-floating-button" data-testid="floating-refresh-button" :title="$t('common.refresh')" :aria-label="$t('common.refresh')" @click="home.refreshCurrentSpace()">

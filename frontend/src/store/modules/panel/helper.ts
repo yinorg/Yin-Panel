@@ -11,7 +11,6 @@ import { defaultFooterHtml } from '@/constants/panelFooter'
 
 export function defaultStatePanelConfig(): Panel.panelConfig {
   return {
-    homeLayout: 'standard',
     backgroundImageSrc: defaultBackground,
     wallpaperMode: 'theme',
     backgroundBlur: 0,

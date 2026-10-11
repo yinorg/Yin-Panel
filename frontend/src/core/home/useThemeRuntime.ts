@@ -4,6 +4,7 @@ import { useAuthStore, usePanelState } from '@/store'
 import { useRoute } from 'vue-router'
 import { getThemeRuntimeGrant, setThemeRuntimeGrant } from '@/api/theme'
 import { activeThemePackage, activeThemeSlots, themePackageResolved } from '@/hooks/useTheme'
+import { homeLayoutForThemePackage, isBuiltinThemePackage, isYinThemePackage } from '@/utils/theme'
 import { createThemePersistence } from '@/core/home/themePersistence'
 import { createThemeSettingsSchemaValidator } from '@/core/home/themeSettingsSchema'
 import { createIconifyResourceResolver } from '@/core/home/iconifyResource'
@@ -82,8 +83,7 @@ export function useThemeRuntime(input: {
    *  the built-in is trusted by construction, and the sandbox was never a real
    *  isolation for it anyway. Third-party themes stay on `sandbox` until trusted. */
   const isBuiltinTheme = computed(() => {
-    const id = themeRuntimePackage.value?.manifest.id
-    return id === 'org.yin.default' || id === 'org.yin.glass'
+    return isBuiltinThemePackage(themeRuntimePackage.value?.manifest.id)
   })
   /** Mount strategy, deliberately separate from the permission `executionMode`:
    *  a built-in theme keeps the (already granted) sandbox capability flow but is
@@ -195,7 +195,12 @@ export function useThemeRuntime(input: {
     return input.publicCode && input.publicAccessReady.value ? PUBLIC_VISITOR_PERMISSIONS : []
   })
 
-  const themeCanWriteGroups = computed(() => input.canWrite.value && input.activeSpace.value?.canEdit === true && themeRuntimePackage.value?.manifest.id === 'org.yin.default' && themeRuntimePermissions.value.includes('groups.write'))
+  // Group mutations exist in both built-in home layouts, so the capability stays
+  // with the Yin home family rather than with one layout.
+  const themeCanWriteGroups = computed(() => input.canWrite.value && input.activeSpace.value?.canEdit === true && isYinThemePackage(themeRuntimePackage.value?.manifest.id) && themeRuntimePermissions.value.includes('groups.write'))
+  // The drag layout editor belongs to the standard home only; the directory
+  // layout has no drag mode, so the Core must not offer the entry for it.
+  const themeCanEditHomeLayout = computed(() => isYinThemePackage(themeRuntimePackage.value?.manifest.id) && homeLayoutForThemePackage(themeRuntimePackage.value?.manifest.id) === 'standard')
 
   // `?yinDiag` 只在这个标签页里生效，不落盘、不进配置，所以关掉标签页就没了。
   // 它存在的意义是让「点了到底发生什么」可以直接看见：主题跑在 opaque 沙箱里，
@@ -271,6 +276,7 @@ export function useThemeRuntime(input: {
       networkMode: panelState.networkMode === PanelStateNetworkModeEnum.lan ? 'lan' : 'wan',
       signedIn: !!authStore.loggedIn,
     },
+    layout: homeLayoutForThemePackage(activeThemePackage.value?.manifest.id),
     monitorReservedHeight: input.getMonitorReservedHeight(),
     searchConfiguration: input.getSearchConfiguration(),
   }))
@@ -450,6 +456,7 @@ export function useThemeRuntime(input: {
     homeFallbackReason,
     themeRuntimePermissions,
     themeCanWriteGroups,
+    themeCanEditHomeLayout,
     themeRuntimeSlots,
     themeRuntimeSnapshot,
     themeRuntimeGrant,

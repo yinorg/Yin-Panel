@@ -83,6 +83,7 @@
       "homeLayout": "Ana sayfa düzeni",
       "homeLayoutStandard": "Standart",
       "homeLayoutDirectory": "Dizin",
+      "homeLayoutUnavailable": "Yalnızca yerleşik ana sayfa temalarıyla kullanılabilir.",
       "hideDescription": "Açıklama bilgisini gizle",
       "hideTitle": "Başlığı gizle",
       "leftRightMargin": "Sol-sağ kenar boşluğu",

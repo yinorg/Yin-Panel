@@ -8,7 +8,6 @@ func publicPanelConfig(source *repository.PanelConfig) *repository.PanelConfig {
 	}
 	monitorDisabled := false
 	return &repository.PanelConfig{
-		HomeLayout:                  source.HomeLayout,
 		BackgroundImageSrc:          source.BackgroundImageSrc,
 		WallpaperMode:               source.WallpaperMode,
 		WallpaperKind:               source.WallpaperKind,

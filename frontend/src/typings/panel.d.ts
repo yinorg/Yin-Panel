@@ -40,7 +40,6 @@ declare namespace Panel {
     }
 
     interface panelConfig{
-        homeLayout?:'standard' | 'directory'
         backgroundImageSrc?:string
         wallpaperMode?:'theme' | 'custom' | 'none'
         wallpaperKind?:'image' | 'video' | 'webBundle' | 'externalUrl'

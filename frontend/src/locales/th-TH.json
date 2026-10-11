@@ -83,6 +83,7 @@
       "homeLayout": "เลย์เอาต์หน้าแรก",
       "homeLayoutStandard": "มาตรฐาน",
       "homeLayoutDirectory": "ไดเรกทอรี",
+      "homeLayoutUnavailable": "ใช้ได้เฉพาะกับธีมหน้าแรกที่มีมาให้เท่านั้น",
       "hideDescription": "ซ่อนข้อมูลคำอธิบาย",
       "hideTitle": "ซ่อนชื่อเรื่อง",
       "leftRightMargin": "ระยะขอบซ้าย-ขวา",

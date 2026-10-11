@@ -10,8 +10,8 @@ import { getEnableStatus } from '@/api/system/systemMonitor'
 import { getSearchConfig, getSpaces, setSearchConfig, spaceOptions, type Space, type SpaceSearchConfig } from '@/api/panel/space'
 import { readSpaceCache, writeSpaceCache } from '@/utils/spaceCache'
 import { searchEngineList } from '@/components/deskModule/SearchBox/engines'
-import { beginThemeTrial, clearSpaceTheme, confirmThemeTrial, getSpaceTheme, getThemePackages, getThemeRevision, getTrustedThemeRuntimePolicy, installThemePackage, previewThemePackage, removeThemePackage, rollbackThemeTrial, setSpaceTheme, setTrustedThemeRuntimePolicy, uploadWebWallpaper } from '@/api/theme'
-import type { ThemePackage } from '@/utils/theme'
+import { beginThemeTrial, clearSpaceTheme, confirmThemeTrial, getSpaceTheme, getThemePackages, getThemeRevision, getTrustedThemeRuntimePolicy, installThemePackage, previewThemePackage, removeThemePackage, rollbackThemeTrial, saveThemePreference, setSpaceTheme, setTrustedThemeRuntimePolicy, uploadWebWallpaper } from '@/api/theme'
+import { HOME_LAYOUT_PACKAGES, homeLayoutForThemePackage, isBuiltinThemePackage, isYinThemePackage, type ThemePackage } from '@/utils/theme'
 import { activeThemePackageId, refreshMyTheme } from '@/hooks/useTheme'
 
 const authStore = useAuthStore()
@@ -380,6 +380,33 @@ const homeLayoutOptions = computed(() => [
   { label: t('apps.baseSettings.homeLayoutDirectory'), value: 'directory' },
 ])
 
+// The home layout belongs to the mounted theme package: each built-in home
+// package renders exactly one layout, so this switch is a shortcut for picking
+// one of them. It is only meaningful while one of them is active; a theme that
+// renders its own home keeps its own layout, and the switch is disabled with a
+// hint instead of silently doing nothing.
+const homeLayoutEditable = computed(() => isYinThemePackage(activeThemePackageId.value))
+const homeLayoutValue = computed(() => homeLayoutForThemePackage(activeThemePackageId.value))
+const homeLayoutSaving = ref(false)
+async function handleChangeHomeLayout(value: string) {
+  if (!homeLayoutEditable.value || homeLayoutSaving.value) return
+  const packageId = value === 'directory' ? HOME_LAYOUT_PACKAGES.directory : HOME_LAYOUT_PACKAGES.standard
+  homeLayoutSaving.value = true
+  try {
+    const result = await saveThemePreference({ packageId, mode: appStore.theme, themeMode: 'custom' })
+    if (result.code === 0) {
+      await refreshMyTheme(appStore)
+      ms.success(t('themePackage.saved'))
+    }
+    else {
+      ms.error(result.msg)
+    }
+  }
+  finally {
+    homeLayoutSaving.value = false
+  }
+}
+
 const maxWidthUnitOption = [
   {
     label: 'px',
@@ -479,7 +506,7 @@ function adoptThemeDefaults() {
       <div class="mt-3 divide-y">
         <div v-for="item in themePackages" :key="item.id" class="flex items-center justify-between gap-3 py-2">
           <span class="min-w-0 truncate">{{ item.name }} <span class="text-gray-500">{{ item.id }} · {{ item.version }} · {{ item.verified ? $t('themePackage.verified') : $t('themePackage.unverified') }}</span></span>
-          <NButton v-if="item.id !== 'org.yin.default'" size="tiny" tertiary type="error" @click="deleteTheme(item.id)">{{ $t('common.delete') }}</NButton>
+          <NButton v-if="!isBuiltinThemePackage(item.id)" size="tiny" tertiary type="error" @click="deleteTheme(item.id)">{{ $t('common.delete') }}</NButton>
         </div>
       </div>
       <section class="mt-4 border-t pt-3" aria-labelledby="trusted-runtime-heading" data-testid="theme-trusted-policy">
@@ -625,7 +652,10 @@ function adoptThemeDefaults() {
       <div class="mt-[5px]">
         <div>{{ $t('apps.baseSettings.homeLayout') }}</div>
         <div class="flex items-center mt-[5px]">
-          <NSelect v-model:value="panelState.panelConfig.homeLayout" to="body" :options="homeLayoutOptions" />
+          <NSelect :value="homeLayoutValue" to="body" :options="homeLayoutOptions" :disabled="!homeLayoutEditable || homeLayoutSaving" @update-value="handleChangeHomeLayout" />
+        </div>
+        <div v-if="!homeLayoutEditable" class="mt-[3px] text-xs text-slate-400">
+          {{ $t('apps.baseSettings.homeLayoutUnavailable') }}
         </div>
       </div>
       <div class="mt-[5px]">

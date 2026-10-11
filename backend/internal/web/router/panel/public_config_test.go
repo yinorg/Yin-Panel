@@ -10,7 +10,6 @@ func TestPublicPanelConfigProjectsDisplayPreferencesOnly(t *testing.T) {
 	monitorEnabled := true
 	searchVisible := true
 	source := &repository.PanelConfig{
-		HomeLayout:             "directory",
 		LogoText:               "Public bookmarks",
 		SearchBoxShow:          &searchVisible,
 		SystemMonitorShow:      &monitorEnabled,
@@ -19,7 +18,7 @@ func TestPublicPanelConfigProjectsDisplayPreferencesOnly(t *testing.T) {
 	}
 
 	projected := publicPanelConfig(source)
-	if projected.HomeLayout != "directory" || projected.LogoText != "Public bookmarks" || projected.SearchBoxShow == nil || !*projected.SearchBoxShow {
+	if projected.LogoText != "Public bookmarks" || projected.SearchBoxShow == nil || !*projected.SearchBoxShow {
 		t.Fatalf("display preferences were not preserved: %+v", projected)
 	}
 	if projected.FooterHtml != "" {

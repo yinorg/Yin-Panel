@@ -83,6 +83,7 @@
       "homeLayout": "Макет главной страницы",
       "homeLayoutStandard": "Стандартный",
       "homeLayoutDirectory": "Каталог",
+      "homeLayoutUnavailable": "Доступно только со встроенными темами главной страницы.",
       "hideDescription": "Скрывать описание",
       "hideTitle": "Скрывать заголовок",
       "leftRightMargin": "Отступы слева и справа",

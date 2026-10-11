@@ -124,19 +124,11 @@ select {
   font-weight: 300;
 }
 
-.directory-folder-button,
 .yin-search-submit {
   color: var(--yin-icon-text-color, #fff);
   cursor: pointer;
 }
 
-.directory-folder-button:hover {
-  border-color: var(--yin-primary, #176b80);
-  color: var(--yin-icon-text-color, #fff);
-  background: rgb(42 42 42 / 62%);
-}
-
-.directory-folder-button:focus-visible,
 .yin-search-submit:focus-visible,
 .yin-search-clear:focus-visible,
 .yin-search-engine:focus-visible,
@@ -149,12 +141,6 @@ select {
 .yin-search-submit:disabled {
   cursor: wait;
   opacity: .58;
-}
-
-.directory-folder-button.active {
-  border-color: var(--yin-primary, #176b80);
-  box-shadow: 0 0 0 1px var(--yin-primary, #176b80);
-  color: var(--yin-primary, #176b80);
 }
 
 /* Mirrors the pre-theme .home-header: an 80%-wide block that centres the
@@ -354,16 +340,6 @@ select {
   content: '';
 }
 
-.directory-folders {
-  display: flex;
-  gap: 8px;
-  max-width: 100%;
-  margin: 22px auto 0;
-  overflow-x: auto;
-  padding: 3px 2px 9px;
-  scrollbar-width: thin;
-}
-
 .yin-status:empty {
   display: none;
 }
@@ -397,8 +373,6 @@ select {
      rather than on the page, which keeps the header 10px wider than the grid. */
   margin-inline: var(--yin-margin-x, 5px);
 }
-
-.yin-page--directory .yin-collection { margin-top: 18px; }
 
 .yin-group {
   min-width: 0;
@@ -781,12 +755,6 @@ select {
   align-items: start;
 }
 
-.yin-page--directory .yin-group-items {
-  display: grid;
-  gap: var(--yin-component-group-gap, 12px);
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr));
-}
-
 .yin-group.is-collapsed .yin-group-items {
   display: none;
 }
@@ -1063,51 +1031,6 @@ select {
 
 .yin-footer a:hover {
   text-decoration: underline;
-}
-
-.yin-page--directory .yin-collection {
-  display: block;
-  margin-top: 18px;
-  padding: var(--yin-component-card-padding, 16px);
-  border: var(--yin-component-card-border-width, 1px) var(--yin-component-card-border-style, solid) var(--yin-border, #d8e0e3);
-  border-radius: var(--yin-component-card-radius, 8px);
-  background: color-mix(in srgb, var(--yin-surfaceElevated, var(--yin-surface, #fff)) 84%, transparent);
-  box-shadow: var(--yin-component-card-shadow, var(--yin-shadowCard, none));
-}
-
-.yin-page--directory .yin-group {
-  padding: 12px 0;
-  border-bottom: 1px solid color-mix(in srgb, var(--yin-border, #d8e0e3) 70%, transparent);
-}
-
-.yin-page--directory .yin-group:last-child {
-  border-bottom: 0;
-}
-
-.yin-page--directory .yin-group-heading {
-  margin-bottom: 10px;
-}
-
-.yin-page--directory .yin-group-title {
-  font-size: var(--yin-fontBodySize, 14px);
-}
-
-.yin-page--directory .yin-group-items {
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr));
-}
-
-.yin-page--directory .yin-item {
-  flex-direction: row;
-  justify-content: flex-start;
-  min-height: 72px;
-  text-align: left;
-}
-
-.yin-page--directory .yin-item-icon {
-  width: 36px;
-  height: 36px;
-  flex-basis: 36px;
-  font-size: 17px;
 }
 
 @media (max-width: 640px) {

@@ -331,12 +331,13 @@ func TestBuiltinPackagesV2AreCompleteDTCGAndRepeatable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(packages) != 2 {
-		t.Fatalf("expected Yin/Glass, got %d", len(packages))
+	if len(packages) != 3 {
+		t.Fatalf("expected Yin/Directory/Glass, got %d", len(packages))
 	}
 	expectedPermissions := map[string][]string{
-		"org.yin.default": {"spaces.read", "groups.read", "items.read", "items.write", "groups.write", "preferences.read", "preferences.write", "diagnostics.report"},
-		"org.yin.glass":   {"spaces.read", "groups.read", "items.read"},
+		"org.yin.default":   {"spaces.read", "groups.read", "items.read", "items.write", "groups.write", "preferences.read", "preferences.write", "diagnostics.report"},
+		"org.yin.directory": {"spaces.read", "groups.read", "items.read", "items.write", "groups.write", "preferences.read", "preferences.write", "diagnostics.report"},
+		"org.yin.glass":     {"spaces.read", "groups.read", "items.read"},
 	}
 	for _, summary := range packages {
 		pkg, err := PackageRevisionPublicV2(db, summary.Revision)
@@ -366,8 +367,11 @@ func TestBuiltinPackagesV2AreCompleteDTCGAndRepeatable(t *testing.T) {
 			t.Errorf("%s implicit permissions = %v, want %v, builtin=%v, err=%v", summary.ID, permissions, wantPermissions, builtin, err)
 		}
 		wantVersion := "2.3.3"
-		if summary.ID == "org.yin.default" {
-			wantVersion = "2.3.81"
+		switch summary.ID {
+		case "org.yin.default":
+			wantVersion = "2.3.82"
+		case "org.yin.directory":
+			wantVersion = "2.4.0"
 		}
 		if pkg.Manifest.Version != wantVersion {
 			t.Errorf("%s builtin version = %q, want %q", summary.ID, pkg.Manifest.Version, wantVersion)
@@ -376,6 +380,10 @@ func TestBuiltinPackagesV2AreCompleteDTCGAndRepeatable(t *testing.T) {
 		case "org.yin.default":
 			if !strings.Contains(string(mustPackageAsset(t, db, summary.Revision, "styles/home.css")), ".yin-masthead") {
 				t.Error("Yin home styling is missing its Yin-only layout rules")
+			}
+		case "org.yin.directory":
+			if !strings.Contains(string(mustPackageAsset(t, db, summary.Revision, "styles/home.css")), ".directory-folders") {
+				t.Error("directory home styling is missing its folder picker")
 			}
 		case "org.yin.glass":
 			if !strings.Contains(string(mustPackageAsset(t, db, summary.Revision, "styles/home.css")), "backdrop-filter") {
@@ -391,23 +399,26 @@ func TestBuiltinPackagesV2AreCompleteDTCGAndRepeatable(t *testing.T) {
 }
 
 func TestBuiltinHomeAssetsLoadFromPackagedThemeSources(t *testing.T) {
-	ids := []string{"org.yin.default", "org.yin.glass"}
+	ids := []string{"org.yin.default", "org.yin.directory", "org.yin.glass"}
 	styles := map[string]string{}
 	for _, id := range ids {
 		resources := builtinHomeResourcesV2(id)
 		if !strings.Contains(string(resources["views/home.mjs"].Content), "apiVersion: '1.0.0'") {
 			t.Errorf("%s does not load a Theme API v1 source view", id)
 		}
-		if id == "org.yin.default" && !strings.Contains(string(resources["views/home.mjs"].Content), "yin-theme-root") {
-			t.Error("default Yin does not load its independent home view")
-		}
-		if id != "org.yin.default" && strings.Contains(string(resources["views/home.mjs"].Content), "yin-theme-root") {
-			t.Errorf("%s unexpectedly loads the independent Yin home view", id)
+		// The two Yin home packages share the independent home view; Glass uses the
+		// shared one.
+		wantsYinView := id != "org.yin.glass"
+		if got := strings.Contains(string(resources["views/home.mjs"].Content), "yin-theme-root"); got != wantsYinView {
+			t.Errorf("%s independent home view = %v, want %v", id, got, wantsYinView)
 		}
 		styles[id] = string(resources["styles/home.css"].Content)
 	}
-	if styles[ids[0]] == styles[ids[1]] {
+	if styles["org.yin.default"] == styles["org.yin.glass"] {
 		t.Fatal("Glass source styles must differ from Yin")
+	}
+	if styles["org.yin.directory"] == styles["org.yin.default"] {
+		t.Fatal("Directory source styles must differ from the standard home")
 	}
 	for id, marker := range map[string]string{
 		"org.yin.glass": "backdrop-filter: blur(18px)",
@@ -425,10 +436,15 @@ func TestBuiltinHomeAssetsLoadFromPackagedThemeSources(t *testing.T) {
 func TestBuiltinHomeResourceHashesPinTheEmbeddedThemes(t *testing.T) {
 	expected := map[string]map[string]string{
 		"org.yin.default": {
-			// 详细模式卡片改为磨砂玻璃 + 跟随指针的触碰动效，改了 yin 的 home.mjs
-			// 与主题样式表，两个哈希都变。
-			"views/home.mjs":  "33df7b08e316be16125fecbcc5edeec21be10dee06af9dad7feb1eb338d06a23",
-			"styles/home.css": "1c0ec9ea1addbac84a8dbcbbc7c0f2c17d70546b54cc16a25de2566e54821717",
+			// 默认主题拆成「shell + standard 布局」，视图哈希随之改变；样式表移出
+			// 目录规则后也变。
+			"views/home.mjs":  "42aaf065d0598dd6e1b8c31dd805f7074246f031e85941b43e0015970149d526",
+			"styles/home.css": "b9c2dc1c6408a9d95b660f9f744fb241017673630174d071589abdbf7dbf0f57",
+		},
+		"org.yin.directory": {
+			// 目录主题是「shell + directory 布局」，样式为共享样式表加目录样式表。
+			"views/home.mjs":  "17f4043d0fbc73c37e0f469a9b4002255f66962f80b4ce448cac7861498ef177",
+			"styles/home.css": "fea4b4150ffbb360b6aef22d42f5e0d357d392b66dbf85ee75a9434ff2ee5a5c",
 		},
 		"org.yin.glass": {
 			// Glass 复用 shared/home.mjs 与 shared/home.css，两者都改了。
@@ -500,7 +516,7 @@ func TestEnsureBuiltinV2UpgradesOnlyActivationForSelectedBuiltin(t *testing.T) {
 		t.Fatal(err)
 	}
 	latest, err := LatestPackageRevisionV2(db, "org.yin.default")
-	if err != nil || latest.Version != "2.3.81" || activation.ActiveRevisionID != latest.ID {
+	if err != nil || latest.Version != "2.3.82" || activation.ActiveRevisionID != latest.ID {
 		t.Fatalf("selected builtin activation = %+v, latest=%s, err=%v", activation, latest.ID, err)
 	}
 	if latest.ID == old.Revision {

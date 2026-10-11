@@ -83,6 +83,7 @@
       "homeLayout": "Layout della home",
       "homeLayoutStandard": "Standard",
       "homeLayoutDirectory": "Elenco",
+      "homeLayoutUnavailable": "Disponibile solo con i temi home integrati.",
       "hideDescription": "Nascondi le informazioni di descrizione",
       "hideTitle": "Nascondi il titolo",
       "leftRightMargin": "Margine laterale",

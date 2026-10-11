@@ -83,6 +83,7 @@
       "homeLayout": "首页布局",
       "homeLayoutStandard": "标准",
       "homeLayoutDirectory": "目录",
+      "homeLayoutUnavailable": "仅内置首页主题支持切换。",
       "hideDescription": "隐藏描述信息",
       "hideTitle": "隐藏标题",
       "leftRightMargin": "左右边距",

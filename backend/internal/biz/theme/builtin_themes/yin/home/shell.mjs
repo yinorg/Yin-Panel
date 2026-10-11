@@ -53,7 +53,11 @@ const diagClick = (label, detail) => {
   ])
 }
 
-export default {
+// Shared shell for the built-in Yin home themes. The layout-specific
+// behaviour is supplied by the `yinHomeLayout` module concatenated after this
+// file, so the shell stays layout-agnostic and is shipped to every package
+// that composes it.
+const createYinHome = yinLayout => ({
   apiVersion: '1.0.0',
   setup(api) {
     let root
@@ -63,7 +67,6 @@ export default {
     const envLabel = (key, fallback) => api.environment?.get?.()?.labels?.[key] || fallback
     let sideSwitching = false
     let query = ''
-    let directoryRootId
     let clockTimer
     let collectionLayoutFrame
     let groupDialog
@@ -88,7 +91,6 @@ export default {
     const collapsedGroups = new Set()
     const groupNodes = new Map()
     const itemNodes = new Map()
-    const directoryNodes = new Map()
 
     // Drag edit mode (see enterEditMode): while editing, the DOM is the source of
     // truth, so renderCollection is frozen and the saved layout is diffed against
@@ -321,7 +323,7 @@ export default {
     let engineButton
     let selectedEngineId = ''
     let searchButton
-    let directoryNav
+    let layoutNav
     let collection
     let emptyState
     let footer
@@ -487,8 +489,7 @@ export default {
       searchButton.addEventListener('click', submitSearch)
       searchSection.append(searchContainer, engineMenu)
       searchContainer.append(engineButton, searchInput, searchClearButton, searchButton)
-      directoryNav = element('nav', 'directory-folders')
-      directoryNav.setAttribute('aria-label', 'Bookmark groups')
+      layoutNav = yinLayout.createNav(() => renderCollection())
       status = element('p', 'yin-status')
       status.setAttribute('role', 'status')
       status.dataset.testid = 'theme-home-status'
@@ -561,7 +562,9 @@ export default {
       // fixed-position overlays (dialog, context menu) as siblings of it: a
       // transformed ancestor would otherwise become their containing block.
       const content = element('div', 'yin-content')
-      content.append(headerSection, monitorSection, directoryNav, status, collection, emptyState, footer)
+      const contentNodes = [headerSection, monitorSection, status, collection, emptyState, footer]
+      if (layoutNav) contentNodes.splice(2, 0, layoutNav)
+      content.append(...contentNodes)
       page.append(content, groupDialog, contextMenu)
       page.addEventListener('keydown', event => {
         if (!groupDialog.hidden && event.key === 'Tab') {
@@ -839,7 +842,7 @@ export default {
       return link
     }
 
-    const updateItemNode = (link, item, presentation, layout) => {
+    const updateItemNode = (link, item, presentation) => {
       const { icon, title, description } = link._yin
       link.dataset.itemId = String(item.id)
       link.dataset.testid = 'theme-home-item'
@@ -852,12 +855,9 @@ export default {
       title.textContent = item.title || ''
       description.textContent = item.description || ''
       link._yin.item = item
-      title.hidden = layout === 'directory' ? false : presentation?.iconTextIconHideTitle === true
-      description.hidden = layout === 'directory'
-        ? true
-        : presentation?.iconStyle === 'info'
-          ? presentation.iconTextInfoHideDescription === true
-          : true
+      const chrome = yinLayout.itemChrome(presentation)
+      title.hidden = chrome.hideTitle
+      description.hidden = chrome.hideDescription
       icon.replaceChildren()
       icon.removeAttribute('style')
       const itemIcon = item.icon
@@ -880,7 +880,7 @@ export default {
         image.src = itemIcon.src
         icon.append(image)
       }
-      const infoStyle = layout === 'standard' && presentation?.iconStyle === 'info'
+      const infoStyle = chrome.info
       link.classList.toggle('yin-item--info', infoStyle)
       // The detailed style paints the whole card with the item colour and keeps
       // the glyph on a transparent tile, matching the pre-theme build.
@@ -894,48 +894,6 @@ export default {
         link.style.removeProperty('background-color')
         if (itemIcon?.backgroundColor) icon.style.backgroundColor = itemIcon.backgroundColor
       }
-    }
-
-    const groupTree = groups => {
-      const byId = new Map((groups || []).map(group => [String(group.id), group]))
-      const children = new Map()
-      for (const group of byId.values()) {
-        const parent = group.parentId == null ? '' : String(group.parentId)
-        const siblings = children.get(parent) || []
-        siblings.push(group)
-        children.set(parent, siblings)
-      }
-      return { byId, children, roots: children.get('') || [] }
-    }
-
-    const updateDirectoryNav = roots => {
-      const kept = new Set()
-      for (const group of roots) {
-        const key = String(group.id)
-        kept.add(key)
-        let button = directoryNodes.get(key)
-        if (!button) {
-          button = element('button', 'directory-folder-button')
-          button.type = 'button'
-          button.addEventListener('click', () => {
-            directoryRootId = button.dataset.groupId
-            renderCollection()
-          })
-          directoryNodes.set(key, button)
-        }
-        button.dataset.groupId = key
-        button.textContent = group.title || 'Untitled group'
-        button.classList.toggle('active', key === directoryRootId)
-        button.setAttribute('aria-pressed', key === directoryRootId ? 'true' : 'false')
-        directoryNav.append(button)
-      }
-      for (const [key, button] of directoryNodes) {
-        if (!kept.has(key)) {
-          button.remove()
-          directoryNodes.delete(key)
-        }
-      }
-      directoryNav.hidden = snapshot.presentation?.layout !== 'directory' || roots.length === 0
     }
 
     const updateFooter = html => {
@@ -1002,25 +960,24 @@ export default {
 
     const positionCollectionAfterMonitor = () => {      if (collectionLayoutFrame) cancelAnimationFrame(collectionLayoutFrame)
       collection.style.removeProperty('margin-top')
-      if (directoryNav) directoryNav.style.removeProperty('margin-top')
+      if (layoutNav) layoutNav.style.removeProperty('margin-top')
       collectionLayoutFrame = requestAnimationFrame(() => {
         collectionLayoutFrame = undefined
         const reservedHeight = Number(snapshot?.presentation?.monitor?.reservedHeight)
         if (!Number.isFinite(reservedHeight) || reservedHeight <= 0) return
-        const isDirectory = snapshot?.presentation?.layout === 'directory'
-        const naturalMargin = isDirectory ? 18 : 24
+        const naturalMargin = yinLayout.collectionGap
         // Unified with the desktop spacing. The monitor band already reserves its
         // own height, so the old mobile-only viewport-proportional extra only
         // pushed the first group needlessly far below it.
         const standardGap = 77
         const desiredTop = reservedHeight + standardGap
-        // The directory folder picker sits between the search box and the
-        // collection, so it is the element that lands inside the monitor band.
-        // Push the picker below the band and keep the collection at its natural
-        // spacing, otherwise the picker is covered by the monitor.
-        if (isDirectory && directoryNav && !directoryNav.hidden) {
-          const navTop = directoryNav.getBoundingClientRect().top
-          directoryNav.style.marginTop = `${Math.max(0, desiredTop - navTop)}px`
+        // A layout that renders its own row between the search box and the
+        // collection is what lands inside the monitor band first. Push that row
+        // below the band and keep the collection at its natural spacing,
+        // otherwise the row is covered by the monitor.
+        if (layoutNav && !layoutNav.hidden) {
+          const navTop = layoutNav.getBoundingClientRect().top
+          layoutNav.style.marginTop = `${Math.max(0, desiredTop - navTop)}px`
           collection.style.marginTop = `${naturalMargin}px`
         } else {
           const currentTop = collection.getBoundingClientRect().top
@@ -1047,24 +1004,7 @@ export default {
       // serialized from it, so a snapshot re-render would discard the drag.
       if (editMode) return
       const presentation = snapshot.presentation || {}
-      const tree = groupTree(snapshot.groups)
-      const isDirectory = presentation.layout === 'directory'
-      updateDirectoryNav(tree.roots)
-      if (!directoryRootId || !tree.roots.some(group => String(group.id) === directoryRootId)) {
-        directoryRootId = tree.roots.length ? String(tree.roots[0].id) : undefined
-        updateDirectoryNav(tree.roots)
-      }
-      const visibleGroups = []
-      const addGroupTree = (group, depth) => {
-        visibleGroups.push({ group, depth })
-        for (const child of tree.children.get(String(group.id)) || []) addGroupTree(child, depth + 1)
-      }
-      if (isDirectory) {
-        const selectedRoot = tree.roots.find(group => String(group.id) === directoryRootId)
-        if (selectedRoot) addGroupTree(selectedRoot, 0)
-      } else {
-        for (const group of snapshot.groups || []) visibleGroups.push({ group, depth: 0 })
-      }
+      const visibleGroups = yinLayout.visibleGroups(snapshot.groups)
       const itemById = new Map((snapshot.items || []).map(item => [String(item.id), item]))
       const needle = query.trim().toLocaleLowerCase()
       const usedGroups = new Set()
@@ -1079,12 +1019,11 @@ export default {
         section._yin.toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true')
         section.classList.toggle('is-collapsed', collapsed)
         section.style.setProperty('--yin-group-depth', String(depth))
-        // In the directory layout the selected root is already named by the folder
-        // picker above, so its title is redundant. Keep the heading row, though:
-        // its controls (add item, edit/delete/reorder group) are the only way to
-        // manage the group in that layout.
+        // The heading row always stays: its controls (add item, edit/delete/
+        // reorder group) are the only way to manage the group. A layout whose
+        // own chrome already names the group can hide the redundant title
+        // through `decorateGroup`.
         section._yin.heading.hidden = false
-        section._yin.title.hidden = isDirectory && depth === 0
         const siblings = (snapshot.groups || []).filter(candidate => (candidate.parentId ?? null) === (group.parentId ?? null))
         const siblingIndex = siblings.findIndex(candidate => String(candidate.id) === String(group.id))
         section._yin.addItem.hidden = !canCreateItems()
@@ -1109,7 +1048,7 @@ export default {
               node = createItemNode(item)
               itemNodes.set(String(item.id), node)
             }
-            updateItemNode(node, item, presentation, isDirectory ? 'directory' : 'standard')
+            updateItemNode(node, item, presentation)
             list.append(node)
             visibleItemIds.add(String(item.id))
           }
@@ -1123,14 +1062,7 @@ export default {
             || `${item.title || ''} ${item.description || ''}`.toLocaleLowerCase().includes(needle))
         })
         section.hidden = !!needle && presentation.search?.itemFilterEnabled !== false && !hasVisibleItem
-        section.classList.toggle('is-directory', isDirectory)
-        if (isDirectory) {
-          section._yin.title.classList.add('directory-group-heading')
-          section._yin.title.style.marginInlineStart = `${Math.min(8, depth) * 18}px`
-        } else {
-          section._yin.title.classList.remove('directory-group-heading')
-          section._yin.title.style.removeProperty('margin-inline-start')
-        }
+        yinLayout.decorateGroup(section, group, depth)
         collection.append(section)
         usedGroups.add(String(group.id))
       }
@@ -1218,8 +1150,7 @@ export default {
     }
 
     const enterEditMode = () => {
-      if (editMode || !canArrange()) return
-      if (snapshot?.presentation?.layout === 'directory') return
+      if (editMode || !canArrange() || !yinLayout.allowDragEdit) return
       // A save serializes the whole collection, so a search filter or a collapsed
       // group would silently drop items from the layout.
       query = ''
@@ -1382,11 +1313,10 @@ export default {
       // 也读不到父窗口（SecurityError）。详见文件顶部关于 `diagOn` 的说明。
       diagOn = Boolean(snapshot.diagnostics && snapshot.diagnostics.showClickTrace)
       const presentation = snapshot.presentation || {}
-      root.dataset.layout = presentation.layout === 'directory' ? 'directory' : 'standard'
-      page.classList.toggle('yin-page--directory', presentation.layout === 'directory')
+      root.dataset.layout = yinLayout.kind
       // The pre-theme build switched the item grid to a 200px-minimum card grid
       // for the "detailed" icon style; the marker lets the stylesheet do the same.
-      page.classList.toggle('yin-page--info', presentation.layout !== 'directory' && presentation.iconStyle === 'info')
+      page.classList.toggle('yin-page--info', yinLayout.itemChrome(presentation).info)
       page.style.setProperty('--yin-viewport-height', `${viewportHeight()}px`)
       page.style.setProperty('--yin-content-max-width', `${presentation.content?.maxWidth || 1200}${presentation.content?.maxWidthUnit || 'px'}`)
       page.style.setProperty('--yin-margin-x', `${presentation.content?.marginX || 0}px`)
@@ -1692,4 +1622,4 @@ export default {
       },
     }
   },
-}
+})

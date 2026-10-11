@@ -83,6 +83,7 @@
       "homeLayout": "Diseño de inicio",
       "homeLayoutStandard": "Estándar",
       "homeLayoutDirectory": "Directorio",
+      "homeLayoutUnavailable": "Disponible solo con los temas de inicio integrados.",
       "hideDescription": "Ocultar la descripción",
       "hideTitle": "Ocultar el título",
       "leftRightMargin": "Margen izquierdo y derecho",

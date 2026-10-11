@@ -1,0 +1,82 @@
+/* The directory layout's own chrome. It is composed after theme-home.css for
+   the built-in directory theme only, so the rules are unconditional: in this
+   package the home is always the directory presentation. */
+
+.directory-folder-button {
+  color: var(--yin-icon-text-color, #fff);
+  cursor: pointer;
+}
+
+.directory-folder-button:hover {
+  border-color: var(--yin-primary, #176b80);
+  color: var(--yin-icon-text-color, #fff);
+  background: rgb(42 42 42 / 62%);
+}
+
+.directory-folder-button:focus-visible {
+  outline: 3px solid var(--yin-focusRing, var(--yin-primary, #176b80));
+  outline-offset: 3px;
+}
+
+.directory-folder-button.active {
+  border-color: var(--yin-primary, #176b80);
+  box-shadow: 0 0 0 1px var(--yin-primary, #176b80);
+  color: var(--yin-primary, #176b80);
+}
+
+.directory-folders {
+  display: flex;
+  gap: 8px;
+  max-width: 100%;
+  margin: 22px auto 0;
+  overflow-x: auto;
+  padding: 3px 2px 9px;
+  scrollbar-width: thin;
+}
+
+.yin-collection {
+  display: block;
+  margin-top: 18px;
+  padding: var(--yin-component-card-padding, 16px);
+  border: var(--yin-component-card-border-width, 1px) var(--yin-component-card-border-style, solid) var(--yin-border, #d8e0e3);
+  border-radius: var(--yin-component-card-radius, 8px);
+  background: color-mix(in srgb, var(--yin-surfaceElevated, var(--yin-surface, #fff)) 84%, transparent);
+  box-shadow: var(--yin-component-card-shadow, var(--yin-shadowCard, none));
+}
+
+.yin-group {
+  padding: 12px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--yin-border, #d8e0e3) 70%, transparent);
+}
+
+.yin-group:last-child {
+  border-bottom: 0;
+}
+
+.yin-group-heading {
+  margin-bottom: 10px;
+}
+
+.yin-group-title {
+  font-size: var(--yin-fontBodySize, 14px);
+}
+
+.yin-group-items {
+  display: grid;
+  gap: var(--yin-component-group-gap, 12px);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr));
+}
+
+.yin-item {
+  flex-direction: row;
+  justify-content: flex-start;
+  min-height: 72px;
+  text-align: left;
+}
+
+.yin-item-icon {
+  width: 36px;
+  height: 36px;
+  flex-basis: 36px;
+  font-size: 17px;
+}

@@ -77,6 +77,42 @@ export const semanticSlots = [
   'onPrimary', 'secondary', 'success', 'warning', 'danger', 'focusRing',
 ] as const
 
+/**
+ * The built-in home layout packages. Each one renders exactly one layout, so the
+ * panel's "home layout" choice selects this package rather than handing a layout
+ * value to a theme that would render several.
+ */
+export const HOME_LAYOUT_PACKAGES = {
+  standard: 'org.yin.default',
+  directory: 'org.yin.directory',
+} as const
+
+const BUILTIN_THEME_PACKAGES = new Set<string>([
+  HOME_LAYOUT_PACKAGES.standard,
+  HOME_LAYOUT_PACKAGES.directory,
+  'org.yin.glass',
+])
+
+const YIN_THEME_PACKAGES = new Set<string>([
+  HOME_LAYOUT_PACKAGES.standard,
+  HOME_LAYOUT_PACKAGES.directory,
+])
+
+/** True for a theme that ships with the panel. */
+export function isBuiltinThemePackage(id?: string): boolean {
+  return !!id && BUILTIN_THEME_PACKAGES.has(id)
+}
+
+/** True for the Yin visual family, which the two built-in home layouts belong to. */
+export function isYinThemePackage(id?: string): boolean {
+  return !!id && YIN_THEME_PACKAGES.has(id)
+}
+
+/** The home layout a package renders; every package except the directory one is standard. */
+export function homeLayoutForThemePackage(id?: string): 'standard' | 'directory' {
+  return id === HOME_LAYOUT_PACKAGES.directory ? 'directory' : 'standard'
+}
+
 const cssColorProfiles = new Set(['srgb', 'srgb-linear', 'display-p3', 'a98-rgb', 'prophoto-rgb', 'rec2020', 'xyz-d50', 'xyz-d65'])
 const cssPolarColorSpaces = new Set(['hsl', 'hwb', 'lab', 'lch', 'oklab', 'oklch'])
 const DTCG_SCHEMA_202510 = 'https://www.designtokens.org/schemas/2025.10/format.json'

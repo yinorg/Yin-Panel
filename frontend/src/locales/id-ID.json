@@ -83,6 +83,7 @@
       "homeLayout": "Tata letak beranda",
       "homeLayoutStandard": "Standar",
       "homeLayoutDirectory": "Direktori",
+      "homeLayoutUnavailable": "Hanya tersedia dengan tema beranda bawaan.",
       "hideDescription": "Sembunyikan informasi deskripsi",
       "hideTitle": "Sembunyikan judul",
       "leftRightMargin": "Margin kiri-kanan",

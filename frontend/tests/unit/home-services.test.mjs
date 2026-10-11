@@ -416,7 +416,7 @@ test('Core Home snapshot keeps Item and Group write capabilities independent and
 
 test('Core Home presentation maps panel configuration, search engines, and safe numeric defaults', () => {
   const panelConfig = {
-    homeLayout: 'directory', iconStyle: 0, iconTextColor: '#abc', iconTextInfoHideDescription: true,
+    iconStyle: 0, iconTextColor: '#abc', iconTextInfoHideDescription: true,
     iconTextIconHideTitle: true, logoText: 'Workspace', logoImageSrc: '/logo.svg', clockShowSecond: false,
     clockColor: '#123456', searchBoxShow: false, searchBoxSearchIcon: false,
     marginTop: 18, marginBottom: 27, maxWidth: 88, maxWidthUnit: '%', marginX: 24,
@@ -427,6 +427,7 @@ test('Core Home presentation maps panel configuration, search engines, and safe 
     version: 4, status: 'ready', spaces: [], groups: [], canWrite: false,
     monitorReservedHeight: 184,
     presentation: panelConfig,
+    layout: 'directory',
     searchConfiguration: { engines: [engine], currentSearchEngine: engine },
   })
   assert.deepEqual(snapshot.presentation, {
@@ -440,7 +441,7 @@ test('Core Home presentation maps panel configuration, search engines, and safe 
     signedIn: false,
   })
   assert.deepEqual(panelConfig, {
-    homeLayout: 'directory', iconStyle: 0, iconTextColor: '#abc', iconTextInfoHideDescription: true,
+    iconStyle: 0, iconTextColor: '#abc', iconTextInfoHideDescription: true,
     iconTextIconHideTitle: true, logoText: 'Workspace', logoImageSrc: '/logo.svg', clockShowSecond: false,
     clockColor: '#123456', searchBoxShow: false, searchBoxSearchIcon: false,
     marginTop: 18, marginBottom: 27, maxWidth: 88, maxWidthUnit: '%', marginX: 24,

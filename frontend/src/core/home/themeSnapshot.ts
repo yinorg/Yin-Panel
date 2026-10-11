@@ -22,7 +22,6 @@ interface SearchEngineSource {
 }
 
 interface PresentationSource {
-  homeLayout?: string
   iconStyle?: number | string
   iconTextColor?: string
   iconTextInfoHideDescription?: boolean
@@ -103,6 +102,8 @@ export function createThemeHomeSnapshot(input: {
   /** Viewport height through the bottom edge of Core's fixed monitor layer. */
   monitorReservedHeight?: number
   presentation?: PresentationSource
+  /** The home layout the mounted theme package renders. */
+  layout?: 'standard' | 'directory'
   searchConfiguration?: SearchConfigurationSource
   /**
    * Resolves an item's open address with the Core's LAN/WAN and mobile policy.
@@ -167,7 +168,7 @@ export function createThemeHomeSnapshot(input: {
       })
     }
   }
-  const presentation = mapPresentation(input.presentation, input.searchConfiguration, input.monitorReservedHeight, input.activeSpaceSide)
+  const presentation = mapPresentation(input.presentation, input.searchConfiguration, input.monitorReservedHeight, input.activeSpaceSide, input.layout)
   const capabilities = [
     ...(input.activeSpaceCanEdit === true && input.canWrite ? ['items.write'] : []),
     ...(input.activeSpaceCanEdit === true && input.canWriteGroups ? ['groups.write'] : []),
@@ -195,10 +196,9 @@ export function createThemeHomeSnapshot(input: {
   }
 }
 
-function mapPresentation(source?: PresentationSource, searchConfiguration?: SearchConfigurationSource, monitorReservedHeight?: number, activeSide?: 'yin' | 'yang'): ThemeHomePresentation | undefined {
+function mapPresentation(source?: PresentationSource, searchConfiguration?: SearchConfigurationSource, monitorReservedHeight?: number, activeSide?: 'yin' | 'yang', layout?: 'standard' | 'directory'): ThemeHomePresentation | undefined {
   if (!source && !searchConfiguration) return undefined
   const defaults = {
-    homeLayout: 'standard',
     iconStyle: 1,
     iconTextColor: '#ffffff',
     iconTextInfoHideDescription: false,
@@ -235,7 +235,7 @@ function mapPresentation(source?: PresentationSource, searchConfiguration?: Sear
     ? defaults.maxWidthUnit as ThemeHomePresentation['content']['maxWidthUnit']
     : 'px'
   return {
-    layout: defaults.homeLayout === 'directory' ? 'directory' : 'standard',
+    layout: layout === 'directory' ? 'directory' : 'standard',
     iconStyle: defaults.iconStyle === 0 || defaults.iconStyle === 'info' ? 'info' : 'icon',
     iconTextColor: optionalText(defaults.iconTextColor),
     iconTextInfoHideDescription: defaults.iconTextInfoHideDescription === true,

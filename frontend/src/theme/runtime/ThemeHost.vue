@@ -5,6 +5,7 @@ import type { ThemePackage } from '@/utils/theme'
 import { mountThemeSandbox, type ThemeSandboxHandle, type ThemeSandboxStylesheet } from './sandbox'
 import { mountThemeDirect, type ThemeDirectHandle } from './direct'
 import { rewriteThemeStylesheet } from './resources'
+import { isBuiltinThemePackage } from '@/utils/theme'
 import { sha256Hex } from '@/utils/sha256.js'
 import { toThemeItemIcon } from '@/core/home/iconifyResource'
 
@@ -46,7 +47,7 @@ const mountMode = computed<'sandbox' | 'direct'>(() => props.mountMode ?? ((prop
  *  over the API, so on the very first tick the grant may not be in hand yet; the
  *  host remounts when it arrives (the permission list is part of the key), so a
  *  direct-mount built-in must tolerate that gap instead of failing closed. */
-const isBuiltinPackage = computed(() => props.theme.manifest.id === 'org.yin.default' || props.theme.manifest.id === 'org.yin.glass')
+const isBuiltinPackage = computed(() => isBuiltinThemePackage(props.theme.manifest.id))
 /**
  * The explicit trusted-route takeover is the fullscreen, frame-replacing mount
  * with its own exit toolbar. A built-in theme mounting directly on the normal

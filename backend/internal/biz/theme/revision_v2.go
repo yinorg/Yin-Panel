@@ -928,8 +928,15 @@ func EnsureBuiltinV2(db *gorm.DB) error {
 }
 
 func builtinPackagesV2() []*PackageV2 {
+	// The default and directory packages are the same visual family and share one
+	// palette; only their identity and their home layout differ.
+	yinHome := builtinPaletteV2{"org.yin.default", "Yin", map[string]string{"canvas": "#f4f7f8", "surface": "#ffffff", "text": "#20282c", "muted": "#64737a", "border": "#d8e0e3", "primary": "#176b80"}, map[string]string{"canvas": "#171d20", "surface": "#22292c", "text": "#f2f5f6", "muted": "#b7c1c4", "border": "#536066", "primary": "#78c5d4"}, "8px", "16px", "0 8px 24px #18242a22", "180ms", []string{"Inter", "system-ui", "sans-serif"}, 1, 1, 0, 0, 0, 0, "16px", "70px"}
+	directoryHome := yinHome
+	directoryHome.id = "org.yin.directory"
+	directoryHome.name = "目录"
 	palettes := []builtinPaletteV2{
-		{"org.yin.default", "Yin", map[string]string{"canvas": "#f4f7f8", "surface": "#ffffff", "text": "#20282c", "muted": "#64737a", "border": "#d8e0e3", "primary": "#176b80"}, map[string]string{"canvas": "#171d20", "surface": "#22292c", "text": "#f2f5f6", "muted": "#b7c1c4", "border": "#536066", "primary": "#78c5d4"}, "8px", "16px", "0 8px 24px #18242a22", "180ms", []string{"Inter", "system-ui", "sans-serif"}, 1, 1, 0, 0, 0, 0, "16px", "70px"},
+		yinHome,
+		directoryHome,
 		{"org.yin.glass", "Glass", map[string]string{"canvas": "#e7edf4", "surface": "#edf2f8cc", "text": "#182535", "muted": "#53677c", "border": "#a9bed3aa", "primary": "#2666a6"}, map[string]string{"canvas": "#101827", "surface": "#19263acc", "text": "#eef5ff", "muted": "#a6b8cd", "border": "#526c89aa", "primary": "#73b9ff"}, "18px", "22px", "0 18px 50px #18365b55", "260ms", []string{"Inter", "system-ui", "sans-serif"}, 1.08, .82, 18, 0, 0, .08, "22px", "76px"},
 	}
 	result := make([]*PackageV2, 0, len(palettes))
@@ -939,10 +946,14 @@ func builtinPackagesV2() []*PackageV2 {
 		version := "2.3.3"
 		requiredPermissions := []PermissionV2{{Name: "spaces.read"}, {Name: "groups.read"}, {Name: "items.read"}}
 		contributedViews := []string{"home"}
-		if palette.id == "org.yin.default" {
+		if palette.id == "org.yin.default" || palette.id == "org.yin.directory" {
 			// Bump whenever a home resource changes; a published version is
-			// immutable, so reusing it would abort startup.
-			version = "2.3.81"
+			// immutable, so reusing it would abort startup. The directory package
+			// starts its own version line because it is a new package.
+			version = "2.3.82"
+			if palette.id == "org.yin.directory" {
+				version = "2.4.0"
+			}
 			requiredPermissions = append(requiredPermissions,
 				PermissionV2{Name: "items.write"},
 				PermissionV2{Name: "groups.write"},

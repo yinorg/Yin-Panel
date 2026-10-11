@@ -5,10 +5,11 @@ import (
 	"testing"
 )
 
-// The default Yin theme and the shared theme view are two implementations of
-// the same contract, so the two guarantees the Yin home established must hold
-// for every built-in theme: the theme does not render its own space navigation,
-// and the brand mark is the side switch rather than a second standalone button.
+// The default and directory home packages and the shared theme view are all
+// implementations of the same contract, so the two guarantees the Yin home
+// established must hold for every built-in theme: the theme does not render its
+// own space navigation, and the brand mark is the side switch rather than a
+// second standalone button.
 func TestSharedHomeViewDropsTheSpaceNavAndMovesTheSideSwitchToTheBrandMark(t *testing.T) {
 	view, err := builtinThemeFiles.ReadFile("builtin_themes/shared/home.mjs")
 	if err != nil {
@@ -68,7 +69,7 @@ func TestBuiltinHomeVersionsAdvanceWhenSharedHomeResourcesChange(t *testing.T) {
 	for _, pkg := range builtinPackagesV2() {
 		versions[pkg.Manifest.ID] = pkg.Manifest.Version
 	}
-	for _, id := range []string{"org.yin.default", "org.yin.glass"} {
+	for _, id := range []string{"org.yin.default", "org.yin.directory", "org.yin.glass"} {
 		version, ok := versions[id]
 		if !ok {
 			t.Fatalf("built-in package %s must expose a version", id)
@@ -79,16 +80,36 @@ func TestBuiltinHomeVersionsAdvanceWhenSharedHomeResourcesChange(t *testing.T) {
 	}
 }
 
-// Yin and Glass are the only built-in themes. A retired palette must not come
-// back through the seed table, the built-in ID set, or the embedded filesystem,
-// because a database seeded by an earlier release can still carry its rows and
-// the resolution fallback then treats them as a missing package.
-func TestOnlyYinAndGlassAreBuiltIn(t *testing.T) {
+// The default package must not ship the directory layout at all: the split only
+// counts if its own resources are free of the directory code and styles, and
+// the directory package must carry them.
+func TestBuiltinHomeLayoutsStayInTheirOwnPackage(t *testing.T) {
+	defaultResources := builtinHomeResourcesV2("org.yin.default")
+	for _, path := range []string{"views/home.mjs", "styles/home.css"} {
+		if strings.Contains(strings.ToLower(string(defaultResources[path].Content)), "directory") {
+			t.Errorf("default home resource %s still contains directory layout code", path)
+		}
+	}
+	directoryResources := builtinHomeResourcesV2("org.yin.directory")
+	view := string(directoryResources["views/home.mjs"].Content)
+	if !strings.Contains(view, "directory-folders") {
+		t.Error("directory home view is missing its folder picker")
+	}
+	if !strings.Contains(string(directoryResources["styles/home.css"].Content), ".directory-folders") {
+		t.Error("directory home stylesheet is missing its folder picker rules")
+	}
+}
+
+// Yin, Directory and Glass are the only built-in themes. A retired palette must
+// not come back through the seed table, the built-in ID set, or the embedded
+// filesystem, because a database seeded by an earlier release can still carry
+// its rows and the resolution fallback then treats them as a missing package.
+func TestOnlyYinDirectoryAndGlassAreBuiltIn(t *testing.T) {
 	seeded := map[string]bool{}
 	for _, pkg := range builtinPackagesV2() {
 		seeded[pkg.Manifest.ID] = true
 	}
-	for _, id := range []string{"org.yin.default", "org.yin.glass"} {
+	for _, id := range []string{"org.yin.default", "org.yin.directory", "org.yin.glass"} {
 		if !seeded[id] {
 			t.Errorf("built-in package %s must be seeded on every startup", id)
 		}
@@ -96,8 +117,8 @@ func TestOnlyYinAndGlassAreBuiltIn(t *testing.T) {
 			t.Errorf("%s must be recognised as built-in, otherwise it can be removed or overwritten like a community package", id)
 		}
 	}
-	if len(seeded) != 2 {
-		t.Errorf("expected exactly 2 built-in packages, got %d", len(seeded))
+	if len(seeded) != 3 {
+		t.Errorf("expected exactly 3 built-in packages, got %d", len(seeded))
 	}
 	for _, retired := range []string{"org.yin.minimal", "org.yin.cyber"} {
 		if seeded[retired] {

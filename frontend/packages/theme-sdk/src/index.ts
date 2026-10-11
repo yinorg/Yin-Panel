@@ -149,6 +149,11 @@ export interface ThemeSearchEngine {
 }
 
 export interface ThemeHomePresentation {
+  /**
+   * Informational: the layout of the theme package that is mounted. Each built-in
+   * home package renders exactly one layout, so a theme that ships a single
+   * layout can ignore this; it exists for a theme that renders several.
+   */
   layout: 'standard' | 'directory'
   iconStyle: 'icon' | 'info'
   iconTextColor?: string
