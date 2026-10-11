@@ -1,5 +1,4 @@
 export * from './app'
 export * from './auth'
-export * from './admin'
 export * from './panel'
 export * from './moduleConfig'
