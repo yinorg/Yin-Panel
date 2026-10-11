@@ -24,7 +24,12 @@ jobs:
         with:
           go-version: '1.27.2'
           cache: true
-          cache-dependency-path: backend/go.sum
+          # Deliberately keyed on go.mod rather than go.sum. setup-go derives the
+          # cache key from this path, and the release pipeline owns the go.sum key
+          # with a musl build. Sharing it meant this job's non-musl build cache won
+          # the save race, after which the release restored a cache that could not
+          # contain its CGO objects and rebuilt them on every tag.
+          cache-dependency-path: backend/go.mod
       - name: Verify modules
         working-directory: backend
         run: go mod verify
