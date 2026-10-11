@@ -1,0 +1,76 @@
+name: Warm Build Caches
+
+# GitHub scopes action caches to the ref that created them, and every release tag
+# is a ref of its own. A tag run can therefore only restore caches created on that
+# same tag (which never happens twice) or on the default branch — so without this
+# workflow every release starts cold: the Go module and build caches miss and the
+# CGO compile of the SQLite driver (~60s) runs again, on both architectures.
+#
+# Keeping the default branch's scope warm is what makes a tag run hit, exactly as
+# it did before the dependency bump invalidated the old cache.
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'backend/go.mod'
+      - 'backend/go.sum'
+      - 'frontend/package.json'
+      - 'frontend/package-lock.json'
+      - '.github/workflows/cache-warm.yml'
+      - '.github/workflows/ci-docker.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: '1.27.2'
+          cache: true
+          cache-dependency-path: backend/go.sum
+      - name: Install musl compiler
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+      # This must mirror the release build exactly. The Go build cache key covers
+      # the CGO toolchain, the target platform and the build tags, so a plain
+      # `go build` here would warm nothing the release can use.
+      - name: Build backend
+        working-directory: backend
+        env:
+          CGO_ENABLED: '1'
+          CC: musl-gcc
+          GOOS: linux
+          GOARCH: ${{ matrix.arch }}
+        run: |
+          mkdir -p ../build-output
+          go build -trimpath -buildvcs=true -tags timetzdata -o ../build-output/yin-panel \
+            -ldflags="-s -w" \
+            main.go
+
+  node:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24.21.0
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Warm the npm cache
+        working-directory: frontend
+        run: npm ci

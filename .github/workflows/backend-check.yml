@@ -1,0 +1,39 @@
+name: Backend Check
+
+# Module integrity, vet, tests and the vulnerability scan. This used to run inside
+# the release workflow, where it added a ~100s job to every tag without being on
+# the critical path (the image job never depended on it). It belongs on the code
+# that is about to be released, not on the tag that ships it.
+on:
+  pull_request:
+  push:
+    branches: ['**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backend-check:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: '1.27.2'
+          cache: true
+          cache-dependency-path: backend/go.sum
+      - name: Verify modules
+        working-directory: backend
+        run: go mod verify
+      - name: Vet
+        working-directory: backend
+        run: go vet ./...
+      - name: Test
+        working-directory: backend
+        run: go test ./...
+      - name: Vulnerability scan
+        working-directory: backend
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
