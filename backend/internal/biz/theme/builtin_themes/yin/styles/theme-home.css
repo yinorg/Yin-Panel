@@ -923,15 +923,65 @@ select {
 }
 
 .yin-item--info {
+  --yin-lift: 0px;
+  --yin-tilt-x: 0deg;
+  --yin-tilt-y: 0deg;
+  --yin-tilt-scale: 1;
+  position: relative;
   width: 100%;
   min-height: 70px;
   justify-content: flex-start;
   gap: 0;
   padding: 0;
+  border: 1px solid color-mix(in srgb, var(--yin-border, #d8e0e3) 48%, transparent);
   border-radius: 16px;
   overflow: hidden;
   text-align: left;
-  background: var(--yin-component-app-icon-surface, #2a2a2a6b);
+  /* Frosted glass: a faint scheme-tinted pane the wallpaper reads through, with
+     a soft sheen and a bright rim so the edge catches the light. The colour
+     follows the scheme, so the label stays legible on the glass. */
+  background-color: color-mix(in srgb, var(--yin-surface, #fff) 38%, transparent);
+  background-image: linear-gradient(135deg, color-mix(in srgb, var(--yin-surface, #fff) 62%, transparent), color-mix(in srgb, var(--yin-surface, #fff) 16%, transparent));
+  color: var(--yin-text, #20282c);
+  box-shadow: 0 12px 30px rgb(15 23 30 / 18%), inset 0 1px 0 rgb(255 255 255 / 38%);
+  backdrop-filter: blur(22px) saturate(160%);
+  -webkit-backdrop-filter: blur(22px) saturate(160%);
+  /* The touch motion is composed entirely from custom properties the theme's
+     script writes on pointer movement, so CSS owns the transform and the
+     script never forces a per-frame reflow. */
+  transform: perspective(1000px) translateY(var(--yin-lift)) rotateX(var(--yin-tilt-x)) rotateY(var(--yin-tilt-y)) scale(var(--yin-tilt-scale));
+  transform-style: preserve-3d;
+  transition: transform 160ms cubic-bezier(.2, .8, .2, 1), background-color var(--yin-motion-duration, 180ms) ease, border-color var(--yin-motion-duration, 180ms) ease, box-shadow var(--yin-motion-duration, 180ms) ease;
+}
+
+/* A soft light patch where the pointer touches the glass, following it as it
+   moves (the variables are set by the theme's pointermove handler). */
+.yin-item--info::after {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(circle at var(--yin-glow-x, 50%) var(--yin-glow-y, 50%), rgb(255 255 255 / 26%), transparent 62%);
+  opacity: 0;
+  pointer-events: none;
+  content: '';
+  transition: opacity 240ms ease;
+}
+
+.yin-item--info:hover,
+.yin-item--info:active {
+  --yin-lift: -2px;
+  will-change: transform;
+}
+
+.yin-item--info:hover {
+  --yin-tilt-scale: 1.02;
+  background-color: color-mix(in srgb, var(--yin-surface, #fff) 54%, transparent);
+  box-shadow: 0 18px 38px rgb(15 23 30 / 24%), inset 0 1px 0 rgb(255 255 255 / 46%);
+}
+
+.yin-item--info:hover::after,
+.yin-item--info:active::after {
+  opacity: 1;
 }
 
 .yin-item--info .yin-item-icon {
@@ -940,6 +990,7 @@ select {
   flex: 0 0 70px;
   border-radius: 0;
   background: transparent;
+  color: var(--yin-text, #20282c);
   font-size: 24px;
 }
 
@@ -948,14 +999,32 @@ select {
 }
 
 .yin-item--info .yin-item-title {
-  color: #fff;
+  color: var(--yin-text, #20282c);
   font-size: 16px;
   font-weight: 600;
+  text-shadow: none;
 }
 
 .yin-item--info .yin-item-description {
-  color: rgb(255 255 255 / 82%);
+  color: var(--yin-textMuted, #64737a);
   font-size: 12px;
+}
+
+/* An item that carries its own colour paints the whole card with it, so the
+   label goes back to the panel's wallpaper text colour (white by default)
+   instead of the scheme text colour. */
+.yin-item--info.yin-item--tinted {
+  color: var(--yin-icon-text-color, #fff);
+  border-color: rgb(255 255 255 / 26%);
+}
+
+.yin-item--info.yin-item--tinted .yin-item-icon,
+.yin-item--info.yin-item--tinted .yin-item-title {
+  color: var(--yin-icon-text-color, #fff);
+}
+
+.yin-item--info.yin-item--tinted .yin-item-description {
+  color: rgb(255 255 255 / 84%);
 }
 
 @media (max-width: 500px) {

@@ -367,7 +367,7 @@ func TestBuiltinPackagesV2AreCompleteDTCGAndRepeatable(t *testing.T) {
 		}
 		wantVersion := "2.3.3"
 		if summary.ID == "org.yin.default" {
-			wantVersion = "2.3.78"
+			wantVersion = "2.3.81"
 		}
 		if pkg.Manifest.Version != wantVersion {
 			t.Errorf("%s builtin version = %q, want %q", summary.ID, pkg.Manifest.Version, wantVersion)
@@ -425,10 +425,10 @@ func TestBuiltinHomeAssetsLoadFromPackagedThemeSources(t *testing.T) {
 func TestBuiltinHomeResourceHashesPinTheEmbeddedThemes(t *testing.T) {
 	expected := map[string]map[string]string{
 		"org.yin.default": {
-			// 图片加载失败时回退到文字，改了 yin 的 home.mjs，所以视图哈希变；
-			// yin 的样式表没动，哈希保持不变。
-			"views/home.mjs":  "9d1661633254693b649ff356cfef0c562063ccf203aec6c0fdd7db2fe64d2d87",
-			"styles/home.css": "b0ffa4bbd4f82bfce115e8a949954301261b3ea2dd139827b7cb2e907140263f",
+			// 详细模式卡片改为磨砂玻璃 + 跟随指针的触碰动效，改了 yin 的 home.mjs
+			// 与主题样式表，两个哈希都变。
+			"views/home.mjs":  "33df7b08e316be16125fecbcc5edeec21be10dee06af9dad7feb1eb338d06a23",
+			"styles/home.css": "1c0ec9ea1addbac84a8dbcbbc7c0f2c17d70546b54cc16a25de2566e54821717",
 		},
 		"org.yin.glass": {
 			// Glass 复用 shared/home.mjs 与 shared/home.css，两者都改了。
@@ -500,7 +500,7 @@ func TestEnsureBuiltinV2UpgradesOnlyActivationForSelectedBuiltin(t *testing.T) {
 		t.Fatal(err)
 	}
 	latest, err := LatestPackageRevisionV2(db, "org.yin.default")
-	if err != nil || latest.Version != "2.3.78" || activation.ActiveRevisionID != latest.ID {
+	if err != nil || latest.Version != "2.3.81" || activation.ActiveRevisionID != latest.ID {
 		t.Fatalf("selected builtin activation = %+v, latest=%s, err=%v", activation, latest.ID, err)
 	}
 	if latest.ID == old.Revision {

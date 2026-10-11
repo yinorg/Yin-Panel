@@ -789,6 +789,35 @@ export default {
         run(() => api.commands.execute('item.open', { itemId: link.dataset.itemId }))
       })
       link._yin = { icon, title, description }
+      // 「磨砂玻璃触碰」动效：指针在详情卡片上移动时，触点处亮起一片柔光，卡片随之
+      // 轻微倾斜。位置角度都写进 CSS 变量，由样式表合成 transform，脚本只写变量，
+      // 不在每帧读取布局。触摸设备没有 hover，交由 :active 的按压反馈处理。
+      let cardRect = null
+      const resetCardMotion = () => {
+        cardRect = null
+        link.style.removeProperty('--yin-glow-x')
+        link.style.removeProperty('--yin-glow-y')
+        link.style.removeProperty('--yin-tilt-x')
+        link.style.removeProperty('--yin-tilt-y')
+      }
+      link.addEventListener('pointerenter', event => {
+        if (editMode || event.pointerType === 'touch' || !link.classList.contains('yin-item--info')) return
+        // 进入时缓存一次未变形的矩形：倾斜本身会改变 getBoundingClientRect 的结果，
+        // 每次移动都重读会让指针与卡片互相追逐、抖动。
+        cardRect = link.getBoundingClientRect()
+      })
+      link.addEventListener('pointermove', event => {
+        if (!cardRect || editMode || event.pointerType === 'touch') return
+        if (!link.classList.contains('yin-item--info')) return
+        const x = (event.clientX - cardRect.left) / cardRect.width
+        const y = (event.clientY - cardRect.top) / cardRect.height
+        link.style.setProperty('--yin-glow-x', `${(x * 100).toFixed(1)}%`)
+        link.style.setProperty('--yin-glow-y', `${(y * 100).toFixed(1)}%`)
+        link.style.setProperty('--yin-tilt-y', `${((x - 0.5) * 7).toFixed(2)}deg`)
+        link.style.setProperty('--yin-tilt-x', `${((0.5 - y) * 7).toFixed(2)}deg`)
+      })
+      link.addEventListener('pointerleave', resetCardMotion)
+      link.addEventListener('pointercancel', resetCardMotion)
       link.addEventListener('contextmenu', event => {
         if (editMode) return
         const item = link._yin.item
@@ -855,6 +884,8 @@ export default {
       link.classList.toggle('yin-item--info', infoStyle)
       // The detailed style paints the whole card with the item colour and keeps
       // the glyph on a transparent tile, matching the pre-theme build.
+      const tinted = infoStyle && !!itemIcon?.backgroundColor
+      link.classList.toggle('yin-item--tinted', tinted)
       if (infoStyle) {
         if (itemIcon?.backgroundColor) link.style.backgroundColor = itemIcon.backgroundColor
         else link.style.removeProperty('background-color')
