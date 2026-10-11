@@ -4,7 +4,7 @@ const LOCAL_NAME = 'appSetting'
 
 export type Theme = 'light' | 'dark' | 'auto'
 
-export type Language = 'auto' | 'zh-CN' | 'en-US' | 'zh-TW' | 'ja-JP' | 'ko-KR' | 'de-DE' | 'fr-FR' | 'es-ES' | 'pt-BR' | 'ru-RU'
+export type Language = 'auto' | 'zh-CN' | 'en-US' | 'zh-TW' | 'ja-JP' | 'ko-KR' | 'de-DE' | 'fr-FR' | 'es-ES' | 'pt-BR' | 'ru-RU' | 'id-ID' | 'tr-TR' | 'pl-PL' | 'it-IT' | 'nl-NL' | 'hi-IN' | 'th-TH'
 
 export interface AppState {
   siderCollapsed: boolean

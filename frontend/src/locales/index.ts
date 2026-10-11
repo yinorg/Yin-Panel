@@ -10,8 +10,15 @@ import frFR from './fr-FR.json'
 import esES from './es-ES.json'
 import ptBR from './pt-BR.json'
 import ruRU from './ru-RU.json'
+import idID from './id-ID.json'
+import trTR from './tr-TR.json'
+import plPL from './pl-PL.json'
+import itIT from './it-IT.json'
+import nlNL from './nl-NL.json'
+import hiIN from './hi-IN.json'
+import thTH from './th-TH.json'
 
-export const supportedLocales = ['zh-CN', 'en-US', 'zh-TW', 'ja-JP', 'ko-KR', 'de-DE', 'fr-FR', 'es-ES', 'pt-BR', 'ru-RU'] as const
+export const supportedLocales = ['zh-CN', 'en-US', 'zh-TW', 'ja-JP', 'ko-KR', 'de-DE', 'fr-FR', 'es-ES', 'pt-BR', 'ru-RU', 'id-ID', 'tr-TR', 'pl-PL', 'it-IT', 'nl-NL', 'hi-IN', 'th-TH'] as const
 export type SupportedLocale = typeof supportedLocales[number]
 const defaultLocale: SupportedLocale = 'en-US'
 
@@ -26,6 +33,13 @@ export function resolveBrowserLocale(): SupportedLocale {
   if (browserLocale.startsWith('es')) return 'es-ES'
   if (browserLocale.startsWith('pt')) return 'pt-BR'
   if (browserLocale.startsWith('ru')) return 'ru-RU'
+  if (browserLocale.startsWith('id')) return 'id-ID'
+  if (browserLocale.startsWith('tr')) return 'tr-TR'
+  if (browserLocale.startsWith('pl')) return 'pl-PL'
+  if (browserLocale.startsWith('it')) return 'it-IT'
+  if (browserLocale.startsWith('nl')) return 'nl-NL'
+  if (browserLocale.startsWith('hi')) return 'hi-IN'
+  if (browserLocale.startsWith('th')) return 'th-TH'
   return 'en-US'
 }
 
@@ -46,6 +60,13 @@ const i18n = createI18n({
     'es-ES': esES,
     'pt-BR': ptBR,
     'ru-RU': ruRU,
+    'id-ID': idID,
+    'tr-TR': trTR,
+    'pl-PL': plPL,
+    'it-IT': itIT,
+    'nl-NL': nlNL,
+    'hi-IN': hiIN,
+    'th-TH': thTH,
   },
 })
 

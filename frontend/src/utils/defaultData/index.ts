@@ -23,4 +23,11 @@ export const languageOptions: { label: string; key: Language; value: Language }[
   { label: 'Español', key: 'es-ES', value: 'es-ES' },
   { label: 'Português (Brasil)', key: 'pt-BR', value: 'pt-BR' },
   { label: 'Русский', key: 'ru-RU', value: 'ru-RU' },
+  { label: 'Bahasa Indonesia', key: 'id-ID', value: 'id-ID' },
+  { label: 'Türkçe', key: 'tr-TR', value: 'tr-TR' },
+  { label: 'Polski', key: 'pl-PL', value: 'pl-PL' },
+  { label: 'Italiano', key: 'it-IT', value: 'it-IT' },
+  { label: 'Nederlands', key: 'nl-NL', value: 'nl-NL' },
+  { label: 'हिन्दी', key: 'hi-IN', value: 'hi-IN' },
+  { label: 'ไทย', key: 'th-TH', value: 'th-TH' },
 ]
