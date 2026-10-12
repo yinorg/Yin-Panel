@@ -1162,6 +1162,35 @@ select {
    even though it is otherwise revealed on hover only. */
 [data-editing='true'] .yin-actions { opacity: 1; }
 
+/* The editor's Save / Cancel pair: a glyph carrying the action name as its
+   hover tooltip. A green tick commits the staged layout, a red cross discards
+   it, so the two read apart at a glance. */
+.yin-action-button--glyph svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+}
+
+.yin-action-button--confirm {
+  color: var(--yin-success, #1a7f37);
+  border-color: color-mix(in srgb, var(--yin-success, #1a7f37) 45%, var(--yin-border, #d8e0e3));
+}
+
+.yin-action-button--confirm:hover:not(:disabled) {
+  border-color: var(--yin-success, #1a7f37);
+  color: var(--yin-success, #1a7f37);
+}
+
+.yin-action-button--cancel {
+  color: var(--yin-danger, #c62828);
+  border-color: color-mix(in srgb, var(--yin-danger, #c62828) 45%, var(--yin-border, #d8e0e3));
+}
+
+.yin-action-button--cancel:hover:not(:disabled) {
+  border-color: var(--yin-danger, #c62828);
+  color: var(--yin-danger, #c62828);
+}
+
 /* KDE-style edit mode: the whole content block zooms out to 85% and a single
    dashed frame is drawn around it, so the layout reads as editable at a glance.
    The block is a sibling of the fixed-position overlays (dialog, context menu,

@@ -95,6 +95,7 @@ export function useHomeCommands(input: {
   createThemeRuntimeError: (code: string, message: string) => Error
   confirmThemeDelete: (message: string, action: (spaceId: number) => Promise<unknown>) => Promise<unknown>
   reportSearchBottom: (searchBottom: number) => void
+  reportLayoutEditing: (editing: boolean) => void
   getMonitorSnapshot: () => Promise<unknown>
   scrollToTop: () => void
   /** Whether the active theme contributes a view for a Core surface (e.g.
@@ -337,6 +338,7 @@ export function useHomeCommands(input: {
     toggleSide: input.togglePanelSide,
     setNetworkMode: mode => input.handleChangeNetwork(mode === 'lan' ? PanelStateNetworkModeEnum.lan : PanelStateNetworkModeEnum.wan),
     reportLayout: ({ searchBottom }) => input.reportSearchBottom(searchBottom),
+    reportLayoutEditing: ({ editing }) => input.reportLayoutEditing(editing),
     forwardKey: key => handleShortcutKey(key),
     openLink: url => input.openPage(2, url),
     refresh: () => input.refreshCollection(true),

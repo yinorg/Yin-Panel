@@ -121,6 +121,7 @@ export const THEME_COMMANDS = [
   'ui.openCoreSurface',
   'network.setMode',
   'layout.report',
+  'layout.editState',
   'input.forwardKey',
   'link.open',
 ] as const satisfies readonly ThemeCommand[]

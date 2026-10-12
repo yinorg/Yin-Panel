@@ -73,9 +73,18 @@ type RuntimeV2 struct {
 }
 
 type ContributionsV2 struct {
-	Views      []string `json:"views,omitempty"`
-	Regions    []string `json:"regions,omitempty"`
-	Components []string `json:"components,omitempty"`
+	Views      []string      `json:"views,omitempty"`
+	Regions    []string      `json:"regions,omitempty"`
+	Components []string      `json:"components,omitempty"`
+	HomeLayout *HomeLayoutV2 `json:"homeLayout,omitempty"`
+}
+
+// HomeLayoutV2 declares the home layout a package renders and whether it offers
+// the drag editor, so the Core reads the layout from the package instead of
+// mapping built-in package IDs.
+type HomeLayoutV2 struct {
+	Kind     string `json:"kind"`
+	Editable bool   `json:"editable,omitempty"`
 }
 
 type PermissionsV2 struct {

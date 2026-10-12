@@ -11,7 +11,62 @@ const yinHomeLayout = (() => {
   let pagerPrevious
   let pagerNext
   let requestRender = () => {}
+  let editing = false
+  let tree = null
+  let activeIds = new Set()
+  let hoverTimer = null
   const nodes = new Map()
+  const sections = new Map()
+
+  // ---- Editing keeps the folder view ---------------------------------
+  //
+  // The shell serializes group order from the content DOM, so every root has to
+  // be in it while a drag is staged. Only one root is ever visible, though: the
+  // page keeps the shape it has while browsing, and a hover opens a folder
+  // instead of replacing the view.
+
+  const subtreeIds = key => {
+    const ids = new Set()
+    if (!tree || !key) return ids
+    const root = tree.roots.find(group => String(group.id) === String(key))
+    if (!root) return ids
+    const walk = group => {
+      ids.add(String(group.id))
+      for (const child of tree.children.get(String(group.id)) || []) walk(child)
+    }
+    walk(root)
+    return ids
+  }
+
+  const applyRootVisibility = () => {
+    for (const [id, section] of sections) {
+      if (!editing) { section.hidden = false; continue }
+      section.hidden = !activeIds.has(id)
+    }
+  }
+
+  const activateRoot = key => {
+    if (!key || String(key) === rootId) return
+    rootId = String(key)
+    activeIds = subtreeIds(rootId)
+    for (const [id, button] of nodes) {
+      const active = id === rootId
+      button.classList.toggle('active', active)
+      button.setAttribute('aria-pressed', active ? 'true' : 'false')
+    }
+    applyRootVisibility()
+  }
+
+  // Hovering a folder opens it, so a dragged item can be carried into a folder
+  // that is not the one on screen. The shell's drag listens on the document and
+  // never captures the pointer, so these events still arrive mid-drag.
+  const openDelay = 600
+  const scheduleOpenRoot = key => {
+    if (!editing || !key || String(key) === rootId) return
+    clearTimeout(hoverTimer)
+    hoverTimer = setTimeout(() => { hoverTimer = null; activateRoot(key) }, openDelay)
+  }
+  const cancelOpenRoot = () => { clearTimeout(hoverTimer); hoverTimer = null }
 
   const groupTree = groups => {
     const byId = new Map((groups || []).map(group => [String(group.id), group]))
@@ -56,9 +111,16 @@ const yinHomeLayout = (() => {
         button = element('button', 'directory-folder-button')
         button.type = 'button'
         button.addEventListener('click', () => {
+          if (editing) { activateRoot(button.dataset.groupId); return }
           rootId = button.dataset.groupId
           requestRender()
         })
+        button.addEventListener('pointerdown', event => {
+          if (event.button === 0) beginTabDrag(event, button)
+        })
+        button.addEventListener('pointerenter', () => scheduleOpenRoot(key))
+        button.addEventListener('pointermove', () => scheduleOpenRoot(key))
+        button.addEventListener('pointerleave', cancelOpenRoot)
         nodes.set(key, button)
       }
       button.dataset.groupId = key
@@ -158,13 +220,92 @@ const yinHomeLayout = (() => {
     return entry
   }
 
+  // ---- Reordering folders from the strip -----------------------------
+  //
+  // Root order lives in the tab strip, not in the content area: the content
+  // shows one root at a time, so its DOM cannot hold every root sibling. Moving
+  // the tab and its section together keeps the shell's DOM-ordered
+  // serialization correct without the shell knowing anything about tabs.
+
+  let tabDrag = null
+
+  const tabDropTarget = () => {
+    if (!tabDrag || !tabs) return null
+    for (const button of tabs.querySelectorAll('.directory-folder-button')) {
+      if (button === tabDrag.button || !button.offsetParent) continue
+      const rect = button.getBoundingClientRect()
+      if (tabDrag.lastX < rect.left + rect.width / 2) return button
+    }
+    return null
+  }
+
+  const onTabDragMove = event => {
+    if (!tabDrag) return
+    tabDrag.lastX = event.clientX
+    if (!tabDrag.moved) {
+      if (Math.abs(event.clientX - tabDrag.originX) < 6) return
+      tabDrag.moved = true
+      tabDrag.button.classList.add('is-dragging')
+      document.body.append(tabDrag.ghost)
+    }
+    event.preventDefault()
+    tabDrag.ghost.style.left = `${event.clientX - tabDrag.offsetX}px`
+    tabDrag.ghost.style.top = `${event.clientY - tabDrag.offsetY}px`
+    const before = tabDropTarget()
+    if (before) tabs.insertBefore(tabDrag.button, before)
+    else tabs.append(tabDrag.button)
+  }
+
+  // The shell reads group order from the content DOM, so the sections follow the
+  // strip. Re-appending only the roots is enough: a group's siblings all share
+  // its parent, and the shell indexes siblings per parent.
+  const syncSectionsToTabs = () => {
+    const ordered = [...tabs.querySelectorAll('.directory-folder-button')]
+      .map(button => sections.get(button.dataset.groupId))
+      .filter(Boolean)
+    if (!ordered.length) return
+    const collection = ordered[0].parentElement
+    if (!collection) return
+    for (const section of ordered) collection.append(section)
+  }
+
+  const onTabDragEnd = () => {
+    document.removeEventListener('pointermove', onTabDragMove)
+    document.removeEventListener('pointerup', onTabDragEnd)
+    document.removeEventListener('pointercancel', onTabDragEnd)
+    if (!tabDrag) return
+    const { button, ghost, moved } = tabDrag
+    button.classList.remove('is-dragging')
+    ghost.remove()
+    tabDrag = null
+    if (moved) { syncSectionsToTabs(); syncPager() }
+  }
+
+  const beginTabDrag = (event, button) => {
+    if (tabDrag || !editing) return
+    const rect = button.getBoundingClientRect()
+    const ghost = button.cloneNode(true)
+    ghost.classList.add('yin-drag-ghost')
+    ghost.style.width = `${rect.width}px`
+    ghost.style.height = `${rect.height}px`
+    tabDrag = { button, ghost, offsetX: event.clientX - rect.left, offsetY: event.clientY - rect.top, lastX: event.clientX, originX: event.clientX, moved: false }
+    document.addEventListener('pointermove', onTabDragMove, { passive: false })
+    document.addEventListener('pointerup', onTabDragEnd)
+    document.addEventListener('pointercancel', onTabDragEnd)
+  }
+
   return {
     kind: 'directory',
     // The tab bar is the card's top edge, so the collection sits flush under it.
     collectionGap: 0,
-    allowDragEdit: false,
-    // The row list is a table of groups: a group with no bookmarks is not a row.
-    hideEmptyGroups: true,
+    allowDragEdit: true,
+    // Editing has to see an empty group to be able to drop into it.
+    hideEmptyGroups: () => !editing,
+    onEditingChange: value => {
+      editing = value === true
+      if (!editing) cancelOpenRoot()
+      activeIds = editing ? subtreeIds(rootId) : new Set()
+    },
     createNav: actions => {
       requestRender = actions.requestRender
       nav = element('nav', 'directory-folders')
@@ -205,27 +346,43 @@ const yinHomeLayout = (() => {
     },
     refreshNav,
     visibleGroups: groups => {
-      const tree = groupTree(groups)
+      tree = groupTree(groups)
       refreshNav(tree.roots)
       if (!rootId || !tree.roots.some(group => String(group.id) === rootId)) {
         rootId = tree.roots.length ? String(tree.roots[0].id) : undefined
         refreshNav(tree.roots)
       }
-      const selectedRoot = tree.roots.find(group => String(group.id) === rootId)
       const visible = []
       const walk = (group, depth) => {
         visible.push({ group, depth })
         for (const child of tree.children.get(String(group.id)) || []) walk(child, depth + 1)
       }
+      // While a drag is staged the whole tree is rendered so the shell can
+      // serialize group order from it; only the open root is ever visible.
+      if (editing) {
+        for (const root of tree.roots) walk(root, 0)
+        activeIds = subtreeIds(rootId)
+        return visible
+      }
+      const selectedRoot = tree.roots.find(group => String(group.id) === rootId)
       if (selectedRoot) walk(selectedRoot, 0)
       return visible
     },
-    decorateGroup: (section, _group, depth) => {
+    decorateGroup: (section, group, depth) => {
       // The selected root is already named by the tab, so its own row carries no
       // label; deeper groups keep theirs and indent so the hierarchy reads.
       section._yin.title.hidden = depth === 0
       section._yin.title.style.marginInlineStart = depth > 0 ? `${Math.min(3, depth) * 12}px` : '0px'
       section._yin.toggle.hidden = true
+      sections.set(String(group.id), section)
+      // Only the open folder is shown while editing; the rest stay in the DOM so
+      // the shell can serialize the complete group order.
+      if (editing) section.hidden = !activeIds.has(String(group.id))
+      // A root has no rendered siblings here, and the content area cannot place
+      // it against siblings that are not in the DOM, so it is reordered by
+      // dragging its tab instead.
+      if (depth === 0 && editing) section.dataset.noGroupDrag = '1'
+      else delete section.dataset.noGroupDrag
       const menu = buildGroupMenu(section)
       // Rows the viewer may not manage keep no trigger at all.
       menu.trigger.hidden = !menu.actions.some(action => !action.hidden)

@@ -307,9 +307,11 @@ const themeSurfaceRoute = computed(() => route.name === 'themeSurface')
     inlined because <SvgIcon> resolves them over the network.
   -->
   <div v-if="home.showFloatingBar" class="home-floating" role="group" :aria-label="$t('panelHome.floatingActions')" data-testid="home-floating-bar">
-    <!-- Edit layout: a one-shot signal the theme turns into its own edit mode. -->
-    <button v-if="home.canWrite && theme.themeRuntimeActive && theme.themeCanEditHomeLayout" type="button" class="home-floating-button" data-testid="floating-edit-layout-button" :title="$t('themeHome.edit')" :aria-label="$t('themeHome.edit')" @click="home.requestLayoutEdit()">
-      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75z"/></svg>
+    <!-- Edit layout: toggles the theme's own edit mode. The theme reports the
+         resulting state back, so the entry can offer the matching affordance. -->
+    <button v-if="home.canWrite && theme.themeRuntimeActive && theme.themeCanEditHomeLayout" type="button" class="home-floating-button" :class="{ 'home-floating-button--cancel': home.layoutEditing }" data-testid="floating-edit-layout-button" :title="home.layoutEditing ? $t('common.cancel') : $t('themeHome.edit')" :aria-label="home.layoutEditing ? $t('common.cancel') : $t('themeHome.edit')" @click="home.requestLayoutEdit()">
+      <svg v-if="home.layoutEditing" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+      <svg v-else viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75z"/></svg>
     </button>
     <button type="button" class="home-floating-button" data-testid="floating-refresh-button" :title="$t('common.refresh')" :aria-label="$t('common.refresh')" @click="home.refreshCurrentSpace()">
       <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 20q-3.35 0-5.675-2.325T4 12t2.325-5.675T12 4q1.725 0 3.3.712T18 6.75V5q0-.425.288-.712T19 4t.713.288T20 5v5q0 .425-.288.713T19 11h-5q-.425 0-.712-.288T13 10t.288-.712T14 9h3.2q-.8-1.4-2.187-2.2T12 6Q9.5 6 7.75 7.75T6 12t1.75 4.25T12 18q1.7 0 3.113-.862t2.187-2.313q.2-.35.563-.487t.737-.013q.4.125.575.525t-.025.75q-1.025 2-2.925 3.2T12 20"/></svg>

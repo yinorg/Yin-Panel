@@ -155,12 +155,30 @@ const createYinHome = yinLayout => ({
 
     const openEditor = (key, payload, button) => mutate(key, button, 'editor.open', payload)
 
-    const addActionButton = (container, text, testId, label, action, disabled = false) => {
-      const button = element('button', 'yin-action-button', text)
+    const glyphSvg = path => {
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+      svg.setAttribute('viewBox', '0 0 24 24')
+      svg.setAttribute('aria-hidden', 'true')
+      svg.setAttribute('focusable', 'false')
+      const node = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+      node.setAttribute('fill', 'currentColor')
+      node.setAttribute('d', path)
+      svg.append(node)
+      return svg
+    }
+
+    const addActionButton = (container, text, testId, label, action, disabled = false, icon) => {
+      // An icon form carries no text, so the label becomes its hover tooltip.
+      const button = element('button', 'yin-action-button', icon ? '' : text)
       button.type = 'button'
       if (container === contextMenu) button.setAttribute('role', 'menuitem')
       button.dataset.testid = testId
       button.setAttribute('aria-label', label)
+      if (icon) {
+        button.setAttribute('title', label)
+        button.classList.add('yin-action-button--glyph')
+        button.append(glyphSvg(icon))
+      }
       button.disabled = disabled
       button.addEventListener('click', () => action(button))
       container.append(button)
@@ -175,6 +193,8 @@ const createYinHome = yinLayout => ({
       remove: 'M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6zM19 4h-3.5l-1-1h-5l-1 1H5v2h14z',
       up: 'M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8z',
       down: 'M20 12l-1.41-1.41L13 16.17V4h-2v12.17l-5.58-5.59L4 12l8 8z',
+      confirm: 'M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z',
+      cancel: 'M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z',
     }
     const addIconButton = (container, icon, testId, label, action) => {
       const button = element('button', 'yin-icon-button')
@@ -182,15 +202,7 @@ const createYinHome = yinLayout => ({
       button.dataset.testid = testId
       button.setAttribute('aria-label', label)
       button.setAttribute('title', label)
-      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
-      svg.setAttribute('viewBox', '0 0 24 24')
-      svg.setAttribute('aria-hidden', 'true')
-      svg.setAttribute('focusable', 'false')
-      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path')
-      path.setAttribute('fill', 'currentColor')
-      path.setAttribute('d', icon)
-      svg.append(path)
-      button.append(svg)
+      button.append(glyphSvg(icon))
       button.addEventListener('click', () => action(button))
       container.append(button)
       return button
@@ -426,8 +438,14 @@ const createYinHome = yinLayout => ({
       styleButton = addActionButton(actionBar, envLabel('actions.style', 'Style'), 'theme-open-style', 'Open theme style settings', () => run(() => api.ui.openCoreSurface('theme-settings')))
       pageButton = addActionButton(actionBar, envLabel('actions.page', 'Pages'), 'theme-open-page', 'Open a theme-rendered page', () => run(() => api.ui.openCoreSurface('theme-page')))
       appsButton = addActionButton(actionBar, envLabel('actions.apps', 'Apps'), 'theme-open-apps', 'Open Core apps', () => run(() => api.ui.openCoreSurface('apps')))
-      saveButton = addActionButton(actionBar, envLabel('actions.save', 'Save'), 'theme-save-layout', 'Save layout', button => void saveLayout(button))
-      cancelButton = addActionButton(actionBar, envLabel('actions.cancel', 'Cancel'), 'theme-cancel-edit', 'Cancel layout editing', () => exitEditMode())
+      // A glyph instead of a label, with the action name as its hover tooltip:
+      // a green tick commits the staged layout, a red cross discards it.
+      const saveLabel = envLabel('actions.save', 'Save')
+      const cancelLabel = envLabel('actions.cancel', 'Cancel')
+      saveButton = addActionButton(actionBar, saveLabel, 'theme-save-layout', saveLabel, button => void saveLayout(button), false, ICON_PATHS.confirm)
+      saveButton.classList.add('yin-action-button--confirm')
+      cancelButton = addActionButton(actionBar, cancelLabel, 'theme-cancel-edit', cancelLabel, () => exitEditMode(), false, ICON_PATHS.cancel)
+      cancelButton.classList.add('yin-action-button--cancel')
 
       searchSection = element('section', 'yin-search')
       searchSection.setAttribute('role', 'search')
@@ -1010,13 +1028,18 @@ const createYinHome = yinLayout => ({
       // serialized from it, so a snapshot re-render would discard the drag.
       if (editMode) return
       const presentation = snapshot.presentation || {}
+      // A layout may resolve this per render: hiding empty groups while
+      // browsing is right, but a drag needs an empty group to exist as a target.
+      const hideEmptyGroups = typeof yinLayout.hideEmptyGroups === 'function'
+        ? yinLayout.hideEmptyGroups() === true
+        : yinLayout.hideEmptyGroups === true
       const visibleGroups = yinLayout.visibleGroups(snapshot.groups)
       const itemById = new Map((snapshot.items || []).map(item => [String(item.id), item]))
       const needle = query.trim().toLocaleLowerCase()
       const usedGroups = new Set()
       // A tab whose groups are all empty must still render its own row: hidden
       // rows keep the list clean, but the row is also where the group is managed.
-      const tabHasItems = !yinLayout.hideEmptyGroups
+      const tabHasItems = !hideEmptyGroups
         || visibleGroups.some(({ group }) => (group.itemIds || []).some(itemId => itemById.has(String(itemId))))
       for (const { group, depth } of visibleGroups) {
         const section = groupNodes.get(String(group.id)) || createGroupNode(group)
@@ -1072,7 +1095,7 @@ const createYinHome = yinLayout => ({
             || `${item.title || ''} ${item.description || ''}`.toLocaleLowerCase().includes(needle))
         })
         const hasAnyItem = (group.itemIds || []).some(itemId => itemById.has(String(itemId)))
-        const emptyRow = yinLayout.hideEmptyGroups === true && !hasAnyItem && !(depth === 0 && !tabHasItems)
+        const emptyRow = hideEmptyGroups && !hasAnyItem && !(depth === 0 && !tabHasItems)
         section.hidden = emptyRow
           || (!!needle && presentation.search?.itemFilterEnabled !== false && !hasVisibleItem)
         yinLayout.decorateGroup(section, group, depth)
@@ -1164,12 +1187,25 @@ const createYinHome = yinLayout => ({
       return { items, groups }
     }
 
+    // Optional: a layout that renders only part of the collection while
+    // browsing uses this to render all of it while a drag is staged.
+    const setLayoutEditing = editing => {
+      if (typeof yinLayout.onEditingChange === 'function') yinLayout.onEditingChange(editing)
+      // The Core owns the floating entry but cannot know whether its signal
+      // actually started an edit, so the resulting state goes back to it.
+      void Promise.resolve(api.commands.execute('layout.editState', { editing })).catch(() => {})
+    }
+
     const enterEditMode = () => {
       if (editMode || !canArrange() || !yinLayout.allowDragEdit) return
       // A save serializes the whole collection, so a search filter or a collapsed
       // group would silently drop items from the layout.
       query = ''
       collapsedGroups.clear()
+      // Told before the render: a layout that pages its groups has to paint
+      // every one of them here, or the baseline below would be a partial
+      // collection and a group drag would save a partial order.
+      setLayoutEditing(true)
       renderCollection()
       editMode = true
       editBaseline = serializeLayout()
@@ -1182,6 +1218,7 @@ const createYinHome = yinLayout => ({
       editMode = false
       editBaseline = null
       delete root.dataset.editing
+      setLayoutEditing(false)
       renderCollection()
     }
 
@@ -1195,6 +1232,7 @@ const createYinHome = yinLayout => ({
         editMode = false
         editBaseline = null
         delete root.dataset.editing
+        setLayoutEditing(false)
         if (status) status.textContent = envLabel('status.layoutSaved', 'Layout saved')
         renderCollection()
       }
@@ -1316,8 +1354,12 @@ const createYinHome = yinLayout => ({
       const tile = target.closest && target.closest('.yin-item')
       if (tile && collection.contains(tile)) { beginDrag(event, tile, 'item'); return }
       const heading = target.closest && target.closest('.yin-group-heading')
-      if (heading && canMutateGroup('reorder')) {
-        const section = heading.closest('.yin-group')
+      // A layout whose content area does not hold every sibling of a group marks
+      // it: reordering it from here would place it against siblings that are not
+      // in the DOM at all.
+      const headingSection = heading && heading.closest('.yin-group')
+      if (heading && canMutateGroup('reorder') && !(headingSection && headingSection.dataset.noGroupDrag === '1')) {
+        const section = headingSection
         if (section) beginDrag(event, section, 'group')
       }
     }

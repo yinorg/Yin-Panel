@@ -43,6 +43,8 @@ export interface HomeThemeActionBindings {
   setNetworkMode: (mode: 'lan' | 'wan') => Promise<unknown> | unknown
   /** The sandbox reports the measured bottom edge of its search box. */
   reportLayout: (input: { searchBottom: number }) => Promise<unknown> | unknown
+  /** The theme reports whether its own layout edit mode is active. */
+  reportLayoutEditing: (input: { editing: boolean }) => Promise<unknown> | unknown
   forwardKey: (key: string) => Promise<unknown> | unknown
   openLink: (url: string) => Promise<unknown> | unknown
   refresh: () => Promise<unknown> | unknown
@@ -204,6 +206,12 @@ export function createHomeThemeHandlers(bindings: HomeThemeActionBindings): Them
           if (typeof searchBottom !== 'number' || !Number.isFinite(searchBottom) || searchBottom < 0 || searchBottom > 100000)
             throw apiError('INVALID_ARGUMENT', 'Search bottom must be a finite, non-negative number')
           return bindings.reportLayout({ searchBottom })
+        }
+        case 'layout.editState': {
+          const editing = payload.editing
+          if (typeof editing !== 'boolean')
+            throw apiError('INVALID_ARGUMENT', 'Editing must be a boolean')
+          return bindings.reportLayoutEditing({ editing })
         }
         case 'input.forwardKey': {
           const key = payload.key

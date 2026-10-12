@@ -24,6 +24,9 @@ const commandPermissions: Record<ThemeCommand, ThemePermission> = {
   'network.setMode': 'preferences.write',
   // Geometry telemetry: the theme telling the Core where its layout landed.
   'layout.report': 'diagnostics.report',
+  // The theme reporting its own layout edit state, so the Core's floating button
+  // can show the matching affordance.
+  'layout.editState': 'items.write',
   // Gated like the command centre, which is the only thing a forwarded key can
   // open, so losing the grant is a visible no-op rather than a silent bypass.
   'input.forwardKey': 'items.read',

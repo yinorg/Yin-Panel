@@ -944,15 +944,21 @@ func builtinPackagesV2() []*PackageV2 {
 		docs := map[string]json.RawMessage{"light": builtinDTCGDocumentV2(palette.light, palette), "dark": builtinDTCGDocumentV2(palette.dark, palette)}
 		files := builtinHomeResourcesV2(palette.id)
 		version := "2.3.3"
+		// Only the two Yin home packages declare a layout. Glass carries no
+		// declaration, so its manifest — and therefore its revision — is
+		// unchanged by this field.
+		var homeLayout *HomeLayoutV2
 		requiredPermissions := []PermissionV2{{Name: "spaces.read"}, {Name: "groups.read"}, {Name: "items.read"}}
 		contributedViews := []string{"home"}
 		if palette.id == "org.yin.default" || palette.id == "org.yin.directory" {
 			// Bump whenever a home resource changes; a published version is
 			// immutable, so reusing it would abort startup. The directory package
 			// starts its own version line because it is a new package.
-			version = "2.3.88"
+			version = "2.3.91"
+			homeLayout = &HomeLayoutV2{Kind: "standard", Editable: true}
 			if palette.id == "org.yin.directory" {
-				version = "2.11.5"
+				version = "2.11.8"
+				homeLayout = &HomeLayoutV2{Kind: "directory", Editable: true}
 			}
 			requiredPermissions = append(requiredPermissions,
 				PermissionV2{Name: "items.write"},
@@ -980,7 +986,7 @@ func builtinPackagesV2() []*PackageV2 {
 			Format: "yin-theme", FormatVersion: PackageFormatVersionV2, ID: palette.id, Name: palette.name, Version: version, ThemeAPI: "^1.0.0", Core: ">=0.4.0", Author: "Yin", License: "AGPL-3.0",
 			Tokens: TokenSetV2{Format: "DTCG", Version: DTCGVersion, Docs: map[string]string{"light": "tokens/light.json", "dark": "tokens/dark.json"}}, DefaultScheme: "light",
 			Entrypoints: EntrypointsV2{Script: "views/home.mjs", Styles: []string{"styles/home.css"}}, Runtime: RuntimeV2{SupportedModes: []string{"sandbox"}},
-			Contributes: ContributionsV2{Views: contributedViews}, Permissions: PermissionsV2{Required: requiredPermissions}, Resources: resources,
+			Contributes: ContributionsV2{Views: contributedViews, HomeLayout: homeLayout}, Permissions: PermissionsV2{Required: requiredPermissions}, Resources: resources,
 		}
 		manifestJSON, _ := json.Marshal(manifest)
 		revisionFiles := resourceBytesV2(files)

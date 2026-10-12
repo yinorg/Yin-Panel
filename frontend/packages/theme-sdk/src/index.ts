@@ -41,6 +41,10 @@ export type ThemeCommand =
   // DOM. It reports the search box's bottom edge here so the Core can place its
   // monitor layer from real geometry instead of guessing with viewport units.
   | 'layout.report'
+  // The Core's floating edit button toggles the theme's edit mode, but only the
+  // theme knows whether it is editing. It reports the state back so the Core can
+  // render the matching affordance.
+  | 'layout.editState'
   // The home is rendered inside a cross-origin frame, so keystrokes never reach
   // the Core's own window listener. The theme forwards them here so the global
   // shortcut keeps working; the Core keeps the policy (dialogs, modifiers).

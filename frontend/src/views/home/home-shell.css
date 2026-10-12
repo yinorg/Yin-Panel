@@ -369,6 +369,16 @@ html {
   background: rgba(42, 42, 42, 0.6);
 }
 
+/* The theme reports whether it is editing, so the entry turns into the way out:
+   the same button, in red, closing the edit instead of opening it. */
+.home-floating-button--cancel {
+  background: color-mix(in srgb, var(--yin-danger) 80%, rgba(42, 42, 42, 0.42));
+}
+
+.home-floating-button--cancel:hover {
+  background: var(--yin-danger);
+}
+
 .home-floating-button:focus-visible {
   outline: 2px solid rgba(255, 255, 255, 0.8);
   outline-offset: -2px;

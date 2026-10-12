@@ -10,7 +10,7 @@ export interface ThemeManifest {
   core?: string
   entrypoints?: { script?: string; styles?: string[] }
   runtime?: { supportedModes?: string[] }
-  contributes?: { views?: string[]; regions?: string[]; components?: string[] }
+  contributes?: { views?: string[]; regions?: string[]; components?: string[]; homeLayout?: { kind?: string; editable?: boolean } }
   permissions?: { required?: Array<{ name: string; origins?: string[] }>; optional?: Array<{ name: string; origins?: string[] }> }
   settings?: { schema: string; schemaVersion: number }
   wallpapers?: Record<string, { kind: 'image' | 'video' | 'webBundle' | 'externalUrl' | 'imageUrl'; source: string; poster?: string; overlayOpacity?: number }>
@@ -36,7 +36,7 @@ export interface ThemePackageV2 {
     core?: string
     entrypoints?: { script?: string; styles?: string[] }
     runtime?: { supportedModes?: string[] }
-    contributes?: { views?: string[]; regions?: string[]; components?: string[] }
+    contributes?: { views?: string[]; regions?: string[]; components?: string[]; homeLayout?: { kind?: string; editable?: boolean } }
     permissions?: { required?: Array<{ name: string; origins?: string[] }>; optional?: Array<{ name: string; origins?: string[] }> }
     settings?: { schema: string; schemaVersion: number }
     tokens: { format: 'DTCG'; version: string; documents: Record<string, string> }
@@ -114,6 +114,23 @@ export function isYinThemePackage(id?: string): boolean {
 /** The home layout a package renders; every package except the directory one is standard. */
 export function homeLayoutForThemePackage(id?: string): 'standard' | 'directory' {
   return id === HOME_LAYOUT_PACKAGES.directory ? 'directory' : 'standard'
+}
+
+/**
+ * The home layout a package renders and whether it offers the drag editor.
+ * The manifest wins when the package declares it, so a package that does not
+ * ship with the panel can opt in; packages that predate the declaration keep
+ * the built-in ID mapping.
+ */
+export function resolveThemeHomeLayout(manifest?: {
+  id?: string
+  contributes?: { homeLayout?: { kind?: string; editable?: boolean } }
+}): { kind: 'standard' | 'directory'; editable: boolean } {
+  const declared = manifest?.contributes?.homeLayout
+  if (declared && (declared.kind === 'standard' || declared.kind === 'directory'))
+    return { kind: declared.kind, editable: declared.editable === true }
+  const id = manifest?.id
+  return { kind: homeLayoutForThemePackage(id), editable: isYinThemePackage(id) && homeLayoutForThemePackage(id) === 'standard' }
 }
 
 const cssColorProfiles = new Set(['srgb', 'srgb-linear', 'display-p3', 'a98-rgb', 'prophoto-rgb', 'rec2020', 'xyz-d50', 'xyz-d65'])

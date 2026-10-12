@@ -3,7 +3,7 @@ import { useRouter } from 'vue-router'
 import { parsePublicCodeFromPath } from '@/utils/request/axios'
 import { useAuthStore, usePanelState } from '@/store'
 import { PanelStateNetworkModeEnum } from '@/enums'
-import { homeLayoutForThemePackage, resolvePanelValue } from '@/utils/theme'
+import { resolvePanelValue, resolveThemeHomeLayout } from '@/utils/theme'
 import { PanelPanelConfigStyleEnum } from '@/enums'
 import { activeThemePackage, activeThemeWallpaper, reconcileSpaceTheme } from '@/hooks/useTheme'
 import { spaceDisplayName } from '@/api/panel/space'
@@ -68,7 +68,7 @@ export function useHomeShell() {
   // The home layout follows the mounted package: each built-in home package
   // renders exactly one layout, so the Core reads it from the theme rather than
   // from a separate panel preference.
-  const directoryLayout = computed(() => homeLayoutForThemePackage(activeThemePackage.value?.manifest.id) === 'directory')
+  const directoryLayout = computed(() => resolveThemeHomeLayout(activeThemePackage.value?.manifest).kind === 'directory')
 
   // The data composable must drop the command layer's cached remote items when the
   // collection is invalidated, but the command layer is created further down. A
@@ -89,6 +89,9 @@ export function useHomeShell() {
   // environment, and the theme toggles its own edit mode when the token changes,
   // so the two never need a shared editing flag across the sandbox boundary.
   const layoutEditToken = ref(0)
+  // The theme reports its edit state back, so the floating button can show the
+  // matching affordance instead of inferring it from the token it sent.
+  const layoutEditing = ref(false)
   const themeRuntimeEnvironment = computed(() => ({ ...runtimeEnvironment.value, editToken: layoutEditToken.value }))
 
   // Wired before the theme gates below because they read `publicAccessReady` to
@@ -342,6 +345,7 @@ export function useHomeShell() {
     createThemeRuntimeError,
     confirmThemeDelete,
     reportSearchBottom,
+    reportLayoutEditing: (editing: boolean) => { layoutEditing.value = editing },
     getMonitorSnapshot,
     scrollToTop,
     hasThemeSurface: themeHasSurface,
@@ -500,6 +504,7 @@ export function useHomeShell() {
   const home = reactive({
     canWrite,
     requestLayoutEdit: () => { layoutEditToken.value++ },
+    layoutEditing,
     setPublicAccessCode,
     homeReady,
     spaces,

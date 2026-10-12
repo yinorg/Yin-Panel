@@ -4,7 +4,7 @@ import { useAuthStore, usePanelState } from '@/store'
 import { useRoute } from 'vue-router'
 import { getThemeRuntimeGrant, setThemeRuntimeGrant } from '@/api/theme'
 import { activeThemePackage, activeThemeSlots, themePackageResolved } from '@/hooks/useTheme'
-import { homeLayoutForThemePackage, isBuiltinThemePackage, isYinThemePackage } from '@/utils/theme'
+import { isBuiltinThemePackage, isYinThemePackage, resolveThemeHomeLayout } from '@/utils/theme'
 import { createThemePersistence } from '@/core/home/themePersistence'
 import { createThemeSettingsSchemaValidator } from '@/core/home/themeSettingsSchema'
 import { createIconifyResourceResolver } from '@/core/home/iconifyResource'
@@ -198,9 +198,9 @@ export function useThemeRuntime(input: {
   // Group mutations exist in both built-in home layouts, so the capability stays
   // with the Yin home family rather than with one layout.
   const themeCanWriteGroups = computed(() => input.canWrite.value && input.activeSpace.value?.canEdit === true && isYinThemePackage(themeRuntimePackage.value?.manifest.id) && themeRuntimePermissions.value.includes('groups.write'))
-  // The drag layout editor belongs to the standard home only; the directory
-  // layout has no drag mode, so the Core must not offer the entry for it.
-  const themeCanEditHomeLayout = computed(() => isYinThemePackage(themeRuntimePackage.value?.manifest.id) && homeLayoutForThemePackage(themeRuntimePackage.value?.manifest.id) === 'standard')
+  // A package declares whether its home supports the drag editor; the Core never
+  // offers the entry for a layout that has not opted in.
+  const themeCanEditHomeLayout = computed(() => resolveThemeHomeLayout(themeRuntimePackage.value?.manifest).editable)
 
   // `?yinDiag` 只在这个标签页里生效，不落盘、不进配置，所以关掉标签页就没了。
   // 它存在的意义是让「点了到底发生什么」可以直接看见：主题跑在 opaque 沙箱里，
@@ -276,7 +276,7 @@ export function useThemeRuntime(input: {
       networkMode: panelState.networkMode === PanelStateNetworkModeEnum.lan ? 'lan' : 'wan',
       signedIn: !!authStore.loggedIn,
     },
-    layout: homeLayoutForThemePackage(activeThemePackage.value?.manifest.id),
+    layout: resolveThemeHomeLayout(activeThemePackage.value?.manifest).kind,
     monitorReservedHeight: input.getMonitorReservedHeight(),
     searchConfiguration: input.getSearchConfiguration(),
   }))
