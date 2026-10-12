@@ -191,7 +191,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="overflow-auto pt-2">
+  <div class="app-users-page overflow-auto p-2">
     <div class="my-[10px]">
       <NButton type="primary" size="small" ghost @click="handleAdd">
         {{ $t('common.add') }}
@@ -209,3 +209,21 @@ onMounted(() => {
     <EditUser v-model:visible="editUserDialogShow" :user-info="editUserUserInfo" @done="handelDone" />
   </div>
 </template>
+
+<style>
+/* The users page is a single table, so the table is the card: it takes the same
+   surface, border and radius every other page's cards use, which is what lifts it
+   off the page's canvas. Naive paints none of the three, so without this the page
+   is a flat recessed slab. Its header band is an internal colour that does not
+   follow the theme, so it is derived from the tokens here instead. */
+.app-users-page .n-data-table {
+    background-color: var(--yin-surface);
+    border: 1px solid var(--yin-border);
+    border-radius: var(--yin-component-card-radius);
+    overflow: hidden;
+}
+
+.app-users-page .n-data-table-th {
+    background-color: color-mix(in srgb, var(--yin-text) 6%, var(--yin-surface));
+}
+</style>
