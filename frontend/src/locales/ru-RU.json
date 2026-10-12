@@ -103,7 +103,8 @@
       "topMargin": "Верхний отступ",
       "uploadOrDragText": "Нажмите для загрузки или перетащите изображение в поле, чтобы заменить его",
       "vague": "Размытие",
-      "wallpaper": "Обои"
+      "wallpaper": "Обои",
+      "logoTextPlaceholder": "Введите текст"
     },
     "exportImport": {
       "appName": "Экспорт/импорт",
@@ -377,7 +378,15 @@
     "publicIdInvalid": "FN ID должен содержать от 6 до 30 строчных латинских букв, цифр или дефисов",
     "accessCodeInvalid": "Код доступа должен содержать от 4 до 12 символов",
     "publicSaved": "Настройки публичного доступа сохранены",
-    "groupDeleteConfirm": "Удалить эту группу, её подгруппы и элементы?"
+    "groupDeleteConfirm": "Удалить эту группу, её подгруппы и элементы?",
+    "untitledGroup": "Группа без названия",
+    "createSuccess": "Пространство создано",
+    "renameSuccess": "Название пространства обновлено",
+    "copySuccess": "Пространство скопировано",
+    "publicAddress": "Публичный адрес:",
+    "bookmarkGroupCount": "({n} элементов)",
+    "confirmImport": "Подтвердить импорт",
+    "childGroupLabel": "(подгруппа)"
   },
   "settingUserInfo": {
     "confirmLogoutText": "Вы уверены, что хотите выйти?",
@@ -396,5 +405,7 @@
     "spaceTitle": "Тема пространства",
     "followSystem": "Следовать системной",
     "saved": "Сохранено"
-  }
+  },
+  "verification": { "required": "Введите код подтверждения", "title": "Введите код подтверждения, чтобы продолжить", "placeholder": "Введите буквы или цифры с изображения" },
+  "exception": { "notFound": "Страница не найдена", "backHome": "Вернуться на главную" }
 }

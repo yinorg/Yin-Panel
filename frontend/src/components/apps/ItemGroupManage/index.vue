@@ -180,7 +180,7 @@ onMounted(() => {
       </VueDraggable>
     </div>
 
-    <RoundCardModal v-model:show="editModalArg.show" size="small" type="small" :title="editModalArg.editStatus === 1 ? '添加' : '编辑'" style="width: 400px;">
+    <RoundCardModal v-model:show="editModalArg.show" size="small" type="small" :title="editModalArg.editStatus === 1 ? $t('common.add') : $t('common.edit')" style="width: 400px;">
       <NForm ref="formRef" :model="editModalArg.model" :rules="editModalArg.rules">
         <NFormItem path="title" :label="$t('apps.itemGroupManage.groupName')">
           <NInput v-model:value="editModalArg.model.title" type="text" :maxlength="20" show-count />

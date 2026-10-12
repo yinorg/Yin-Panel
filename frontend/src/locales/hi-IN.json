@@ -103,7 +103,8 @@
       "topMargin": "ऊपरी मार्जिन",
       "uploadOrDragText": "इमेज बदलने के लिए क्लिक करके अपलोड करें या बॉक्स में खींचकर छोड़ें",
       "vague": "धुंधला",
-      "wallpaper": "वॉलपेपर"
+      "wallpaper": "वॉलपेपर",
+      "logoTextPlaceholder": "टेक्स्ट दर्ज करें"
     },
     "exportImport": {
       "appName": "निर्यात/आयात",
@@ -330,7 +331,15 @@
     "publicIdInvalid": "FN ID में 6-30 छोटे अक्षर, अंक या हाइफ़न होने चाहिए",
     "accessCodeInvalid": "एक्सेस कोड 4-12 वर्णों का होना चाहिए",
     "publicSaved": "सार्वजनिक एक्सेस सेटिंग्स सहेजी गईं",
-    "groupDeleteConfirm": "इस समूह, इसके उप-समूहों और आइटम को हटाएँ?"
+    "groupDeleteConfirm": "इस समूह, इसके उप-समूहों और आइटम को हटाएँ?",
+    "untitledGroup": "बिना नाम का समूह",
+    "createSuccess": "स्पेस बनाया गया",
+    "renameSuccess": "स्पेस नाम अपडेट किया गया",
+    "copySuccess": "स्पेस कॉपी किया गया",
+    "publicAddress": "सार्वजनिक पता:",
+    "bookmarkGroupCount": "({n} आइटम)",
+    "confirmImport": "इम्पोर्ट की पुष्टि करें",
+    "childGroupLabel": "(उपसमूह)"
   },
   "settingUserInfo": {
     "confirmLogoutText": "क्या आप वाकई लॉगआउट करना चाहते हैं?",
@@ -349,5 +358,7 @@
     "spaceTitle": "स्पेस थीम",
     "followSystem": "सिस्टम डिफ़ॉल्ट का अनुसरण करें",
     "saved": "सहेजा गया"
-  }
+  },
+  "verification": { "required": "सत्यापन कोड दर्ज करें", "title": "जारी रखने के लिए सत्यापन कोड दर्ज करें", "placeholder": "छवि में दिखाए गए अक्षर या अंक दर्ज करें" },
+  "exception": { "notFound": "पृष्ठ नहीं मिला", "backHome": "होम पर वापस जाएँ" }
 }

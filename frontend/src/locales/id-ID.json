@@ -103,7 +103,8 @@
       "topMargin": "Margin atas",
       "uploadOrDragText": "Klik untuk mengunggah atau seret dan lepas ke dalam kotak untuk mengganti gambar",
       "vague": "Kabur",
-      "wallpaper": "Wallpaper"
+      "wallpaper": "Wallpaper",
+      "logoTextPlaceholder": "Masukkan teks"
     },
     "exportImport": {
       "appName": "Ekspor/Impor",
@@ -330,7 +331,15 @@
     "publicIdInvalid": "FN ID harus 6-30 huruf kecil, angka, atau tanda hubung",
     "accessCodeInvalid": "Kode akses harus 4-12 karakter",
     "publicSaved": "Pengaturan akses publik disimpan",
-    "groupDeleteConfirm": "Hapus grup ini, subgrupnya, dan item-itemnya?"
+    "groupDeleteConfirm": "Hapus grup ini, subgrupnya, dan item-itemnya?",
+    "untitledGroup": "Grup tanpa judul",
+    "createSuccess": "Ruang dibuat",
+    "renameSuccess": "Nama ruang diperbarui",
+    "copySuccess": "Ruang disalin",
+    "publicAddress": "Alamat publik:",
+    "bookmarkGroupCount": "({n} item)",
+    "confirmImport": "Konfirmasi impor",
+    "childGroupLabel": "(subgrup)"
   },
   "settingUserInfo": {
     "confirmLogoutText": "Apakah Anda yakin ingin keluar?",
@@ -349,5 +358,7 @@
     "spaceTitle": "Tema ruang",
     "followSystem": "Ikuti bawaan sistem",
     "saved": "Disimpan"
-  }
+  },
+  "verification": { "required": "Masukkan kode verifikasi", "title": "Masukkan kode verifikasi untuk melanjutkan", "placeholder": "Masukkan huruf atau angka yang ditampilkan" },
+  "exception": { "notFound": "Halaman tidak ditemukan", "backHome": "Kembali ke beranda" }
 }

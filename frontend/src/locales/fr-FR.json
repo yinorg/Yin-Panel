@@ -103,7 +103,8 @@
       "topMargin": "Marge supérieure",
       "uploadOrDragText": "Cliquez pour téléverser ou glissez-déposez dans la zone pour remplacer l'image",
       "vague": "Flou",
-      "wallpaper": "Fond d'écran"
+      "wallpaper": "Fond d'écran",
+      "logoTextPlaceholder": "Saisir du texte"
     },
     "exportImport": {
       "appName": "Export/Import",
@@ -377,7 +378,15 @@
     "publicIdInvalid": "L'ID FN doit comporter 6 à 30 lettres minuscules, chiffres ou tirets",
     "accessCodeInvalid": "Le code d'accès doit comporter 4 à 12 caractères",
     "publicSaved": "Paramètres d'accès public enregistrés",
-    "groupDeleteConfirm": "Supprimer ce groupe, ses sous-groupes et ses éléments ?"
+    "groupDeleteConfirm": "Supprimer ce groupe, ses sous-groupes et ses éléments ?",
+    "untitledGroup": "Groupe sans nom",
+    "createSuccess": "Espace créé",
+    "renameSuccess": "Nom de l’espace mis à jour",
+    "copySuccess": "Espace copié",
+    "publicAddress": "Adresse publique :",
+    "bookmarkGroupCount": "({n} éléments)",
+    "confirmImport": "Confirmer l’importation",
+    "childGroupLabel": "(sous-groupe)"
   },
   "settingUserInfo": {
     "confirmLogoutText": "Voulez-vous vraiment vous déconnecter ?",
@@ -396,5 +405,7 @@
     "spaceTitle": "Thème de l espace",
     "followSystem": "Suivre le thème système",
     "saved": "Enregistré"
-  }
+  },
+  "verification": { "required": "Saisissez le code de vérification", "title": "Saisissez le code de vérification pour continuer", "placeholder": "Saisissez les lettres ou les chiffres affichés" },
+  "exception": { "notFound": "Page introuvable", "backHome": "Retour à l’accueil" }
 }

@@ -103,7 +103,8 @@
       "topMargin": "Top margin",
       "uploadOrDragText": "Click to upload or drag and drop into the box to replace the image",
       "vague": "Blur",
-      "wallpaper": "Wallpaper"
+      "wallpaper": "Wallpaper",
+      "logoTextPlaceholder": "Enter text"
     },
     "exportImport": {
       "appName": "Export/Import",
@@ -330,7 +331,15 @@
     "publicIdInvalid": "FN ID must be 6-30 lowercase letters, numbers, or hyphens",
     "accessCodeInvalid": "Access code must be 4-12 characters",
     "publicSaved": "Public access settings saved",
-    "groupDeleteConfirm": "Delete this group, its subgroups, and items?"
+    "groupDeleteConfirm": "Delete this group, its subgroups, and items?",
+    "untitledGroup": "Untitled group",
+    "createSuccess": "Space created",
+    "renameSuccess": "Space name updated",
+    "copySuccess": "Space copied",
+    "publicAddress": "Public address:",
+    "bookmarkGroupCount": "({n} items)",
+    "confirmImport": "Confirm import",
+    "childGroupLabel": "(subgroup)"
   },
   "settingUserInfo": {
     "confirmLogoutText": "Are you sure you want to logout?",
@@ -349,5 +358,7 @@
     "spaceTitle": "Space theme",
     "followSystem": "Follow the system default",
     "saved": "Saved"
-  }
+  },
+  "verification": { "required": "Enter the verification code", "title": "Enter the verification code to continue", "placeholder": "Type the letters or numbers shown" },
+  "exception": { "notFound": "Page not found", "backHome": "Back to home" }
 }

@@ -103,7 +103,8 @@
       "topMargin": "Üst kenar boşluğu",
       "uploadOrDragText": "Görseli değiştirmek için yüklemek üzere tıklayın veya kutunun içine sürükleyip bırakın",
       "vague": "Bulanıklık",
-      "wallpaper": "Duvar kağıdı"
+      "wallpaper": "Duvar kağıdı",
+      "logoTextPlaceholder": "Metin girin"
     },
     "exportImport": {
       "appName": "Dışa/İçe Aktar",
@@ -330,7 +331,15 @@
     "publicIdInvalid": "FN ID 6-30 küçük harf, sayı veya tire olmalıdır",
     "accessCodeInvalid": "Erişim kodu 4-12 karakter olmalıdır",
     "publicSaved": "Herkese açık erişim ayarları kaydedildi",
-    "groupDeleteConfirm": "Bu grup, alt grupları ve öğeleri silinsin mi?"
+    "groupDeleteConfirm": "Bu grup, alt grupları ve öğeleri silinsin mi?",
+    "untitledGroup": "Adsız grup",
+    "createSuccess": "Alan oluşturuldu",
+    "renameSuccess": "Alan adı güncellendi",
+    "copySuccess": "Alan kopyalandı",
+    "publicAddress": "Genel adres:",
+    "bookmarkGroupCount": "({n} öğe)",
+    "confirmImport": "İçe aktarmayı onayla",
+    "childGroupLabel": "(alt grup)"
   },
   "settingUserInfo": {
     "confirmLogoutText": "Çıkış yapmak istediğinizden emin misiniz?",
@@ -349,5 +358,7 @@
     "spaceTitle": "Alan teması",
     "followSystem": "Sistem varsayılanını takip et",
     "saved": "Kaydedildi"
-  }
+  },
+  "verification": { "required": "Doğrulama kodunu girin", "title": "Devam etmek için doğrulama kodunu girin", "placeholder": "Görseldeki harf veya sayıları girin" },
+  "exception": { "notFound": "Sayfa bulunamadı", "backHome": "Ana sayfaya dön" }
 }

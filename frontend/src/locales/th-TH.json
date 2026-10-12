@@ -103,7 +103,8 @@
       "topMargin": "ระยะขอบบน",
       "uploadOrDragText": "คลิกเพื่ออัปโหลด หรือลากและวางลงในกล่องเพื่อเปลี่ยนรูปภาพ",
       "vague": "เบลอ",
-      "wallpaper": "ภาพพื้นหลัง"
+      "wallpaper": "ภาพพื้นหลัง",
+      "logoTextPlaceholder": "ป้อนข้อความ"
     },
     "exportImport": {
       "appName": "ส่งออก/นำเข้า",
@@ -330,7 +331,15 @@
     "publicIdInvalid": "FN ID ต้องเป็นตัวพิมพ์เล็ก ตัวเลข หรือขีดกลาง 6-30 ตัวอักษร",
     "accessCodeInvalid": "รหัสเข้าถึงต้องมี 4-12 ตัวอักษร",
     "publicSaved": "บันทึกการตั้งค่าการเข้าถึงสาธารณะแล้ว",
-    "groupDeleteConfirm": "ลบกลุ่มนี้ กลุ่มย่อย และรายการต่างๆ หรือไม่?"
+    "groupDeleteConfirm": "ลบกลุ่มนี้ กลุ่มย่อย และรายการต่างๆ หรือไม่?",
+    "untitledGroup": "กลุ่มที่ไม่มีชื่อ",
+    "createSuccess": "สร้างสเปซแล้ว",
+    "renameSuccess": "อัปเดตชื่อสเปซแล้ว",
+    "copySuccess": "คัดลอกสเปซแล้ว",
+    "publicAddress": "ที่อยู่สาธารณะ:",
+    "bookmarkGroupCount": "({n} รายการ)",
+    "confirmImport": "ยืนยันการนำเข้า",
+    "childGroupLabel": "(กลุ่มย่อย)"
   },
   "settingUserInfo": {
     "confirmLogoutText": "คุณแน่ใจหรือไม่ว่าต้องการออกจากระบบ?",
@@ -349,5 +358,7 @@
     "spaceTitle": "ธีมของสเปซ",
     "followSystem": "ตามค่าเริ่มต้นของระบบ",
     "saved": "บันทึกแล้ว"
-  }
+  },
+  "verification": { "required": "ป้อนรหัสยืนยัน", "title": "ป้อนรหัสยืนยันเพื่อดำเนินการต่อ", "placeholder": "ป้อนตัวอักษรหรือตัวเลขที่แสดง" },
+  "exception": { "notFound": "ไม่พบหน้า", "backHome": "กลับหน้าหลัก" }
 }

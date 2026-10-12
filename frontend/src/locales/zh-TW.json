@@ -103,7 +103,8 @@
       "topMargin": "上邊距",
       "uploadOrDragText": "點擊上傳替換圖片或拖拽到框內",
       "vague": "模糊",
-      "wallpaper": "壁紙"
+      "wallpaper": "壁紙",
+      "logoTextPlaceholder": "請輸入文字"
     },
     "exportImport": {
       "appName": "導出導入",
@@ -377,7 +378,15 @@
     "publicIdInvalid": "FN ID需為6-30位小寫字母、數字或連字符",
     "accessCodeInvalid": "訪問碼需為4-12個字符",
     "publicSaved": "公開訪問配置已保存",
-    "groupDeleteConfirm": "確認刪除此分組及其子分組和項目嗎？"
+    "groupDeleteConfirm": "確認刪除此分組及其子分組和項目嗎？",
+    "untitledGroup": "未命名群組",
+    "createSuccess": "空間建立成功",
+    "renameSuccess": "空間名稱已更新",
+    "copySuccess": "空間已複製",
+    "publicAddress": "訪問位址：",
+    "bookmarkGroupCount": "（{n}項）",
+    "confirmImport": "確認匯入",
+    "childGroupLabel": "(子群組)"
   },
   "settingUserInfo": {
     "confirmLogoutText": "你確定要退出登錄嗎？",
@@ -396,5 +405,7 @@
     "spaceTitle": "空間主題",
     "followSystem": "跟隨系統預設",
     "saved": "已儲存"
-  }
+  },
+  "verification": { "required": "驗證碼必須填寫", "title": "請輸入驗證碼繼續", "placeholder": "輸入圖中字母或數字後繼續" },
+  "exception": { "notFound": "頁面不存在", "backHome": "返回首頁" }
 }

@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { NButton, NInput, NModal, useMessage } from 'naive-ui'
 import { Captcha } from '../index'
+import { t } from '../../../locales'
 
 const props = defineProps<{
   visible: boolean
@@ -38,7 +39,7 @@ watch(show, (newValue, oldValue) => {
 // 提交
 function handleSubmit() {
   if (vCode.value === '') {
-    ms.warning('验证码必须填写')
+    ms.warning(t('verification.required'))
     return
   }
 
@@ -55,15 +56,15 @@ function handleSubmit() {
 
 <template>
   <div>
-    <NModal v-model:show="show" preset="card" style="width: 400px" :title="title ?? '请输入验证码继续'" :mask-closable="false">
+    <NModal v-model:show="show" preset="card" style="width: 400px" :title="title ?? $t('verification.title')" :mask-closable="false">
       <Captcha ref="captchaRef" class="rounded border" :src="`/api/captcha/getImageByCaptchaId/${verificationId}/200/60?0`" />
       <div class="flex">
         <div class="flex w-[80%]">
-          <NInput v-model:value="vCode" placeholder="输入图中字母或数字后继续" @keydown.enter="handleSubmit" />
+          <NInput v-model:value="vCode" :placeholder="$t('verification.placeholder')" @keydown.enter="handleSubmit" />
         </div>
         <div class="flex ml-[auto]">
           <NButton type="info" :loading="loading" :disabled="loading" @click="handleSubmit">
-            继续
+            {{ $t('common.continue') }}
           </NButton>
         </div>
       </div>

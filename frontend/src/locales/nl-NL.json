@@ -103,7 +103,8 @@
       "topMargin": "Bovenste marge",
       "uploadOrDragText": "Klik om te uploaden of sleep de afbeelding naar het vak om deze te vervangen",
       "vague": "Vervaging",
-      "wallpaper": "Achtergrond"
+      "wallpaper": "Achtergrond",
+      "logoTextPlaceholder": "Voer tekst in"
     },
     "exportImport": {
       "appName": "Exporteren/importeren",
@@ -330,7 +331,15 @@
     "publicIdInvalid": "FN ID moet bestaan uit 6-30 kleine letters, cijfers of koppeltekens",
     "accessCodeInvalid": "De toegangscode moet 4-12 tekens lang zijn",
     "publicSaved": "Instellingen voor openbare toegang opgeslagen",
-    "groupDeleteConfirm": "Deze groep, de subgroepen en items verwijderen?"
+    "groupDeleteConfirm": "Deze groep, de subgroepen en items verwijderen?",
+    "untitledGroup": "Naamloze groep",
+    "createSuccess": "Ruimte aangemaakt",
+    "renameSuccess": "Ruimtenaam bijgewerkt",
+    "copySuccess": "Ruimte gekopieerd",
+    "publicAddress": "Openbaar adres:",
+    "bookmarkGroupCount": "({n} items)",
+    "confirmImport": "Import bevestigen",
+    "childGroupLabel": "(subgroep)"
   },
   "settingUserInfo": {
     "confirmLogoutText": "Weet u zeker dat u zich wilt afmelden?",
@@ -349,5 +358,7 @@
     "spaceTitle": "Ruimtethema",
     "followSystem": "Systeemstandaard volgen",
     "saved": "Opgeslagen"
-  }
+  },
+  "verification": { "required": "Voer de verificatiecode in", "title": "Voer de verificatiecode in om door te gaan", "placeholder": "Voer de letters of cijfers in die worden weergegeven" },
+  "exception": { "notFound": "Pagina niet gevonden", "backHome": "Terug naar home" }
 }

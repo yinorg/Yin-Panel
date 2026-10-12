@@ -103,7 +103,8 @@
       "topMargin": "上边距",
       "uploadOrDragText": "点击上传替换图片或拖拽到框内",
       "vague": "模糊",
-      "wallpaper": "壁纸"
+      "wallpaper": "壁纸",
+      "logoTextPlaceholder": "请输入文字"
     },
     "exportImport": {
       "appName": "导出导入",
@@ -330,7 +331,15 @@
     "publicIdInvalid": "FN ID需为6-30位小写字母、数字或连字符",
     "accessCodeInvalid": "访问码需为4-12个字符",
     "publicSaved": "公开访问配置已保存",
-    "groupDeleteConfirm": "确认删除此分组及其子分组和项目吗？"
+    "groupDeleteConfirm": "确认删除此分组及其子分组和项目吗？",
+    "untitledGroup": "未命名分组",
+    "createSuccess": "空间创建成功",
+    "renameSuccess": "空间名称已更新",
+    "copySuccess": "空间已复制",
+    "publicAddress": "访问地址：",
+    "bookmarkGroupCount": "（{n}项）",
+    "confirmImport": "确认导入",
+    "childGroupLabel": "(子分组)"
   },
   "settingUserInfo": {
     "confirmLogoutText": "你确定要退出登录吗？",
@@ -349,5 +358,7 @@
     "spaceTitle": "空间主题",
     "followSystem": "跟随系统默认",
     "saved": "已保存"
-  }
+  },
+  "verification": { "required": "验证码必须填写", "title": "请输入验证码继续", "placeholder": "输入图中字母或数字后继续" },
+  "exception": { "notFound": "页面不存在", "backHome": "返回首页" }
 }

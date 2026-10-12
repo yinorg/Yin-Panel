@@ -103,7 +103,8 @@
       "topMargin": "上余白",
       "uploadOrDragText": "クリックまたはドラッグ＆ドロップで画像を置き換え",
       "vague": "ぼかし",
-      "wallpaper": "壁紙"
+      "wallpaper": "壁紙",
+      "logoTextPlaceholder": "テキストを入力"
     },
     "exportImport": {
       "appName": "エクスポート/インポート",
@@ -330,7 +331,15 @@
     "publicIdInvalid": "FN IDは6～30文字の小文字、数字、ハイフンで入力してください",
     "accessCodeInvalid": "アクセスコードは4～12文字で入力してください",
     "publicSaved": "公開アクセス設定を保存しました",
-    "groupDeleteConfirm": "このグループとサブグループ、項目を削除しますか？"
+    "groupDeleteConfirm": "このグループとサブグループ、項目を削除しますか？",
+    "untitledGroup": "無題のグループ",
+    "createSuccess": "スペースを作成しました",
+    "renameSuccess": "スペース名を更新しました",
+    "copySuccess": "スペースをコピーしました",
+    "publicAddress": "公開アドレス：",
+    "bookmarkGroupCount": "（{n}件）",
+    "confirmImport": "インポートを確定",
+    "childGroupLabel": "（サブグループ）"
   },
   "settingUserInfo": {
     "confirmLogoutText": "ログアウトしますか？",
@@ -349,5 +358,7 @@
     "spaceTitle": "スペースのテーマ",
     "followSystem": "システム既定に従う",
     "saved": "保存しました"
-  }
+  },
+  "verification": { "required": "認証コードを入力してください", "title": "続行するには認証コードを入力してください", "placeholder": "画像の文字または数字を入力してください" },
+  "exception": { "notFound": "ページが見つかりません", "backHome": "ホームに戻る" }
 }

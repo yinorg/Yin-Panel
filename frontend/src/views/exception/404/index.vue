@@ -14,7 +14,7 @@ function goHome() {
     <div class="px-4 m-auto space-y-4 text-center max-[400px]">
       <h1 class="text-4xl text-slate-800 dark:text-neutral-200">
         <!-- Sorry, page not found! -->
-        页面不存在
+        {{ $t('exception.notFound') }}
       </h1>
       <p class="text-base text-slate-500 dark:text-neutral-400">
         <!-- Sorry, we couldn’t find the page you’re looking for. Perhaps you’ve mistyped the URL? Be sure to check your spelling. -->
@@ -26,7 +26,7 @@ function goHome() {
       </div>
       <NButton type="primary" @click="goHome">
         <!-- Go to Home -->
-        返回首页
+        {{ $t('exception.backHome') }}
       </NButton>
     </div>
   </div>

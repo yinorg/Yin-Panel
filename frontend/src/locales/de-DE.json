@@ -103,7 +103,8 @@
       "topMargin": "Oberer Rand",
       "uploadOrDragText": "Zum Hochladen klicken oder das Bild per Drag & Drop in das Feld ziehen, um es zu ersetzen",
       "vague": "Unschärfe",
-      "wallpaper": "Hintergrundbild"
+      "wallpaper": "Hintergrundbild",
+      "logoTextPlaceholder": "Text eingeben"
     },
     "exportImport": {
       "appName": "Export/Import",
@@ -377,7 +378,15 @@
     "publicIdInvalid": "Die FN ID muss aus 6-30 Kleinbuchstaben, Zahlen oder Bindestrichen bestehen",
     "accessCodeInvalid": "Der Zugriffscode muss 4-12 Zeichen lang sein",
     "publicSaved": "Einstellungen für öffentlichen Zugriff gespeichert",
-    "groupDeleteConfirm": "Diese Gruppe, ihre Untergruppen und Einträge löschen?"
+    "groupDeleteConfirm": "Diese Gruppe, ihre Untergruppen und Einträge löschen?",
+    "untitledGroup": "Unbenannte Gruppe",
+    "createSuccess": "Bereich erstellt",
+    "renameSuccess": "Bereichsname aktualisiert",
+    "copySuccess": "Bereich kopiert",
+    "publicAddress": "Öffentliche Adresse:",
+    "bookmarkGroupCount": "({n} Elemente)",
+    "confirmImport": "Import bestätigen",
+    "childGroupLabel": "(Untergruppe)"
   },
   "settingUserInfo": {
     "confirmLogoutText": "Möchten Sie sich wirklich abmelden?",
@@ -396,5 +405,7 @@
     "spaceTitle": "Space-Theme",
     "followSystem": "Systemstandard folgen",
     "saved": "Gespeichert"
-  }
+  },
+  "verification": { "required": "Bestätigungscode eingeben", "title": "Bestätigungscode eingeben, um fortzufahren", "placeholder": "Buchstaben oder Ziffern aus dem Bild eingeben" },
+  "exception": { "notFound": "Seite nicht gefunden", "backHome": "Zurück zur Startseite" }
 }

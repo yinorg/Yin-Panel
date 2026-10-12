@@ -60,7 +60,7 @@ async function enrichBookmarkIcons(groups: any[], onProgress: (completed: number
   return uploads
 }
 function exportBookmarks() { if (!selectedSpaceId.value) return; fetch(`/api/spaces/${selectedSpaceId.value}/bookmarks/export`, { credentials: 'include' }).then(r => r.blob()).then(blob => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `space-${selectedSpaceId.value}-bookmarks.html`; a.click(); URL.revokeObjectURL(a.href) }) }
-function previewBookmarks(event: Event) { const file = (event.target as HTMLInputElement).files?.[0]; if (!file) return; file.text().then(text => { const doc = new DOMParser().parseFromString(text, 'text/html'); const groups: any[] = []; doc.querySelectorAll('h3').forEach(h3 => { const group: any = { title: h3.textContent?.trim() || '未命名分组', items: [] }; let node = h3.parentElement?.nextElementSibling; while (node) { node.querySelectorAll?.('a').forEach((a: HTMLAnchorElement) => group.items.push({ title: a.textContent?.trim() || a.href, url: a.href })); node = node.nextElementSibling } groups.push(group) }); bookmarkPreview.value = groups }) }
+function previewBookmarks(event: Event) { const file = (event.target as HTMLInputElement).files?.[0]; if (!file) return; file.text().then(text => { const doc = new DOMParser().parseFromString(text, 'text/html'); const groups: any[] = []; doc.querySelectorAll('h3').forEach(h3 => { const group: any = { title: h3.textContent?.trim() || t('spaceManage.untitledGroup'), items: [] }; let node = h3.parentElement?.nextElementSibling; while (node) { node.querySelectorAll?.('a').forEach((a: HTMLAnchorElement) => group.items.push({ title: a.textContent?.trim() || a.href, url: a.href })); node = node.nextElementSibling } groups.push(group) }); bookmarkPreview.value = groups }) }
 async function confirmImport() {
   if (!selectedSpaceId.value || !bookmarkPreview.value || importing.value) return
   const count = bookmarkPreview.value.reduce((sum, group) => sum + group.items.length, 0)
@@ -121,7 +121,7 @@ async function create() {
   try {
     const { code } = await createSpace<{ code: number }>(name.value.trim())
     if (code !== 0) return false
-    message.success('空间创建成功')
+    message.success(t('spaceManage.createSuccess'))
     name.value = ''
     createDialogVisible.value = false
     load()
@@ -147,13 +147,13 @@ async function renameCurrent() {
   const baseSpace = space?.side === 'yang' ? spaces.value.find(item => item.pairedSpaceId === space.id) : space
   const { code } = await renameSpace(baseSpace?.id || selectedSpaceId.value, value)
   if (code !== 0) return false
-  message.success('空间名称已更新')
+  message.success(t('spaceManage.renameSuccess'))
   renameDialogVisible.value = false
   load()
   emit('spaces-changed')
   return true
 }
-function copyCurrent() { if (selectedSpaceId.value) copySpace<{ code: number }>(selectedSpaceId.value).then(({ code }) => { if (code === 0) { message.success('空间已复制'); load(); emit('spaces-changed') } }) }
+function copyCurrent() { if (selectedSpaceId.value) copySpace<{ code: number }>(selectedSpaceId.value).then(({ code }) => { if (code === 0) { message.success(t('spaceManage.copySuccess')); load(); emit('spaces-changed') } }) }
 async function addCurrentMember() {
   const email = memberEmail.value.trim()
   if (!selectedSpaceId.value || !email) return false
@@ -228,20 +228,20 @@ onMounted(load)
             <NInput v-model:value="publicId" :placeholder="$t('spaceManage.publicIdPlaceholder')" maxlength="30" />
             <NSelect v-model:value="publicMode" :options="[{ label: $t('spaceManage.directAccess'), value: 'direct' }, { label: $t('spaceManage.codeAccess'), value: 'code' }]" />
             <NInput v-if="publicMode === 'code'" v-model:value="publicAccessCode" type="password" show-password-on="click" :placeholder="$t('spaceManage.accessCodePlaceholder')" maxlength="12" />
-            <span v-if="publicEnabled && publicId" class="text-gray-500">访问地址：{{ `${publicOrigin}/${publicId}` }}</span>
+            <span v-if="publicEnabled && publicId" class="text-gray-500">{{ $t('spaceManage.publicAddress') }}{{ `${publicOrigin}/${publicId}` }}</span>
             <NButton type="primary" :loading="publicSaving" @click="savePublic">{{ $t('spaceManage.savePublic') }}</NButton>
           </NSpace>
         </NCard>
         <NCard v-if="selectedSpaceId" :title="$t('spaceManage.bookmarkTransfer')">
           <NSpace><NButton @click="exportBookmarks">{{ $t('spaceManage.exportBookmarks') }}</NButton><NButton @click="bookmarkFileInput?.click()">{{ $t('spaceManage.chooseFile') }}</NButton><input ref="bookmarkFileInput" class="hidden" type="file" accept=".html,text/html" @change="previewBookmarks"></NSpace>
-          <NList v-if="bookmarkPreview" class="mt-2"><NListItem v-for="group in bookmarkPreview" :key="group.title"><span>{{ group.title }}（{{ group.items.length }}项）</span></NListItem><NProgress v-if="importing" type="line" :percentage="importProgress" processing /><NButton type="primary" :loading="importing" @click="confirmImport">确认导入</NButton></NList>
+          <NList v-if="bookmarkPreview" class="mt-2"><NListItem v-for="group in bookmarkPreview" :key="group.title"><span>{{ group.title }} {{ $t('spaceManage.bookmarkGroupCount', { n: group.items.length }) }}</span></NListItem><NProgress v-if="importing" type="line" :percentage="importProgress" processing /><NButton type="primary" :loading="importing" @click="confirmImport">{{ $t('spaceManage.confirmImport') }}</NButton></NList>
         </NCard>
         <NButton v-if="selectedSpaceId" type="error" secondary @click="clearCurrentSpace">{{ $t('spaceManage.clearSpace') }}</NButton>
         <NList v-if="selectedSpaceId" bordered>
           <NListItem>
             <div class="w-full">
               <div class="flex items-center gap-2"><span>{{ $t('spaceManage.groups') }}</span><NButton size="tiny" type="primary" @click="openAddGroup(selectedSpaceId!)">{{ $t('spaceManage.addGroup') }}</NButton><span v-if="!groups[selectedSpaceId]?.length" class="text-gray-500">{{ $t('common.noData') }}</span></div>
-              <NSpace vertical size="small" class="mt-1"><NButton v-for="group in groups[selectedSpaceId]" :key="group.id" size="tiny" secondary @click="editGroup(selectedSpaceId!, group)">{{ group.title }}{{ group.parentId ? ' (子分组)' : '' }}</NButton></NSpace>
+              <NSpace vertical size="small" class="mt-1"><NButton v-for="group in groups[selectedSpaceId]" :key="group.id" size="tiny" secondary @click="editGroup(selectedSpaceId!, group)">{{ group.title }}{{ group.parentId ? ' ' + $t('spaceManage.childGroupLabel') : '' }}</NButton></NSpace>
             </div>
           </NListItem>
         </NList>

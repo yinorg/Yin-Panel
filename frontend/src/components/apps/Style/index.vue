@@ -525,7 +525,7 @@ function adoptThemeDefaults() {
           {{ $t('apps.baseSettings.textContent') }}
         </div>
         <div class="flex items-center mt-[5px]">
-          <NInput v-model:value="panelState.panelConfig.logoText" type="text" show-count :maxlength="20" placeholder="请输入文字" />
+          <NInput v-model:value="panelState.panelConfig.logoText" type="text" show-count :maxlength="20" :placeholder="$t('apps.baseSettings.logoTextPlaceholder')" />
         </div>
       </div>
 
