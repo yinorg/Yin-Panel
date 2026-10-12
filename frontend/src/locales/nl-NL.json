@@ -359,7 +359,6 @@
     "followSystem": "Systeemstandaard volgen",
     "saved": "Opgeslagen"
   },
-  "verification": { "required": "Voer de verificatiecode in", "title": "Voer de verificatiecode in om door te gaan", "placeholder": "Voer de letters of cijfers in die worden weergegeven" },
   "exception": { "notFound": "Pagina niet gevonden", "backHome": "Terug naar home" },
   "wallpaperCatalogue": {
     "categories": {

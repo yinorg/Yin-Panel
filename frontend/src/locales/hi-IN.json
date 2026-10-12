@@ -359,7 +359,6 @@
     "followSystem": "सिस्टम डिफ़ॉल्ट का अनुसरण करें",
     "saved": "सहेजा गया"
   },
-  "verification": { "required": "सत्यापन कोड दर्ज करें", "title": "जारी रखने के लिए सत्यापन कोड दर्ज करें", "placeholder": "छवि में दिखाए गए अक्षर या अंक दर्ज करें" },
   "exception": { "notFound": "पृष्ठ नहीं मिला", "backHome": "होम पर वापस जाएँ" },
   "wallpaperCatalogue": {
     "categories": {

@@ -359,7 +359,6 @@
     "followSystem": "Sistem varsayılanını takip et",
     "saved": "Kaydedildi"
   },
-  "verification": { "required": "Doğrulama kodunu girin", "title": "Devam etmek için doğrulama kodunu girin", "placeholder": "Görseldeki harf veya sayıları girin" },
   "exception": { "notFound": "Sayfa bulunamadı", "backHome": "Ana sayfaya dön" },
   "wallpaperCatalogue": {
     "categories": {

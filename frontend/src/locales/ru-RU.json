@@ -406,7 +406,6 @@
     "followSystem": "Следовать системной",
     "saved": "Сохранено"
   },
-  "verification": { "required": "Введите код подтверждения", "title": "Введите код подтверждения, чтобы продолжить", "placeholder": "Введите буквы или цифры с изображения" },
   "exception": { "notFound": "Страница не найдена", "backHome": "Вернуться на главную" },
   "wallpaperCatalogue": {
     "categories": {

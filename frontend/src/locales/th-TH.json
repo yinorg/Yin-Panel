@@ -359,7 +359,6 @@
     "followSystem": "ตามค่าเริ่มต้นของระบบ",
     "saved": "บันทึกแล้ว"
   },
-  "verification": { "required": "ป้อนรหัสยืนยัน", "title": "ป้อนรหัสยืนยันเพื่อดำเนินการต่อ", "placeholder": "ป้อนตัวอักษรหรือตัวเลขที่แสดง" },
   "exception": { "notFound": "ไม่พบหน้า", "backHome": "กลับหน้าหลัก" },
   "wallpaperCatalogue": {
     "categories": {

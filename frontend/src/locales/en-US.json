@@ -359,7 +359,6 @@
     "followSystem": "Follow the system default",
     "saved": "Saved"
   },
-  "verification": { "required": "Enter the verification code", "title": "Enter the verification code to continue", "placeholder": "Type the letters or numbers shown" },
   "exception": { "notFound": "Page not found", "backHome": "Back to home" },
   "wallpaperCatalogue": {
     "categories": {

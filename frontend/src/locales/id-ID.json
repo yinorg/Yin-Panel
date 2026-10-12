@@ -359,7 +359,6 @@
     "followSystem": "Ikuti bawaan sistem",
     "saved": "Disimpan"
   },
-  "verification": { "required": "Masukkan kode verifikasi", "title": "Masukkan kode verifikasi untuk melanjutkan", "placeholder": "Masukkan huruf atau angka yang ditampilkan" },
   "exception": { "notFound": "Halaman tidak ditemukan", "backHome": "Kembali ke beranda" },
   "wallpaperCatalogue": {
     "categories": {

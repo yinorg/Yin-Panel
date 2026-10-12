@@ -406,7 +406,6 @@
     "followSystem": "Seguir o padrão do sistema",
     "saved": "Salvo"
   },
-  "verification": { "required": "Insira o código de verificação", "title": "Insira o código de verificação para continuar", "placeholder": "Insira as letras ou números exibidos" },
   "exception": { "notFound": "Página não encontrada", "backHome": "Voltar ao início" },
   "wallpaperCatalogue": {
     "categories": {

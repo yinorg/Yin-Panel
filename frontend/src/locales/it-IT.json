@@ -359,7 +359,6 @@
     "followSystem": "Segui il valore predefinito del sistema",
     "saved": "Salvato"
   },
-  "verification": { "required": "Inserisci il codice di verifica", "title": "Inserisci il codice di verifica per continuare", "placeholder": "Inserisci le lettere o i numeri mostrati" },
   "exception": { "notFound": "Pagina non trovata", "backHome": "Torna alla home" },
   "wallpaperCatalogue": {
     "categories": {

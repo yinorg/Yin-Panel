@@ -359,7 +359,6 @@
     "followSystem": "Zgodnie z domyślnym ustawieniem systemu",
     "saved": "Zapisano"
   },
-  "verification": { "required": "Wprowadź kod weryfikacyjny", "title": "Wprowadź kod weryfikacyjny, aby kontynuować", "placeholder": "Wprowadź litery lub cyfry z obrazka" },
   "exception": { "notFound": "Nie znaleziono strony", "backHome": "Powrót do strony głównej" },
   "wallpaperCatalogue": {
     "categories": {

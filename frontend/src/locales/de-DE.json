@@ -406,7 +406,6 @@
     "followSystem": "Systemstandard folgen",
     "saved": "Gespeichert"
   },
-  "verification": { "required": "Bestätigungscode eingeben", "title": "Bestätigungscode eingeben, um fortzufahren", "placeholder": "Buchstaben oder Ziffern aus dem Bild eingeben" },
   "exception": { "notFound": "Seite nicht gefunden", "backHome": "Zurück zur Startseite" },
   "wallpaperCatalogue": {
     "categories": {

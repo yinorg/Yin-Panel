@@ -359,7 +359,6 @@
     "followSystem": "システム既定に従う",
     "saved": "保存しました"
   },
-  "verification": { "required": "認証コードを入力してください", "title": "続行するには認証コードを入力してください", "placeholder": "画像の文字または数字を入力してください" },
   "exception": { "notFound": "ページが見つかりません", "backHome": "ホームに戻る" },
   "wallpaperCatalogue": {
     "categories": {

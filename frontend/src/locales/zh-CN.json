@@ -359,7 +359,6 @@
     "followSystem": "跟随系统默认",
     "saved": "已保存"
   },
-  "verification": { "required": "验证码必须填写", "title": "请输入验证码继续", "placeholder": "输入图中字母或数字后继续" },
   "exception": { "notFound": "页面不存在", "backHome": "返回首页" },
   "wallpaperCatalogue": {
     "categories": {

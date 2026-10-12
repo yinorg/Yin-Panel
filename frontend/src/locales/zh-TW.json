@@ -406,7 +406,6 @@
     "followSystem": "跟隨系統預設",
     "saved": "已儲存"
   },
-  "verification": { "required": "驗證碼必須填寫", "title": "請輸入驗證碼繼續", "placeholder": "輸入圖中字母或數字後繼續" },
   "exception": { "notFound": "頁面不存在", "backHome": "返回首頁" },
   "wallpaperCatalogue": {
     "categories": {
