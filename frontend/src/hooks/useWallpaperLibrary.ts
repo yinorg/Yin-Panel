@@ -40,17 +40,6 @@ function sameOrigin(url: string): boolean {
 }
 
 /**
- * A catalogue names its own entries, but the name is authored in one language.
- * The locale files carry a `wallpaperCatalogue` map keyed by the same ids, so a
- * name resolves per locale and falls back to the catalogue's own one — which is
- * also what a theme's catalogue gets, since its ids are not in these files.
- */
-function localisedName(scope: 'categories' | 'items', id: string, fallback: string): string {
-  const key = `wallpaperCatalogue.${scope}.${id}`
-  return i18n.global.te(key) ? i18n.global.t(key) : fallback
-}
-
-/**
  * One catalogue entry, validated and resolved. A catalogue is theme content, so
  * anything malformed, of an unknown kind, or pointing off-origin is dropped: the
  * layer only ever paints the app's own assets.
@@ -66,7 +55,7 @@ function normaliseEntry(raw: unknown, base: string, packageId: string): Wallpape
   const poster = resolveAgainst(value.poster, base)
   return {
     id: packageId ? `${packageId}:${value.id}` : value.id,
-    name: localisedName('items', value.id, value.name),
+    name: value.name,
     kind,
     source,
     poster: poster && sameOrigin(poster) ? poster : undefined,
@@ -84,7 +73,7 @@ function normaliseCategories(raw: unknown, base: string, packageId: string): Wal
       .map(item => normaliseEntry(item, base, packageId))
       .filter((item): item is WallpaperLibraryEntry => !!item)
     if (items.length)
-      result.push({ id: candidate.id, name: localisedName('categories', candidate.id, candidate.name), items })
+      result.push({ id: candidate.id, name: candidate.name, items })
   }
   return result
 }
@@ -110,6 +99,28 @@ async function loadThemeCatalogue() {
     // library must stay usable.
     themeCategories.value = []
   }
+}
+
+/**
+ * The Core pack names its own entries, but a name is authored in one language.
+ * The locale files carry a `wallpaperCatalogue` map keyed by the pack's own ids,
+ * so a Core name resolves per locale and falls back to the pack's own one. This
+ * runs inside the `library` computed so switching language re-resolves it.
+ *
+ * A theme's catalogue is deliberately left alone: its ids are the theme's, and a
+ * theme that happens to reuse a Core id must still get its own name.
+ */
+function localisedCoreName(scope: 'categories' | 'items', id: string, fallback: string): string {
+  const key = `wallpaperCatalogue.${scope}.${id}`
+  return i18n.global.te(key) ? i18n.global.t(key) : fallback
+}
+
+function localisedCoreCategories(categories: WallpaperLibraryCategory[]): WallpaperLibraryCategory[] {
+  return categories.map(category => ({
+    ...category,
+    name: localisedCoreName('categories', category.id, category.name),
+    items: category.items.map(entry => ({ ...entry, name: localisedCoreName('items', entry.id, entry.name) })),
+  }))
 }
 
 export function useWallpaperLibrary() {
@@ -142,7 +153,7 @@ export function useWallpaperLibrary() {
 
   const library = computed<WallpaperLibrary>(() => ({
     version: coreLibrary.value.version,
-    categories: [...coreLibrary.value.categories, ...themeCategories.value],
+    categories: [...localisedCoreCategories(coreLibrary.value.categories), ...themeCategories.value],
   }))
 
   function find(id?: string): WallpaperLibraryEntry | null {
