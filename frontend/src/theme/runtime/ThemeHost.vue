@@ -327,7 +327,9 @@ async function loadResource(theme: ThemePackage, resource: NonNullable<ThemePack
 }
 
 function isThemeMediaResource(mediaType: string) {
-  return mediaType.startsWith('image/') || mediaType === 'font/woff2' || mediaType.startsWith('video/')
+  // `text/html` carries a theme's own effect pages: the asset route already
+  // sandboxes them, and the theme renders them in a frame.
+  return mediaType.startsWith('image/') || mediaType === 'font/woff2' || mediaType.startsWith('video/') || mediaType === 'text/html'
 }
 
 function revokeAssetURLs(urls: readonly string[]) {

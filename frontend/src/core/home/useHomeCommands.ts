@@ -38,6 +38,9 @@ const CORE_SURFACE_COMPONENTS: Record<string, string> = {
   // not render an app menu.
   'apps': 'UserInfo',
   'theme-settings': 'Style',
+  // The wallpaper centre. The Core owns the library, the layer and the stored
+  // choice, so every theme opens this one picker instead of building its own.
+  'wallpaper-center': 'WallpaperCenter',
   'user-info': 'UserInfo',
   'space-manage': 'SpaceManage',
   'users': 'Users',

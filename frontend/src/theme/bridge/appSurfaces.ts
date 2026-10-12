@@ -24,6 +24,8 @@ registerCoreElement('yin-space-manage', () => import('@/components/apps/SpaceMan
 })
 registerCoreElement('yin-users', () => import('@/components/apps/Users/index.vue'))
 registerCoreElement('yin-about', () => import('@/components/apps/About/index.vue'))
+// The wallpaper centre: a theme embeds the Core picker rather than drawing one.
+registerCoreElement('yin-wallpaper-center', () => import('@/components/apps/WallpaperCenter/index.vue'))
 registerCoreElement('yin-item-editor', () => import('@/views/home/components/EditItem/index.vue'), () => {
   const state = getBridgeHandlers().getEditorState?.()
   if (!state)

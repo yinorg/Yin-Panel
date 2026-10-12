@@ -14,6 +14,7 @@ type PanelConfig struct {
 	WallpaperKind               string   `json:"wallpaperKind,omitempty"`
 	WallpaperSource             string   `json:"wallpaperSource,omitempty"`
 	WallpaperPoster             string   `json:"wallpaperPoster,omitempty"`
+	WallpaperLibraryEntry       string   `json:"wallpaperLibraryEntry,omitempty"`
 	BackgroundBlur              *int     `json:"backgroundBlur,omitempty"`
 	BackgroundMaskNumber        *float64 `json:"backgroundMaskNumber,omitempty"`
 	IconStyle                   *int     `json:"iconStyle,omitempty"`

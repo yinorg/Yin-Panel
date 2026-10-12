@@ -2,8 +2,13 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { usePanelState } from '@/store'
 import { activeThemeWallpaper } from '@/hooks/useTheme'
+import { useWallpaperLibrary } from '@/hooks/useWallpaperLibrary'
 
 const panelState = usePanelState()
+// The Core wallpaper library: a stored selection is an id, so the layer resolves
+// it here. The picker shares this request, but the layer must be able to paint a
+// choice on its own, before the picker has ever been opened.
+const wallpaperLibrary = useWallpaperLibrary()
 const previewThemeDefaults = new URLSearchParams(window.location.search).has('themePreview')
 const visible = ref(true)
 const online = ref(navigator.onLine)
@@ -17,6 +22,12 @@ const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
 const wallpaper = computed(() => {
   const config = panelState.panelConfig
   if (!previewThemeDefaults && config.wallpaperMode === 'none') return null
+  if (!previewThemeDefaults && config.wallpaperMode === 'library') {
+    const entry = wallpaperLibrary.find(config.wallpaperLibraryEntry)
+    // An entry the library no longer carries (a rebuilt or narrowed pack) falls
+    // through to the theme's own wallpaper rather than leaving the page bare.
+    if (entry) return { kind: entry.kind, source: entry.source, poster: entry.poster || entry.source, overlayOpacity: 0 }
+  }
   if (!previewThemeDefaults && (config.wallpaperMode === 'custom' || (!config.wallpaperMode && config.backgroundImageSrc))) {
     const kind = config.wallpaperKind || 'image'
     const source = config.wallpaperSource || config.backgroundImageSrc || '/assets/bg-forest.webp'
@@ -31,6 +42,9 @@ const wallpaper = computed(() => {
 const dynamic = computed(() => wallpaper.value?.kind !== 'image' || /\.gif(?:[?#]|$)/i.test(wallpaper.value?.source || ''))
 const play = computed(() => dynamic.value && !paused.value && !reducedMotion.value && visible.value && online.value && !failed.value)
 const mediaKind = computed(() => wallpaper.value?.kind)
+// Kinds the layer paints in a frame. A library `page` entry is the same shape as
+// a web-bundle or remote wallpaper: an HTML document the asset route sandboxes.
+const framed = computed(() => mediaKind.value === 'webBundle' || mediaKind.value === 'externalUrl' || mediaKind.value === 'page')
 // Static images are painted as a CSS background so their resampling matches the
 // pre-theme build exactly; animated media keeps the <img>/<video> path.
 const staticImage = computed(() => !!wallpaper.value && !dynamic.value)
@@ -51,6 +65,12 @@ const maskColor = computed(() => {
   return `rgba(0,0,0,${panelState.panelConfig.backgroundMaskNumber ?? 0})`
 })
 watch(() => wallpaper.value?.source, () => { failed.value = false; posterFailed.value = false; interacting.value = false })
+// The library must be loaded whenever a selection exists — not only at mount:
+// the panel config arrives after the layer mounts on a cold load, and the picker
+// can switch the mode while the page is open.
+watch(() => [panelState.panelConfig.wallpaperMode, panelState.panelConfig.wallpaperLibraryEntry] as const, ([mode]) => {
+  if (mode === 'library') void wallpaperLibrary.load()
+}, { immediate: true })
 
 function updateVisibility() {
   visible.value = !document.hidden
@@ -105,7 +125,7 @@ onUnmounted(() => {
       @error="failed = true"
     />
     <iframe
-      v-if="play && (mediaKind === 'webBundle' || mediaKind === 'externalUrl')"
+      v-if="play && framed"
       class="wallpaper-media wallpaper-frame"
       :class="{ 'wallpaper-frame--interactive': interacting }"
       :src="wallpaper.source"
@@ -121,7 +141,7 @@ onUnmounted(() => {
       <button class="wallpaper-control" type="button" :title="paused ? $t('themeWallpaper.wallpaperPlay') : $t('themeWallpaper.wallpaperPause')" :aria-label="paused ? $t('themeWallpaper.wallpaperPlay') : $t('themeWallpaper.wallpaperPause')" @click="paused = !paused; interacting = false">
         <SvgIcon :icon="paused ? 'tabler-player-play' : 'tabler-player-pause'" />
       </button>
-      <button v-if="play && (mediaKind === 'webBundle' || mediaKind === 'externalUrl')" class="wallpaper-control" type="button" :title="interacting ? $t('themeWallpaper.wallpaperExit') : $t('themeWallpaper.wallpaperInteract')" :aria-label="interacting ? $t('themeWallpaper.wallpaperExit') : $t('themeWallpaper.wallpaperInteract')" @click="interacting = !interacting">
+      <button v-if="play && framed" class="wallpaper-control" type="button" :title="interacting ? $t('themeWallpaper.wallpaperExit') : $t('themeWallpaper.wallpaperInteract')" :aria-label="interacting ? $t('themeWallpaper.wallpaperExit') : $t('themeWallpaper.wallpaperInteract')" @click="interacting = !interacting">
         <SvgIcon :icon="interacting ? 'tabler-arrow-back-up' : 'tabler-hand-click'" />
       </button>
     </div>

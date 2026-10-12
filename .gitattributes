@@ -1,0 +1,6 @@
+# The wallpaper pack mirrors a third-party site byte for byte. Its files are
+# distributed artwork, not source: reformatting them would change what the
+# browser runs, and diffing them produces nothing but noise. Treating the tree as
+# binary also keeps `git diff --check` meaningful — it is a gate for our own
+# source, not for the trailing whitespace inside a mirrored effect page.
+backend/internal/biz/theme/wallpaperpack/assets/** -diff -text

@@ -14,6 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/yinorg/Yin-Panel/backend/internal/biz/repository"
 	"github.com/yinorg/Yin-Panel/backend/internal/biz/theme"
+	"github.com/yinorg/Yin-Panel/backend/internal/biz/theme/wallpaperpack"
 	"github.com/yinorg/Yin-Panel/backend/internal/constant"
 	"github.com/yinorg/Yin-Panel/backend/internal/web/interceptor"
 	"github.com/yinorg/Yin-Panel/backend/internal/web/model/base"
@@ -34,6 +35,8 @@ func (a *ThemeRouter) InitRouter(router *gin.RouterGroup) {
 	router.GET("/theme/v2/preview/:token", a.PreviewPackageV2)
 	router.GET("/theme/v2/preview/:token/assets/*name", a.PreviewAssetV2)
 	router.GET("/theme/v2/assets/:revision/*name", a.AssetV2)
+	router.GET("/theme/v2/wallpaper/library", a.WallpaperLibrary)
+	router.GET("/theme/v2/wallpaper/library/assets/:version/*name", a.WallpaperLibraryAsset)
 	router.GET("/theme/v2/wallpaper/web/:id/:name", a.WebWallpaperAsset)
 	user := router.Group("")
 	user.Use(interceptor.Auth, themeJWTOnly)
@@ -966,6 +969,58 @@ func (a *ThemeRouter) UploadWebWallpaper(c *gin.Context) {
 func (a *ThemeRouter) WebWallpaperAsset(c *gin.Context) {
 	mediaType, content, err := theme.WebWallpaperAsset(repository.Db, c.Param("id"), c.Param("name"))
 	if err != nil {
+		c.Status(http.StatusNotFound)
+		return
+	}
+	serveThemeAsset(c, mediaType, content, c.Param("name"), true)
+}
+
+// wallpaperLibraryRoot is the URL every library asset is served from. The pack
+// version is part of the path, so a published URL can be cached forever and an
+// older pack simply stops resolving.
+const wallpaperLibraryRoot = "/api/theme/v2/wallpaper/library/assets/"
+
+// WallpaperLibrary publishes the Core's built-in wallpaper library. It is
+// public, like the theme assets: it is packaged content, not user data, and the
+// picker only ever applies an entry through the acting user's own config.
+func (a *ThemeRouter) WallpaperLibrary(c *gin.Context) {
+	catalogue, err := wallpaperpack.Catalogue()
+	if err != nil {
+		response.ErrorDatabase(c, err.Error())
+		return
+	}
+	categories := make([]gin.H, 0, len(catalogue.Categories))
+	for _, category := range catalogue.Categories {
+		items := make([]gin.H, 0, len(category.Items))
+		for _, item := range category.Items {
+			entry := gin.H{
+				"id":     item.ID,
+				"name":   item.Name,
+				"kind":   item.Kind,
+				"source": wallpaperLibraryRoot + catalogue.Version + "/" + item.Source,
+			}
+			if item.Poster != "" {
+				entry["poster"] = wallpaperLibraryRoot + catalogue.Version + "/" + item.Poster
+			}
+			items = append(items, entry)
+		}
+		categories = append(categories, gin.H{"id": category.ID, "name": category.Name, "items": items})
+	}
+	c.Header("Cache-Control", "public, max-age=3600")
+	response.SuccessData(c, gin.H{"version": catalogue.Version, "categories": categories})
+}
+
+// WallpaperLibraryAsset serves one packaged library file. A `page` entry is
+// sandboxed exactly like a theme's own HTML asset, so an effect page cannot
+// reach the panel even though it is same-origin.
+func (a *ThemeRouter) WallpaperLibraryAsset(c *gin.Context) {
+	catalogue, err := wallpaperpack.Catalogue()
+	if err != nil || c.Param("version") != catalogue.Version {
+		c.Status(http.StatusNotFound)
+		return
+	}
+	content, mediaType, ok := wallpaperpack.Asset(c.Param("name"))
+	if !ok {
 		c.Status(http.StatusNotFound)
 		return
 	}

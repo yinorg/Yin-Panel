@@ -491,11 +491,7 @@ const createYinHome = yinLayout => ({
       searchContainer.append(engineButton, searchInput, searchClearButton, searchButton)
       layoutNav = yinLayout.createNav({
         requestRender: () => renderCollection(),
-        toggleSide: () => togglePanelSide(),
-        canToggleSide,
-        isSideSwitching: () => sideSwitching,
-        getSide: () => snapshot?.activeSpaceSide,
-        resolveAsset: path => api.assets.resolve(path),
+        openCoreSurface: surface => api.ui.openCoreSurface(surface),
       })
       status = element('p', 'yin-status')
       status.setAttribute('role', 'status')

@@ -50,7 +50,11 @@ type PackageManifestV2 struct {
 	Contributes   ContributionsV2  `json:"contributes"`
 	Permissions   PermissionsV2    `json:"permissions"`
 	Settings      *ThemeSettingsV2 `json:"settings,omitempty"`
-	Resources     []ResourceV2     `json:"resources"`
+	// WallpaperCatalogue names a packaged resource holding the theme's own
+	// wallpaper catalogue (the same shape the Core's built-in library uses). The
+	// Core renders the picker; a theme only supplies entries.
+	WallpaperCatalogue string       `json:"wallpaperCatalogue,omitempty"`
+	Resources          []ResourceV2 `json:"resources"`
 }
 
 type TokenSetV2 struct {

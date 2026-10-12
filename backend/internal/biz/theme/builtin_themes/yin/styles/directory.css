@@ -22,7 +22,10 @@
 
 .directory-folders {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  /* A 1:2:1 track split keeps the tab strip centred on the bar and, more
+     importantly, keeps it inside its own track: a content-sized middle track
+     let a long tab strip spill over the group pager and swallow its clicks. */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr);
   align-items: center;
   gap: 12px;
   max-width: 100%;
@@ -37,14 +40,23 @@
 
 .directory-tabs {
   grid-column: 2;
+  /* Centred while it fits, scrollable once it does not: `fit-content` plus auto
+     margins keeps the first tab reachable, which flex centring would clip. */
   justify-self: center;
+  width: fit-content;
+  margin-inline: auto;
   display: flex;
   gap: 6px;
   min-width: 0;
   max-width: 100%;
   overflow-x: auto;
   padding: 2px;
-  scrollbar-width: thin;
+  /* The arrows page the strip, so its own scrollbar is not needed. */
+  scrollbar-width: none;
+}
+
+.directory-tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .directory-folder-button {
@@ -74,52 +86,42 @@
   color: var(--yin-primary, #176b80);
 }
 
-.directory-side-toggle {
-  grid-column: 3;
-  justify-self: end;
-  position: relative;
-  width: 38px;
-  height: 22px;
+.directory-pager {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.directory-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
   padding: 0;
   border: 0;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--yin-text, #20282c) 22%, transparent);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--yin-textMuted, #53636a);
+  font-size: 17px;
+  line-height: 1;
   cursor: pointer;
-  transition: background-color var(--yin-motion-duration, 180ms) ease;
+  transition: background-color var(--yin-motion-duration, 180ms) ease, color var(--yin-motion-duration, 180ms) ease;
 }
 
-.directory-side-toggle[hidden] {
-  display: none;
+.directory-page:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--yin-primary, #176b80) 10%, transparent);
+  color: var(--yin-primary, #176b80);
 }
 
-.directory-side-toggle:disabled {
-  cursor: wait;
-  opacity: .6;
+.directory-page:disabled {
+  opacity: .35;
+  cursor: default;
 }
 
-.directory-side-toggle:focus-visible {
+.directory-page:focus-visible {
   outline: 3px solid var(--yin-focusRing, var(--yin-primary, #176b80));
   outline-offset: 2px;
-}
-
-.directory-side-toggle-thumb {
-  position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: var(--yin-surfaceElevated, #fff);
-  box-shadow: 0 1px 3px rgb(15 23 30 / 35%);
-  transition: transform var(--yin-motion-duration, 180ms) ease;
-}
-
-.directory-side-toggle[aria-checked='true'] {
-  background: var(--yin-primary, #176b80);
-}
-
-.directory-side-toggle[aria-checked='true'] .directory-side-toggle-thumb {
-  transform: translateX(16px);
 }
 
 /* ---- Rows ---------------------------------------------------------- */
@@ -366,11 +368,6 @@
   background: var(--yin-primary, #3b6ef5);
 }
 
-/* The switch sits on the panel, so it follows the card's text colour. */
-.directory-side-toggle {
-  background: color-mix(in srgb, var(--yin-text, #1f2329) 18%, transparent);
-}
-
 /* The wallpaper's white brand text disappears on the theme's own light canvas;
    the accent reads on light and dark backgrounds alike. */
 .yin-identity,
@@ -379,24 +376,8 @@
   text-shadow: 0 2px 6px rgb(0 0 0 / 30%);
 }
 
-/* ---- Wallpapers ----------------------------------------------------
-   A canvas of our own, painted behind the panel; the centre that selects it
-   opens from the tab bar. */
-
-.yin-wallpaper {
-  position: fixed;
-  z-index: 0;
-  inset: 0;
-  display: block;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-}
-
-.yin-wallpaper[hidden] {
-  display: none;
-}
-
+/* The effect pages fill the same layer; the asset route sandboxes their own
+   document, so they can only paint inside this frame. */
 /* Keep the panel above the canvas. */
 .yin-page {
   position: relative;
@@ -441,189 +422,5 @@
   outline-offset: 2px;
 }
 
-.yin-wallpaper-center {
-  position: fixed;
-  z-index: 60;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  padding: 24px;
-  background: rgb(12 18 22 / 45%);
-  backdrop-filter: blur(6px);
-}
-
-.yin-wallpaper-center[hidden] {
-  display: none;
-}
-
-.yin-wallpaper-sheet {
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  width: min(880px, 100%);
-  max-height: min(80vh, 640px);
-  padding: 18px 20px 20px;
-  overflow: auto;
-  border: 1px solid var(--yin-border, #e6eaf2);
-  border-radius: 14px;
-  background: var(--yin-surfaceElevated, #fff);
-  color: var(--yin-text, #1f2329);
-  box-shadow: 0 24px 60px rgb(15 23 30 / 28%);
-}
-
-.yin-wallpaper-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.yin-wallpaper-title {
-  margin: 0;
-  font-size: 17px;
-  font-weight: 600;
-}
-
-.yin-wallpaper-close {
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--yin-textMuted, #8a94a6);
-  font-size: 20px;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.yin-wallpaper-close:hover {
-  background: color-mix(in srgb, var(--yin-text, #1f2329) 8%, transparent);
-  color: var(--yin-text, #1f2329);
-}
-
-.yin-wallpaper-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 12px;
-}
-
-.yin-wallpaper-item {
-  display: grid;
-  gap: 6px;
-  padding: 6px 6px 8px;
-  border: 1px solid transparent;
-  border-radius: 10px;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-  text-align: center;
-  transition: border-color var(--yin-motion-duration, 180ms) ease, background-color var(--yin-motion-duration, 180ms) ease;
-}
-
-.yin-wallpaper-item:hover {
-  background: color-mix(in srgb, var(--yin-primary, #3b6ef5) 7%, transparent);
-}
-
-.yin-wallpaper-item.active {
-  border-color: var(--yin-primary, #3b6ef5);
-  background: color-mix(in srgb, var(--yin-primary, #3b6ef5) 12%, transparent);
-}
-
-.yin-wallpaper-item:focus-visible {
-  outline: 3px solid var(--yin-focusRing, var(--yin-primary, #3b6ef5));
-  outline-offset: 2px;
-}
-
-.yin-wallpaper-preview {
-  display: block;
-  width: 100%;
-  height: auto;
-  aspect-ratio: 16 / 9;
-  object-fit: cover;
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--yin-text, #1f2329) 10%, transparent);
-}
-
-.yin-wallpaper-preview-empty {
-  background: color-mix(in srgb, var(--yin-text, #1f2329) 5%, transparent);
-}
-
-.yin-wallpaper-name {
-  margin: 0;
-  font-size: 12.5px;
-  font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 @media (max-width: 640px) {
-  .yin-wallpaper-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
-}
-
-.yin-wallpaper-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--yin-border, #e6eaf2);
-}
-
-.yin-wallpaper-tab {
-  padding: 5px 14px;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--yin-textMuted, #8a94a6);
-  font-size: 13px;
-  cursor: pointer;
-  transition: background-color var(--yin-motion-duration, 180ms) ease, border-color var(--yin-motion-duration, 180ms) ease, color var(--yin-motion-duration, 180ms) ease;
-}
-
-.yin-wallpaper-tab:hover {
-  background: color-mix(in srgb, var(--yin-primary, #3b6ef5) 7%, transparent);
-}
-
-.yin-wallpaper-tab.active {
-  border-color: var(--yin-primary, #3b6ef5);
-  background: color-mix(in srgb, var(--yin-primary, #3b6ef5) 12%, transparent);
-  color: var(--yin-primary, #3b6ef5);
-}
-
-.yin-wallpaper-tab:focus-visible,
-.yin-wallpaper-page:focus-visible {
-  outline: 3px solid var(--yin-focusRing, var(--yin-primary, #3b6ef5));
-  outline-offset: 2px;
-}
-
-.yin-wallpaper-pager {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-}
-
-.yin-wallpaper-page {
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border: 1px solid var(--yin-border, #e6eaf2);
-  border-radius: 8px;
-  background: transparent;
-  color: var(--yin-text, #1f2329);
-  font-size: 16px;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.yin-wallpaper-page:disabled {
-  opacity: .4;
-  cursor: default;
-}
-
-.yin-wallpaper-page-status {
-  font-size: 12.5px;
-  color: var(--yin-textMuted, #8a94a6);
-}
+  }

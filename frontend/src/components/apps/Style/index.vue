@@ -11,6 +11,7 @@ import { getSearchConfig, getSpaces, setSearchConfig, spaceOptions, type Space, 
 import { readSpaceCache, writeSpaceCache } from '@/utils/spaceCache'
 import { searchEngineList } from '@/components/deskModule/SearchBox/engines'
 import { beginThemeTrial, clearSpaceTheme, confirmThemeTrial, getSpaceTheme, getThemePackages, getThemeRevision, getTrustedThemeRuntimePolicy, installThemePackage, previewThemePackage, removeThemePackage, rollbackThemeTrial, saveThemePreference, setSpaceTheme, setTrustedThemeRuntimePolicy, uploadWebWallpaper } from '@/api/theme'
+import WallpaperCenter from '@/components/apps/WallpaperCenter/index.vue'
 import { HOME_LAYOUT_PACKAGES, homeLayoutForThemePackage, isBuiltinThemePackage, isYinThemePackage, type ThemePackage } from '@/utils/theme'
 import { activeThemePackageId, refreshMyTheme } from '@/hooks/useTheme'
 
@@ -52,9 +53,14 @@ const previewRemoteDomains = computed(() => Object.values(previewPackage.value?.
   .map(item => new URL(item.source).hostname))
 const wallpaperModeOptions = computed(() => [
   { label: t('themeWallpaper.follow'), value: 'theme' },
+  { label: t('themeWallpaper.center'), value: 'library' },
   { label: t('themeWallpaper.custom'), value: 'custom' },
   { label: t('themeWallpaper.none'), value: 'none' },
 ])
+// The Core's own wallpaper picker, expanded from the wallpaper card. The picker
+// writes the same panel config this page edits, so the page and the modal stay
+// in step.
+const wallpaperCenterOpen = ref(false)
 const wallpaperKindOptions = computed(() => [
   { label: t('themeWallpaper.image'), value: 'image' },
   { label: t('themeWallpaper.video'), value: 'video' },
@@ -712,6 +718,10 @@ function adoptThemeDefaults() {
         {{ $t('apps.baseSettings.wallpaper') }}
       </div>
       <NSelect v-model:value="panelState.panelConfig.wallpaperMode" to="body" :options="wallpaperModeOptions" class="mb-2" />
+      <NButton size="small" class="mb-2" @click="wallpaperCenterOpen = !wallpaperCenterOpen">
+        {{ $t('themeWallpaper.center') }}
+      </NButton>
+      <WallpaperCenter v-if="wallpaperCenterOpen" embedded class="mb-2" />
       <NSelect v-if="panelState.panelConfig.wallpaperMode === 'custom'" v-model:value="panelState.panelConfig.wallpaperKind" to="body" :options="wallpaperKindOptions" class="mb-2" />
       <NUpload
         v-if="panelState.panelConfig.wallpaperMode === 'custom' && (panelState.panelConfig.wallpaperKind === 'image' || panelState.panelConfig.wallpaperKind === 'video')"

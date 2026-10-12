@@ -3,12 +3,14 @@ package panel
 import (
 	"errors"
 	"github.com/yinorg/Yin-Panel/backend/internal/biz/repository"
+	"github.com/yinorg/Yin-Panel/backend/internal/biz/theme/wallpaperpack"
 	"github.com/yinorg/Yin-Panel/backend/internal/constant"
 	"github.com/yinorg/Yin-Panel/backend/internal/global"
 	"github.com/yinorg/Yin-Panel/backend/internal/web/interceptor"
 	"github.com/yinorg/Yin-Panel/backend/internal/web/model/base"
 	"github.com/yinorg/Yin-Panel/backend/internal/web/model/response"
 	"net/url"
+	"regexp"
 	"strings"
 
 	"github.com/gin-gonic/gin/binding"
@@ -16,6 +18,12 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
+
+// themeWallpaperEntryV2 matches a wallpaper entry a theme's own catalogue
+// declared: `<packageId>:<entryId>`, both dot/dash/underscore-safe. It is a
+// shape check only — the Core cannot know another package's entries — and the
+// layer falls back to the theme wallpaper when one no longer resolves.
+var themeWallpaperEntryV2 = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,63}:[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`)
 
 type UserConfigRouter struct {
 }
@@ -73,9 +81,21 @@ func (a *UserConfigRouter) SetConfig(c *gin.Context) {
 	}
 	if req.Panel != nil {
 		wallpaper := req.Panel
-		if wallpaper.WallpaperMode != "" && wallpaper.WallpaperMode != "theme" && wallpaper.WallpaperMode != "custom" && wallpaper.WallpaperMode != "none" {
+		if wallpaper.WallpaperMode != "" && wallpaper.WallpaperMode != "theme" && wallpaper.WallpaperMode != "custom" && wallpaper.WallpaperMode != "library" && wallpaper.WallpaperMode != "none" {
 			response.ErrorParamFomat(c, "invalid wallpaper mode")
 			return
+		}
+		// A library selection only names one of the Core's packaged entries, so
+		// the library itself is the validation: an unknown entry is rejected
+		// rather than stored and silently ignored later. A theme's own catalogue
+		// entry is namespaced with its package id and cannot be checked here, so
+		// only its shape is enforced and the layer falls back if it is gone.
+		if wallpaper.WallpaperMode == "library" {
+			entry := wallpaper.WallpaperLibraryEntry
+			if _, ok := wallpaperpack.Find(entry); !ok && !themeWallpaperEntryV2.MatchString(entry) {
+				response.ErrorParamFomat(c, "invalid wallpaper library entry")
+				return
+			}
 		}
 		if wallpaper.WallpaperMode == "custom" {
 			if wallpaper.WallpaperKind != "image" && wallpaper.WallpaperKind != "video" && wallpaper.WallpaperKind != "webBundle" && wallpaper.WallpaperKind != "externalUrl" {

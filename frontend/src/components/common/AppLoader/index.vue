@@ -17,6 +17,7 @@ const componentLoaders: Record<string, () => Promise<Component>> = {
   SpaceManage: () => import('../../apps/SpaceManage/index.vue'),
   About: () => import('../../apps/About/index.vue'),
   Users: () => import('../../apps/Users/index.vue'),
+  WallpaperCenter: () => import('../../apps/WallpaperCenter/index.vue'),
 }
 
 function updateComponent() {

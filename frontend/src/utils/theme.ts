@@ -14,6 +14,9 @@ export interface ThemeManifest {
   permissions?: { required?: Array<{ name: string; origins?: string[] }>; optional?: Array<{ name: string; origins?: string[] }> }
   settings?: { schema: string; schemaVersion: number }
   wallpapers?: Record<string, { kind: 'image' | 'video' | 'webBundle' | 'externalUrl' | 'imageUrl'; source: string; poster?: string; overlayOpacity?: number }>
+  /** A packaged resource holding the theme's own wallpaper catalogue. The Core
+   *  renders the picker and merges these entries with its built-in library. */
+  wallpaperCatalogue?: string
 }
 
 export interface ThemePackage {

@@ -8,12 +8,9 @@ const yinHomeLayout = (() => {
   let rootId
   let nav
   let tabs
-  let sideToggle
+  let pagerPrevious
+  let pagerNext
   let requestRender = () => {}
-  let toggleSide = () => {}
-  let canToggleSide = () => false
-  let isSideSwitching = () => false
-  let getSide = () => 'yin'
   const nodes = new Map()
 
   const groupTree = groups => {
@@ -30,14 +27,20 @@ const yinHomeLayout = (() => {
 
   // ---- Paired-side switch -------------------------------------------
 
-  const syncSideToggle = () => {
-    if (!sideToggle) return
-    sideToggle.hidden = !canToggleSide()
-    if (sideToggle.hidden) return
-    const yang = getSide() === 'yang'
-    sideToggle.setAttribute('aria-checked', yang ? 'true' : 'false')
-    sideToggle.setAttribute('aria-label', `Switch to ${yang ? 'Yin' : 'Yang'}-Panel`)
-    sideToggle.disabled = isSideSwitching()
+  // The tab bar is paged, not stepped: the arrows scroll the parent-group strip
+  // left and right so more groups come into view, and never change the
+  // selection. They are disabled at each end of the scroll range.
+  const pageTabs = direction => {
+    if (!tabs) return
+    const step = Math.max(160, Math.round(tabs.clientWidth * 0.85))
+    tabs.scrollBy({ left: direction * step, behavior: 'smooth' })
+  }
+
+  const syncPager = () => {
+    if (!pagerPrevious || !tabs) return
+    const max = Math.max(0, tabs.scrollWidth - tabs.clientWidth)
+    pagerPrevious.disabled = tabs.scrollLeft <= 1
+    pagerNext.disabled = max <= 1 || tabs.scrollLeft >= max - 1
   }
 
   // ---- Tab bar ------------------------------------------------------
@@ -70,9 +73,9 @@ const yinHomeLayout = (() => {
         nodes.delete(key)
       }
     }
-    syncSideToggle()
-    // Even without groups the switch must stay reachable.
-    nav.hidden = roots.length === 0 && sideToggle.hidden
+    // The strip's width is only measurable once it has been laid out.
+    requestAnimationFrame(syncPager)
+    nav.hidden = roots.length === 0
   }
 
   // ---- Per-row group menu -------------------------------------------
@@ -164,17 +167,12 @@ const yinHomeLayout = (() => {
     hideEmptyGroups: true,
     createNav: actions => {
       requestRender = actions.requestRender
-      toggleSide = actions.toggleSide
-      canToggleSide = actions.canToggleSide
-      isSideSwitching = actions.isSideSwitching
-      getSide = actions.getSide
       nav = element('nav', 'directory-folders')
       nav.setAttribute('aria-label', 'Bookmark groups')
       tabs = element('div', 'directory-tabs')
-      // Wallpapers paint a canvas behind the panel; the centre is their entry.
-      const host = document.getElementById('theme-root') || document.body
-      const wallpaperLayer = createYinWallpaperLayer(host, actions.resolveAsset)
-      const wallpaperCenter = createYinWallpaperCenter(wallpaperLayer, YIN_WALLPAPER_CATALOGUE, actions.resolveAsset, () => requestRender())
+      // The wallpaper centre is a Core surface, not a theme view: the Core owns
+      // the library, the layer behind the panel and the stored choice, so any
+      // theme opens the exact same picker.
       const wallpaperButton = element('button', 'directory-wallpaper-button')
       wallpaperButton.type = 'button'
       wallpaperButton.dataset.testid = 'theme-wallpaper-center'
@@ -183,34 +181,26 @@ const yinHomeLayout = (() => {
       wallpaperButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zm1 12h14l-4.6-6.1-3 3.7L9 11z"/><circle cx="8.2" cy="9.2" r="1.6" fill="currentColor"/></svg>'
       wallpaperButton.addEventListener('click', event => {
         event.stopPropagation()
-        wallpaperCenter.open()
+        Promise.resolve(actions.openCoreSurface('wallpaper-center')).catch(() => {})
       })
-      sideToggle = element('button', 'directory-side-toggle')
-      sideToggle.type = 'button'
-      sideToggle.setAttribute('role', 'switch')
-      const thumb = element('span', 'directory-side-toggle-thumb')
-      thumb.setAttribute('aria-hidden', 'true')
-      sideToggle.append(thumb)
-      sideToggle.addEventListener('click', async () => {
-        if (sideToggle.disabled || !canToggleSide() || isSideSwitching()) return
-        // The switch stays disabled until the round trip settles. Recomputing from
-        // `isSideSwitching()` alone would strand it: the snapshot that arrives
-        // mid-switch re-applies the disabled state, and no later render clears it.
-        sideToggle.disabled = true
-        try {
-          await toggleSide()
-        }
-        finally {
-          syncSideToggle()
-        }
-      })
+      pagerPrevious = element('button', 'directory-page', '\u2039')
+      pagerPrevious.type = 'button'
+      pagerPrevious.dataset.testid = 'theme-group-previous'
+      pagerPrevious.setAttribute('aria-label', '向前翻页父分组')
+      pagerPrevious.addEventListener('click', () => pageTabs(-1))
+      pagerNext = element('button', 'directory-page', '\u203a')
+      pagerNext.type = 'button'
+      pagerNext.dataset.testid = 'theme-group-next'
+      pagerNext.setAttribute('aria-label', '向后翻页父分组')
+      pagerNext.addEventListener('click', () => pageTabs(1))
+      const pager = element('div', 'directory-pager')
+      pager.append(pagerPrevious, pagerNext)
       const actionsBar = element('div', 'directory-actions')
-      actionsBar.append(wallpaperButton, sideToggle)
+      actionsBar.append(wallpaperButton, pager)
       nav.append(tabs, actionsBar)
-      // The centre lives beside the page, so its own stacking stays above every
-      // Core surface instead of inside the page's context.
-      host.append(wallpaperCenter.element)
-      syncSideToggle()
+      tabs.addEventListener('scroll', () => syncPager(), { passive: true })
+      window.addEventListener('resize', () => syncPager())
+      syncPager()
       return nav
     },
     refreshNav,

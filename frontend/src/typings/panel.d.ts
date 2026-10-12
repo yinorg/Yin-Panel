@@ -41,10 +41,14 @@ declare namespace Panel {
 
     interface panelConfig{
         backgroundImageSrc?:string
-        wallpaperMode?:'theme' | 'custom' | 'none'
+        wallpaperMode?:'theme' | 'custom' | 'library' | 'none'
         wallpaperKind?:'image' | 'video' | 'webBundle' | 'externalUrl'
         wallpaperSource?:string
         wallpaperPoster?:string
+        /** The Core wallpaper library entry the user picked (see
+         *  `wallpaperMode: 'library'`). Only an id: the layer resolves it against
+         *  the library, so a stored choice survives a library rebuild. */
+        wallpaperLibraryEntry?:string
         backgroundBlur?:number
         backgroundMaskNumber?:number
         iconStyle?:PanelPanelConfigStyleEnum

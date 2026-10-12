@@ -3,6 +3,7 @@ import Style from './Style/index.vue'
 import UserInfo from './UserInfo/index.vue'
 import Users from './Users/index.vue'
 import SpaceManage from './SpaceManage/index.vue'
+import WallpaperCenter from './WallpaperCenter/index.vue'
 
 export {
   About,
@@ -10,4 +11,5 @@ export {
   UserInfo,
   Users,
   SpaceManage,
+  WallpaperCenter,
 }

@@ -369,9 +369,9 @@ func TestBuiltinPackagesV2AreCompleteDTCGAndRepeatable(t *testing.T) {
 		wantVersion := "2.3.3"
 		switch summary.ID {
 		case "org.yin.default":
-			wantVersion = "2.3.86"
+			wantVersion = "2.3.88"
 		case "org.yin.directory":
-			wantVersion = "2.10.2"
+			wantVersion = "2.11.5"
 		}
 		if pkg.Manifest.Version != wantVersion {
 			t.Errorf("%s builtin version = %q, want %q", summary.ID, pkg.Manifest.Version, wantVersion)
@@ -438,13 +438,13 @@ func TestBuiltinHomeResourceHashesPinTheEmbeddedThemes(t *testing.T) {
 		"org.yin.default": {
 			// shell 增加了布局钩子（空组隐藏、导航动作对象），视图哈希随之改变；
 			// 样式表未动。
-			"views/home.mjs":  "901a5f3ae238bcc37b2176c7c7a955adbaafdbd5f56879f371e8fc00d7251dbc",
+			"views/home.mjs":  "b91f59a915e9582be52dc6332e6216bcb9abcd433f263e85e31542d45c8efc70",
 			"styles/home.css": "b9c2dc1c6408a9d95b660f9f744fb241017673630174d071589abdbf7dbf0f57",
 		},
 		"org.yin.directory": {
 			// 目录主题改为「标签页 + 行标签 + 书签网格 + 行内分组菜单」。
-			"views/home.mjs":  "a33ce40f2dbc72bb780121809a39990a24bc3112d1dfbf8d56d37437c98f8a26",
-			"styles/home.css": "0bea421b75c5bbd6a6b6b285a4206b5e396cff130f8f6bcfa9dc88c2c9efecc8",
+			"views/home.mjs":  "4717dd277026729284a066b91bac0023662a357e2f4dd4bf617c884350f370c6",
+			"styles/home.css": "05c088ab21a6cb17dfa32ae99c6d23e288d489895922ddaffce1c0004d818628",
 		},
 		"org.yin.glass": {
 			// Glass 复用 shared/home.mjs 与 shared/home.css，两者都改了。
@@ -515,7 +515,7 @@ func TestEnsureBuiltinV2UpgradesOnlyActivationForSelectedBuiltin(t *testing.T) {
 		t.Fatal(err)
 	}
 	latest, err := LatestPackageRevisionV2(db, "org.yin.default")
-	if err != nil || latest.Version != "2.3.86" || activation.ActiveRevisionID != latest.ID {
+	if err != nil || latest.Version != "2.3.88" || activation.ActiveRevisionID != latest.ID {
 		t.Fatalf("selected builtin activation = %+v, latest=%s, err=%v", activation, latest.ID, err)
 	}
 	if latest.ID == old.Revision {
