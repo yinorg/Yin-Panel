@@ -388,5 +388,8 @@ const yinHomeLayout = (() => {
       menu.trigger.hidden = !menu.actions.some(action => !action.hidden)
     },
     itemChrome: () => ({ hideTitle: false, hideDescription: true, info: false }),
+    // What this layout browses is a folder, not a space, so its own wording
+    // applies here rather than the Core's single word for both layouts.
+    emptyKey: 'collection.emptyFolder',
   }
 })()

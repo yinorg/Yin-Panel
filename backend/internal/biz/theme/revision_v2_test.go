@@ -369,9 +369,9 @@ func TestBuiltinPackagesV2AreCompleteDTCGAndRepeatable(t *testing.T) {
 		wantVersion := "2.3.3"
 		switch summary.ID {
 		case "org.yin.default":
-			wantVersion = "2.3.93"
+			wantVersion = "2.3.94"
 		case "org.yin.directory":
-			wantVersion = "2.11.10"
+			wantVersion = "2.11.11"
 		}
 		if pkg.Manifest.Version != wantVersion {
 			t.Errorf("%s builtin version = %q, want %q", summary.ID, pkg.Manifest.Version, wantVersion)
@@ -437,16 +437,17 @@ func TestBuiltinHomeResourceHashesPinTheEmbeddedThemes(t *testing.T) {
 	expected := map[string]map[string]string{
 		"org.yin.default": {
 			// shell 增加了编辑态钩子（onEditingChange，hideEmptyGroups 可解析为函数）、
-			// noGroupDrag 判定、编辑态回报 Core 的 layout.editState，并删除了动作栏里
-			// 五个导航入口；样式表新增了 Save/Cancel 的绿勾红叉规则。
-			"views/home.mjs":  "ad82cd5bc28f29c6e0e2e925ba2488213b6445a7c42dab4b9b67589d7677e832",
+			// noGroupDrag 判定、编辑态回报 Core 的 layout.editState、主题自带语言表
+			// （THEME_STRINGS + 三层 envLabel），并删除了动作栏里五个导航入口；
+			// 样式表新增了 Save/Cancel 的绿勾红叉规则。
+			"views/home.mjs":  "72abe43120e2e906d92af86c2d85a8d4bad6559de0b9cb11a743bb94b1049fad",
 			"styles/home.css": "2e88bc1bfa4887b02e969540093cacdfb54073476fba1f32395e2411c790d155",
 		},
 		"org.yin.directory": {
 			// 目录主题改为「标签页 + 行标签 + 书签网格 + 行内分组菜单」，
 			// 编辑模式保持文件夹视图：整棵树在 DOM 中、只显示打开的根，
 			// 悬停打开文件夹，根分组由标签拖拽排序。
-			"views/home.mjs":  "e4f74855a54d917c3e8e30714a8305ec4301164ef8494d9bda431dee125111cd",
+			"views/home.mjs":  "6e8be4ade38740ace0ab907f71b6406056c68453f191e78851bec2381dc3e4c8",
 			"styles/home.css": "151ce0edcf3e67ef4ea5fc4264ca1fd5e6ddd0c13f3b17d1a3d7439c92d429be",
 		},
 		"org.yin.glass": {
@@ -518,7 +519,7 @@ func TestEnsureBuiltinV2UpgradesOnlyActivationForSelectedBuiltin(t *testing.T) {
 		t.Fatal(err)
 	}
 	latest, err := LatestPackageRevisionV2(db, "org.yin.default")
-	if err != nil || latest.Version != "2.3.93" || activation.ActiveRevisionID != latest.ID {
+	if err != nil || latest.Version != "2.3.94" || activation.ActiveRevisionID != latest.ID {
 		t.Fatalf("selected builtin activation = %+v, latest=%s, err=%v", activation, latest.ID, err)
 	}
 	if latest.ID == old.Revision {

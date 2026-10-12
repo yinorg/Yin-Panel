@@ -62,9 +62,31 @@ const createYinHome = yinLayout => ({
   setup(api) {
     let root
     let snapshot
-    // Theme UI text is owned by the Core: the theme holds no locale bundle and
-    // falls back to its own English when a label is missing (older Core).
-    const envLabel = (key, fallback) => api.environment?.get?.()?.labels?.[key] || fallback
+    // Theme UI text is layered. The Core owns the words it also names — Save,
+    // Cancel, the dialog titles — and hands them over in `labels`. The theme owns
+    // the wording a layout decides, which the Core cannot know: what a container
+    // of bookmarks is called differs between the two built-in layouts, and the
+    // Core has one word for both. Theme strings win over the Core's, and the
+    // literal is the last resort for a Core older than the key.
+    const THEME_STRINGS = {
+      en: {
+        'collection.empty': 'No bookmarks here',
+        'collection.emptyFolder': 'No bookmarks in this folder',
+      },
+      'zh-CN': {
+        'collection.empty': '这里还没有书签',
+        'collection.emptyFolder': '此文件夹暂无书签',
+      },
+      'zh-TW': {
+        'collection.empty': '這裡還沒有書籤',
+        'collection.emptyFolder': '此資料夾暫無書籤',
+      },
+    }
+    const themeStrings = () => {
+      const language = String(api.environment?.get?.()?.language || 'en')
+      return THEME_STRINGS[language] || THEME_STRINGS[language.split('-')[0]] || THEME_STRINGS.en
+    }
+    const envLabel = (key, fallback) => themeStrings()[key] || api.environment?.get?.()?.labels?.[key] || fallback
     let sideSwitching = false
     let query = ''
     let clockTimer
@@ -1107,7 +1129,7 @@ const createYinHome = yinLayout => ({
           ? snapshot.error?.message || envLabel('collection.loadFailed', 'Could not load items')
           : needle
             ? envLabel('collection.noMatch', 'No matching items')
-            : envLabel('collection.empty', 'No items in this space')
+            : envLabel(yinLayout.emptyKey || 'collection.empty', 'No items')
       if (snapshot.status === 'loading') collection.setAttribute('aria-busy', 'true')
       else collection.removeAttribute('aria-busy')
       status.textContent = ''
