@@ -369,9 +369,9 @@ func TestBuiltinPackagesV2AreCompleteDTCGAndRepeatable(t *testing.T) {
 		wantVersion := "2.3.3"
 		switch summary.ID {
 		case "org.yin.default":
-			wantVersion = "2.3.92"
+			wantVersion = "2.3.93"
 		case "org.yin.directory":
-			wantVersion = "2.11.9"
+			wantVersion = "2.11.10"
 		}
 		if pkg.Manifest.Version != wantVersion {
 			t.Errorf("%s builtin version = %q, want %q", summary.ID, pkg.Manifest.Version, wantVersion)
@@ -518,7 +518,7 @@ func TestEnsureBuiltinV2UpgradesOnlyActivationForSelectedBuiltin(t *testing.T) {
 		t.Fatal(err)
 	}
 	latest, err := LatestPackageRevisionV2(db, "org.yin.default")
-	if err != nil || latest.Version != "2.3.92" || activation.ActiveRevisionID != latest.ID {
+	if err != nil || latest.Version != "2.3.93" || activation.ActiveRevisionID != latest.ID {
 		t.Fatalf("selected builtin activation = %+v, latest=%s, err=%v", activation, latest.ID, err)
 	}
 	if latest.ID == old.Revision {

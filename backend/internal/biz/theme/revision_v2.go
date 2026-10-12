@@ -933,7 +933,7 @@ func builtinPackagesV2() []*PackageV2 {
 	// solid accent, which is what makes it read as a distinct theme rather than a
 	// Yin layout variant.
 	yinHome := builtinPaletteV2{"org.yin.default", "Yin", map[string]string{"canvas": "#f4f7f8", "surface": "#ffffff", "text": "#20282c", "muted": "#64737a", "border": "#d8e0e3", "primary": "#176b80"}, map[string]string{"canvas": "#171d20", "surface": "#22292c", "text": "#f2f5f6", "muted": "#b7c1c4", "border": "#536066", "primary": "#78c5d4"}, "8px", "16px", "0 8px 24px #18242a22", "180ms", []string{"Inter", "system-ui", "sans-serif"}, 1, 1, 0, 0, 0, 0, "16px", "70px"}
-	directoryHome := builtinPaletteV2{"org.yin.directory", "目录", map[string]string{"canvas": "#eef2f9", "surface": "#ffffff", "text": "#1f2329", "muted": "#8a94a6", "border": "#e6eaf2", "primary": "#3b6ef5"}, map[string]string{"canvas": "#0f1319", "surface": "#1a2130", "text": "#eef2f8", "muted": "#9aa4b5", "border": "#2b3444", "primary": "#4f83ff"}, "8px", "16px", "0 8px 24px #18242a1f", "180ms", []string{"Inter", "system-ui", "sans-serif"}, 1, 1, 0, 0, 0, 0, "16px", "70px"}
+	directoryHome := builtinPaletteV2{"org.yin.directory", "Directory", map[string]string{"canvas": "#eef2f9", "surface": "#ffffff", "text": "#1f2329", "muted": "#8a94a6", "border": "#e6eaf2", "primary": "#3b6ef5"}, map[string]string{"canvas": "#0f1319", "surface": "#1a2130", "text": "#eef2f8", "muted": "#9aa4b5", "border": "#2b3444", "primary": "#4f83ff"}, "8px", "16px", "0 8px 24px #18242a1f", "180ms", []string{"Inter", "system-ui", "sans-serif"}, 1, 1, 0, 0, 0, 0, "16px", "70px"}
 	palettes := []builtinPaletteV2{
 		yinHome,
 		directoryHome,
@@ -954,10 +954,10 @@ func builtinPackagesV2() []*PackageV2 {
 			// Bump whenever a home resource changes; a published version is
 			// immutable, so reusing it would abort startup. The directory package
 			// starts its own version line because it is a new package.
-			version = "2.3.92"
+			version = "2.3.93"
 			homeLayout = &HomeLayoutV2{Kind: "standard", Editable: true}
 			if palette.id == "org.yin.directory" {
-				version = "2.11.9"
+				version = "2.11.10"
 				homeLayout = &HomeLayoutV2{Kind: "directory", Editable: true}
 			}
 			requiredPermissions = append(requiredPermissions,
