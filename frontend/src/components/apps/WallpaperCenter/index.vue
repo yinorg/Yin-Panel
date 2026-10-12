@@ -71,7 +71,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <section class="wallpaper-center">
+  <section class="wallpaper-center" :class="embedded ? 'wallpaper-center--embedded' : ''">
     <header v-if="!embedded" class="wallpaper-center-head">
       <h2 class="wallpaper-center-title">
         {{ t('themeWallpaper.center') }}
@@ -149,7 +149,16 @@ onMounted(() => {
   --wpc-hover: #f2f5fa;
   --wpc-preview: #eef2f9;
   --wpc-accent: #3b6ef5;
+
+  /* The Core mounts the standalone picker inside a rounded panel that carries no
+     padding of its own, so the picker insets itself the way every other app in
+     that panel does. Without it the 16px corner radius clips the first stroke of
+     the title. An embedded picker sits in its host's padded layout instead and
+     must not inset a second time. */
+  padding: 16px;
 }
+
+.wallpaper-center--embedded { padding: 0; }
 
 .dark .wallpaper-center {
   --wpc-text: #eef2f8;
