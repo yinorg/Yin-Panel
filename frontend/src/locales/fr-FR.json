@@ -62,7 +62,8 @@
     "1400": "Erreur de format des paramètres"
   },
   "appLauncher": {
-    "title": "Paramètres système"
+    "title": "Paramètres système",
+    "groups": { "personal": "Personnel", "space": "Espace", "admin": "Administration" }
   },
   "apps": {
     "about": {
@@ -126,16 +127,29 @@
       "deleteWarnText": "Voulez-vous vraiment supprimer ce groupe [{name}] ? Les icônes de ce groupe seront perdues après la suppression.",
       "groupName": "Nom du groupe"
     },
-    "userInfo": {
-      "appName": "Mes informations",
+    "account": {
+      "appName": "Compte",
+      "languageHint": "Enregistré sur votre compte, appliqué aussi sur vos autres appareils"
+    },
+    "appearance": {
+      "appName": "Apparence",
+      "identity": "Identité de mon accueil",
+      "identityHint": "N'affecte que votre propre page d'accueil, pas les autres utilisateurs",
       "theme": "Thème",
+      "scheme": "Mode clair/sombre",
       "themeStyle": {
         "auto": "Suivre le système ",
         "dark": "Sombre ",
         "light": "Clair "
-      },
-      "publicVisit": "Accès public",
-      "enablePublicVisit": "Activer l'accès public"
+      }
+    },
+    "layout": {
+      "appName": "Mise en page et composants",
+      "components": "Composants"
+    },
+    "instance": {
+      "appName": "Paramètres de l'instance",
+      "scopeHint": "Concerne toute l'instance et tous les utilisateurs"
     }
   },
   "themePackage": { "title": "Bibliothèque de thèmes", "label": "Thème", "instanceDefault": "Thème par défaut de l’instance", "install": "Installer le paquet", "setDefault": "Définir par défaut", "verified": "Signature officielle", "unverified": "Non vérifié", "confirmUnverified": "Ce paquet n’est pas signé par Yin. Installez-le uniquement si sa source est fiable.", "installed": "Thème installé", "removed": "Thème supprimé", "saved": "Préférence enregistrée", "adoptDefaults": "Utiliser les couleurs du thème", "removeConfirm": "Supprimer ce thème ? Les utilisateurs qui le sélectionnent et le défaut de l’instance reviendront à Yin Default.", "runtimePrompt": "{name} demande les permissions Theme API suivantes : {permissions}", "runtimeConfirm": "Autoriser {name} à s’exécuter dans un cadre isolé avec : {permissions} ?", "runtimeEnable": "Autoriser", "noRuntimePermissions": "Aucune permission Theme API", "runtimeGrantFailed": "Impossible d’enregistrer les permissions Theme API.", "runtimeLoadFailed": "Le thème n’a pas démarré. Yin Home est affiché." },
@@ -330,7 +344,13 @@
     "personal": "Personnel",
     "emailMissing": "E-mail indisponible",
     "admin": "Administrateur",
-    "title": "Gestion des espaces",
+    "title": "Paramètres de l'espace",
+    "sectionBasic": "Informations générales",
+    "sectionContent": "Contenu et données",
+    "sectionSharing": "Partage et accès",
+    "sectionDanger": "Zone sensible",
+    "scopeHint": "Affecte cet espace et ses membres",
+    "dangerHint": "Irréversible ; séparé des réglages du quotidien",
     "newSpaceName": "Nom du nouvel espace",
     "createSpace": "Créer un nouvel espace",
     "spaceName": "Nom de l'espace",

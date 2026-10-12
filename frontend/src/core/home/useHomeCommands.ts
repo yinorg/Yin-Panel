@@ -36,13 +36,20 @@ interface CommandGroup {
 const CORE_SURFACE_COMPONENTS: Record<string, string> = {
   // The app launcher itself: the Core modal is the fallback for a theme that does
   // not render an app menu.
-  'apps': 'UserInfo',
-  'theme-settings': 'Style',
+  'apps': 'Account',
+  // The appearance page owns the visual side of the home. `theme-settings` and
+  // `user-info` are the names themes were written against before the settings
+  // pages were split, so they keep working and land on the closest page.
+  'theme-settings': 'Appearance',
+  'appearance': 'Appearance',
+  'layout': 'Layout',
   // The wallpaper centre. The Core owns the library, the layer and the stored
   // choice, so every theme opens this one picker instead of building its own.
   'wallpaper-center': 'WallpaperCenter',
-  'user-info': 'UserInfo',
+  'account': 'Account',
+  'user-info': 'Account',
   'space-manage': 'SpaceManage',
+  'instance': 'Instance',
   'users': 'Users',
   'about': 'About',
 }

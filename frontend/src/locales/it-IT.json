@@ -62,7 +62,8 @@
     "1400": "Formato del parametro non valido"
   },
   "appLauncher": {
-    "title": "Impostazioni di sistema"
+    "title": "Impostazioni di sistema",
+    "groups": { "personal": "Personale", "space": "Spazio", "admin": "Amministrazione" }
   },
   "apps": {
     "about": {
@@ -126,16 +127,29 @@
       "deleteWarnText": "Vuoi davvero eliminare questo gruppo [{name}]? Le icone delle applicazioni in questo gruppo andranno perse dopo l'eliminazione.",
       "groupName": "Nome del gruppo"
     },
-    "userInfo": {
-      "appName": "Le mie informazioni",
+    "account": {
+      "appName": "Account",
+      "languageHint": "Salvato nell'account e applicato anche sugli altri dispositivi"
+    },
+    "appearance": {
+      "appName": "Aspetto",
+      "identity": "Identità della mia home",
+      "identityHint": "Influisce solo sulla tua home, non sugli altri utenti",
       "theme": "Tema",
+      "scheme": "Modalità chiara/scura",
       "themeStyle": {
         "auto": "Segui il sistema ",
         "dark": "Scuro ",
         "light": "Chiaro "
-      },
-      "publicVisit": "Visita pubblica",
-      "enablePublicVisit": "Abilita la visita pubblica"
+      }
+    },
+    "layout": {
+      "appName": "Layout e componenti",
+      "components": "Componenti"
+    },
+    "instance": {
+      "appName": "Impostazioni dell'istanza",
+      "scopeHint": "Riguarda l'intera istanza e tutti gli utenti"
     }
   },
   "themePackage": { "title": "Libreria dei temi", "label": "Pacchetto del tema", "instanceDefault": "Usa il valore predefinito dell'istanza", "install": "Installa pacchetto", "setDefault": "Imposta come predefinito dell'istanza", "verified": "Firma ufficiale", "unverified": "Non verificato", "confirmUnverified": "Questo pacchetto non è firmato da Yin. Installalo solo se ti fidi della sua origine.", "installed": "Tema installato", "removed": "Tema rimosso", "saved": "Preferenza del tema salvata", "adoptDefaults": "Usa i colori del tema", "removeConfirm": "Rimuovere questo tema? Gli utenti che lo hanno selezionato e il valore predefinito dell'istanza torneranno a Yin Default.", "runtimePrompt": "{name} richiede questi permessi dell'API Theme: {permissions}", "runtimeConfirm": "Consentire a {name} di essere eseguito in un frame di tema isolato con: {permissions}?", "runtimeEnable": "Consenti", "noRuntimePermissions": "Nessun permesso dell'API Theme", "runtimeGrantFailed": "Impossibile salvare i permessi dell'API Theme.", "runtimeLoadFailed": "Impossibile avviare il tema. Al suo posto viene mostrata Yin Home." },
@@ -322,7 +336,13 @@
     "retryWhenOnline": "Aggiorna quando sei online"
   },
   "spaceManage": { "mySpace": "Il mio spazio", "chooseFile": "Importa", "oidcTitle": "Autorizzazione dei gruppi OIDC", "addRule": "Aggiungi regola", "shared": "Condiviso", "personal": "Personale", "emailMissing": "Email non disponibile", "admin": "Amministratore",
-    "title": "Gestione degli spazi", "newSpaceName": "Nome del nuovo spazio", "createSpace": "Crea un nuovo spazio", "spaceName": "Nome dello spazio", "rename": "Rinomina", "copy": "Copia spazio", "publicAccess": "Accesso pubblico", "enablePublicAccess": "Abilita l'accesso pubblico", "publicIdPlaceholder": "FN ID, ad es. my-panel", "directAccess": "Accesso tramite link diretto", "codeAccess": "Codice di accesso richiesto", "accessCodePlaceholder": "Codice di accesso (4-12 caratteri)", "savePublic": "Salva le impostazioni di accesso pubblico", "bookmarkTransfer": "Segnalibri (compatibili con Chrome) - Importa/Esporta", "exportBookmarks": "Esporta", "clearSpace": "Svuota lo spazio corrente", "groups": "Gruppi", "groupName": "Nome del gruppo", "parentGroupOptional": "Gruppo principale (facoltativo)", "addGroup": "Aggiungi gruppo", "members": "Membri", "userEmail": "Email dell'utente", "editor": "Editor", "viewer": "Visualizzatore", "addMember": "Aggiungi membro", "removeMember": "Rimuovi membro", "removeMemberConfirm": "Rimuovere questo membro dallo spazio corrente? Perderà immediatamente l'accesso.", "removeMemberSuccess": "Membro rimosso dallo spazio", "leaveSpace": "Abbandona lo spazio", "leaveSpaceConfirm": "Sei l'ultimo amministratore di questo spazio. Se lo abbandoni, l'intero spazio e tutti i suoi segnalibri verranno eliminati, e l'operazione non può essere annullata. Confermi?", "leaveSpaceSuccess": "Spazio eliminato", "accessVerification": "Verifica dell'accesso", "enterAccessCode": "Inserisci il codice di accesso per continuare", "accessCodeShortPlaceholder": "Codice di accesso (4-12 caratteri)", "confirmAccess": "Conferma accesso", "expandGroup": "Espandi gruppo", "collapseGroup": "Comprimi gruppo", "backToTop": "Torna in cima", "createTeamSpace": "Crea spazio di squadra", "teamName": "Nome del team",
+    "title": "Impostazioni dello spazio", "newSpaceName": "Nome del nuovo spazio", "createSpace": "Crea un nuovo spazio", "spaceName": "Nome dello spazio", "rename": "Rinomina", "copy": "Copia spazio", "publicAccess": "Accesso pubblico", "enablePublicAccess": "Abilita l'accesso pubblico", "publicIdPlaceholder": "FN ID, ad es. my-panel", "directAccess": "Accesso tramite link diretto", "codeAccess": "Codice di accesso richiesto", "accessCodePlaceholder": "Codice di accesso (4-12 caratteri)", "savePublic": "Salva le impostazioni di accesso pubblico", "bookmarkTransfer": "Segnalibri (compatibili con Chrome) - Importa/Esporta", "exportBookmarks": "Esporta", "clearSpace": "Svuota lo spazio corrente", "groups": "Gruppi", "groupName": "Nome del gruppo", "parentGroupOptional": "Gruppo principale (facoltativo)", "addGroup": "Aggiungi gruppo", "members": "Membri", "userEmail": "Email dell'utente", "editor": "Editor", "viewer": "Visualizzatore", "addMember": "Aggiungi membro", "removeMember": "Rimuovi membro", "removeMemberConfirm": "Rimuovere questo membro dallo spazio corrente? Perderà immediatamente l'accesso.", "removeMemberSuccess": "Membro rimosso dallo spazio", "leaveSpace": "Abbandona lo spazio", "leaveSpaceConfirm": "Sei l'ultimo amministratore di questo spazio. Se lo abbandoni, l'intero spazio e tutti i suoi segnalibri verranno eliminati, e l'operazione non può essere annullata. Confermi?", "leaveSpaceSuccess": "Spazio eliminato", "accessVerification": "Verifica dell'accesso", "enterAccessCode": "Inserisci il codice di accesso per continuare", "accessCodeShortPlaceholder": "Codice di accesso (4-12 caratteri)", "confirmAccess": "Conferma accesso", "expandGroup": "Espandi gruppo", "collapseGroup": "Comprimi gruppo", "backToTop": "Torna in cima", "createTeamSpace": "Crea spazio di squadra", "teamName": "Nome del team",
+    "sectionBasic": "Informazioni di base",
+    "sectionContent": "Contenuti e dati",
+    "sectionSharing": "Condivisione e accesso",
+    "sectionDanger": "Zona a rischio",
+    "scopeHint": "Influisce su questo spazio e sui suoi membri",
+    "dangerHint": "Non è reversibile; tenuto separato dalle impostazioni quotidiane",
     "importConfirm": "Stai per importare {count} elementi. Continuare?",
     "importConfirmAgain": "Questa è la seconda conferma. Importare i segnalibri?",
     "importSuccess": "Segnalibri importati correttamente",

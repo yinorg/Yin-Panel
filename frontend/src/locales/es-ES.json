@@ -62,7 +62,8 @@
     "1400": "Error en el formato de los parámetros"
   },
   "appLauncher": {
-    "title": "Configuración del sistema"
+    "title": "Configuración del sistema",
+    "groups": { "personal": "Personal", "space": "Espacio", "admin": "Administración" }
   },
   "apps": {
     "about": {
@@ -126,16 +127,29 @@
       "deleteWarnText": "¿Seguro que quieres eliminar este grupo [{name}]? Los iconos de las aplicaciones de este grupo se perderán tras la eliminación.",
       "groupName": "Nombre del grupo"
     },
-    "userInfo": {
-      "appName": "Mi información",
+    "account": {
+      "appName": "Cuenta",
+      "languageHint": "Se guarda en tu cuenta y se aplica en tus otros dispositivos"
+    },
+    "appearance": {
+      "appName": "Apariencia",
+      "identity": "Identidad de mi inicio",
+      "identityHint": "Solo afecta a tu propia página de inicio, no a otros usuarios",
       "theme": "Tema",
+      "scheme": "Modo claro/oscuro",
       "themeStyle": {
         "auto": "Seguir el sistema ",
         "dark": "Oscuro ",
         "light": "Claro "
-      },
-      "publicVisit": "Visita pública",
-      "enablePublicVisit": "Activar visita pública"
+      }
+    },
+    "layout": {
+      "appName": "Diseño y componentes",
+      "components": "Componentes"
+    },
+    "instance": {
+      "appName": "Ajustes de la instancia",
+      "scopeHint": "Afecta a toda la instancia y a todos los usuarios"
     }
   },
   "themePackage": { "title": "Biblioteca de temas", "label": "Paquete de tema", "instanceDefault": "Usar el tema predeterminado de la instancia", "install": "Instalar paquete", "setDefault": "Establecer predeterminado", "verified": "Firma oficial", "unverified": "Sin verificar", "confirmUnverified": "Yin no ha firmado este paquete. Instálalo solo si confías en su origen.", "installed": "Tema instalado", "removed": "Tema eliminado", "saved": "Preferencia guardada", "adoptDefaults": "Usar colores del tema", "removeConfirm": "¿Eliminar este tema? Los usuarios que lo seleccionaron y el predeterminado de la instancia volverán a Yin Default.", "runtimePrompt": "{name} solicita estos permisos de Theme API: {permissions}", "runtimeConfirm": "¿Permitir que {name} se ejecute en un marco aislado con: {permissions}?", "runtimeEnable": "Permitir", "noRuntimePermissions": "Sin permisos de Theme API", "runtimeGrantFailed": "No se pudieron guardar los permisos de Theme API.", "runtimeLoadFailed": "El tema no se pudo iniciar. Se muestra Yin Home." },
@@ -330,7 +344,13 @@
     "personal": "Personal",
     "emailMissing": "Correo electrónico no disponible",
     "admin": "Administrador",
-    "title": "Gestión de espacios",
+    "title": "Ajustes del espacio",
+    "sectionBasic": "Información básica",
+    "sectionContent": "Contenido y datos",
+    "sectionSharing": "Compartir y acceso",
+    "sectionDanger": "Zona de riesgo",
+    "scopeHint": "Afecta a este espacio y a sus miembros",
+    "dangerHint": "No se puede deshacer; separado de los ajustes habituales",
     "newSpaceName": "Nombre del nuevo espacio",
     "createSpace": "Crear espacio nuevo",
     "spaceName": "Nombre del espacio",

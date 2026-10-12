@@ -62,7 +62,8 @@
     "1400": "पैरामीटर प्रारूप त्रुटि"
   },
   "appLauncher": {
-    "title": "सिस्टम सेटिंग्स"
+    "title": "सिस्टम सेटिंग्स",
+    "groups": { "personal": "व्यक्तिगत", "space": "स्पेस", "admin": "प्रबंधन" }
   },
   "apps": {
     "about": {
@@ -126,16 +127,29 @@
       "deleteWarnText": "क्या आप वाकई इस समूह [{name}] को हटाना चाहते हैं? हटाने के बाद इस समूह के एप्लिकेशन आइकन खो जाएंगे।",
       "groupName": "समूह नाम"
     },
-    "userInfo": {
-      "appName": "मेरी जानकारी",
+    "account": {
+      "appName": "खाता",
+      "languageHint": "खाते में सहेजा जाता है और अन्य डिवाइस पर भी लागू होता है"
+    },
+    "appearance": {
+      "appName": "रूप-रंग",
+      "identity": "मेरे होम की पहचान",
+      "identityHint": "केवल आपके होम पर लागू होता है, अन्य उपयोगकर्ताओं पर नहीं",
       "theme": "थीम",
+      "scheme": "लाइट/डार्क मोड",
       "themeStyle": {
         "auto": "सिस्टम का अनुसरण करें ",
         "dark": "गहरा ",
         "light": "हल्का "
-      },
-      "publicVisit": "सार्वजनिक विज़िट",
-      "enablePublicVisit": "सार्वजनिक विज़िट सक्षम करें"
+      }
+    },
+    "layout": {
+      "appName": "लेआउट और कॉम्पोनेंट",
+      "components": "कॉम्पोनेंट"
+    },
+    "instance": {
+      "appName": "इंस्टेंस सेटिंग्स",
+      "scopeHint": "पूरे इंस्टेंस पर लागू, सभी उपयोगकर्ताओं को प्रभावित करता है"
     }
   },
   "themePackage": { "title": "थीम लाइब्रेरी", "label": "थीम पैकेज", "instanceDefault": "इंस्टेंस डिफ़ॉल्ट का उपयोग करें", "install": "पैकेज इंस्टॉल करें", "setDefault": "इंस्टेंस डिफ़ॉल्ट सेट करें", "verified": "आधिकारिक हस्ताक्षर", "unverified": "असत्यापित", "confirmUnverified": "यह पैकेज Yin द्वारा हस्ताक्षरित नहीं है। इसे केवल तभी इंस्टॉल करें जब आप इसके स्रोत पर भरोसा करते हों।", "installed": "थीम इंस्टॉल हुई", "removed": "थीम हटाई गई", "saved": "थीम प्राथमिकता सहेजी गई", "adoptDefaults": "थीम रंगों का उपयोग करें", "removeConfirm": "इस थीम को हटाएँ? इसे चुनने वाले उपयोगकर्ता और इंस्टेंस डिफ़ॉल्ट Yin Default पर लौट आएंगे।", "runtimePrompt": "{name} इन थीम API अनुमतियों का अनुरोध करता है: {permissions}", "runtimeConfirm": "{name} को इनके साथ पृथक थीम फ़्रेम में चलाने की अनुमति दें: {permissions}?", "runtimeEnable": "अनुमति दें", "noRuntimePermissions": "कोई थीम API अनुमति नहीं", "runtimeGrantFailed": "थीम API अनुमतियाँ सहेजी नहीं जा सकीं।", "runtimeLoadFailed": "थीम शुरू नहीं हो सकी। इसके बजाय Yin Home दिखाया जा रहा है।" },
@@ -322,7 +336,13 @@
     "retryWhenOnline": "ऑनलाइन होने पर रीफ़्रेश करें"
   },
   "spaceManage": { "mySpace": "मेरा स्पेस", "chooseFile": "आयात करें", "oidcTitle": "OIDC समूह प्राधिकरण", "addRule": "नियम जोड़ें", "shared": "साझा", "personal": "व्यक्तिगत", "emailMissing": "ईमेल उपलब्ध नहीं", "admin": "एडमिनिस्ट्रेटर",
-    "title": "स्पेस प्रबंधन", "newSpaceName": "नया स्पेस नाम", "createSpace": "नया स्पेस बनाएँ", "spaceName": "स्पेस नाम", "rename": "नाम बदलें", "copy": "स्पेस कॉपी करें", "publicAccess": "सार्वजनिक पहुँच", "enablePublicAccess": "सार्वजनिक पहुँच सक्षम करें", "publicIdPlaceholder": "FN ID, जैसे my-panel", "directAccess": "सीधा लिंक एक्सेस", "codeAccess": "एक्सेस कोड आवश्यक", "accessCodePlaceholder": "एक्सेस कोड (4-12 वर्ण)", "savePublic": "सार्वजनिक एक्सेस सेटिंग्स सहेजें", "bookmarkTransfer": "बुकमार्क (Chrome संगत) - आयात/निर्यात", "exportBookmarks": "निर्यात करें", "clearSpace": "वर्तमान स्पेस साफ़ करें", "groups": "समूह", "groupName": "समूह नाम", "parentGroupOptional": "मूल समूह (वैकल्पिक)", "addGroup": "समूह जोड़ें", "members": "सदस्य", "userEmail": "उपयोगकर्ता ईमेल", "editor": "एडिटर", "viewer": "व्यूअर", "addMember": "सदस्य जोड़ें", "removeMember": "सदस्य हटाएँ", "removeMemberConfirm": "इस सदस्य को वर्तमान स्पेस से हटाएँ? वे तुरंत पहुँच खो देंगे।", "removeMemberSuccess": "सदस्य स्पेस से हटा दिया गया", "leaveSpace": "स्पेस छोड़ें", "leaveSpaceConfirm": "आप इस स्पेस के अंतिम एडमिनिस्ट्रेटर हैं। छोड़ने पर पूरा स्पेस और इसके सभी बुकमार्क हट जाएंगे, और इसे पूर्ववत नहीं किया जा सकता। पुष्टि करें?", "leaveSpaceSuccess": "स्पेस हटा दिया गया", "accessVerification": "एक्सेस सत्यापन", "enterAccessCode": "जारी रखने के लिए एक्सेस कोड दर्ज करें", "accessCodeShortPlaceholder": "एक्सेस कोड (4-12 वर्ण)", "confirmAccess": "एक्सेस की पुष्टि करें", "expandGroup": "समूह फैलाएँ", "collapseGroup": "समूह संकुचित करें", "backToTop": "ऊपर लौटें", "createTeamSpace": "टीम स्पेस बनाएँ", "teamName": "टीम नाम",
+    "title": "स्पेस सेटिंग्स", "newSpaceName": "नया स्पेस नाम", "createSpace": "नया स्पेस बनाएँ", "spaceName": "स्पेस नाम", "rename": "नाम बदलें", "copy": "स्पेस कॉपी करें", "publicAccess": "सार्वजनिक पहुँच", "enablePublicAccess": "सार्वजनिक पहुँच सक्षम करें", "publicIdPlaceholder": "FN ID, जैसे my-panel", "directAccess": "सीधा लिंक एक्सेस", "codeAccess": "एक्सेस कोड आवश्यक", "accessCodePlaceholder": "एक्सेस कोड (4-12 वर्ण)", "savePublic": "सार्वजनिक एक्सेस सेटिंग्स सहेजें", "bookmarkTransfer": "बुकमार्क (Chrome संगत) - आयात/निर्यात", "exportBookmarks": "निर्यात करें", "clearSpace": "वर्तमान स्पेस साफ़ करें", "groups": "समूह", "groupName": "समूह नाम", "parentGroupOptional": "मूल समूह (वैकल्पिक)", "addGroup": "समूह जोड़ें", "members": "सदस्य", "userEmail": "उपयोगकर्ता ईमेल", "editor": "एडिटर", "viewer": "व्यूअर", "addMember": "सदस्य जोड़ें", "removeMember": "सदस्य हटाएँ", "removeMemberConfirm": "इस सदस्य को वर्तमान स्पेस से हटाएँ? वे तुरंत पहुँच खो देंगे।", "removeMemberSuccess": "सदस्य स्पेस से हटा दिया गया", "leaveSpace": "स्पेस छोड़ें", "leaveSpaceConfirm": "आप इस स्पेस के अंतिम एडमिनिस्ट्रेटर हैं। छोड़ने पर पूरा स्पेस और इसके सभी बुकमार्क हट जाएंगे, और इसे पूर्ववत नहीं किया जा सकता। पुष्टि करें?", "leaveSpaceSuccess": "स्पेस हटा दिया गया", "accessVerification": "एक्सेस सत्यापन", "enterAccessCode": "जारी रखने के लिए एक्सेस कोड दर्ज करें", "accessCodeShortPlaceholder": "एक्सेस कोड (4-12 वर्ण)", "confirmAccess": "एक्सेस की पुष्टि करें", "expandGroup": "समूह फैलाएँ", "collapseGroup": "समूह संकुचित करें", "backToTop": "ऊपर लौटें", "createTeamSpace": "टीम स्पेस बनाएँ", "teamName": "टीम नाम",
+    "sectionBasic": "मूल जानकारी",
+    "sectionContent": "सामग्री और डेटा",
+    "sectionSharing": "साझा करना और पहुँच",
+    "sectionDanger": "खतरनाक क्षेत्र",
+    "scopeHint": "इस स्पेस और इसके सदस्यों पर लागू",
+    "dangerHint": "पूर्ववत नहीं किया जा सकता; रोज़मर्रा की सेटिंग्स से अलग",
     "importConfirm": "लगभग {count} आइटम आयात किए जाएंगे। जारी रखें?",
     "importConfirmAgain": "यह दूसरी पुष्टि है। बुकमार्क आयात करें?",
     "importSuccess": "बुकमार्क सफलतापूर्वक आयात किए गए",

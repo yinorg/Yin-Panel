@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, provide, ref, watch } from 'vue'
 import { NLayout, NLayoutContent, NLayoutSider, NSpace } from 'naive-ui'
 import { useAuthStore } from '../../../../store'
 import AppLoader from '../../../../components/common/AppLoader/index.vue'
 import RoundCardModal from '../../../../components/common/RoundCardModal/index.vue'
 import SvgIcon from '../../../../components/common/SvgIcon/index.vue'
+import { openSettingsAppKey } from '../../../../components/apps/navigation'
 import { t } from '../../../../locales'
 
 interface App {
@@ -12,6 +13,12 @@ interface App {
   componentName: string
   icon: string
   auth?: number
+}
+
+interface AppGroup {
+  /** Group label; the fallback group (About) carries no label on purpose. */
+  title: string
+  items: App[]
 }
 const props = defineProps<{
   visible: boolean
@@ -25,7 +32,7 @@ const emit = defineEmits<{
   (e: 'spaces-changed'): void
 }>()
 
-const componentName = ref('UserInfo')
+const componentName = ref('Account')
 const collapsed = ref(false)
 const screenWidth = ref(0)
 const isSmallScreen = ref(false)
@@ -33,30 +40,87 @@ const defaultTitle = t('appLauncher.title')
 const title = ref('')
 const height = ref('500px')
 
-const apps = ref<App[]>([
+const authStore = useAuthStore()
+const isAdmin = computed(() => Number(authStore.userInfo?.role) === 1)
+
+/**
+ * The apps are grouped by the scope they change — the user's own account, the
+ * selected space, or the whole instance — so a page's reach is readable before
+ * it is opened. The admin group disappears entirely for a non-admin.
+ */
+const menuGroups = computed<AppGroup[]>(() => [
   {
-    name: t('apps.userInfo.appName'),
-    componentName: 'UserInfo',
-    icon: 'material-symbols-person-edit-outline-rounded',
+    title: t('appLauncher.groups.personal'),
+    items: [
+      {
+        name: t('apps.account.appName'),
+        componentName: 'Account',
+        icon: 'material-symbols-person-edit-outline-rounded',
+      },
+      {
+        name: t('apps.appearance.appName'),
+        componentName: 'Appearance',
+        icon: 'ion-color-palette-outline',
+      },
+      {
+        name: t('apps.layout.appName'),
+        componentName: 'Layout',
+        icon: 'lucide-layout-dashboard',
+      },
+      {
+        name: t('themeWallpaper.center'),
+        componentName: 'WallpaperCenter',
+        icon: 'lucide-wallpaper',
+      },
+    ],
   },
   {
-    name: t('apps.baseSettings.appName'),
-    componentName: 'Style',
-    icon: 'ion-color-palette-outline',
+    title: t('appLauncher.groups.space'),
+    items: [
+      {
+        name: t('spaceManage.title'),
+        componentName: 'SpaceManage',
+        icon: 'ic-baseline-add-business',
+      },
+    ],
   },
   {
-    name: t('themeWallpaper.center'),
-    componentName: 'WallpaperCenter',
-    icon: 'lucide-wallpaper',
+    title: t('appLauncher.groups.admin'),
+    items: [
+      {
+        name: t('apps.instance.appName'),
+        componentName: 'Instance',
+        icon: 'lucide-server',
+        auth: 1,
+      },
+      {
+        name: t('adminSettingUsers.appName'),
+        componentName: 'Users',
+        icon: 'lucide-users',
+        auth: 1,
+      },
+    ].filter(item => isAdmin.value),
   },
   {
-    name: t('spaceManage.title'),
-    componentName: 'SpaceManage',
-    icon: 'ic-baseline-add-business',
+    title: '',
+    items: [
+      {
+        name: t('apps.about.appName'),
+        componentName: 'About',
+        icon: 'lucide-info',
+      },
+    ],
   },
 ])
 
-const authStore = useAuthStore()
+/** Switch the modal to another app: the appearance page points at the wallpaper
+ *  centre instead of embedding a second picker. */
+function openSettingsApp(name: string) {
+  componentName.value = name
+  if (isSmallScreen.value)
+    collapsed.value = true
+}
+provide(openSettingsAppKey, openSettingsApp)
 
 // Open on the app the Core asked for (a surface fallback); otherwise keep the
 // last-selected app so reopening the modal is stable.
@@ -99,28 +163,6 @@ function handleResize() {
 }
 
 onMounted(() => {
-  const adminApp: App = {
-    name: t('adminSettingUsers.appName'),
-    componentName: 'Users',
-    icon: 'lucide-users',
-    auth: 1,
-  }
-  const aboutApp: App = {
-    name: t('apps.about.appName'),
-    componentName: 'About',
-    icon: 'lucide-info',
-  }
-  // 初始化
-  const addAdminApp = () => {
-    if (Number(authStore.userInfo?.role) !== 1)
-      return
-    if (!apps.value.some(item => item.componentName === 'Users'))
-      apps.value.push(adminApp)
-  }
-  addAdminApp()
-  apps.value.push(aboutApp)
-  watch(() => authStore.userInfo?.role, addAdminApp)
-
   window.addEventListener('resize', handleResize)
   handleResize()
 })
@@ -186,27 +228,31 @@ onUnmounted(() => {
                     height,
                   }"
                 >
-                  <div
-                    v-for=" (item, index) in apps"
-                    :key="index"
-                    :style="{ color: componentName === item.componentName ? 'var(--yin-primary)' : '' }"
-                    @click="handleClickApp(item)"
-                  >
+                  <template v-for="(group, groupIndex) in menuGroups" :key="groupIndex">
                     <div
-                      class="app-starter-menu-item p-[10px] rounded-lg mb-[5px] font-bold cursor-pointer flex items-center"
+                      v-if="group.title"
+                      class="px-[6px] pt-[8px] pb-[2px] text-xs font-bold yin-text-muted"
                     >
-                      <div class="flex items-center justify-center">
-                        <div class="text-lg">
-                          <SvgIcon :icon="item.icon" />
-                        </div>
-                        <span class="ml-2">{{ item.name }}</span>
-                      </div>
-                    <!-- 更多按钮 -->
-                    <!-- <div class="ml-auto">
-                      <SvgIcon icon="mingcute-more-1-fill" />
-                    </div> -->
+                      {{ group.title }}
                     </div>
-                  </div>
+                    <div
+                      v-for="item in group.items"
+                      :key="item.componentName"
+                      :style="{ color: componentName === item.componentName ? 'var(--yin-primary)' : '' }"
+                      @click="handleClickApp(item)"
+                    >
+                      <div
+                        class="app-starter-menu-item p-[10px] rounded-lg mb-[5px] font-bold cursor-pointer flex items-center"
+                      >
+                        <div class="flex items-center justify-center">
+                          <div class="text-lg">
+                            <SvgIcon :icon="item.icon" />
+                          </div>
+                          <span class="ml-2">{{ item.name }}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </template>
                 </div>
               </div>
             </NLayoutSider>

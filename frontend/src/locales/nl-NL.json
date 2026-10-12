@@ -62,7 +62,8 @@
     "1400": "Ongeldig parameterformaat"
   },
   "appLauncher": {
-    "title": "Systeeminstellingen"
+    "title": "Systeeminstellingen",
+    "groups": { "personal": "Persoonlijk", "space": "Ruimte", "admin": "Beheer" }
   },
   "apps": {
     "about": {
@@ -126,16 +127,29 @@
       "deleteWarnText": "Weet u zeker dat u de groep [{name}] wilt verwijderen? De applicatiepictogrammen in deze groep gaan na verwijdering verloren.",
       "groupName": "Groepsnaam"
     },
-    "userInfo": {
-      "appName": "Mijn gegevens",
+    "account": {
+      "appName": "Account",
+      "languageHint": "Wordt met je account opgeslagen en geldt ook op je andere apparaten"
+    },
+    "appearance": {
+      "appName": "Uiterlijk",
+      "identity": "Mijn startpagina-identiteit",
+      "identityHint": "Beïnvloedt alleen je eigen startpagina, niet andere gebruikers",
       "theme": "Thema",
+      "scheme": "Licht/donker",
       "themeStyle": {
         "auto": "Systeem volgen ",
         "dark": "Donker ",
         "light": "Licht "
-      },
-      "publicVisit": "Openbaar bezoek",
-      "enablePublicVisit": "Openbaar bezoek inschakelen"
+      }
+    },
+    "layout": {
+      "appName": "Indeling en onderdelen",
+      "components": "Onderdelen"
+    },
+    "instance": {
+      "appName": "Instance-instellingen",
+      "scopeHint": "Geldt voor de hele instance en alle gebruikers"
     }
   },
   "themePackage": { "title": "Themabibliotheek", "label": "Themapakket", "instanceDefault": "Instantie-standaard gebruiken", "install": "Pakket installeren", "setDefault": "Als instantie-standaard instellen", "verified": "Officiële handtekening", "unverified": "Niet geverifieerd", "confirmUnverified": "Dit pakket is niet ondertekend door Yin. Installeer het alleen als u de bron vertrouwt.", "installed": "Thema geïnstalleerd", "removed": "Thema verwijderd", "saved": "Themavoorkeur opgeslagen", "adoptDefaults": "Themakleuren gebruiken", "removeConfirm": "Dit thema verwijderen? Gebruikers die het selecteren en de instantie-standaard keren terug naar Yin Default.", "runtimePrompt": "{name} vraagt deze Theme API-rechten aan: {permissions}", "runtimeConfirm": "{name} toestaan in een geïsoleerd themaframe te draaien met: {permissions}?", "runtimeEnable": "Toestaan", "noRuntimePermissions": "Geen Theme API-rechten", "runtimeGrantFailed": "Theme API-rechten konden niet worden opgeslagen.", "runtimeLoadFailed": "Het thema kon niet starten. In plaats daarvan wordt Yin Home getoond." },
@@ -322,7 +336,13 @@
     "retryWhenOnline": "Vernieuwen wanneer online"
   },
   "spaceManage": { "mySpace": "Mijn ruimte", "chooseFile": "Importeren", "oidcTitle": "OIDC-groepsautorisatie", "addRule": "Regel toevoegen", "shared": "Gedeeld", "personal": "Persoonlijk", "emailMissing": "E-mailadres niet beschikbaar", "admin": "Beheerder",
-    "title": "Ruimtebeheer", "newSpaceName": "Naam van nieuwe ruimte", "createSpace": "Nieuwe ruimte aanmaken", "spaceName": "Ruimtenaam", "rename": "Naam wijzigen", "copy": "Ruimte kopiëren", "publicAccess": "Openbare toegang", "enablePublicAccess": "Openbare toegang inschakelen", "publicIdPlaceholder": "FN ID, bijv. my-panel", "directAccess": "Toegang via directe link", "codeAccess": "Toegangscode vereist", "accessCodePlaceholder": "Toegangscode (4-12 tekens)", "savePublic": "Instellingen voor openbare toegang opslaan", "bookmarkTransfer": "Bladwijzers (Chrome-compatibel) - importeren/exporteren", "exportBookmarks": "Exporteren", "clearSpace": "Huidige ruimte wissen", "groups": "Groepen", "groupName": "Groepsnaam", "parentGroupOptional": "Bovenliggende groep (optioneel)", "addGroup": "Groep toevoegen", "members": "Leden", "userEmail": "E-mailadres van gebruiker", "editor": "Bewerker", "viewer": "Kijker", "addMember": "Lid toevoegen", "removeMember": "Lid verwijderen", "removeMemberConfirm": "Dit lid uit de huidige ruimte verwijderen? De toegang vervalt onmiddellijk.", "removeMemberSuccess": "Lid uit de ruimte verwijderd", "leaveSpace": "Ruimte verlaten", "leaveSpaceConfirm": "U bent de laatste beheerder van deze ruimte. Als u deze verlaat, worden de hele ruimte en al haar bladwijzers verwijderd en kan dit niet ongedaan worden gemaakt. Bevestigen?", "leaveSpaceSuccess": "Ruimte verwijderd", "accessVerification": "Toegangsverificatie", "enterAccessCode": "Voer de toegangscode in om door te gaan", "accessCodeShortPlaceholder": "Toegangscode (4-12 tekens)", "confirmAccess": "Toegang bevestigen", "expandGroup": "Groep uitklappen", "collapseGroup": "Groep inklappen", "backToTop": "Terug naar boven", "createTeamSpace": "Teamruimte aanmaken", "teamName": "Teamnaam",
+    "title": "Ruimte-instellingen", "newSpaceName": "Naam van nieuwe ruimte", "createSpace": "Nieuwe ruimte aanmaken", "spaceName": "Ruimtenaam", "rename": "Naam wijzigen", "copy": "Ruimte kopiëren", "publicAccess": "Openbare toegang", "enablePublicAccess": "Openbare toegang inschakelen", "publicIdPlaceholder": "FN ID, bijv. my-panel", "directAccess": "Toegang via directe link", "codeAccess": "Toegangscode vereist", "accessCodePlaceholder": "Toegangscode (4-12 tekens)", "savePublic": "Instellingen voor openbare toegang opslaan", "bookmarkTransfer": "Bladwijzers (Chrome-compatibel) - importeren/exporteren", "exportBookmarks": "Exporteren", "clearSpace": "Huidige ruimte wissen", "groups": "Groepen", "groupName": "Groepsnaam", "parentGroupOptional": "Bovenliggende groep (optioneel)", "addGroup": "Groep toevoegen", "members": "Leden", "userEmail": "E-mailadres van gebruiker", "editor": "Bewerker", "viewer": "Kijker", "addMember": "Lid toevoegen", "removeMember": "Lid verwijderen", "removeMemberConfirm": "Dit lid uit de huidige ruimte verwijderen? De toegang vervalt onmiddellijk.", "removeMemberSuccess": "Lid uit de ruimte verwijderd", "leaveSpace": "Ruimte verlaten", "leaveSpaceConfirm": "U bent de laatste beheerder van deze ruimte. Als u deze verlaat, worden de hele ruimte en al haar bladwijzers verwijderd en kan dit niet ongedaan worden gemaakt. Bevestigen?", "leaveSpaceSuccess": "Ruimte verwijderd", "accessVerification": "Toegangsverificatie", "enterAccessCode": "Voer de toegangscode in om door te gaan", "accessCodeShortPlaceholder": "Toegangscode (4-12 tekens)", "confirmAccess": "Toegang bevestigen", "expandGroup": "Groep uitklappen", "collapseGroup": "Groep inklappen", "backToTop": "Terug naar boven", "createTeamSpace": "Teamruimte aanmaken", "teamName": "Teamnaam",
+    "sectionBasic": "Basisgegevens",
+    "sectionContent": "Inhoud en gegevens",
+    "sectionSharing": "Delen en toegang",
+    "sectionDanger": "Gevarenzone",
+    "scopeHint": "Geldt voor deze ruimte en zijn leden",
+    "dangerHint": "Niet ongedaan te maken; los van dagelijkse instellingen",
     "importConfirm": "Er worden {count} items geïmporteerd. Doorgaan?",
     "importConfirmAgain": "Dit is de tweede bevestiging. Bladwijzers importeren?",
     "importSuccess": "Bladwijzers succesvol geïmporteerd",

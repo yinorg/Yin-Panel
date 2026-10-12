@@ -12,8 +12,10 @@ const loading = shallowRef(false)
 const dynamicComponent = shallowRef<Component | null>(null)
 
 const componentLoaders: Record<string, () => Promise<Component>> = {
-  UserInfo: () => import('../../apps/UserInfo/index.vue'),
-  Style: () => import('../../apps/Style/index.vue'),
+  Account: () => import('../../apps/Account/index.vue'),
+  Appearance: () => import('../../apps/Appearance/index.vue'),
+  Layout: () => import('../../apps/Layout/index.vue'),
+  Instance: () => import('../../apps/Instance/index.vue'),
   SpaceManage: () => import('../../apps/SpaceManage/index.vue'),
   About: () => import('../../apps/About/index.vue'),
   Users: () => import('../../apps/Users/index.vue'),

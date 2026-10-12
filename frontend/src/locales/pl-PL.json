@@ -62,7 +62,8 @@
     "1400": "Błąd formatu parametru"
   },
   "appLauncher": {
-    "title": "Ustawienia systemowe"
+    "title": "Ustawienia systemowe",
+    "groups": { "personal": "Osobiste", "space": "Przestrzeń", "admin": "Zarządzanie" }
   },
   "apps": {
     "about": {
@@ -126,16 +127,29 @@
       "deleteWarnText": "Czy na pewno chcesz usunąć tę grupę [{name}]? Po usunięciu ikony aplikacji z tej grupy zostaną utracone.",
       "groupName": "Nazwa grupy"
     },
-    "userInfo": {
-      "appName": "Moje informacje",
+    "account": {
+      "appName": "Konto",
+      "languageHint": "Zapisywane na koncie, działa też na innych urządzeniach"
+    },
+    "appearance": {
+      "appName": "Wygląd",
+      "identity": "Identyfikacja mojego pulpitu",
+      "identityHint": "Dotyczy tylko Twojego pulpitu, nie innych użytkowników",
       "theme": "Motyw",
+      "scheme": "Tryb jasny/ciemny",
       "themeStyle": {
         "auto": "Zgodnie z systemem ",
         "dark": "Ciemny ",
         "light": "Jasny "
-      },
-      "publicVisit": "Dostęp publiczny",
-      "enablePublicVisit": "Włącz dostęp publiczny"
+      }
+    },
+    "layout": {
+      "appName": "Układ i komponenty",
+      "components": "Komponenty"
+    },
+    "instance": {
+      "appName": "Ustawienia instancji",
+      "scopeHint": "Dotyczy całej instancji i wszystkich użytkowników"
     }
   },
   "themePackage": { "title": "Biblioteka motywów", "label": "Pakiet motywu", "instanceDefault": "Użyj domyślnego ustawienia instancji", "install": "Zainstaluj pakiet", "setDefault": "Ustaw jako domyślne instancji", "verified": "Oficjalny podpis", "unverified": "Niezweryfikowany", "confirmUnverified": "Ten pakiet nie jest podpisany przez Yin. Zainstaluj go tylko wtedy, gdy ufasz jego źródłu.", "installed": "Motyw zainstalowany", "removed": "Motyw usunięty", "saved": "Preferencja motywu zapisana", "adoptDefaults": "Użyj kolorów motywu", "removeConfirm": "Usunąć ten motyw? Użytkownicy, którzy go wybrali, oraz domyślny motyw instancji powrócą do Yin Default.", "runtimePrompt": "{name} żąda następujących uprawnień Theme API: {permissions}", "runtimeConfirm": "Zezwolić, aby {name} działał w izolowanej ramce motywu z uprawnieniami: {permissions}?", "runtimeEnable": "Zezwól", "noRuntimePermissions": "Brak uprawnień Theme API", "runtimeGrantFailed": "Nie udało się zapisać uprawnień Theme API.", "runtimeLoadFailed": "Nie udało się uruchomić motywu. Zamiast tego wyświetlono Yin Home." },
@@ -322,7 +336,13 @@
     "retryWhenOnline": "Odśwież po połączeniu z siecią"
   },
   "spaceManage": { "mySpace": "Moja przestrzeń", "chooseFile": "Importuj", "oidcTitle": "Autoryzacja grup OIDC", "addRule": "Dodaj regułę", "shared": "Współdzielona", "personal": "Osobista", "emailMissing": "E-mail niedostępny", "admin": "Administrator",
-    "title": "Zarządzanie przestrzeniami", "newSpaceName": "Nazwa nowej przestrzeni", "createSpace": "Utwórz nową przestrzeń", "spaceName": "Nazwa przestrzeni", "rename": "Zmień nazwę", "copy": "Kopiuj przestrzeń", "publicAccess": "Dostęp publiczny", "enablePublicAccess": "Włącz dostęp publiczny", "publicIdPlaceholder": "FN ID, np. my-panel", "directAccess": "Dostęp przez bezpośredni link", "codeAccess": "Wymagany kod dostępu", "accessCodePlaceholder": "Kod dostępu (4-12 znaków)", "savePublic": "Zapisz ustawienia dostępu publicznego", "bookmarkTransfer": "Zakładki (zgodne z Chrome) - Import/Eksport", "exportBookmarks": "Eksportuj", "clearSpace": "Wyczyść bieżącą przestrzeń", "groups": "Grupy", "groupName": "Nazwa grupy", "parentGroupOptional": "Grupa nadrzędna (opcjonalnie)", "addGroup": "Dodaj grupę", "members": "Członkowie", "userEmail": "E-mail użytkownika", "editor": "Redaktor", "viewer": "Widz", "addMember": "Dodaj członka", "removeMember": "Usuń członka", "removeMemberConfirm": "Usunąć tego członka z bieżącej przestrzeni? Natychmiast traci dostęp.", "removeMemberSuccess": "Członek usunięty z przestrzeni", "leaveSpace": "Opuść przestrzeń", "leaveSpaceConfirm": "Jesteś ostatnim administratorem tej przestrzeni. Opuszczenie usunie całą przestrzeń i wszystkie jej zakładki i nie można tego cofnąć. Potwierdzić?", "leaveSpaceSuccess": "Przestrzeń usunięta", "accessVerification": "Weryfikacja dostępu", "enterAccessCode": "Wprowadź kod dostępu, aby kontynuować", "accessCodeShortPlaceholder": "Kod dostępu (4-12 znaków)", "confirmAccess": "Potwierdź dostęp", "expandGroup": "Rozwiń grupę", "collapseGroup": "Zwiń grupę", "backToTop": "Powrót na górę", "createTeamSpace": "Utwórz przestrzeń zespołu", "teamName": "Nazwa zespołu",
+    "title": "Ustawienia przestrzeni", "newSpaceName": "Nazwa nowej przestrzeni", "createSpace": "Utwórz nową przestrzeń", "spaceName": "Nazwa przestrzeni", "rename": "Zmień nazwę", "copy": "Kopiuj przestrzeń", "publicAccess": "Dostęp publiczny", "enablePublicAccess": "Włącz dostęp publiczny", "publicIdPlaceholder": "FN ID, np. my-panel", "directAccess": "Dostęp przez bezpośredni link", "codeAccess": "Wymagany kod dostępu", "accessCodePlaceholder": "Kod dostępu (4-12 znaków)", "savePublic": "Zapisz ustawienia dostępu publicznego", "bookmarkTransfer": "Zakładki (zgodne z Chrome) - Import/Eksport", "exportBookmarks": "Eksportuj", "clearSpace": "Wyczyść bieżącą przestrzeń", "groups": "Grupy", "groupName": "Nazwa grupy", "parentGroupOptional": "Grupa nadrzędna (opcjonalnie)", "addGroup": "Dodaj grupę", "members": "Członkowie", "userEmail": "E-mail użytkownika", "editor": "Redaktor", "viewer": "Widz", "addMember": "Dodaj członka", "removeMember": "Usuń członka", "removeMemberConfirm": "Usunąć tego członka z bieżącej przestrzeni? Natychmiast traci dostęp.", "removeMemberSuccess": "Członek usunięty z przestrzeni", "leaveSpace": "Opuść przestrzeń", "leaveSpaceConfirm": "Jesteś ostatnim administratorem tej przestrzeni. Opuszczenie usunie całą przestrzeń i wszystkie jej zakładki i nie można tego cofnąć. Potwierdzić?", "leaveSpaceSuccess": "Przestrzeń usunięta", "accessVerification": "Weryfikacja dostępu", "enterAccessCode": "Wprowadź kod dostępu, aby kontynuować", "accessCodeShortPlaceholder": "Kod dostępu (4-12 znaków)", "confirmAccess": "Potwierdź dostęp", "expandGroup": "Rozwiń grupę", "collapseGroup": "Zwiń grupę", "backToTop": "Powrót na górę", "createTeamSpace": "Utwórz przestrzeń zespołu", "teamName": "Nazwa zespołu",
+    "sectionBasic": "Informacje podstawowe",
+    "sectionContent": "Treści i dane",
+    "sectionSharing": "Udostępnianie i dostęp",
+    "sectionDanger": "Strefa zagrożenia",
+    "scopeHint": "Dotyczy tej przestrzeni i jej członków",
+    "dangerHint": "Nieodwracalne; oddzielone od codziennych ustawień",
     "importConfirm": "Za chwilę zaimportowanych zostanie {count} elementów. Kontynuować?",
     "importConfirmAgain": "To drugie potwierdzenie. Zaimportować zakładki?",
     "importSuccess": "Zakładki zaimportowane pomyślnie",

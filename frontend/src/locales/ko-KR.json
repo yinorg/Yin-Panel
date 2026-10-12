@@ -62,7 +62,8 @@
     "1400": "매개변수 형식 오류"
   },
   "appLauncher": {
-    "title": "시스템 설정"
+    "title": "시스템 설정",
+    "groups": { "personal": "개인", "space": "공간", "admin": "관리" }
   },
   "apps": {
     "about": {
@@ -126,16 +127,29 @@
       "deleteWarnText": "이 그룹 [{name}]을(를) 삭제하시겠습니까? 삭제 후 이 그룹의 애플리케이션 아이콘이 사라집니다.",
       "groupName": "그룹 이름"
     },
-    "userInfo": {
-      "appName": "내 정보",
+    "account": {
+      "appName": "계정",
+      "languageHint": "계정에 저장되어 다른 기기에서도 적용됩니다"
+    },
+    "appearance": {
+      "appName": "모양",
+      "identity": "내 홈 표시",
+      "identityHint": "내 홈 화면에만 적용되며 다른 사용자에게는 영향을 주지 않습니다",
       "theme": "테마",
+      "scheme": "밝기 모드",
       "themeStyle": {
         "auto": "시스템 따르기 ",
         "dark": "어두운 ",
         "light": "밝은 "
-      },
-      "publicVisit": "공개 방문",
-      "enablePublicVisit": "공개 방문 활성화"
+      }
+    },
+    "layout": {
+      "appName": "레이아웃과 구성 요소",
+      "components": "구성 요소"
+    },
+    "instance": {
+      "appName": "인스턴스 설정",
+      "scopeHint": "인스턴스 전체에 적용되어 모든 사용자에게 영향을 줍니다"
     }
   },
   "themePackage": { "title": "테마 라이브러리", "label": "테마 패키지", "instanceDefault": "인스턴스 기본값 사용", "install": "패키지 설치", "setDefault": "인스턴스 기본값 설정", "verified": "공식 서명", "unverified": "미검증", "confirmUnverified": "이 패키지는 Yin 서명이 없습니다. 출처를 신뢰하는 경우에만 설치하세요.", "installed": "테마를 설치했습니다", "removed": "테마를 삭제했습니다", "saved": "테마 설정을 저장했습니다", "adoptDefaults": "테마 색상 사용", "removeConfirm": "이 테마를 삭제할까요? 선택한 사용자와 인스턴스 기본값은 Yin 기본 테마로 돌아갑니다.", "runtimePrompt": "{name} 테마가 다음 Theme API 권한을 요청합니다: {permissions}", "runtimeConfirm": "{name} 테마를 격리된 프레임에서 실행하고 다음 권한을 허용할까요: {permissions}?", "runtimeEnable": "허용", "noRuntimePermissions": "요청하는 Theme API 권한 없음", "runtimeGrantFailed": "Theme API 권한을 저장하지 못했습니다.", "runtimeLoadFailed": "테마를 시작하지 못해 Yin 홈을 표시합니다." },
@@ -330,7 +344,13 @@
     "personal": "개인",
     "emailMissing": "이메일 없음",
     "admin": "관리자",
-    "title": "공간 관리",
+    "title": "공간 설정",
+    "sectionBasic": "기본 정보",
+    "sectionContent": "콘텐츠와 데이터",
+    "sectionSharing": "공유 및 접근",
+    "sectionDanger": "위험 작업",
+    "scopeHint": "이 공간과 구성원에게 적용됩니다",
+    "dangerHint": "되돌릴 수 없으며 일상 설정과 분리되어 있습니다",
     "newSpaceName": "새 공간 이름",
     "createSpace": "새 공간 만들기",
     "spaceName": "공간 이름",

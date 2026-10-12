@@ -62,7 +62,8 @@
     "1400": "パラメータ形式エラー"
   },
   "appLauncher": {
-    "title": "システム設定"
+    "title": "システム設定",
+    "groups": { "personal": "個人", "space": "スペース", "admin": "管理" }
   },
   "apps": {
     "about": {
@@ -126,16 +127,29 @@
       "deleteWarnText": "このグループ[{name}]を削除しますか？グループ内の項目も失われます。",
       "groupName": "グループ名"
     },
-    "userInfo": {
-      "appName": "マイページ",
-    "theme": "テーマ",
+    "account": {
+      "appName": "アカウント",
+      "languageHint": "アカウントに保存され、別の端末でも反映されます"
+    },
+    "appearance": {
+      "appName": "外観",
+      "identity": "ホームの表示名",
+      "identityHint": "自分のホーム表示だけに反映され、他のユーザーには影響しません",
+      "theme": "テーマ",
+      "scheme": "明暗モード",
       "themeStyle": {
-      "auto": "システムに従う",
-      "dark": "ダーク",
-      "light": "ライト"
-      },
-    "publicVisit": "公開アクセス",
-    "enablePublicVisit": "公開アクセスを有効化"
+        "auto": "システムに従う",
+        "dark": "ダーク",
+        "light": "ライト"
+      }
+    },
+    "layout": {
+      "appName": "レイアウトとコンポーネント",
+      "components": "コンポーネント"
+    },
+    "instance": {
+      "appName": "インスタンス設定",
+      "scopeHint": "インスタンス全体に反映され、すべてのユーザーに影響します"
     }
   },
   "themePackage": { "title": "テーマライブラリ", "label": "テーマパッケージ", "instanceDefault": "インスタンスの既定を使用", "install": "パッケージをインストール", "setDefault": "インスタンスの既定に設定", "verified": "公式署名", "unverified": "未検証", "confirmUnverified": "このパッケージには Yin の署名がありません。信頼できる場合のみインストールしてください。", "installed": "テーマをインストールしました", "removed": "テーマを削除しました", "saved": "テーマ設定を保存しました", "adoptDefaults": "テーマの色を使用", "removeConfirm": "このテーマを削除しますか？選択中のユーザーとインスタンスの既定は Yin Default に戻ります。", "runtimePrompt": "{name} は次の Theme API 権限を要求しています: {permissions}", "runtimeConfirm": "{name} を隔離テーマフレームで実行し、次の権限を許可しますか: {permissions}?", "runtimeEnable": "許可", "noRuntimePermissions": "Theme API 権限の要求なし", "runtimeGrantFailed": "Theme API 権限を保存できませんでした。", "runtimeLoadFailed": "テーマを起動できません。Yin ホームを表示します。" },
@@ -322,7 +336,13 @@
     "retryWhenOnline": "オンラインで更新"
   },
   "spaceManage": { "mySpace": "マイスペース", "chooseFile": "インポート", "oidcTitle": "OIDCグループ認証", "addRule": "ルールを追加", "shared": "共有", "personal": "個人", "emailMissing": "メール未設定", "admin": "管理者",
-    "title": "スペース管理", "newSpaceName": "新しいスペース名", "createSpace": "新しいスペースを作成", "spaceName": "スペース名", "rename": "名前を変更", "copy": "スペースをコピー", "publicAccess": "公開アクセス", "enablePublicAccess": "公開アクセスを有効化", "publicIdPlaceholder": "FN ID（例: my-panel）", "directAccess": "リンクで直接アクセス", "codeAccess": "アクセスコードが必要", "accessCodePlaceholder": "アクセスコード（4～12文字）", "savePublic": "公開アクセス設定を保存", "bookmarkTransfer": "ブックマーク（Chrome対応）- インポート/エクスポート", "exportBookmarks": "エクスポート", "clearSpace": "現在のスペースをクリア", "groups": "グループ", "groupName": "グループ名", "parentGroupOptional": "親グループ（任意）", "addGroup": "グループを追加", "members": "メンバー", "userEmail": "ユーザーメール", "editor": "編集者", "viewer": "閲覧者", "addMember": "メンバーを追加", "removeMember": "メンバーを削除", "removeMemberConfirm": "このメンバーを現在のスペースから削除しますか？すぐにアクセス権が失われます。", "removeMemberSuccess": "メンバーをスペースから削除しました", "leaveSpace": "スペースを退出", "leaveSpaceConfirm": "あなたはこのスペースの最後の管理者です。退出するとスペースとすべてのブックマークが削除され、元に戻せません。続行しますか？", "leaveSpaceSuccess": "スペースを削除しました", "accessVerification": "アクセス認証", "enterAccessCode": "アクセスコードを入力して続行してください", "accessCodeShortPlaceholder": "アクセスコード（4～12文字）", "confirmAccess": "アクセスを確認", "expandGroup": "グループを展開", "collapseGroup": "グループを折りたたむ", "backToTop": "トップへ戻る", "createTeamSpace": "チームスペースを作成", "teamName": "チーム名",
+    "title": "スペース設定", "newSpaceName": "新しいスペース名", "createSpace": "新しいスペースを作成", "spaceName": "スペース名", "rename": "名前を変更", "copy": "スペースをコピー", "publicAccess": "公開アクセス", "enablePublicAccess": "公開アクセスを有効化", "publicIdPlaceholder": "FN ID（例: my-panel）", "directAccess": "リンクで直接アクセス", "codeAccess": "アクセスコードが必要", "accessCodePlaceholder": "アクセスコード（4～12文字）", "savePublic": "公開アクセス設定を保存", "bookmarkTransfer": "ブックマーク（Chrome対応）- インポート/エクスポート", "exportBookmarks": "エクスポート", "clearSpace": "現在のスペースをクリア", "groups": "グループ", "groupName": "グループ名", "parentGroupOptional": "親グループ（任意）", "addGroup": "グループを追加", "members": "メンバー", "userEmail": "ユーザーメール", "editor": "編集者", "viewer": "閲覧者", "addMember": "メンバーを追加", "removeMember": "メンバーを削除", "removeMemberConfirm": "このメンバーを現在のスペースから削除しますか？すぐにアクセス権が失われます。", "removeMemberSuccess": "メンバーをスペースから削除しました", "leaveSpace": "スペースを退出", "leaveSpaceConfirm": "あなたはこのスペースの最後の管理者です。退出するとスペースとすべてのブックマークが削除され、元に戻せません。続行しますか？", "leaveSpaceSuccess": "スペースを削除しました", "accessVerification": "アクセス認証", "enterAccessCode": "アクセスコードを入力して続行してください", "accessCodeShortPlaceholder": "アクセスコード（4～12文字）", "confirmAccess": "アクセスを確認", "expandGroup": "グループを展開", "collapseGroup": "グループを折りたたむ", "backToTop": "トップへ戻る", "createTeamSpace": "チームスペースを作成", "teamName": "チーム名",
+    "sectionBasic": "基本情報",
+    "sectionContent": "コンテンツとデータ",
+    "sectionSharing": "共有とアクセス",
+    "sectionDanger": "危険な操作",
+    "scopeHint": "このスペースとそのメンバーに反映されます",
+    "dangerHint": "元に戻せません。日常的な設定とは分けています",
     "importConfirm": "{count} 件をインポートします。続行しますか？",
     "importConfirmAgain": "2回目の確認です。ブックマークをインポートしますか？",
     "importSuccess": "ブックマークをインポートしました",

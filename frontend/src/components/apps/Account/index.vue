@@ -1,20 +1,16 @@
 <script setup lang="ts">
 import type { FormInst, FormRules } from 'naive-ui'
 import { NButton, NCard, NDivider, NForm, NFormItem, NInput, NSelect, useDialog, useMessage } from 'naive-ui'
-import { computed, onMounted, ref } from 'vue'
+import { computed, ref } from 'vue'
 import { RoundCardModal, SvgIcon } from '../../common'
 import { useAppStore, useAuthStore, usePanelState } from '@/store'
 import { languageOptions } from '@/utils/defaultData'
-import type { Language, Theme } from '@/store/modules/app/helper'
+import type { Language } from '@/store/modules/app/helper'
 import { logout } from '@/api'
 import { updateInfo, updatePassword } from '@/api/system/user'
 import { updateLocalUserInfo } from '@/utils/cmn'
 import { t } from '@/locales'
-import { getInstalledThemes, getMyTheme, saveThemePreference } from '@/api/theme'
 import { set as setUserConfig } from '@/api/panel/userConfig'
-import { refreshMyTheme } from '@/hooks/useTheme'
-
-// 使用导入的 ApiResponse 类型
 
 const authStore = useAuthStore()
 const appStore = useAppStore()
@@ -24,22 +20,9 @@ const dialog = useDialog()
 
 const languageValue = ref(appStore.language)
 const localizedLanguageOptions = computed(() => languageOptions.map(option => ({ ...option, label: option.key === 'auto' ? t('common.followBrowser') : option.label })))
-const themeValue = ref(appStore.theme)
-const selectedThemePackage = ref('')
-const themeModeValue = ref<'custom' | 'follow-space'>('custom')
-const themePackageOptions = ref<{ label: string; value: string }[]>([])
-const themeModeOptions = computed(() => [
-  { label: t('themeScope.modeCustom'), value: 'custom' },
-  { label: t('themeScope.modeFollowSpace'), value: 'follow-space' },
-])
 const nickName = ref(authStore.userInfo?.name || '')
 const isEditNickNameStatus = ref(false)
 const formRef = ref<FormInst | null>(null)
-const themeOptions: { label: string; key: string; value: Theme }[] = [
-  { label: t('apps.userInfo.themeStyle.dark'), key: 'dark', value: 'dark' },
-  { label: t('apps.userInfo.themeStyle.light'), key: 'light', value: 'light' },
-  { label: t('apps.userInfo.themeStyle.auto'), key: 'Auto', value: 'auto' },
-]
 const updatePasswordModalState = ref({
   show: false,
   loading: false,
@@ -108,9 +91,8 @@ function handleUpdatePassword(e: MouseEvent) {
       return
     }
     updatePasswordModalState.value.loading = true
-    updatePassword(updatePasswordModalState.value.form.oldPassword, updatePasswordModalState.value.form.password).then(({ code, msg }) => {
+    updatePassword(updatePasswordModalState.value.form.oldPassword, updatePasswordModalState.value.form.password).then(({ code }) => {
       if (code === 0) {
-        // 成功
         updatePasswordModalState.value.show = false
         ms.success(t('common.success'))
       }
@@ -147,59 +129,6 @@ async function handleChangeLanuage(value: Language) {
   }
   location.reload()
 }
-
-function handleChangeTheme(value: Theme) {
-  themeValue.value = value
-  appStore.setTheme(value)
-  saveThemePreference({ packageId: selectedThemePackage.value, mode: value })
-}
-
-async function loadThemeSettings() {
-  try {
-    const [installed, mine] = await Promise.all([getInstalledThemes(), getMyTheme()])
-    if (installed.code === 0) {
-      themePackageOptions.value = [
-        { label: t('themePackage.instanceDefault'), value: '' },
-        ...installed.data.map(item => ({ label: item.name, value: item.id })),
-      ]
-    }
-    if (mine.code === 0) {
-      selectedThemePackage.value = mine.data.preference.packageId || ''
-      themeValue.value = mine.data.preference.mode
-      themeModeValue.value = mine.data.preference.themeMode || 'custom'
-    }
-  }
-  catch {
-    // Theme selection remains on the server's current default when unavailable.
-  }
-}
-
-async function handleChangeThemePackage(packageId: string) {
-  selectedThemePackage.value = packageId
-  const result = await saveThemePreference({ packageId, mode: themeValue.value, themeMode: themeModeValue.value })
-  if (result.code === 0) {
-    await refreshMyTheme(appStore)
-    ms.success(t('themePackage.saved'))
-  }
-  else {
-    ms.error(result.msg)
-  }
-}
-
-async function handleChangeThemeMode(value: 'custom' | 'follow-space') {
-  themeModeValue.value = value
-  const result = await saveThemePreference({ packageId: selectedThemePackage.value, mode: themeValue.value, themeMode: value })
-  if (result.code === 0) {
-    await refreshMyTheme(appStore)
-    ms.success(t('themeScope.saved'))
-  }
-  else {
-    ms.error(result.msg)
-  }
-}
-
-onMounted(loadThemeSettings)
-
 </script>
 
 <template>
@@ -209,7 +138,7 @@ onMounted(loadThemeSettings)
         <div class="yin-text-muted font-bold">
           {{ $t('spaceManage.userEmail') }}
         </div>
-          {{ authStore.userInfo?.mail }}
+        {{ authStore.userInfo?.mail }}
       </div>
 
       <div class="mt-[10px]">
@@ -247,34 +176,17 @@ onMounted(loadThemeSettings)
 
       <NDivider style="margin: 10px 0;" dashed />
 
-      <div class="mt-[10px]">
+      <div>
         <div class="yin-text-muted font-bold">
           {{ $t('common.language') }}
         </div>
         <div class="max-w-[200px]">
           <NSelect v-model:value="languageValue" :options="localizedLanguageOptions" @update-value="handleChangeLanuage" />
         </div>
-      </div>
-
-      <div class="mt-[10px]">
-        <div class="yin-text-muted font-bold">
-          {{ $t('apps.userInfo.theme') }}
-        </div>
-        <div class="max-w-[200px]">
-        <NSelect v-model:value="themeValue" :options="themeOptions" @update-value="handleChangeTheme" />
-        <div class="mt-3">
-          <div class="mb-1">{{ $t('themeScope.mode') }}</div>
-          <NSelect v-model:value="themeModeValue" :options="themeModeOptions" @update-value="handleChangeThemeMode" />
-        </div>
-        <div class="mt-3">
-          <div class="mb-1">{{ $t('themePackage.label') }}</div>
-          <NSelect v-model:value="selectedThemePackage" :options="themePackageOptions" :disabled="themeModeValue === 'follow-space'" @update-value="handleChangeThemePackage" />
-        </div>
+        <div class="mt-1 text-xs opacity-70">
+          {{ $t('apps.account.languageHint') }}
         </div>
       </div>
-
-      <NDivider style="margin: 10px 0;" dashed />
-
     </NCard>
 
     <NCard style="border-radius:10px" class="mt-[10px]" size="small">

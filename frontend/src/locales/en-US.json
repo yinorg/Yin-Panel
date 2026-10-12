@@ -62,7 +62,8 @@
     "1400": "Parameter format error"
   },
   "appLauncher": {
-    "title": "System Settings"
+    "title": "System Settings",
+    "groups": { "personal": "Personal", "space": "Space", "admin": "Administration" }
   },
   "apps": {
     "about": {
@@ -126,16 +127,29 @@
       "deleteWarnText": "Are you sure you want to delete this group [{name}]? The application icons in this group will be lost after deletion.",
       "groupName": "Group name"
     },
-    "userInfo": {
-      "appName": "My Information",
+    "account": {
+      "appName": "Account",
+      "languageHint": "Saved with your account, so it applies on your other devices too"
+    },
+    "appearance": {
+      "appName": "Appearance",
+      "identity": "My home identity",
+      "identityHint": "Affects only your own home view, not other users",
       "theme": "Theme",
+      "scheme": "Colour scheme",
       "themeStyle": {
         "auto": "Follow the system ",
         "dark": "Dark ",
         "light": "Light "
-      },
-      "publicVisit": "Public visit",
-      "enablePublicVisit": "Enable public visit"
+      }
+    },
+    "layout": {
+      "appName": "Layout and components",
+      "components": "Components"
+    },
+    "instance": {
+      "appName": "Instance settings",
+      "scopeHint": "Instance-wide: affects every user"
     }
   },
   "themePackage": { "title": "Theme library", "label": "Theme package", "instanceDefault": "Use instance default", "install": "Install package", "setDefault": "Set instance default", "verified": "Official signature", "unverified": "Unverified", "confirmUnverified": "This package is not signed by Yin. Install it only if you trust its source.", "installed": "Theme installed", "removed": "Theme removed", "saved": "Theme preference saved", "adoptDefaults": "Use theme colors", "removeConfirm": "Remove this theme? Users selecting it and the instance default will return to Yin Default.", "runtimePrompt": "{name} requests these Theme API permissions: {permissions}", "runtimeConfirm": "Allow {name} to run in an isolated theme frame with: {permissions}?", "runtimeEnable": "Allow", "noRuntimePermissions": "No Theme API permissions", "runtimeGrantFailed": "Could not save Theme API permissions.", "runtimeLoadFailed": "The theme could not start. Yin Home is shown instead." },
@@ -322,7 +336,13 @@
     "retryWhenOnline": "Refresh when online"
   },
   "spaceManage": { "mySpace": "My space", "chooseFile": "Import", "oidcTitle": "OIDC group authorization", "addRule": "Add rule", "shared": "Shared", "personal": "Personal", "emailMissing": "Email unavailable", "admin": "Administrator",
-    "title": "Space Management", "newSpaceName": "New space name", "createSpace": "Create new space", "spaceName": "Space name", "rename": "Rename", "copy": "Copy space", "publicAccess": "Public access", "enablePublicAccess": "Enable public access", "publicIdPlaceholder": "FN ID, e.g. my-panel", "directAccess": "Direct link access", "codeAccess": "Access code required", "accessCodePlaceholder": "Access code (4-12 characters)", "savePublic": "Save public access settings", "bookmarkTransfer": "Bookmarks (Chrome compatible) - Import/Export", "exportBookmarks": "Export", "clearSpace": "Clear current space", "groups": "Groups", "groupName": "Group name", "parentGroupOptional": "Parent group (optional)", "addGroup": "Add group", "members": "Members", "userEmail": "User email", "editor": "Editor", "viewer": "Viewer", "addMember": "Add member", "removeMember": "Remove member", "removeMemberConfirm": "Remove this member from the current space? They lose access immediately.", "removeMemberSuccess": "Member removed from the space", "leaveSpace": "Leave space", "leaveSpaceConfirm": "You are the last administrator of this space. Leaving deletes the entire space and all its bookmarks, and cannot be undone. Confirm?", "leaveSpaceSuccess": "Space deleted", "accessVerification": "Access verification", "enterAccessCode": "Enter the access code to continue", "accessCodeShortPlaceholder": "Access code (4-12 characters)", "confirmAccess": "Confirm access", "expandGroup": "Expand group", "collapseGroup": "Collapse group", "backToTop": "Back to top", "createTeamSpace": "Create team space", "teamName": "Team name",
+    "title": "Space settings", "newSpaceName": "New space name", "createSpace": "Create new space", "spaceName": "Space name", "rename": "Rename", "copy": "Copy space", "publicAccess": "Public access", "enablePublicAccess": "Enable public access", "publicIdPlaceholder": "FN ID, e.g. my-panel", "directAccess": "Direct link access", "codeAccess": "Access code required", "accessCodePlaceholder": "Access code (4-12 characters)", "savePublic": "Save public access settings", "bookmarkTransfer": "Bookmarks (Chrome compatible) - Import/Export", "exportBookmarks": "Export", "clearSpace": "Clear current space", "groups": "Groups", "groupName": "Group name", "parentGroupOptional": "Parent group (optional)", "addGroup": "Add group", "members": "Members", "userEmail": "User email", "editor": "Editor", "viewer": "Viewer", "addMember": "Add member", "removeMember": "Remove member", "removeMemberConfirm": "Remove this member from the current space? They lose access immediately.", "removeMemberSuccess": "Member removed from the space", "leaveSpace": "Leave space", "leaveSpaceConfirm": "You are the last administrator of this space. Leaving deletes the entire space and all its bookmarks, and cannot be undone. Confirm?", "leaveSpaceSuccess": "Space deleted", "accessVerification": "Access verification", "enterAccessCode": "Enter the access code to continue", "accessCodeShortPlaceholder": "Access code (4-12 characters)", "confirmAccess": "Confirm access", "expandGroup": "Expand group", "collapseGroup": "Collapse group", "backToTop": "Back to top", "createTeamSpace": "Create team space", "teamName": "Team name",
+    "sectionBasic": "Basics",
+    "sectionContent": "Content and data",
+    "sectionSharing": "Sharing and access",
+    "sectionDanger": "Danger zone",
+    "scopeHint": "Affects this space and its members",
+    "dangerHint": "Cannot be undone; kept apart from everyday settings",
     "importConfirm": "About to import {count} items. Continue?",
     "importConfirmAgain": "This is the second confirmation. Import the bookmarks?",
     "importSuccess": "Bookmarks imported successfully",

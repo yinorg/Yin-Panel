@@ -134,7 +134,7 @@ A theme reaches data only through typed commands (`api.commands.execute('item.cr
 
 ### Surfaces the Core keeps
 
-A theme invokes them; the Core renders them: `editor.open` (item editor — privileged file upload and icon selection), `commandCenter.open` (cross-module navigation), `ui.openCoreSurface('theme-settings')` (application shell), `ui.openCoreSurface('wallpaper-center')` (the wallpaper picker: the Core owns the packaged library, the layer, and the stored choice, so a theme only opens it or embeds `<yin-wallpaper-center>`; a theme may add entries through `manifest.wallpaperCatalogue`).
+A theme invokes them; the Core renders them: `editor.open` (item editor — privileged file upload and icon selection), `commandCenter.open` (cross-module navigation), `ui.openCoreSurface('appearance')` (the home's look; the pre-split name `theme-settings` still resolves to it), `ui.openCoreSurface('wallpaper-center')` (the wallpaper picker: the Core owns the packaged library, the layer, and the stored choice, so a theme only opens it or embeds `<yin-wallpaper-center>`; a theme may add entries through `manifest.wallpaperCatalogue`).
 
 ### Decision rule
 

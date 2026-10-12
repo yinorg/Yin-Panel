@@ -62,7 +62,8 @@
     "1400": "Parametre biçimi hatası"
   },
   "appLauncher": {
-    "title": "Sistem Ayarları"
+    "title": "Sistem Ayarları",
+    "groups": { "personal": "Kişisel", "space": "Alan", "admin": "Yönetim" }
   },
   "apps": {
     "about": {
@@ -126,16 +127,29 @@
       "deleteWarnText": "Bu grubu [{name}] silmek istediğinizden emin misiniz? Silme işleminden sonra bu gruptaki uygulama simgeleri kaybolacak.",
       "groupName": "Grup adı"
     },
-    "userInfo": {
-      "appName": "Bilgilerim",
+    "account": {
+      "appName": "Hesap",
+      "languageHint": "Hesaba kaydedilir ve diğer cihazlarınızda da geçerli olur"
+    },
+    "appearance": {
+      "appName": "Görünüm",
+      "identity": "Ana sayfa kimliğim",
+      "identityHint": "Yalnızca kendi ana sayfanızı etkiler, diğer kullanıcıları etkilemez",
       "theme": "Tema",
+      "scheme": "Açık/koyu mod",
       "themeStyle": {
         "auto": "Sistemi takip et ",
         "dark": "Koyu ",
         "light": "Açık "
-      },
-      "publicVisit": "Herkese açık ziyaret",
-      "enablePublicVisit": "Herkese açık ziyareti etkinleştir"
+      }
+    },
+    "layout": {
+      "appName": "Yerleşim ve bileşenler",
+      "components": "Bileşenler"
+    },
+    "instance": {
+      "appName": "Örnek ayarları",
+      "scopeHint": "Tüm örneği ve tüm kullanıcıları etkiler"
     }
   },
   "themePackage": { "title": "Tema kitaplığı", "label": "Tema paketi", "instanceDefault": "Örnek varsayılanını kullan", "install": "Paketi yükle", "setDefault": "Örnek varsayılanı olarak ayarla", "verified": "Resmî imza", "unverified": "Doğrulanmamış", "confirmUnverified": "Bu paket Yin tarafından imzalanmamış. Yalnızca kaynağına güveniyorsanız yükleyin.", "installed": "Tema yüklendi", "removed": "Tema kaldırıldı", "saved": "Tema tercihi kaydedildi", "adoptDefaults": "Tema renklerini kullan", "removeConfirm": "Bu tema kaldırılsın mı? Bu temayı seçen kullanıcılar ve örnek varsayılanı Yin Default'a dönecek.", "runtimePrompt": "{name} şu Tema API izinlerini istiyor: {permissions}", "runtimeConfirm": "{name} öğesinin şu izinlerle yalıtılmış bir tema çerçevesinde çalışmasına izin verilsin mi: {permissions}?", "runtimeEnable": "İzin ver", "noRuntimePermissions": "Tema API izni yok", "runtimeGrantFailed": "Tema API izinleri kaydedilemedi.", "runtimeLoadFailed": "Tema başlatılamadı. Bunun yerine Yin Home gösteriliyor." },
@@ -322,7 +336,13 @@
     "retryWhenOnline": "Çevrimiçi olduğunda yenile"
   },
   "spaceManage": { "mySpace": "Alanım", "chooseFile": "İçe aktar", "oidcTitle": "OIDC grup yetkilendirmesi", "addRule": "Kural ekle", "shared": "Paylaşılan", "personal": "Kişisel", "emailMissing": "E-posta kullanılamıyor", "admin": "Yönetici",
-    "title": "Alan Yönetimi", "newSpaceName": "Yeni alan adı", "createSpace": "Yeni alan oluştur", "spaceName": "Alan adı", "rename": "Yeniden adlandır", "copy": "Alanı kopyala", "publicAccess": "Herkese açık erişim", "enablePublicAccess": "Herkese açık erişimi etkinleştir", "publicIdPlaceholder": "FN ID, örn. my-panel", "directAccess": "Doğrudan bağlantı erişimi", "codeAccess": "Erişim kodu gerekli", "accessCodePlaceholder": "Erişim kodu (4-12 karakter)", "savePublic": "Herkese açık erişim ayarlarını kaydet", "bookmarkTransfer": "Yer işaretleri (Chrome uyumlu) - İçe/Dışa Aktar", "exportBookmarks": "Dışa aktar", "clearSpace": "Geçerli alanı temizle", "groups": "Gruplar", "groupName": "Grup adı", "parentGroupOptional": "Üst grup (isteğe bağlı)", "addGroup": "Grup ekle", "members": "Üyeler", "userEmail": "Kullanıcı e-postası", "editor": "Düzenleyici", "viewer": "Görüntüleyici", "addMember": "Üye ekle", "removeMember": "Üyeyi kaldır", "removeMemberConfirm": "Bu üye geçerli alandan kaldırılsın mı? Erişimini hemen kaybeder.", "removeMemberSuccess": "Üye alandan kaldırıldı", "leaveSpace": "Alandan ayrıl", "leaveSpaceConfirm": "Bu alanın son yöneticisisiniz. Ayrıldığınızda tüm alan ve tüm yer işaretleri silinir ve bu geri alınamaz. Onaylıyor musunuz?", "leaveSpaceSuccess": "Alan silindi", "accessVerification": "Erişim doğrulaması", "enterAccessCode": "Devam etmek için erişim kodunu girin", "accessCodeShortPlaceholder": "Erişim kodu (4-12 karakter)", "confirmAccess": "Erişimi onayla", "expandGroup": "Grubu genişlet", "collapseGroup": "Grubu daralt", "backToTop": "Başa dön", "createTeamSpace": "Ekip alanı oluştur", "teamName": "Ekip adı",
+    "title": "Alan ayarları", "newSpaceName": "Yeni alan adı", "createSpace": "Yeni alan oluştur", "spaceName": "Alan adı", "rename": "Yeniden adlandır", "copy": "Alanı kopyala", "publicAccess": "Herkese açık erişim", "enablePublicAccess": "Herkese açık erişimi etkinleştir", "publicIdPlaceholder": "FN ID, örn. my-panel", "directAccess": "Doğrudan bağlantı erişimi", "codeAccess": "Erişim kodu gerekli", "accessCodePlaceholder": "Erişim kodu (4-12 karakter)", "savePublic": "Herkese açık erişim ayarlarını kaydet", "bookmarkTransfer": "Yer işaretleri (Chrome uyumlu) - İçe/Dışa Aktar", "exportBookmarks": "Dışa aktar", "clearSpace": "Geçerli alanı temizle", "groups": "Gruplar", "groupName": "Grup adı", "parentGroupOptional": "Üst grup (isteğe bağlı)", "addGroup": "Grup ekle", "members": "Üyeler", "userEmail": "Kullanıcı e-postası", "editor": "Düzenleyici", "viewer": "Görüntüleyici", "addMember": "Üye ekle", "removeMember": "Üyeyi kaldır", "removeMemberConfirm": "Bu üye geçerli alandan kaldırılsın mı? Erişimini hemen kaybeder.", "removeMemberSuccess": "Üye alandan kaldırıldı", "leaveSpace": "Alandan ayrıl", "leaveSpaceConfirm": "Bu alanın son yöneticisisiniz. Ayrıldığınızda tüm alan ve tüm yer işaretleri silinir ve bu geri alınamaz. Onaylıyor musunuz?", "leaveSpaceSuccess": "Alan silindi", "accessVerification": "Erişim doğrulaması", "enterAccessCode": "Devam etmek için erişim kodunu girin", "accessCodeShortPlaceholder": "Erişim kodu (4-12 karakter)", "confirmAccess": "Erişimi onayla", "expandGroup": "Grubu genişlet", "collapseGroup": "Grubu daralt", "backToTop": "Başa dön", "createTeamSpace": "Ekip alanı oluştur", "teamName": "Ekip adı",
+    "sectionBasic": "Temel bilgiler",
+    "sectionContent": "İçerik ve veriler",
+    "sectionSharing": "Paylaşım ve erişim",
+    "sectionDanger": "Tehlikeli bölge",
+    "scopeHint": "Bu alanı ve üyelerini etkiler",
+    "dangerHint": "Geri alınamaz; günlük ayarlardan ayrıdır",
     "importConfirm": "{count} öğe içe aktarılmak üzere. Devam edilsin mi?",
     "importConfirmAgain": "Bu ikinci onaydır. Yer işaretleri içe aktarılsın mı?",
     "importSuccess": "Yer işaretleri başarıyla içe aktarıldı",

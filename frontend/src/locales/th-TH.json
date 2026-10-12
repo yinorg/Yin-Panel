@@ -62,7 +62,8 @@
     "1400": "รูปแบบพารามิเตอร์ไม่ถูกต้อง"
   },
   "appLauncher": {
-    "title": "การตั้งค่าระบบ"
+    "title": "การตั้งค่าระบบ",
+    "groups": { "personal": "ส่วนตัว", "space": "สเปซ", "admin": "การจัดการ" }
   },
   "apps": {
     "about": {
@@ -126,16 +127,29 @@
       "deleteWarnText": "คุณแน่ใจหรือไม่ว่าต้องการลบกลุ่มนี้ [{name}]? ไอคอนแอปพลิเคชันในกลุ่มนี้จะหายไปหลังการลบ",
       "groupName": "ชื่อกลุ่ม"
     },
-    "userInfo": {
-      "appName": "ข้อมูลของฉัน",
+    "account": {
+      "appName": "บัญชี",
+      "languageHint": "บันทึกกับบัญชีและมีผลบนอุปกรณ์อื่นด้วย"
+    },
+    "appearance": {
+      "appName": "รูปลักษณ์",
+      "identity": "ข้อมูลระบุตัวตนหน้าแรกของฉัน",
+      "identityHint": "มีผลกับหน้าแรกของคุณเท่านั้น ไม่กระทบผู้ใช้รายอื่น",
       "theme": "ธีม",
+      "scheme": "โหมดสว่าง/มืด",
       "themeStyle": {
         "auto": "ตามระบบ ",
         "dark": "มืด ",
         "light": "สว่าง "
-      },
-      "publicVisit": "การเข้าชมสาธารณะ",
-      "enablePublicVisit": "เปิดใช้งานการเข้าชมสาธารณะ"
+      }
+    },
+    "layout": {
+      "appName": "เลย์เอาต์และคอมโพเนนต์",
+      "components": "คอมโพเนนต์"
+    },
+    "instance": {
+      "appName": "การตั้งค่าอินสแตนซ์",
+      "scopeHint": "มีผลทั้งอินสแตนซ์ ทุกผู้ใช้"
     }
   },
   "themePackage": { "title": "คลังธีม", "label": "แพ็กเกจธีม", "instanceDefault": "ใช้ค่าเริ่มต้นของอินสแตนซ์", "install": "ติดตั้งแพ็กเกจ", "setDefault": "ตั้งเป็นค่าเริ่มต้นของอินสแตนซ์", "verified": "ลายเซ็นอย่างเป็นทางการ", "unverified": "ยังไม่ยืนยัน", "confirmUnverified": "แพ็กเกจนี้ไม่ได้ลงนามโดย Yin ติดตั้งเฉพาะเมื่อคุณเชื่อถือแหล่งที่มา", "installed": "ติดตั้งธีมแล้ว", "removed": "ลบธีมแล้ว", "saved": "บันทึกการตั้งค่าธีมแล้ว", "adoptDefaults": "ใช้สีของธีม", "removeConfirm": "ลบธีมนี้หรือไม่? ผู้ใช้ที่เลือกธีมนี้และค่าเริ่มต้นของอินสแตนซ์จะกลับไปใช้ Yin Default", "runtimePrompt": "{name} ร้องขอสิทธิ์ Theme API เหล่านี้: {permissions}", "runtimeConfirm": "อนุญาตให้ {name} ทำงานในเฟรมธีมที่แยกไว้ด้วยสิทธิ์: {permissions}?", "runtimeEnable": "อนุญาต", "noRuntimePermissions": "ไม่มีสิทธิ์ Theme API", "runtimeGrantFailed": "ไม่สามารถบันทึกสิทธิ์ Theme API ได้", "runtimeLoadFailed": "ธีมไม่สามารถเริ่มทำงานได้ จึงแสดง Yin Home แทน" },
@@ -322,7 +336,13 @@
     "retryWhenOnline": "รีเฟรชเมื่อออนไลน์"
   },
   "spaceManage": { "mySpace": "สเปซของฉัน", "chooseFile": "นำเข้า", "oidcTitle": "การอนุญาตกลุ่ม OIDC", "addRule": "เพิ่มกฎ", "shared": "แชร์", "personal": "ส่วนตัว", "emailMissing": "ไม่มีอีเมล", "admin": "ผู้ดูแลระบบ",
-    "title": "การจัดการสเปซ", "newSpaceName": "ชื่อสเปซใหม่", "createSpace": "สร้างสเปซใหม่", "spaceName": "ชื่อสเปซ", "rename": "เปลี่ยนชื่อ", "copy": "คัดลอกสเปซ", "publicAccess": "การเข้าถึงสาธารณะ", "enablePublicAccess": "เปิดใช้งานการเข้าถึงสาธารณะ", "publicIdPlaceholder": "FN ID เช่น my-panel", "directAccess": "เข้าถึงผ่านลิงก์โดยตรง", "codeAccess": "ต้องใช้รหัสเข้าถึง", "accessCodePlaceholder": "รหัสเข้าถึง (4-12 ตัวอักษร)", "savePublic": "บันทึกการตั้งค่าการเข้าถึงสาธารณะ", "bookmarkTransfer": "บุ๊กมาร์ก (เข้ากันได้กับ Chrome) - นำเข้า/ส่งออก", "exportBookmarks": "ส่งออก", "clearSpace": "ล้างสเปซปัจจุบัน", "groups": "กลุ่ม", "groupName": "ชื่อกลุ่ม", "parentGroupOptional": "กลุ่มแม่ (ไม่บังคับ)", "addGroup": "เพิ่มกลุ่ม", "members": "สมาชิก", "userEmail": "อีเมลผู้ใช้", "editor": "ผู้แก้ไข", "viewer": "ผู้ชม", "addMember": "เพิ่มสมาชิก", "removeMember": "ลบสมาชิก", "removeMemberConfirm": "ลบสมาชิกนี้ออกจากสเปซปัจจุบันหรือไม่? พวกเขาจะสูญเสียการเข้าถึงทันที", "removeMemberSuccess": "ลบสมาชิกออกจากสเปซแล้ว", "leaveSpace": "ออกจากสเปซ", "leaveSpaceConfirm": "คุณเป็นผู้ดูแลคนสุดท้ายของสเปซนี้ การออกจะลบสเปซทั้งหมดและบุ๊กมาร์กทั้งหมด และไม่สามารถย้อนกลับได้ ยืนยันหรือไม่?", "leaveSpaceSuccess": "ลบสเปซแล้ว", "accessVerification": "การยืนยันการเข้าถึง", "enterAccessCode": "กรอกรหัสเข้าถึงเพื่อดำเนินการต่อ", "accessCodeShortPlaceholder": "รหัสเข้าถึง (4-12 ตัวอักษร)", "confirmAccess": "ยืนยันการเข้าถึง", "expandGroup": "ขยายกลุ่ม", "collapseGroup": "ย่อกลุ่ม", "backToTop": "กลับขึ้นด้านบน", "createTeamSpace": "สร้างสเปซทีม", "teamName": "ชื่อทีม",
+    "title": "การตั้งค่าสเปซ", "newSpaceName": "ชื่อสเปซใหม่", "createSpace": "สร้างสเปซใหม่", "spaceName": "ชื่อสเปซ", "rename": "เปลี่ยนชื่อ", "copy": "คัดลอกสเปซ", "publicAccess": "การเข้าถึงสาธารณะ", "enablePublicAccess": "เปิดใช้งานการเข้าถึงสาธารณะ", "publicIdPlaceholder": "FN ID เช่น my-panel", "directAccess": "เข้าถึงผ่านลิงก์โดยตรง", "codeAccess": "ต้องใช้รหัสเข้าถึง", "accessCodePlaceholder": "รหัสเข้าถึง (4-12 ตัวอักษร)", "savePublic": "บันทึกการตั้งค่าการเข้าถึงสาธารณะ", "bookmarkTransfer": "บุ๊กมาร์ก (เข้ากันได้กับ Chrome) - นำเข้า/ส่งออก", "exportBookmarks": "ส่งออก", "clearSpace": "ล้างสเปซปัจจุบัน", "groups": "กลุ่ม", "groupName": "ชื่อกลุ่ม", "parentGroupOptional": "กลุ่มแม่ (ไม่บังคับ)", "addGroup": "เพิ่มกลุ่ม", "members": "สมาชิก", "userEmail": "อีเมลผู้ใช้", "editor": "ผู้แก้ไข", "viewer": "ผู้ชม", "addMember": "เพิ่มสมาชิก", "removeMember": "ลบสมาชิก", "removeMemberConfirm": "ลบสมาชิกนี้ออกจากสเปซปัจจุบันหรือไม่? พวกเขาจะสูญเสียการเข้าถึงทันที", "removeMemberSuccess": "ลบสมาชิกออกจากสเปซแล้ว", "leaveSpace": "ออกจากสเปซ", "leaveSpaceConfirm": "คุณเป็นผู้ดูแลคนสุดท้ายของสเปซนี้ การออกจะลบสเปซทั้งหมดและบุ๊กมาร์กทั้งหมด และไม่สามารถย้อนกลับได้ ยืนยันหรือไม่?", "leaveSpaceSuccess": "ลบสเปซแล้ว", "accessVerification": "การยืนยันการเข้าถึง", "enterAccessCode": "กรอกรหัสเข้าถึงเพื่อดำเนินการต่อ", "accessCodeShortPlaceholder": "รหัสเข้าถึง (4-12 ตัวอักษร)", "confirmAccess": "ยืนยันการเข้าถึง", "expandGroup": "ขยายกลุ่ม", "collapseGroup": "ย่อกลุ่ม", "backToTop": "กลับขึ้นด้านบน", "createTeamSpace": "สร้างสเปซทีม", "teamName": "ชื่อทีม",
+    "sectionBasic": "ข้อมูลพื้นฐาน",
+    "sectionContent": "เนื้อหาและข้อมูล",
+    "sectionSharing": "การแชร์และการเข้าถึง",
+    "sectionDanger": "พื้นที่อันตราย",
+    "scopeHint": "มีผลกับสเปซนี้และสมาชิก",
+    "dangerHint": "ย้อนกลับไม่ได้ แยกจากตั้งค่าประจำวัน",
     "importConfirm": "กำลังจะนำเข้า {count} รายการ ดำเนินการต่อหรือไม่?",
     "importConfirmAgain": "นี่คือการยืนยันครั้งที่สอง นำเข้าบุ๊กมาร์กหรือไม่?",
     "importSuccess": "นำเข้าบุ๊กมาร์กสำเร็จ",

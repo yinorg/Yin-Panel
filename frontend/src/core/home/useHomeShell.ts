@@ -195,7 +195,7 @@ export function useHomeShell() {
 
   /** Which app the Core settings modal opens on. Set by `openCoreSurface` when the
    *  theme does not contribute the surface, so the Core page is the fallback. */
-  const settingModalComponent = ref('UserInfo')
+  const settingModalComponent = ref('Account')
 
   /** The item editor target a theme-rendered editor page is showing. The Core owns
    *  the write (including the icon upload); the theme only renders the editor. */

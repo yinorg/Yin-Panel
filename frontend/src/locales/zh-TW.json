@@ -62,7 +62,8 @@
     "1400": "參數格式錯誤"
   },
   "appLauncher": {
-    "title": "系統設定"
+    "title": "系統設定",
+    "groups": { "personal": "個人", "space": "空間", "admin": "管理" }
   },
   "apps": {
     "about": {
@@ -126,16 +127,29 @@
       "deleteWarnText": "你確定刪除此分組[{name}]，刪除後此分組應用圖標將丟失？",
       "groupName": "分組名稱"
     },
-    "userInfo": {
-      "appName": "我的信息",
+    "account": {
+      "appName": "帳號",
+      "languageHint": "跟隨帳號，換裝置登入後同樣生效"
+    },
+    "appearance": {
+      "appName": "外觀",
+      "identity": "我的首頁標識",
+      "identityHint": "只影響你自己的首頁顯示，不影響其他使用者",
       "theme": "主題",
+      "scheme": "明暗模式",
       "themeStyle": {
         "auto": "跟隨系統 ",
         "dark": "深色 ",
         "light": "淺色 "
-      },
-      "publicVisit": "公開訪問",
-      "enablePublicVisit": "開啟公開訪問"
+      }
+    },
+    "layout": {
+      "appName": "版面與元件",
+      "components": "元件"
+    },
+    "instance": {
+      "appName": "實例設定",
+      "scopeHint": "全實例範圍，影響所有使用者"
     }
   },
   "themePackage": { "title": "主題庫", "label": "主題套件", "instanceDefault": "使用執行個體預設主題", "install": "安裝主題套件", "setDefault": "設為執行個體預設", "verified": "官方簽章", "unverified": "未驗證", "confirmUnverified": "此主題套件沒有 Yin 簽章。請只在信任來源時安裝。", "installed": "主題已安裝", "removed": "主題已移除", "saved": "主題偏好已儲存", "adoptDefaults": "使用主題色彩", "removeConfirm": "移除此主題？選用此主題的使用者和執行個體預設將改為 Yin 預設主題。", "runtimePrompt": "{name} 需要以下 Theme API 權限：{permissions}", "runtimeConfirm": "允許 {name} 在隔離主題框架中執行，並使用這些權限：{permissions}？", "runtimeEnable": "允許", "noRuntimePermissions": "不需要 Theme API 權限", "runtimeGrantFailed": "無法儲存 Theme API 權限。", "runtimeLoadFailed": "主題無法啟動，目前顯示 Yin 首頁。" },
@@ -330,7 +344,13 @@
     "personal": "個人",
     "emailMissing": "郵箱未設置",
     "admin": "管理員",
-    "title": "空間管理",
+    "title": "空間設定",
+    "sectionBasic": "基本資訊",
+    "sectionContent": "內容與資料",
+    "sectionSharing": "共享與存取",
+    "sectionDanger": "危險操作",
+    "scopeHint": "影響這個空間及其成員",
+    "dangerHint": "不可撤銷，與日常設定分開",
     "newSpaceName": "新空間名稱",
     "createSpace": "創建新空間",
     "spaceName": "空間名稱",
