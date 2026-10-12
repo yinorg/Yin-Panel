@@ -187,20 +187,26 @@ test.describe('Functional Regression: Theme home (production path)', () => {
   // lives in `tests/e2e/` under `playwright.e2e.config.ts`. Asserting it here with a
   // stubbed `window.open` would only prove the stub behaves, not the browser.
 
-  test('Core utility entries are reachable without hovering the action bar', async ({ page }) => {
-    // P4a deleted the Core copy of the refresh / back-to-top / LAN-WAN /
-    // settings chrome. Those entries are Core chrome again (see
-    // tests/visual/floating-actions.spec.ts for why they cannot be theme-drawn),
-    // and the theme's own remaining bar must not hide the last of them.
+  test('the theme action bar carries no navigation entries', async ({ page }) => {
+    // Navigation is the Core's. The theme used to duplicate the command centre,
+    // the style surface, the group dialog, the page surface and the app hub in
+    // its own header, which gave the panel two sets of entries for the same
+    // destinations. The header now holds the search box and, while editing, Save
+    // and Cancel — nothing that navigates. The Core's own chrome carries those
+    // entries; see tests/visual/floating-actions.spec.ts.
     await page.goto('/', { waitUntil: 'domcontentloaded' })
 
     const theme = page.frameLocator('[data-testid="theme-home-frame"]')
     const bar = theme.locator('.yin-actions')
     await expect(bar).toBeAttached({ timeout: 30_000 })
-    // The two entries the theme keeps are Core surfaces, so they need the command
-    // permission rather than a Space capability.
-    await expect(theme.locator('[data-testid="theme-open-command-center"]')).toBeAttached()
-    await expect(theme.locator('[data-testid="theme-open-style"]')).toBeAttached()
+    for (const testid of [
+      'theme-open-command-center',
+      'theme-add-group',
+      'theme-open-style',
+      'theme-open-page',
+      'theme-open-apps',
+    ])
+      await expect(theme.locator(`[data-testid="${testid}"]`)).toHaveCount(0)
   })
 
   test('typing in the theme still opens the command centre', async ({ page }) => {
@@ -431,13 +437,7 @@ test.describe('Functional Regression: Public link theme rendering', () => {
     // Read-only: the link exposes reads, never writes. The theme hides these by
     // setting `hidden`, so they stay in the DOM and must be asserted as not
     // visible rather than absent.
-    await expect(theme.locator('[data-testid="theme-add-group"]')).toBeHidden()
     await expect(theme.locator('[data-testid="theme-add-item"]').first()).toBeHidden()
-    // The command center needs only items.read, which this link does hold, but the
-    // Core refuses to open it without a session — so it must be hidden rather than
-    // offered as a button that silently does nothing.
-    await expect(theme.locator('[data-testid="theme-open-command-center"]')).toBeHidden()
-    await expect(theme.locator('[data-testid="theme-open-settings"]')).toBeHidden()
     // The Core's own collection must not render alongside the theme.
     await expect(page.locator('[data-testid="item-group"]')).toHaveCount(0)
   })

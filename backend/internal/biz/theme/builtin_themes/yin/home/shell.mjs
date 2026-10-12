@@ -77,11 +77,6 @@ const createYinHome = yinLayout => ({
     let groupDialogError
     let contextMenu
     let actionBar
-    let addGroupButton
-    let commandCenterButton
-    let styleButton
-    let pageButton
-    let appsButton
     let networkMode = 'wan'
     let reportedSearchBottom = -1
     let groupDialogValue
@@ -433,11 +428,6 @@ const createYinHome = yinLayout => ({
       masthead.append(identity)
       actionBar = element('div', 'yin-actions')
       actionBar.setAttribute('aria-label', 'Bookmark actions')
-      commandCenterButton = addActionButton(actionBar, envLabel('actions.commands', 'Commands'), 'theme-open-command-center', 'Open command center', () => run(() => api.commands.execute('commandCenter.open')))
-      addGroupButton = addActionButton(actionBar, envLabel('actions.addGroup', 'Add group'), 'theme-add-group', 'Add group', () => showGroupDialog('create'))
-      styleButton = addActionButton(actionBar, envLabel('actions.style', 'Style'), 'theme-open-style', 'Open theme style settings', () => run(() => api.ui.openCoreSurface('theme-settings')))
-      pageButton = addActionButton(actionBar, envLabel('actions.page', 'Pages'), 'theme-open-page', 'Open a theme-rendered page', () => run(() => api.ui.openCoreSurface('theme-page')))
-      appsButton = addActionButton(actionBar, envLabel('actions.apps', 'Apps'), 'theme-open-apps', 'Open Core apps', () => run(() => api.ui.openCoreSurface('apps')))
       // A glyph instead of a label, with the action name as its hover tooltip:
       // a green tick commits the staged layout, a red cross discards it.
       const saveLabel = envLabel('actions.save', 'Save')
@@ -1133,13 +1123,8 @@ const createYinHome = yinLayout => ({
       if (!saveButton) return
       saveButton.hidden = !editMode
       cancelButton.hidden = !editMode
-      if (editMode) {
-        if (commandCenterButton) commandCenterButton.hidden = true
-        if (addGroupButton) addGroupButton.hidden = true
-        if (styleButton) styleButton.hidden = true
-        if (pageButton) pageButton.hidden = true
-        if (appsButton) appsButton.hidden = true
-      }
+      // The bar carries nothing but Save/Cancel, so entering an edit has no other
+      // entry to hide.
     }
 
     const serializeLayout = () => {
@@ -1388,16 +1373,6 @@ const createYinHome = yinLayout => ({
       monitorSection.hidden = presentation.monitor?.visible !== true
       updateLogo(presentation)
       updateClock()
-      addGroupButton.hidden = !canMutateGroup('create')
-      // The remaining entries open Core-owned surfaces, so they need the command
-      // permission rather than a Space capability.
-      // The command center needs only items.read, which an anonymous public link
-      // also holds, but the Core refuses to open it without a session.
-      commandCenterButton.hidden = !hasPermission('items.read') || presentation.signedIn !== true
-      // `ui.openCoreSurface` is a top-level Theme API method, not a command:
-      // dispatching it through commands.execute is rejected as an unknown
-      // command, which is why this entry used to do nothing.
-      styleButton.hidden = !hasPermission('preferences.read')
       updateSearch(presentation)
       updateFooter(presentation.footerHtml || '')
       renderCollection()
