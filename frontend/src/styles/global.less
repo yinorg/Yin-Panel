@@ -145,6 +145,9 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .theme-page { background-color: var(--yin-surface); }
+/* Secondary label text. The settings apps reached for Tailwind's slate/gray,
+   which sits outside the theme tokens and so never followed the active theme. */
+.yin-text-muted { color: var(--yin-muted); }
 .markdown-body { color: var(--yin-text); background-color: transparent; }
 .markdown-body pre, .markdown-body code { background-color: var(--yin-surface); border-color: var(--yin-border); }
 

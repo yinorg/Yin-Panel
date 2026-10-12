@@ -228,7 +228,7 @@ onMounted(load)
             <NInput v-model:value="publicId" :placeholder="$t('spaceManage.publicIdPlaceholder')" maxlength="30" />
             <NSelect v-model:value="publicMode" :options="[{ label: $t('spaceManage.directAccess'), value: 'direct' }, { label: $t('spaceManage.codeAccess'), value: 'code' }]" />
             <NInput v-if="publicMode === 'code'" v-model:value="publicAccessCode" type="password" show-password-on="click" :placeholder="$t('spaceManage.accessCodePlaceholder')" maxlength="12" />
-            <span v-if="publicEnabled && publicId" class="text-gray-500">{{ $t('spaceManage.publicAddress') }}{{ `${publicOrigin}/${publicId}` }}</span>
+            <span v-if="publicEnabled && publicId" class="yin-text-muted">{{ $t('spaceManage.publicAddress') }}{{ `${publicOrigin}/${publicId}` }}</span>
             <NButton type="primary" :loading="publicSaving" @click="savePublic">{{ $t('spaceManage.savePublic') }}</NButton>
           </NSpace>
         </NCard>
@@ -240,7 +240,7 @@ onMounted(load)
         <NList v-if="selectedSpaceId" bordered>
           <NListItem>
             <div class="w-full">
-              <div class="flex items-center gap-2"><span>{{ $t('spaceManage.groups') }}</span><NButton size="tiny" type="primary" @click="openAddGroup(selectedSpaceId!)">{{ $t('spaceManage.addGroup') }}</NButton><span v-if="!groups[selectedSpaceId]?.length" class="text-gray-500">{{ $t('common.noData') }}</span></div>
+              <div class="flex items-center gap-2"><span>{{ $t('spaceManage.groups') }}</span><NButton size="tiny" type="primary" @click="openAddGroup(selectedSpaceId!)">{{ $t('spaceManage.addGroup') }}</NButton><span v-if="!groups[selectedSpaceId]?.length" class="yin-text-muted">{{ $t('common.noData') }}</span></div>
               <NSpace vertical size="small" class="mt-1"><NButton v-for="group in groups[selectedSpaceId]" :key="group.id" size="tiny" secondary @click="editGroup(selectedSpaceId!, group)">{{ group.title }}{{ group.parentId ? ' ' + $t('spaceManage.childGroupLabel') : '' }}</NButton></NSpace>
             </div>
           </NListItem>

@@ -138,17 +138,18 @@ onMounted(() => {
 /* The picker is teleported out of the config provider, and this app redefines
    naive-ui's `--n-*` variables as its brand colours (`--n-color` and
    `--n-text-color` were both the target colour), so inheriting them painted the
-   active tile's label in the same colour as its own background. The picker
-   carries its own palette instead, switched by the `dark` class the app sets on
-   the document element. */
+   active tile's label in the same colour as its own background. The picker reads
+   the theme's own tokens instead, which the app does not redefine, so it follows
+   whichever theme is active. The local names survive only as the fallback for a
+   host that sets no tokens at all. */
 .wallpaper-center {
-  --wpc-text: #1f2329;
-  --wpc-muted: #7d8798;
-  --wpc-border: #e6eaf2;
-  --wpc-surface: #fff;
-  --wpc-hover: #f2f5fa;
-  --wpc-preview: #eef2f9;
-  --wpc-accent: #3b6ef5;
+  --wpc-text: var(--yin-text, #1f2329);
+  --wpc-muted: var(--yin-muted, #7d8798);
+  --wpc-border: var(--yin-border, #e6eaf2);
+  --wpc-surface: var(--yin-surface, #fff);
+  --wpc-hover: color-mix(in srgb, var(--yin-text, #1f2329) 8%, var(--yin-surface, #fff));
+  --wpc-preview: var(--yin-canvas, #eef2f9);
+  --wpc-accent: var(--yin-primary, #3b6ef5);
 
   /* The Core mounts the standalone picker inside a rounded panel that carries no
      padding of its own, so the picker insets itself the way every other app in
@@ -159,16 +160,6 @@ onMounted(() => {
 }
 
 .wallpaper-center--embedded { padding: 0; }
-
-.dark .wallpaper-center {
-  --wpc-text: #eef2f8;
-  --wpc-muted: #9aa4b5;
-  --wpc-border: #2b3444;
-  --wpc-surface: #1a2130;
-  --wpc-hover: #232c3b;
-  --wpc-preview: #232c3b;
-  --wpc-accent: #4f83ff;
-}
 
 .wallpaper-center-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .wallpaper-center-title { margin: 0; font-size: 16px; font-weight: 700; color: var(--wpc-text); }

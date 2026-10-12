@@ -177,9 +177,9 @@ onUnmounted(() => {
               style="height: 100%;"
               content-style="overflow: hidden"
             >
-              <div class="w-full h-full dark:bg-[#2c2c32]">
+              <div class="w-full h-full app-starter-rail">
                 <div
-                  class="p-[5px] bg-slate-200 dark:bg-zinc-900 rounded-xl overflow-auto"
+                  class="p-[5px] app-starter-menu rounded-xl overflow-auto"
                   :style="{
                     width: isSmallScreen ? '100%' : '220px',
                     minWidth: '200px',
@@ -189,11 +189,11 @@ onUnmounted(() => {
                   <div
                     v-for=" (item, index) in apps"
                     :key="index"
-                    :style="{ color: componentName === item.componentName ? 'var(--n-color-target)' : '' }"
+                    :style="{ color: componentName === item.componentName ? 'var(--yin-primary)' : '' }"
                     @click="handleClickApp(item)"
                   >
                     <div
-                      class="bg-white dark:bg-zinc-800 p-[10px] rounded-lg mb-[5px] font-bold cursor-pointer flex items-center hover:bg-slate-50 focus:bg-slate-50"
+                      class="app-starter-menu-item p-[10px] rounded-lg mb-[5px] font-bold cursor-pointer flex items-center"
                     >
                       <div class="flex items-center justify-center">
                         <div class="text-lg">
@@ -211,7 +211,7 @@ onUnmounted(() => {
               </div>
             </NLayoutSider>
             <NLayoutContent :content-style="{ height }">
-              <div class="rounded-2xl h-full overflow-auto transition-all duration-500 min-w-[300px] h-full" :class="(isSmallScreen && !collapsed) ? 'opacity-0' : 'opacity-100'">
+              <div class="app-starter-pane rounded-2xl h-full overflow-auto transition-all duration-500 min-w-[300px] h-full" :class="(isSmallScreen && !collapsed) ? 'opacity-0' : 'opacity-100'">
                 <AppLoader :component-name="componentName" class="h-full" @spaces-changed="emit('spaces-changed')" />
               </div>
             </NLayoutContent>
@@ -229,11 +229,53 @@ onUnmounted(() => {
 </style>
 
 <style>
-.dark .app-starter-modal-content .n-layout{
-    background-color: #2c2c32;
+/* The settings modal is built from the theme's two surface tokens, so its depth
+   is deliberate rather than incidental: the rail and the workspace an app renders
+   in sit recessed on the canvas, and everything that should read as raised — the
+   menu items, the cards, the tables — sits on the surface. The rail and the menu
+   share the canvas on purpose, so no strip of a second colour shows between them.
+   The hard-coded greys this replaces (`#2c2c32`, Tailwind zinc) sat outside the
+   theme tokens, so they neither followed the active theme nor agreed with each
+   other. */
+.app-starter-modal-content .n-layout,
+.app-starter-modal-content .n-layout-sider,
+.app-starter-modal-content .n-layout-content,
+.app-starter-modal-content .n-layout-scroll-container,
+.app-starter-rail,
+.app-starter-menu,
+.app-starter-pane {
+    background-color: var(--yin-canvas);
 }
-/* The settings modal's app pages read as one flat surface: their cards drop the
-   drop shadow (the users page had none, so the others looked inconsistent). */
+
+/* The app pages render on that recessed workspace, so the cards they draw are
+   what lifts off it. Scoped to the modal: `theme-page` keeps its own definition
+   everywhere else, including for themes. */
+.app-starter-modal-content .theme-page {
+    background-color: transparent;
+}
+
+/* The line separates the two recessed areas, which now share a depth. */
+.app-starter-modal-content .n-layout-sider {
+    border-inline-end: 1px solid var(--yin-border);
+}
+
+/* Raised on the recessed rail. The active item is marked by its text colour,
+   which the template binds to `--yin-primary`. */
+.app-starter-menu-item {
+    background-color: var(--yin-surface);
+    border: 1px solid transparent;
+    transition: background-color var(--yin-component-state-hover-duration) var(--yin-component-state-easing), border-color var(--yin-component-state-hover-duration) var(--yin-component-state-easing);
+}
+
+.app-starter-menu-item:hover,
+.app-starter-menu-item:focus-visible {
+    background-color: color-mix(in srgb, var(--yin-primary) 10%, var(--yin-surface));
+    border-color: color-mix(in srgb, var(--yin-primary) 30%, var(--yin-surface));
+}
+
+/* The cards drop the drop shadow: the step from the page's canvas to the card's
+   surface already separates them, and the users page never had a shadow, so the
+   others looked inconsistent. */
 .app-starter-modal-content .n-card {
     box-shadow: none;
 }

@@ -206,14 +206,14 @@ onMounted(loadThemeSettings)
   <div class="theme-page p-2 h-full">
     <NCard style="border-radius:10px" size="small">
       <div>
-        <div class="text-slate-500 font-bold">
+        <div class="yin-text-muted font-bold">
           {{ $t('spaceManage.userEmail') }}
         </div>
           {{ authStore.userInfo?.mail }}
       </div>
 
       <div class="mt-[10px]">
-        <div class="text-slate-500 font-bold">
+        <div class="yin-text-muted font-bold">
           {{ $t('common.nickName') }}
         </div>
 
@@ -236,7 +236,7 @@ onMounted(loadThemeSettings)
       </div>
 
       <div class="mt-[10px]">
-        <div class="text-slate-500 font-bold">
+        <div class="yin-text-muted font-bold">
           {{ $t('common.password') }}
         </div>
 
@@ -248,7 +248,7 @@ onMounted(loadThemeSettings)
       <NDivider style="margin: 10px 0;" dashed />
 
       <div class="mt-[10px]">
-        <div class="text-slate-500 font-bold">
+        <div class="yin-text-muted font-bold">
           {{ $t('common.language') }}
         </div>
         <div class="max-w-[200px]">
@@ -257,7 +257,7 @@ onMounted(loadThemeSettings)
       </div>
 
       <div class="mt-[10px]">
-        <div class="text-slate-500 font-bold">
+        <div class="yin-text-muted font-bold">
           {{ $t('apps.userInfo.theme') }}
         </div>
         <div class="max-w-[200px]">

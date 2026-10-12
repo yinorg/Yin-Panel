@@ -462,7 +462,7 @@ function adoptThemeDefaults() {
 <template>
   <div class="theme-page rounded-[10px] p-[8px] overflow-auto">
     <NCard v-if="isAdmin" size="small">
-      <div class="text-slate-500 mb-2 font-bold">{{ $t('themePackage.title') }}</div>
+      <div class="yin-text-muted mb-2 font-bold">{{ $t('themePackage.title') }}</div>
       <div class="flex flex-wrap items-center gap-2">
         <input ref="themeFileInput" type="file" accept=".yin-theme,.zip" class="hidden" @change="prepareThemePackage(($event.target as HTMLInputElement).files?.[0]); ($event.target as HTMLInputElement).value = ''">
         <NButton size="small" @click="themeFileInput?.click()">{{ $t('themePackage.install') }}</NButton>
@@ -479,7 +479,7 @@ function adoptThemeDefaults() {
       </div>
       <div class="mt-3 divide-y">
         <div v-for="item in themePackages" :key="item.id" class="flex items-center justify-between gap-3 py-2">
-          <span class="min-w-0 truncate">{{ item.name }} <span class="text-gray-500">{{ item.id }} · {{ item.version }} · {{ item.verified ? $t('themePackage.verified') : $t('themePackage.unverified') }}</span></span>
+          <span class="min-w-0 truncate">{{ item.name }} <span class="yin-text-muted">{{ item.id }} · {{ item.version }} · {{ item.verified ? $t('themePackage.verified') : $t('themePackage.unverified') }}</span></span>
           <NButton v-if="!isBuiltinThemePackage(item.id)" size="tiny" tertiary type="error" @click="deleteTheme(item.id)">{{ $t('common.delete') }}</NButton>
         </div>
       </div>
@@ -516,7 +516,7 @@ function adoptThemeDefaults() {
       </div>
     </NModal>
     <NCard style="border-radius:10px" size="small">
-      <div class="text-slate-500 mb-[5px] font-bold">
+      <div class="yin-text-muted mb-[5px] font-bold">
         LOGO
       </div>
 
@@ -564,7 +564,7 @@ function adoptThemeDefaults() {
     </NCard>
 
     <NCard style="border-radius:10px" class="mt-[10px]" size="small">
-      <div class="text-slate-500 mb-[5px] font-bold">
+      <div class="yin-text-muted mb-[5px] font-bold">
         {{ $t('apps.baseSettings.clock') }}
       </div>
       <div class="flex items-center mt-[5px]">
@@ -574,7 +574,7 @@ function adoptThemeDefaults() {
     </NCard>
 
     <NCard style="border-radius:10px" class="mt-[10px]" size="small">
-      <div class="text-slate-500 mb-[5px] font-bold">
+      <div class="yin-text-muted mb-[5px] font-bold">
         {{ $t('apps.baseSettings.searchEngine') }}
       </div>
       <NSelect
@@ -592,7 +592,7 @@ function adoptThemeDefaults() {
     </NCard>
 
     <NCard style="border-radius:10px" class="mt-[10px]" size="small">
-      <div class="text-slate-500 mb-[5px] font-bold">
+      <div class="yin-text-muted mb-[5px] font-bold">
         {{ $t('apps.baseSettings.searchBar') }}
       </div>
       <div class="flex items-center mt-[5px]">
@@ -606,7 +606,7 @@ function adoptThemeDefaults() {
     </NCard>
 
     <NCard v-if="monitorEnabled" style="border-radius:10px" class="mt-[10px]" size="small">
-      <div class="text-slate-500 mb-[5px] font-bold">
+      <div class="yin-text-muted mb-[5px] font-bold">
         {{ $t('apps.baseSettings.systemMonitorStatus') }}
       </div>
       <div class="flex items-center mt-[5px]">
@@ -620,7 +620,7 @@ function adoptThemeDefaults() {
     </NCard>
 
     <NCard style="border-radius:10px" class="mt-[10px]" size="small">
-      <div class="text-slate-500 mb-[5px] font-bold">
+      <div class="yin-text-muted mb-[5px] font-bold">
         {{ $t('common.icon') }}
       </div>
       <div class="mt-[5px]">
@@ -673,7 +673,7 @@ function adoptThemeDefaults() {
       </div>
     </NCard>
     <NCard style="border-radius:10px" class="mt-[10px]" size="small">
-      <div class="text-slate-500 mb-[5px] font-bold">
+      <div class="yin-text-muted mb-[5px] font-bold">
         {{ $t('apps.baseSettings.wallpaper') }}
       </div>
       <NSelect v-model:value="panelState.panelConfig.wallpaperMode" to="body" :options="wallpaperModeOptions" class="mb-2" />
@@ -693,7 +693,7 @@ function adoptThemeDefaults() {
       >
         <NUploadDragger style="width: 100%;">
           <div
-            class="h-[200px] w-full border bg-slate-100 flex justify-center items-center cursor-pointer rounded-[10px]"
+            class="h-[200px] w-full border bg-[var(--yin-canvas)] flex justify-center items-center cursor-pointer rounded-[10px]"
             :style="{ background: `url(${panelState.panelConfig.wallpaperPoster || panelState.panelConfig.backgroundImageSrc}) no-repeat`, backgroundSize: 'cover' }"
           >
             <div class="text-shadow text-white">
@@ -729,7 +729,7 @@ function adoptThemeDefaults() {
     </NCard>
 
     <NCard style="border-radius:10px" class="mt-[10px]" size="small">
-      <div class="text-slate-500 mb-[5px] font-bold">
+      <div class="yin-text-muted mb-[5px] font-bold">
         {{ $t('apps.baseSettings.contentArea') }}
       </div>
 
@@ -780,7 +780,7 @@ function adoptThemeDefaults() {
     </NCard>
 
     <NCard style="border-radius:10px" class="mt-[10px]" size="small">
-      <div class="text-slate-500 mb-[5px] font-bold">
+      <div class="yin-text-muted mb-[5px] font-bold">
         {{ $t('apps.baseSettings.customFooter') }}
       </div>
 
@@ -792,7 +792,7 @@ function adoptThemeDefaults() {
     </NCard>
 
     <NCard v-if="spaceThemeSpaces.length" style="border-radius:10px" class="mt-[10px]" size="small">
-      <div class="text-slate-500 mb-[5px] font-bold">
+      <div class="yin-text-muted mb-[5px] font-bold">
         {{ $t('themeScope.spaceTitle') }}
       </div>
       <div class="max-w-[240px]">
