@@ -6,10 +6,12 @@ import { t } from '@/locales'
 import { beginThemeTrial, confirmThemeTrial, getThemePackages, getThemeRevision, getTrustedThemeRuntimePolicy, installThemePackage, previewThemePackage, removeThemePackage, rollbackThemeTrial, setTrustedThemeRuntimePolicy } from '@/api/theme'
 import { isBuiltinThemePackage, type ThemePackage } from '@/utils/theme'
 import { activeThemePackageId, refreshMyTheme } from '@/hooks/useTheme'
+import { useConfirmAction } from '@/hooks/useConfirmAction'
 
 const authStore = useAuthStore()
 const appStore = useAppStore()
 const ms = useMessage()
+const { confirmAction } = useConfirmAction()
 
 const isAdmin = computed(() => authStore.userInfo?.role === 1)
 const themeFileInput = ref<HTMLInputElement | null>(null)
@@ -125,7 +127,7 @@ async function uploadThemePackage(file?: File, confirmed = false): Promise<void>
   if (!file) return
   const result = await installThemePackage(file, confirmed)
   if (result.code !== 0 && !confirmed && /unverified|unsigned/i.test(result.msg)) {
-    if (window.confirm(t('themePackage.confirmUnverified')))
+    if (await confirmAction({ content: t('themePackage.confirmUnverified'), positiveText: t('themePackage.install') }))
       return uploadThemePackage(file, true)
   }
   else if (result.code === 0) {
@@ -165,7 +167,7 @@ async function saveDefaultTheme() {
     const hosts = Object.values(detail.data.manifest.wallpapers || {})
       .filter(item => item.kind === 'externalUrl' || item.kind === 'imageUrl')
       .map(item => new URL(item.source).hostname)
-    if (hosts.length && !window.confirm(t('themeWallpaper.confirmExternal', { hosts: [...new Set(hosts)].join(', ') })))
+    if (hosts.length && !(await confirmAction({ content: t('themeWallpaper.confirmExternal', { hosts: [...new Set(hosts)].join(', ') }) })))
       return
     const { code, msg } = await beginThemeTrial(selectedTrialRevision.value)
     if (code === 0) {
@@ -202,7 +204,7 @@ async function rollbackThemeSelection() {
 }
 
 async function deleteTheme(id: string) {
-  if (!window.confirm(t('themePackage.removeConfirm')))
+  if (!(await confirmAction({ content: t('themePackage.removeConfirm'), positiveText: t('common.delete'), variant: 'error' })))
     return
   const { code, msg } = await removeThemePackage(id)
   if (code === 0) {

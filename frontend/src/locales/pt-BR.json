@@ -142,10 +142,14 @@
         "dark": "Escuro ",
         "light": "Claro "
       }
+    ,
+      "reset": "Restaurar aparência padrão"
     },
     "layout": {
       "appName": "Layout e componentes",
       "components": "Componentes"
+    ,
+      "reset": "Restaurar layout padrão"
     },
     "instance": {
       "appName": "Configurações da instância",
@@ -221,6 +225,10 @@
     "verify": "Verificar",
     "warning": "Aviso",
     "yes": "Sim"
+  ,
+    "saveToAccount": "Salvar na conta",
+    "unsavedChanges": "Alterações não salvas",
+    "saveToAccountHint": "As alterações valem na hora; \"Salvar na conta\" mantém tudo na sua conta e nos outros dispositivos"
   },
   "deskModule": {
     "clock": {

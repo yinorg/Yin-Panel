@@ -25,8 +25,8 @@ const maxWidth = computed({
   set: val => panelState.panelConfig.maxWidth = Number(val),
 })
 
-function resetPanelConfig() {
-  panelState.resetPanelConfig()
+function resetLayoutConfig() {
+  panelState.resetLayoutConfig()
   savePanelConfig()
 }
 
@@ -151,20 +151,26 @@ onMounted(async () => {
     </NCard>
 
     <NCard style="border-radius:10px" class="mt-[10px]" size="small">
+      <div class="mb-2 text-xs opacity-70">
+        {{ $t('common.saveToAccountHint') }}
+      </div>
       <NPopconfirm
-        @positive-click="resetPanelConfig"
+        @positive-click="resetLayoutConfig"
       >
         <template #trigger>
           <NButton size="small" quaternary type="error">
-            {{ $t('common.reset') }}
+            {{ $t('apps.layout.reset') }}
           </NButton>
         </template>
         {{ $t('apps.baseSettings.resetWarnText') }}
       </NPopconfirm>
 
       <NButton size="small" quaternary type="success" class="ml-[10px]" @click="savePanelConfig">
-        {{ $t('common.save') }}
+        {{ $t('common.saveToAccount') }}
       </NButton>
+      <span v-if="panelState.panelConfigDirty" class="ml-[10px] text-xs" style="color:var(--yin-primary)">
+        {{ $t('common.unsavedChanges') }}
+      </span>
     </NCard>
   </div>
 </template>

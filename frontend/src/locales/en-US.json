@@ -142,10 +142,14 @@
         "dark": "Dark ",
         "light": "Light "
       }
+    ,
+      "reset": "Restore default appearance"
     },
     "layout": {
       "appName": "Layout and components",
       "components": "Components"
+    ,
+      "reset": "Restore default layout"
     },
     "instance": {
       "appName": "Instance settings",
@@ -221,6 +225,10 @@
     "verify": "Verify",
     "warning": "Warning",
     "yes": "Yes"
+  ,
+    "saveToAccount": "Save to account",
+    "unsavedChanges": "Unsaved changes",
+    "saveToAccountHint": "Changes take effect at once; \"Save to account\" keeps them with your account on your other devices"
   },
   "deskModule": {
     "clock": {

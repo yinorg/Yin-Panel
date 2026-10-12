@@ -17,10 +17,13 @@ export function usePanelConfigSave() {
 
   function savePanelConfig() {
     setUserConfig({ panel: panelState.panelConfig }).then((res) => {
-      if (res.code === 0)
+      if (res.code === 0) {
+        panelState.markPanelConfigSaved()
         ms.success(t('apps.baseSettings.configSaved'))
-      else
+      }
+      else {
         ms.error(t('apps.baseSettings.configFailed', { message: res.msg }))
+      }
     })
   }
 

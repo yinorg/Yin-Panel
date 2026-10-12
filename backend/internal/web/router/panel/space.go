@@ -964,23 +964,27 @@ func (r *SpaceRouter) Members(c *gin.Context) {
 		response.ErrorDatabase(c, err.Error())
 		return
 	}
-	// Resolve member emails in one batched query instead of one per member.
+	// Resolve member emails and nicknames in one batched query instead of one per
+	// member. The nickname is what the member list shows first, because the email
+	// alone reads as an account id.
 	userIDs := make([]uint, 0, len(records))
 	for _, record := range records {
 		userIDs = append(userIDs, record.UserID)
 	}
 	emailByID := make(map[uint]string, len(userIDs))
+	nameByID := make(map[uint]string, len(userIDs))
 	if len(userIDs) > 0 {
 		var users []repository.User
-		if err := repository.Db.Select("id", "mail").Where("id IN ?", userIDs).Find(&users).Error; err == nil {
+		if err := repository.Db.Select("id", "mail", "name").Where("id IN ?", userIDs).Find(&users).Error; err == nil {
 			for _, u := range users {
 				emailByID[u.ID] = u.Mail
+				nameByID[u.ID] = u.Name
 			}
 		}
 	}
 	members := make([]map[string]any, 0, len(records))
 	for _, record := range records {
-		members = append(members, map[string]any{"id": record.ID, "spaceId": record.SpaceID, "userId": record.UserID, "email": emailByID[record.UserID], "role": record.Role, "source": record.Source, "joinedAt": record.JoinedAt})
+		members = append(members, map[string]any{"id": record.ID, "spaceId": record.SpaceID, "userId": record.UserID, "email": emailByID[record.UserID], "name": nameByID[record.UserID], "role": record.Role, "source": record.Source, "joinedAt": record.JoinedAt})
 	}
 	response.SuccessData(c, members)
 }

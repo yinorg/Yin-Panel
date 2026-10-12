@@ -142,10 +142,14 @@
         "dark": "Sombre ",
         "light": "Clair "
       }
+    ,
+      "reset": "Restaurer l'apparence par défaut"
     },
     "layout": {
       "appName": "Mise en page et composants",
       "components": "Composants"
+    ,
+      "reset": "Restaurer la mise en page par défaut"
     },
     "instance": {
       "appName": "Paramètres de l'instance",
@@ -221,6 +225,10 @@
     "verify": "Vérifier",
     "warning": "Avertissement",
     "yes": "Oui"
+  ,
+    "saveToAccount": "Enregistrer sur le compte",
+    "unsavedChanges": "Modifications non enregistrées",
+    "saveToAccountHint": "Les modifications s'appliquent immédiatement ; « Enregistrer sur le compte » les conserve sur votre compte et vos autres appareils"
   },
   "deskModule": {
     "clock": {

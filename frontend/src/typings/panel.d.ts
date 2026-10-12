@@ -37,6 +37,10 @@ declare namespace Panel {
         leftSiderCollapsed: boolean
         networkMode:PanelStateNetworkModeEnum | null
         panelConfig:panelConfig
+        /** The config the server last confirmed. The appearance and layout pages
+         *  compare against it to tell the user what is still unsaved; null means
+         *  no server answer has arrived yet, so nothing is claimed to be dirty. */
+        savedPanelConfig?:panelConfig | null
     }
 
     interface panelConfig{

@@ -7,7 +7,7 @@ export interface SpaceOption extends SelectOption { label: string; value: number
 export interface SearchEngine { iconSrc: string; title: string; url: string }
 export interface SpaceSearchConfig { currentSearchEngine: SearchEngine }
 export interface PublicConfig { enabled: boolean; publicId: string; mode: 'direct' | 'code'; accessCode?: string }
-export interface SpaceMember { id: number; userId: number; email?: string; role: 'admin' | 'editor' | 'viewer'; source?: string }
+export interface SpaceMember { id: number; userId: number; email?: string; name?: string; role: 'admin' | 'editor' | 'viewer'; source?: string }
 export function spaceDisplayName(space: Space, spaces: Space[], currentUserId?: number) {
   if (space.type === 'personal' && space.ownerUserId === currentUserId)
     return t('spaceManage.mySpace')

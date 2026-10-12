@@ -142,10 +142,14 @@
         "dark": "Scuro ",
         "light": "Chiaro "
       }
+    ,
+      "reset": "Ripristina aspetto predefinito"
     },
     "layout": {
       "appName": "Layout e componenti",
       "components": "Componenti"
+    ,
+      "reset": "Ripristina layout predefinito"
     },
     "instance": {
       "appName": "Impostazioni dell'istanza",
@@ -221,6 +225,10 @@
     "verify": "Verifica",
     "warning": "Avviso",
     "yes": "Sì"
+  ,
+    "saveToAccount": "Salva sull'account",
+    "unsavedChanges": "Modifiche non salvate",
+    "saveToAccountHint": "Le modifiche hanno effetto immediato; \"Salva sull'account\" le mantiene sul tuo account e sugli altri dispositivi"
   },
   "deskModule": {
     "clock": {

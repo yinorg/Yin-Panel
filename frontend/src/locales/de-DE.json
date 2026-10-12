@@ -142,10 +142,14 @@
         "dark": "Dunkel ",
         "light": "Hell "
       }
+    ,
+      "reset": "Standard-Erscheinungsbild wiederherstellen"
     },
     "layout": {
       "appName": "Layout und Komponenten",
       "components": "Komponenten"
+    ,
+      "reset": "Standard-Layout wiederherstellen"
     },
     "instance": {
       "appName": "Instanz-Einstellungen",
@@ -221,6 +225,10 @@
     "verify": "Überprüfen",
     "warning": "Warnung",
     "yes": "Ja"
+  ,
+    "saveToAccount": "Im Konto speichern",
+    "unsavedChanges": "Nicht gespeicherte Änderungen",
+    "saveToAccountHint": "Änderungen wirken sofort; „Im Konto speichern“ überträgt sie auf deine anderen Geräte"
   },
   "deskModule": {
     "clock": {

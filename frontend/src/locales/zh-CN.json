@@ -142,10 +142,14 @@
         "dark": "深色 ",
         "light": "浅色 "
       }
+    ,
+      "reset": "恢复默认外观"
     },
     "layout": {
       "appName": "布局与组件",
       "components": "组件"
+    ,
+      "reset": "恢复默认布局"
     },
     "instance": {
       "appName": "实例设置",
@@ -221,6 +225,10 @@
     "verify": "验证",
     "warning": "警告",
     "yes": "是"
+  ,
+    "saveToAccount": "保存到账号",
+    "unsavedChanges": "有未保存的改动",
+    "saveToAccountHint": "改动即时生效；「保存到账号」后随账号同步到其他设备"
   },
   "deskModule": {
     "clock": {

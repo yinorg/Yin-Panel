@@ -142,10 +142,14 @@
         "dark": "Donker ",
         "light": "Licht "
       }
+    ,
+      "reset": "Standaarduiterlijk herstellen"
     },
     "layout": {
       "appName": "Indeling en onderdelen",
       "components": "Onderdelen"
+    ,
+      "reset": "Standaardindeling herstellen"
     },
     "instance": {
       "appName": "Instance-instellingen",
@@ -221,6 +225,10 @@
     "verify": "Verifiëren",
     "warning": "Waarschuwing",
     "yes": "Ja"
+  ,
+    "saveToAccount": "Opslaan in account",
+    "unsavedChanges": "Niet-opgeslagen wijzigingen",
+    "saveToAccountHint": "Wijzigingen gelden direct; \"Opslaan in account\" houdt ze bij je account op je andere apparaten"
   },
   "deskModule": {
     "clock": {

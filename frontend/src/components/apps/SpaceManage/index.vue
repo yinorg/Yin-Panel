@@ -9,8 +9,10 @@ import { fetchIconsFromExtension, getIconByUrl, iconFileFromBytes, isIconExtensi
 import { importBookmarksBatch } from '@/api/panel/space'
 import { getInstalledThemes, clearSpaceTheme, getSpaceTheme, setSpaceTheme } from '@/api/theme'
 import { searchEngineList } from '@/components/deskModule/SearchBox/engines'
+import { useConfirmAction } from '@/hooks/useConfirmAction'
 
 const message = useMessage()
+const { confirmAction } = useConfirmAction()
 const authStore = useAuthStore()
 const emit = defineEmits<{
   (e: 'spaces-changed'): void
@@ -73,8 +75,8 @@ function previewBookmarks(event: Event) { const file = (event.target as HTMLInpu
 async function confirmImport() {
   if (!selectedSpaceId.value || !bookmarkPreview.value || importing.value) return
   const count = bookmarkPreview.value.reduce((sum, group) => sum + group.items.length, 0)
-  if (count > 2000 && !window.confirm(t('spaceManage.importConfirm', { count }))) return
-  if (count > 2000 && !window.confirm(t('spaceManage.importConfirmAgain'))) return
+  if (count > 2000 && !(await confirmAction({ content: t('spaceManage.importConfirm', { count }) }))) return
+  if (count > 2000 && !(await confirmAction({ content: t('spaceManage.importConfirmAgain') }))) return
   importing.value = true
   importProgress.value = 5
   try {
@@ -99,7 +101,15 @@ async function confirmImport() {
     importProgress.value = 0
   }
 }
-function clearCurrentSpace() { if (!selectedSpaceId.value || !window.confirm(t('spaceManage.clearConfirm'))) return; clearSpace(selectedSpaceId.value).then(({ code }) => { if (code === 0) { invalidateSpaceCache(selectedSpaceId.value!); message.success(t('spaceManage.clearSuccess')); loadGroups(selectedSpaceId.value!) } }) }
+async function clearCurrentSpace() {
+  if (!selectedSpaceId.value) return
+  if (!(await confirmAction({ content: t('spaceManage.clearConfirm'), positiveText: t('spaceManage.clearSpace'), variant: 'error' }))) return
+  const { code } = await clearSpace(selectedSpaceId.value)
+  if (code !== 0) return
+  invalidateSpaceCache(selectedSpaceId.value)
+  message.success(t('spaceManage.clearSuccess'))
+  loadGroups(selectedSpaceId.value)
+}
 function load() { getSpaces<Space[]>().then(({ data }) => { spaces.value = data || []; if (spaces.value.length && !selectedSpaceId.value) selectedSpaceId.value = spaces.value[0].id; spaces.value.forEach(space => loadGroups(space.id)); if (selectedSpaceId.value) { loadGroups(selectedSpaceId.value); loadDetails(selectedSpaceId.value) } }) }
 function loadGroups(spaceId: number) { getGroups<{ id: number; title: string; parentId?: number | null }[]>(spaceId).then(({ data }) => { groups.value[spaceId] = data || [] }) }
 function loadDetails(spaceId: number) { getMembers<SpaceMember[]>(spaceId).then(({ data }) => { members.value = data || [] }); getOIDCGroups<any[]>(spaceId).then(({ data }) => { oidcRules.value = data || [] }); getPublicConfig<any>(spaceId).then(({ data }) => { publicEnabled.value = !!data?.enabled; publicId.value = data?.publicId || ''; publicMode.value = data?.mode === 'code' ? 'code' : 'direct'; publicAccessCode.value = '' }); loadSpaceTheme(spaceId); loadSearchConfig(spaceId) }
@@ -181,9 +191,16 @@ function changeMember(member: SpaceMember, role: string) { if (selectedSpaceId.v
 // space is the user's own default panel and can never be left or deleted.
 function isSpaceOwner(member: SpaceMember) { return member.userId === selected()?.ownerUserId }
 function canLeaveSpace() { return selected()?.type !== 'personal' }
+/** The nickname first, because the email alone reads as an account id; the email
+ *  stays visible as the identity the membership is keyed by. */
+function memberLabel(member: SpaceMember) {
+  const name = member.name?.trim()
+  const email = member.email?.trim() || t('spaceManage.emailMissing')
+  return name && name !== email ? `${name} · ${email}` : email
+}
 async function removeCurrentMember(member: SpaceMember) {
   if (!selectedSpaceId.value || isSpaceOwner(member)) return
-  if (!window.confirm(t('spaceManage.removeMemberConfirm'))) return
+  if (!(await confirmAction({ content: t('spaceManage.removeMemberConfirm'), positiveText: t('spaceManage.removeMember') }))) return
   const { code } = await removeMember(selectedSpaceId.value, member.userId)
   if (code !== 0) return
   message.success(t('spaceManage.removeMemberSuccess'))
@@ -191,7 +208,7 @@ async function removeCurrentMember(member: SpaceMember) {
 }
 async function leaveCurrentSpace() {
   if (!selectedSpaceId.value || !canLeaveSpace()) return
-  if (!window.confirm(t('spaceManage.leaveSpaceConfirm'))) return
+  if (!(await confirmAction({ content: t('spaceManage.leaveSpaceConfirm'), positiveText: t('spaceManage.leaveSpace'), variant: 'error' }))) return
   const { code } = await deleteSpace(selectedSpaceId.value)
   if (code !== 0) return
   message.success(t('spaceManage.leaveSpaceSuccess'))
@@ -372,7 +389,7 @@ onMounted(load)
 
           <div class="mt-4">
             <div class="flex items-center gap-2"><span class="yin-text-muted font-bold">{{ $t('spaceManage.members') }}</span><NButton size="tiny" type="primary" @click="openAddMember">{{ $t('spaceManage.addMember') }}</NButton></div>
-            <NList><NListItem v-for="member in members" :key="member.id"><NSpace justify="space-between" class="w-full" align="center"><span>{{ member.email || $t('spaceManage.emailMissing') }} ({{ member.source || 'manual' }})</span><NSpace align="center"><NSelect class="w-32" :value="member.role" :disabled="isSpaceOwner(member)" :options="[{ label: $t('spaceManage.admin'), value: 'admin' }, { label: $t('spaceManage.editor'), value: 'editor' }, { label: $t('spaceManage.viewer'), value: 'viewer' }]" @update:value="role => changeMember(member, role)" /><NButton v-if="!isSpaceOwner(member)" size="tiny" @click="removeCurrentMember(member)">{{ $t('spaceManage.removeMember') }}</NButton></NSpace></NSpace></NListItem></NList>
+            <NList><NListItem v-for="member in members" :key="member.id"><NSpace justify="space-between" class="w-full" align="center"><span>{{ memberLabel(member) }} ({{ member.source || 'manual' }})</span><NSpace align="center"><NSelect class="w-32" :value="member.role" :disabled="isSpaceOwner(member)" :options="[{ label: $t('spaceManage.admin'), value: 'admin' }, { label: $t('spaceManage.editor'), value: 'editor' }, { label: $t('spaceManage.viewer'), value: 'viewer' }]" @update:value="role => changeMember(member, role)" /><NButton v-if="!isSpaceOwner(member)" size="tiny" @click="removeCurrentMember(member)">{{ $t('spaceManage.removeMember') }}</NButton></NSpace></NSpace></NListItem></NList>
           </div>
           <NModal v-model:show="memberDialogVisible" preset="dialog" :title="$t('spaceManage.addMember')" :positive-text="$t('common.confirm')" :negative-text="$t('common.cancel')" @positive-click="addCurrentMember">
             <NSpace vertical>

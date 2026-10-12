@@ -142,10 +142,14 @@
         "dark": "어두운 ",
         "light": "밝은 "
       }
+    ,
+      "reset": "모양 기본값으로 복원"
     },
     "layout": {
       "appName": "레이아웃과 구성 요소",
       "components": "구성 요소"
+    ,
+      "reset": "레이아웃 기본값으로 복원"
     },
     "instance": {
       "appName": "인스턴스 설정",
@@ -221,6 +225,10 @@
     "verify": "확인",
     "warning": "경고",
     "yes": "예"
+  ,
+    "saveToAccount": "계정에 저장",
+    "unsavedChanges": "저장되지 않은 변경 사항",
+    "saveToAccountHint": "변경 사항은 즉시 적용됩니다. \"계정에 저장\"하면 다른 기기에도 동기화됩니다"
   },
   "deskModule": {
     "clock": {

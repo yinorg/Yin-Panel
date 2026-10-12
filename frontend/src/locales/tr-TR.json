@@ -142,10 +142,14 @@
         "dark": "Koyu ",
         "light": "Açık "
       }
+    ,
+      "reset": "Varsayılan görünüme dön"
     },
     "layout": {
       "appName": "Yerleşim ve bileşenler",
       "components": "Bileşenler"
+    ,
+      "reset": "Varsayılan yerleşime dön"
     },
     "instance": {
       "appName": "Örnek ayarları",
@@ -221,6 +225,10 @@
     "verify": "Doğrula",
     "warning": "Uyarı",
     "yes": "Evet"
+  ,
+    "saveToAccount": "Hesaba kaydet",
+    "unsavedChanges": "Kaydedilmemiş değişiklikler",
+    "saveToAccountHint": "Değişiklikler anında geçerli olur; \"Hesaba kaydet\" bunları hesabınızda ve diğer cihazlarınızda korur"
   },
   "deskModule": {
     "clock": {

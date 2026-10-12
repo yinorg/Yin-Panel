@@ -43,7 +43,56 @@ export function defaultState(): Panel.State {
     leftSiderCollapsed: false,
     networkMode: PanelStateNetworkModeEnum.wan,
     panelConfig: { ...defaultStatePanelConfig() },
+    savedPanelConfig: null,
   }
+}
+
+/**
+ * The panel keys each settings page owns.
+ *
+ * The appearance and layout pages edit different halves of one config and save it
+ * together, so "restore defaults" has to name its own half: resetting the whole
+ * config from either page would silently undo the other page's choices.
+ */
+export const appearancePanelKeys: (keyof Panel.panelConfig)[] = [
+  'logoText',
+  'logoImageSrc',
+  'iconStyle',
+  'iconTextColor',
+  'useThemeDefaults',
+  'iconTextInfoHideDescription',
+  'iconTextIconHideTitle',
+  'backgroundImageSrc',
+  'wallpaperMode',
+  'wallpaperKind',
+  'wallpaperSource',
+  'wallpaperPoster',
+  'wallpaperLibraryEntry',
+  'backgroundBlur',
+  'backgroundMaskNumber',
+]
+
+export const layoutPanelKeys: (keyof Panel.panelConfig)[] = [
+  'maxWidth',
+  'maxWidthUnit',
+  'marginX',
+  'marginTop',
+  'marginBottom',
+  'netModeChangeButtonShow',
+  'clockShowSecond',
+  'searchBoxShow',
+  'searchBoxSearchIcon',
+  'systemMonitorShow',
+  'systemMonitorShowTitle',
+  'footerHtml',
+]
+
+/** A stable signature for a config, so two objects with the same values match
+ *  regardless of the order their keys were written in. */
+export function panelConfigSignature(config?: Panel.panelConfig | null) {
+  if (!config) return ''
+  const keys = Object.keys(config) as (keyof Panel.panelConfig)[]
+  return keys.sort().map(key => `${String(key)}=${JSON.stringify(config[key])}`).join('|')
 }
 
 export function getLocalState(): Panel.State {
@@ -52,6 +101,8 @@ export function getLocalState(): Panel.State {
   state.panelConfig = { ...defaultStatePanelConfig(), ...localState?.panelConfig }
   if (!localState?.panelConfig?.wallpaperMode && localState?.panelConfig?.backgroundImageSrc)
     state.panelConfig.wallpaperMode = 'custom'
+  // The saved baseline is never restored from storage; it comes from the server.
+  state.savedPanelConfig = null
   return state
 }
 

@@ -142,10 +142,14 @@
         "dark": "Ciemny ",
         "light": "Jasny "
       }
+    ,
+      "reset": "Przywróć domyślny wygląd"
     },
     "layout": {
       "appName": "Układ i komponenty",
       "components": "Komponenty"
+    ,
+      "reset": "Przywróć domyślny układ"
     },
     "instance": {
       "appName": "Ustawienia instancji",
@@ -221,6 +225,10 @@
     "verify": "Weryfikuj",
     "warning": "Ostrzeżenie",
     "yes": "Tak"
+  ,
+    "saveToAccount": "Zapisz na koncie",
+    "unsavedChanges": "Niezapisane zmiany",
+    "saveToAccountHint": "Zmiany działają od razu; „Zapisz na koncie“ zachowa je na koncie i innych urządzeniach"
   },
   "deskModule": {
     "clock": {

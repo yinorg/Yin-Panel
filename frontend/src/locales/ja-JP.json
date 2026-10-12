@@ -142,10 +142,14 @@
         "dark": "ダーク",
         "light": "ライト"
       }
+    ,
+      "reset": "外観を既定に戻す"
     },
     "layout": {
       "appName": "レイアウトとコンポーネント",
       "components": "コンポーネント"
+    ,
+      "reset": "レイアウトを既定に戻す"
     },
     "instance": {
       "appName": "インスタンス設定",
@@ -221,6 +225,10 @@
     "verify": "確認",
     "warning": "警告",
     "yes": "はい"
+  ,
+    "saveToAccount": "アカウントに保存",
+    "unsavedChanges": "未保存の変更があります",
+    "saveToAccountHint": "変更はすぐに反映されます。「アカウントに保存」で他の端末にも同期されます"
   },
   "deskModule": {
     "clock": {

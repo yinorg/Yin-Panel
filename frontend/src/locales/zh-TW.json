@@ -142,10 +142,14 @@
         "dark": "深色 ",
         "light": "淺色 "
       }
+    ,
+      "reset": "恢復預設外觀"
     },
     "layout": {
       "appName": "版面與元件",
       "components": "元件"
+    ,
+      "reset": "恢復預設版面"
     },
     "instance": {
       "appName": "實例設定",
@@ -221,6 +225,10 @@
     "verify": "驗證",
     "warning": "警告",
     "yes": "是"
+  ,
+    "saveToAccount": "保存到帳號",
+    "unsavedChanges": "有未儲存的變更",
+    "saveToAccountHint": "變更即時生效；「保存到帳號」後跟隨帳號同步到其他裝置"
   },
   "deskModule": {
     "clock": {

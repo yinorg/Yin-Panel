@@ -142,10 +142,14 @@
         "dark": "Gelap ",
         "light": "Terang "
       }
+    ,
+      "reset": "Pulihkan tampilan bawaan"
     },
     "layout": {
       "appName": "Tata letak dan komponen",
       "components": "Komponen"
+    ,
+      "reset": "Pulihkan tata letak bawaan"
     },
     "instance": {
       "appName": "Pengaturan instans",
@@ -221,6 +225,10 @@
     "verify": "Verifikasi",
     "warning": "Peringatan",
     "yes": "Ya"
+  ,
+    "saveToAccount": "Simpan ke akun",
+    "unsavedChanges": "Perubahan belum disimpan",
+    "saveToAccountHint": "Perubahan langsung berlaku; \"Simpan ke akun\" menyimpannya di akun Anda dan perangkat lain"
   },
   "deskModule": {
     "clock": {
