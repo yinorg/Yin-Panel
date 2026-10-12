@@ -3,6 +3,8 @@ import { defaultState, defaultStatePanelConfig, getLocalState, removeLocalState,
 import { getUserConfig } from '@/api/panel/userConfig'
 import { router } from '@/router'
 import type { PanelStateNetworkModeEnum } from '@/enums'
+import { useAppStore } from '../app'
+import type { Language } from '../app/helper'
 export const usePanelState = defineStore('panel', {
   state: (): Panel.State => getLocalState() || defaultState(),
 
@@ -34,9 +36,15 @@ export const usePanelState = defineStore('panel', {
         if (res.code !== 0) return false
         const saved = res.data.panel
         this.panelConfig = { ...defaultStatePanelConfig(), ...saved }
-        if (!saved.wallpaperMode && saved.backgroundImageSrc)
+        if (!saved?.wallpaperMode && saved?.backgroundImageSrc)
           this.panelConfig.wallpaperMode = 'custom'
         this.recordState()
+        // The language the user chose belongs to the account, so it arrives with
+        // the rest of the config and outranks the browser and this device's local
+        // copy. An absent value means they never chose one, and the local
+        // resolution stands instead.
+        if (res.data.language)
+          useAppStore().setLanguage(res.data.language as Language)
         return true
       }
       catch {

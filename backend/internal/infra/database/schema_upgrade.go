@@ -89,7 +89,11 @@ func deduplicateUserConfigs(db *gorm.DB) error {
 			return err
 		}
 		for _, row := range keep {
-			if err := tx.Create(&row).Error; err != nil {
+			// This runs before AutoMigrate, so the table still has the legacy
+			// shape: a column added to the model since is not there yet. Writing
+			// one would fail the whole upgrade, so only the original columns are
+			// rewritten. A field added later must be omitted here too.
+			if err := tx.Omit("Language").Create(&row).Error; err != nil {
 				return err
 			}
 		}

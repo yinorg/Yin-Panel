@@ -47,6 +47,12 @@ type UserConfig struct {
 	// 面板样式数据
 	PanelJson string       `json:"-"`
 	Panel     *PanelConfig `gorm:"-" json:"panel"`
+
+	// The language the user chose, so the choice belongs to the account rather
+	// than to one browser's storage. Empty means "never chosen": the client then
+	// keeps whatever it already resolved, and `auto` is the explicit choice to
+	// follow the browser.
+	Language string `json:"language,omitempty"`
 }
 
 type UserConfigRepo struct {
@@ -79,8 +85,13 @@ func (r *UserConfigRepo) GetUserConfig(userId uint) (UserConfig, error) {
 // saves user configuration to database
 // It will create a new record if not exists, or update existing one
 func (r *UserConfigRepo) SaveUserConfig(config *UserConfig) error {
-	// Process JSON fields
-	config.PanelJson = util.ToJSONString(config.Panel)
+	// Process JSON fields. Only a request that carries a panel may rewrite it: a
+	// save of some other field alone would otherwise serialize the absent panel
+	// as "null" and erase the wallpaper and display settings already stored. An
+	// empty PanelJson is a zero value, so GORM leaves the existing column alone.
+	if config.Panel != nil {
+		config.PanelJson = util.ToJSONString(config.Panel)
+	}
 
 	// Check if record exists
 	if err := Db.First(&UserConfig{}, "user_id=?", config.UserId).Error; err != nil {

@@ -74,7 +74,8 @@ declare namespace Panel {
     }
 
     interface userConfig{
-        panel:panelConfig
+        panel?:panelConfig
+        language?:string
     }
 
     interface ItemIconSortRequest{

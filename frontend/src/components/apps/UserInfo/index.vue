@@ -11,6 +11,7 @@ import { updateInfo, updatePassword } from '@/api/system/user'
 import { updateLocalUserInfo } from '@/utils/cmn'
 import { t } from '@/locales'
 import { getInstalledThemes, getMyTheme, saveThemePreference } from '@/api/theme'
+import { set as setUserConfig } from '@/api/panel/userConfig'
 import { refreshMyTheme } from '@/hooks/useTheme'
 
 // 使用导入的 ApiResponse 类型
@@ -133,9 +134,17 @@ function handleLogout() {
   })
 }
 
-function handleChangeLanuage(value: Language) {
+async function handleChangeLanuage(value: Language) {
   languageValue.value = value
   appStore.setLanguage(value)
+  try {
+    // The choice belongs to the account, so it reaches the user on their next
+    // device rather than living only in this browser's storage.
+    await setUserConfig({ language: value })
+  }
+  catch {
+    // The local choice stays in effect when the save fails.
+  }
   location.reload()
 }
 

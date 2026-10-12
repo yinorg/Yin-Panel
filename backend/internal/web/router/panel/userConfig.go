@@ -25,6 +25,19 @@ import (
 // layer falls back to the theme wallpaper when one no longer resolves.
 var themeWallpaperEntryV2 = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,63}:[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`)
 
+// supportedLanguages mirrors the list the frontend offers
+// (frontend/src/store/modules/app/helper.ts). A tag the client cannot resolve
+// would silently drop the user onto the fallback locale, so an unknown one is
+// rejected rather than stored. `auto` is the explicit choice to follow the
+// browser, and an empty value means the user has never chosen.
+var supportedLanguages = map[string]bool{
+	"auto": true,
+	"en-US": true, "zh-CN": true, "zh-TW": true, "ja-JP": true, "ko-KR": true,
+	"de-DE": true, "fr-FR": true, "es-ES": true, "pt-BR": true, "ru-RU": true,
+	"id-ID": true, "tr-TR": true, "pl-PL": true, "it-IT": true, "nl-NL": true,
+	"hi-IN": true, "th-TH": true,
+}
+
 type UserConfigRouter struct {
 }
 
@@ -77,6 +90,10 @@ func (a *UserConfigRouter) SetConfig(c *gin.Context) {
 
 	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.ErrorParamFomat(c, err.Error())
+		return
+	}
+	if req.Language != "" && !supportedLanguages[req.Language] {
+		response.ErrorParamFomat(c, "invalid language")
 		return
 	}
 	if req.Panel != nil {

@@ -559,3 +559,56 @@ func TestDropLegacySchemaRemovesRetiredColumnsAndTables(t *testing.T) {
 		t.Fatalf("mail index missing after rebuild: exists=%v err=%v", exists, err)
 	}
 }
+
+// Adding a column to a model must not disturb an existing deployment: the
+// pre-migration rewrite has to keep working against the legacy table, the stored
+// values must survive, and nobody may be handed a language they never chose.
+func TestSchemaUpgradeAddsLanguageWithoutDisturbingLegacyConfigs(t *testing.T) {
+	db := openSchemaUpgradeDB(t, "adds-language.db")
+	if err := db.Exec(`CREATE TABLE user_config (user_id integer, panel_json text)`).Error; err != nil {
+		t.Fatal(err)
+	}
+	for _, statement := range []string{
+		`INSERT INTO user_config (user_id, panel_json) VALUES (1, '{"a":1}')`,
+		`INSERT INTO user_config (user_id, panel_json) VALUES (1, '{"a":2}')`,
+		`INSERT INTO user_config (user_id, panel_json) VALUES (2, '{"b":1}')`,
+	} {
+		if err := db.Exec(statement).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := prepareSchemaUpgrade(db); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.AutoMigrate(&repository.UserConfig{}); err != nil {
+		t.Fatal(err)
+	}
+
+	var configs []repository.UserConfig
+	if err := db.Order("user_id").Find(&configs).Error; err != nil {
+		t.Fatal(err)
+	}
+	if len(configs) != 2 {
+		t.Fatalf("user_config rows = %d, want 2", len(configs))
+	}
+	if configs[0].UserId != 1 || configs[0].PanelJson != `{"a":2}` {
+		t.Fatalf("user 1 config = %#v, want the surviving last row", configs[0])
+	}
+	if configs[0].Language != "" || configs[1].Language != "" {
+		t.Fatalf("the upgrade invented a language: %#v", configs)
+	}
+
+	// The column is usable once the upgrade is done, so a choice can be stored
+	// beside the panel rather than replacing it.
+	if err := db.Model(&repository.UserConfig{}).Where("user_id = ?", 1).Update("language", "en-US").Error; err != nil {
+		t.Fatal(err)
+	}
+	var reread repository.UserConfig
+	if err := db.First(&reread, "user_id = ?", 1).Error; err != nil {
+		t.Fatal(err)
+	}
+	if reread.Language != "en-US" || reread.PanelJson != `{"a":2}` {
+		t.Fatalf("after upgrade user 1 = %#v, want language en-US and the panel intact", reread)
+	}
+}
