@@ -218,6 +218,8 @@ Yin-Panel Core エディションは無償で、継続的に保守・更新さ�
 
 実行中のインスタンスは `GET /api/system/capabilities` でエディション、機能、読み取り専用状態、バージョンを確認できます。問題や提案は [GitHub Issues](https://github.com/yinorg/Yin-Panel/issues) へお寄せください。
 
+このリポジトリにマージされたコントリビューションは Core に残ります。Enterprise 版へ移されることも、再ライセンスされることもありません。詳しくは [Core と Enterprise](../../GOVERNANCE.md) を参照してください。
+
 ## クレジット
 
 Yin-Panel はオープンソースプロジェクト [hslr-s/sun-panel](https://github.com/hslr-s/sun-panel) から発展しました。プロジェクトの基盤を築いた原作者に感謝します。
@@ -228,4 +230,6 @@ Yin-Panel はオープンソースプロジェクト [hslr-s/sun-panel](https://
 
 ## ライセンス
 
-Yin-Panel は [Business Source License 1.1](../../LICENSE) でライセンスされています。個人利用または組織の内部業務での本番利用は無償です。各バージョンは初回公開から 3 年後、AGPL-3.0-or-later ライセンスに移行します。
+Yin-Panel は [Business Source License 1.1](../../LICENSE) でライセンスされています。フォーク、改変、セルフホストは無償で、組織内での利用や自社顧客への提供も含まれます。Yin-Panel 自体をホスト型サービスとして第三者に提供する場合は商用ライセンスが必要です。各バージョンは、そのバージョンの初回公開配布から 3 年後に AGPL-3.0-or-later ライセンスで利用できるようになります。詳しくは [Core と Enterprise](../../GOVERNANCE.md) を参照してください。
+
+サードパーティの通知は [THIRD-PARTY-NOTICES.md](../../THIRD-PARTY-NOTICES.md) に記載されており、コントリビューションは [Contributor License Agreement](../../CLA.md) に基づいて受け入れられます。

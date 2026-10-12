@@ -218,6 +218,8 @@ Die Core-Edition von Yin-Panel ist kostenlos und wird weiter gepflegt und aktual
 
 Eine laufende Instanz zeigt Edition, Fähigkeiten, Nur-Lese-Status und Version unter `GET /api/system/capabilities`. Probleme und Vorschläge bitte in den [GitHub Issues](https://github.com/yinorg/Yin-Panel/issues) melden.
 
+In dieses Repository übernommene Beiträge bleiben im Core: Sie werden weder hinter die Enterprise-Edition verschoben noch neu lizenziert. Siehe [Core und Enterprise](../../GOVERNANCE.md).
+
 ## Danksagung
 
 Yin-Panel entstand aus dem Open-Source-Projekt [hslr-s/sun-panel](https://github.com/hslr-s/sun-panel); Dank an den ursprünglichen Autor für das Fundament.
@@ -228,4 +230,6 @@ Dank an alle ursprünglichen Autoren, Mitwirkenden und Nutzer.
 
 ## Lizenz
 
-Yin-Panel ist unter der [Business Source License 1.1](../../LICENSE) lizenziert: Die Produktionsnutzung ist für den persönlichen Gebrauch oder für die internen Geschäftsabläufe Ihrer Organisation kostenlos. Drei Jahre nach der ersten öffentlichen Verbreitung einer Version wechselt diese Version zur AGPL-3.0-or-later-Lizenz.
+Yin-Panel ist unter der [Business Source License 1.1](../../LICENSE) lizenziert. Forken, Ändern und Selbst-Hosten sind kostenlos, einschließlich der internen Nutzung im Unternehmen und der Bereitstellung für Ihre eigenen Kunden; das Anbieten von Yin-Panel selbst als gehosteten Dienst an Dritte erfordert eine kommerzielle Lizenz. Jede Version wird drei Jahre nach ihrer eigenen ersten öffentlichen Verbreitung unter der AGPL-3.0-or-later-Lizenz verfügbar. Siehe [Core und Enterprise](../../GOVERNANCE.md).
+
+Hinweise zu Drittanbietern sind in [THIRD-PARTY-NOTICES.md](../../THIRD-PARTY-NOTICES.md) aufgeführt; Beiträge werden unter der [Contributor License Agreement](../../CLA.md) angenommen.

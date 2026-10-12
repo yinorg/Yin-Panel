@@ -21,11 +21,17 @@ COPY backend/web /app/web
 COPY backend/lang /app/lang
 COPY backend/conf.yaml.example /app/conf.yaml
 
+# The license and the third-party notices travel with every distributed copy.
+# The MIT notice for the sun-panel-derived code is a condition of the MIT grant,
+# so it has to be present in the image, not only in the repository.
+COPY LICENSE THIRD-PARTY-NOTICES.md /app/
+
 ENV TZ=Asia/Shanghai
 
 LABEL org.opencontainers.image.title="Yin-Panel" \
       org.opencontainers.image.version=$VERSION \
-      org.opencontainers.image.revision=$COMMIT
+      org.opencontainers.image.revision=$COMMIT \
+      org.opencontainers.image.licenses="BUSL-1.1"
 
 EXPOSE 3002
 

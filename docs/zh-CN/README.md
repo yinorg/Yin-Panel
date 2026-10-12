@@ -218,6 +218,8 @@ Yin-Panel Core 版本免费使用，并会持续维护和更新。本仓库是�
 
 运行中的实例可通过 `GET /api/system/capabilities` 查询发行版、能力、只读状态和版本。问题和建议请提交到 [GitHub Issues](https://github.com/yinorg/Yin-Panel/issues)。
 
+合并进本仓库的贡献永远留在 Core：不会被挪进企业版，也不会被换成其他条款再授权。详见 [Core 与企业版](../../GOVERNANCE.md)。
+
 ## 项目沿革与致谢
 
 Yin-Panel 基于开源项目 [hslr-s/sun-panel](https://github.com/hslr-s/sun-panel) 发展，感谢原作者建立了项目基础。
@@ -228,4 +230,6 @@ Yin-Panel 基于开源项目 [hslr-s/sun-panel](https://github.com/hslr-s/sun-pa
 
 ## 许可证
 
-Yin-Panel 使用 [Business Source License 1.1](../../LICENSE) 授权：个人使用或组织内部业务运营可免费用于生产环境。每个版本首次公开发布三年后，该版本将转为 AGPL-3.0-or-later 许可。
+Yin-Panel 使用 [Business Source License 1.1](../../LICENSE) 授权。Fork、修改、自托管均免费，包括组织内部使用和为自己的客户提供服务；把 Yin-Panel 本身作为托管服务提供给第三方需要商业许可。每个版本在其首次公开发布三年后，该版本转为 AGPL-3.0-or-later 许可。详见 [Core 与企业版](../../GOVERNANCE.md)。
+
+第三方声明详见 [THIRD-PARTY-NOTICES.md](../../THIRD-PARTY-NOTICES.md)，贡献依据[贡献者许可协议](../../CLA.md)接受。

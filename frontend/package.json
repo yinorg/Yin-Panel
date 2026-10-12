@@ -7,7 +7,7 @@
   },
   "packageManager": "pnpm@9.15.5",
   "description": "Yin-Panel Web",
-  "author": "BraisedHunter <95302870@qq.com>",
+  "author": "Alkaid / yinorg",
   "keywords": [
     "Yin-Panel",
     "vue"

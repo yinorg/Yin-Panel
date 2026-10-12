@@ -240,7 +240,7 @@ function handleRightMenuSelect(key: string | number) {
           :class="monitorGroup.hoverStatus ? 'opacity-100' : 'opacity-0'"
         >
           <span class="mr-2 cursor-pointer" @click="handleAddItem()">
-            <SvgIcon class="system-monitor-action-icon" icon="typcn:plus" />
+            <SvgIcon class="system-monitor-action-icon" icon="mdi:plus" />
           </span>
           <span class="mr-2 cursor-pointer" @click="handleSetSortStatus(!monitorGroup.sortStatus)">
             <SvgIcon class="system-monitor-action-icon" icon="ri:drag-drop-line" />

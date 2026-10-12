@@ -218,6 +218,8 @@ Edisi Core Yin-Panel gratis dan akan terus dipelihara serta diperbarui. Reposito
 
 Instans yang berjalan mengekspos edisi, kemampuan, status hanya-baca, dan versinya di `GET /api/system/capabilities`. Laporkan masalah dan saran di [GitHub Issues](https://github.com/yinorg/Yin-Panel/issues).
 
+Kontribusi yang digabungkan ke repositori ini tetap berada di Core: tidak dipindahkan ke edisi Enterprise dan tidak dilisensikan ulang. Lihat [Core dan Enterprise](../../GOVERNANCE.md).
+
 ## Kredit
 
 Yin-Panel tumbuh dari proyek sumber terbuka [hslr-s/sun-panel](https://github.com/hslr-s/sun-panel); terima kasih kepada penulis asli yang telah membangun fondasinya.
@@ -228,4 +230,6 @@ Terima kasih kepada semua penulis asli, kontributor, dan pengguna.
 
 ## Lisensi
 
-Yin-Panel dilisensikan di bawah [Business Source License 1.1](../../LICENSE): penggunaan produksi gratis untuk penggunaan pribadi Anda atau untuk operasi bisnis internal organisasi Anda. Tiga tahun setelah distribusi pertama yang tersedia untuk publik dari setiap versi, versi tersebut tersedia di bawah lisensi AGPL-3.0-or-later.
+Yin-Panel dilisensikan di bawah [Business Source License 1.1](../../LICENSE). Fork, modifikasi, dan hosting sendiri gratis, termasuk penggunaan internal di organisasi Anda dan melayani pelanggan Anda sendiri; menawarkan Yin-Panel itu sendiri sebagai layanan terkelola kepada pihak ketiga memerlukan lisensi komersial. Setiap versi menjadi tersedia di bawah lisensi AGPL-3.0-or-later tiga tahun setelah distribusi publik pertamanya. Lihat [Core dan Enterprise](../../GOVERNANCE.md).
+
+Pemberitahuan pihak ketiga tercantum di [THIRD-PARTY-NOTICES.md](../../THIRD-PARTY-NOTICES.md), dan kontribusi diterima berdasarkan [Contributor License Agreement](../../CLA.md).

@@ -218,6 +218,8 @@ Yin-Panel Core sürümü ücretsizdir ve bakımı ile güncellemeleri sürdürü
 
 Çalışan bir örnek; sürümünü, yeteneklerini, salt okunur durumunu ve sürüm numarasını `GET /api/system/capabilities` üzerinden sunar. Sorunları ve önerileri [GitHub Issues](https://github.com/yinorg/Yin-Panel/issues) üzerinden bildirin.
 
+Bu depoya birleştirilen katkılar Core'da kalır: Enterprise sürümüne taşınmaz ve yeniden lisanslanmaz. Bkz. [Core ve Enterprise](../../GOVERNANCE.md).
+
 ## Teşekkürler
 
 Yin-Panel, açık kaynaklı [hslr-s/sun-panel](https://github.com/hslr-s/sun-panel) projesinden doğmuştur; temeli oluşturan özgün yazara teşekkürler.
@@ -228,4 +230,6 @@ Tüm özgün yazarlara, katkıda bulunanlara ve kullanıcılara teşekkürler.
 
 ## Lisans
 
-Yin-Panel, [Business Source License 1.1](../../LICENSE) kapsamında lisanslanmıştır: üretim kullanımı, kişisel kullanımınız veya kuruluşunuzun iç iş operasyonları için ücretsizdir. Her sürümün ilk herkese açık dağıtımından üç yıl sonra, o sürüm AGPL-3.0-or-later lisansı altında kullanılabilir hale gelir.
+Yin-Panel, [Business Source License 1.1](../../LICENSE) kapsamında lisanslanmıştır. Fork'lama, değiştirme ve kendi sunucunuzda barındırma ücretsizdir; kuruluş içi kullanım ve kendi müşterilerinize hizmet verme dahildir. Yin-Panel'in kendisini üçüncü taraflara barındırılan bir hizmet olarak sunmak ticari lisans gerektirir. Her sürüm, kendi ilk herkese açık dağıtımından üç yıl sonra AGPL-3.0-or-later lisansı altında kullanılabilir hale gelir. Bkz. [Core ve Enterprise](../../GOVERNANCE.md).
+
+Üçüncü taraf bildirimleri [THIRD-PARTY-NOTICES.md](../../THIRD-PARTY-NOTICES.md) dosyasında listelenmiştir; katkılar [Contributor License Agreement](../../CLA.md) kapsamında kabul edilir.
