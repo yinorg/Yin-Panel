@@ -45,6 +45,11 @@ const apps = ref<App[]>([
     icon: 'ion-color-palette-outline',
   },
   {
+    name: t('themeWallpaper.center'),
+    componentName: 'WallpaperCenter',
+    icon: 'lucide-wallpaper',
+  },
+  {
     name: t('spaceManage.title'),
     componentName: 'SpaceManage',
     icon: 'ic-baseline-add-business',

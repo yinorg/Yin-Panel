@@ -10,9 +10,9 @@ import { getEnableStatus } from '@/api/system/systemMonitor'
 import { getSearchConfig, getSpaces, setSearchConfig, spaceOptions, type Space, type SpaceSearchConfig } from '@/api/panel/space'
 import { readSpaceCache, writeSpaceCache } from '@/utils/spaceCache'
 import { searchEngineList } from '@/components/deskModule/SearchBox/engines'
-import { beginThemeTrial, clearSpaceTheme, confirmThemeTrial, getSpaceTheme, getThemePackages, getThemeRevision, getTrustedThemeRuntimePolicy, installThemePackage, previewThemePackage, removeThemePackage, rollbackThemeTrial, saveThemePreference, setSpaceTheme, setTrustedThemeRuntimePolicy, uploadWebWallpaper } from '@/api/theme'
+import { beginThemeTrial, clearSpaceTheme, confirmThemeTrial, getSpaceTheme, getThemePackages, getThemeRevision, getTrustedThemeRuntimePolicy, installThemePackage, previewThemePackage, removeThemePackage, rollbackThemeTrial, setSpaceTheme, setTrustedThemeRuntimePolicy, uploadWebWallpaper } from '@/api/theme'
 import WallpaperCenter from '@/components/apps/WallpaperCenter/index.vue'
-import { HOME_LAYOUT_PACKAGES, homeLayoutForThemePackage, isBuiltinThemePackage, isYinThemePackage, type ThemePackage } from '@/utils/theme'
+import { isBuiltinThemePackage, type ThemePackage } from '@/utils/theme'
 import { activeThemePackageId, refreshMyTheme } from '@/hooks/useTheme'
 
 const authStore = useAuthStore()
@@ -381,38 +381,6 @@ const iconTypeOptions = [
   },
 ]
 
-const homeLayoutOptions = computed(() => [
-  { label: t('apps.baseSettings.homeLayoutStandard'), value: 'standard' },
-  { label: t('apps.baseSettings.homeLayoutDirectory'), value: 'directory' },
-])
-
-// The home layout belongs to the mounted theme package: each built-in home
-// package renders exactly one layout, so this switch is a shortcut for picking
-// one of them. It is only meaningful while one of them is active; a theme that
-// renders its own home keeps its own layout, and the switch is disabled with a
-// hint instead of silently doing nothing.
-const homeLayoutEditable = computed(() => isYinThemePackage(activeThemePackageId.value))
-const homeLayoutValue = computed(() => homeLayoutForThemePackage(activeThemePackageId.value))
-const homeLayoutSaving = ref(false)
-async function handleChangeHomeLayout(value: string) {
-  if (!homeLayoutEditable.value || homeLayoutSaving.value) return
-  const packageId = value === 'directory' ? HOME_LAYOUT_PACKAGES.directory : HOME_LAYOUT_PACKAGES.standard
-  homeLayoutSaving.value = true
-  try {
-    const result = await saveThemePreference({ packageId, mode: appStore.theme, themeMode: 'custom' })
-    if (result.code === 0) {
-      await refreshMyTheme(appStore)
-      ms.success(t('themePackage.saved'))
-    }
-    else {
-      ms.error(result.msg)
-    }
-  }
-  finally {
-    homeLayoutSaving.value = false
-  }
-}
-
 const maxWidthUnitOption = [
   {
     label: 'px',
@@ -654,15 +622,6 @@ function adoptThemeDefaults() {
     <NCard style="border-radius:10px" class="mt-[10px]" size="small">
       <div class="text-slate-500 mb-[5px] font-bold">
         {{ $t('common.icon') }}
-      </div>
-      <div class="mt-[5px]">
-        <div>{{ $t('apps.baseSettings.homeLayout') }}</div>
-        <div class="flex items-center mt-[5px]">
-          <NSelect :value="homeLayoutValue" to="body" :options="homeLayoutOptions" :disabled="!homeLayoutEditable || homeLayoutSaving" @update-value="handleChangeHomeLayout" />
-        </div>
-        <div v-if="!homeLayoutEditable" class="mt-[3px] text-xs text-slate-400">
-          {{ $t('apps.baseSettings.homeLayoutUnavailable') }}
-        </div>
       </div>
       <div class="mt-[5px]">
         <div>

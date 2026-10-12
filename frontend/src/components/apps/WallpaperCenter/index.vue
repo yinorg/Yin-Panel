@@ -135,19 +135,47 @@ onMounted(() => {
 </template>
 
 <style scoped>
+/* The picker is teleported out of the config provider, and this app redefines
+   naive-ui's `--n-*` variables as its brand colours (`--n-color` and
+   `--n-text-color` were both the target colour), so inheriting them painted the
+   active tile's label in the same colour as its own background. The picker
+   carries its own palette instead, switched by the `dark` class the app sets on
+   the document element. */
+.wallpaper-center {
+  --wpc-text: #1f2329;
+  --wpc-muted: #7d8798;
+  --wpc-border: #e6eaf2;
+  --wpc-surface: #fff;
+  --wpc-hover: #f2f5fa;
+  --wpc-preview: #eef2f9;
+  --wpc-accent: #3b6ef5;
+}
+
+.dark .wallpaper-center {
+  --wpc-text: #eef2f8;
+  --wpc-muted: #9aa4b5;
+  --wpc-border: #2b3444;
+  --wpc-surface: #1a2130;
+  --wpc-hover: #232c3b;
+  --wpc-preview: #232c3b;
+  --wpc-accent: #4f83ff;
+}
+
 .wallpaper-center-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-.wallpaper-center-title { margin: 0; font-size: 16px; font-weight: 700; }
-.wallpaper-center-tabs { display: flex; flex-wrap: wrap; gap: 6px; padding-bottom: 10px; border-bottom: 1px solid var(--n-border-color, #e6eaf2); }
-.wallpaper-center-tab { padding: 5px 14px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--n-text-color-3, #8a94a6); font-size: 13px; cursor: pointer; }
-.wallpaper-center-tab:hover { background: var(--n-action-color, rgb(0 0 0 / 4%)); }
-.wallpaper-center-tab.active { border-color: var(--n-color-target, #3b6ef5); background: var(--n-color-target, #3b6ef5); color: #fff; }
+.wallpaper-center-title { margin: 0; font-size: 16px; font-weight: 700; color: var(--wpc-text); }
+.wallpaper-center-tabs { display: flex; flex-wrap: wrap; gap: 6px; padding-bottom: 10px; border-bottom: 1px solid var(--wpc-border); }
+.wallpaper-center-tab { padding: 5px 14px; border: 1px solid transparent; border-radius: 8px; background: var(--wpc-surface); color: var(--wpc-muted); font-size: 13px; cursor: pointer; }
+.wallpaper-center-tab:hover { background: var(--wpc-hover); color: var(--wpc-text); }
+.wallpaper-center-tab.active { border-color: var(--wpc-accent); background: var(--wpc-accent); color: #fff; }
 .wallpaper-center-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-top: 12px; }
-.wallpaper-center-item { display: block; padding: 0; border: 1px solid var(--n-border-color, #e6eaf2); border-radius: 10px; background: var(--n-color, transparent); cursor: pointer; overflow: hidden; text-align: left; }
-.wallpaper-center-item:hover { border-color: var(--n-color-target, #3b6ef5); }
-.wallpaper-center-item.active { border-color: var(--n-color-target, #3b6ef5); box-shadow: 0 0 0 2px var(--n-color-target, #3b6ef5) inset; }
-.wallpaper-center-preview { display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; background: var(--n-action-color, #eef2f9); }
-.wallpaper-center-name { display: block; padding: 6px 8px; font-size: 12.5px; color: var(--n-text-color, #1f2329); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wallpaper-center-item { display: block; padding: 0; border: 1px solid var(--wpc-border); border-radius: 10px; background: var(--wpc-surface); cursor: pointer; overflow: hidden; text-align: left; }
+.wallpaper-center-item:hover { border-color: var(--wpc-accent); }
+.wallpaper-center-item.active { border-color: var(--wpc-accent); box-shadow: 0 0 0 2px var(--wpc-accent) inset; }
+.wallpaper-center-item.active .wallpaper-center-name { color: var(--wpc-accent); }
+.wallpaper-center-preview { display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; background: var(--wpc-preview); }
+.wallpaper-center-preview-empty { background: repeating-linear-gradient(135deg, var(--wpc-preview) 0 8px, var(--wpc-hover) 8px 16px); }
+.wallpaper-center-name { display: block; padding: 6px 8px; font-size: 12.5px; color: var(--wpc-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wallpaper-center-empty { margin-top: 24px; }
 .wallpaper-center-pager { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 12px; }
-.wallpaper-center-status { font-size: 12.5px; color: var(--n-text-color-3, #8a94a6); }
+.wallpaper-center-status { font-size: 12.5px; color: var(--wpc-muted); }
 </style>
