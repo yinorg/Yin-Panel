@@ -489,7 +489,14 @@ const createYinHome = yinLayout => ({
       searchButton.addEventListener('click', submitSearch)
       searchSection.append(searchContainer, engineMenu)
       searchContainer.append(engineButton, searchInput, searchClearButton, searchButton)
-      layoutNav = yinLayout.createNav(() => renderCollection())
+      layoutNav = yinLayout.createNav({
+        requestRender: () => renderCollection(),
+        toggleSide: () => togglePanelSide(),
+        canToggleSide,
+        isSideSwitching: () => sideSwitching,
+        getSide: () => snapshot?.activeSpaceSide,
+        resolveAsset: path => api.assets.resolve(path),
+      })
       status = element('p', 'yin-status')
       status.setAttribute('role', 'status')
       status.dataset.testid = 'theme-home-status'
@@ -562,9 +569,12 @@ const createYinHome = yinLayout => ({
       // fixed-position overlays (dialog, context menu) as siblings of it: a
       // transformed ancestor would otherwise become their containing block.
       const content = element('div', 'yin-content')
-      const contentNodes = [headerSection, monitorSection, status, collection, emptyState, footer]
+      const contentNodes = [headerSection, monitorSection, status, collection, footer]
       if (layoutNav) contentNodes.splice(2, 0, layoutNav)
       content.append(...contentNodes)
+      // The empty state belongs to the collection: a layout that renders a card
+      // shows it inside that card, where the message is actually readable.
+      collection.append(emptyState)
       page.append(content, groupDialog, contextMenu)
       page.addEventListener('keydown', event => {
         if (!groupDialog.hidden && event.key === 'Tab') {
@@ -1008,6 +1018,10 @@ const createYinHome = yinLayout => ({
       const itemById = new Map((snapshot.items || []).map(item => [String(item.id), item]))
       const needle = query.trim().toLocaleLowerCase()
       const usedGroups = new Set()
+      // A tab whose groups are all empty must still render its own row: hidden
+      // rows keep the list clean, but the row is also where the group is managed.
+      const tabHasItems = !yinLayout.hideEmptyGroups
+        || visibleGroups.some(({ group }) => (group.itemIds || []).some(itemId => itemById.has(String(itemId))))
       for (const { group, depth } of visibleGroups) {
         const section = groupNodes.get(String(group.id)) || createGroupNode(group)
         groupNodes.set(String(group.id), section)
@@ -1061,7 +1075,10 @@ const createYinHome = yinLayout => ({
           return item && (!needle || presentation.search?.itemFilterEnabled === false
             || `${item.title || ''} ${item.description || ''}`.toLocaleLowerCase().includes(needle))
         })
-        section.hidden = !!needle && presentation.search?.itemFilterEnabled !== false && !hasVisibleItem
+        const hasAnyItem = (group.itemIds || []).some(itemId => itemById.has(String(itemId)))
+        const emptyRow = yinLayout.hideEmptyGroups === true && !hasAnyItem && !(depth === 0 && !tabHasItems)
+        section.hidden = emptyRow
+          || (!!needle && presentation.search?.itemFilterEnabled !== false && !hasVisibleItem)
         yinLayout.decorateGroup(section, group, depth)
         collection.append(section)
         usedGroups.add(String(group.id))
@@ -1069,6 +1086,8 @@ const createYinHome = yinLayout => ({
       for (const [key, section] of groupNodes) {
         if (!usedGroups.has(key)) section.remove()
       }
+      // Re-appending a group moves it to the end, so keep the empty state last.
+      collection.append(emptyState)
       emptyState.hidden = snapshot.status === 'loading' || visibleGroups.some(({ group }) => {
         const section = groupNodes.get(String(group.id))
         return section && !section.hidden && section._yin.list.children.length > 0

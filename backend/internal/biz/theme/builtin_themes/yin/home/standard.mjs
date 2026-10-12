@@ -4,6 +4,7 @@ const yinHomeLayout = {
   kind: 'standard',
   collectionGap: 24,
   allowDragEdit: true,
+  hideEmptyGroups: false,
   createNav: () => null,
   refreshNav: () => {},
   visibleGroups: groups => (groups || []).map(group => ({ group, depth: 0 })),

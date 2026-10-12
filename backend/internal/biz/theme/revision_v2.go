@@ -928,12 +928,12 @@ func EnsureBuiltinV2(db *gorm.DB) error {
 }
 
 func builtinPackagesV2() []*PackageV2 {
-	// The default and directory packages are the same visual family and share one
-	// palette; only their identity and their home layout differ.
+	// Yin keeps its own visual language. The directory package ships its own
+	// palette instead: a light blue-grey page with a plain white panel and one
+	// solid accent, which is what makes it read as a distinct theme rather than a
+	// Yin layout variant.
 	yinHome := builtinPaletteV2{"org.yin.default", "Yin", map[string]string{"canvas": "#f4f7f8", "surface": "#ffffff", "text": "#20282c", "muted": "#64737a", "border": "#d8e0e3", "primary": "#176b80"}, map[string]string{"canvas": "#171d20", "surface": "#22292c", "text": "#f2f5f6", "muted": "#b7c1c4", "border": "#536066", "primary": "#78c5d4"}, "8px", "16px", "0 8px 24px #18242a22", "180ms", []string{"Inter", "system-ui", "sans-serif"}, 1, 1, 0, 0, 0, 0, "16px", "70px"}
-	directoryHome := yinHome
-	directoryHome.id = "org.yin.directory"
-	directoryHome.name = "目录"
+	directoryHome := builtinPaletteV2{"org.yin.directory", "目录", map[string]string{"canvas": "#eef2f9", "surface": "#ffffff", "text": "#1f2329", "muted": "#8a94a6", "border": "#e6eaf2", "primary": "#3b6ef5"}, map[string]string{"canvas": "#0f1319", "surface": "#1a2130", "text": "#eef2f8", "muted": "#9aa4b5", "border": "#2b3444", "primary": "#4f83ff"}, "8px", "16px", "0 8px 24px #18242a1f", "180ms", []string{"Inter", "system-ui", "sans-serif"}, 1, 1, 0, 0, 0, 0, "16px", "70px"}
 	palettes := []builtinPaletteV2{
 		yinHome,
 		directoryHome,
@@ -950,9 +950,9 @@ func builtinPackagesV2() []*PackageV2 {
 			// Bump whenever a home resource changes; a published version is
 			// immutable, so reusing it would abort startup. The directory package
 			// starts its own version line because it is a new package.
-			version = "2.3.82"
+			version = "2.3.86"
 			if palette.id == "org.yin.directory" {
-				version = "2.4.0"
+				version = "2.10.2"
 			}
 			requiredPermissions = append(requiredPermissions,
 				PermissionV2{Name: "items.write"},

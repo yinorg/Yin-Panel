@@ -369,9 +369,9 @@ func TestBuiltinPackagesV2AreCompleteDTCGAndRepeatable(t *testing.T) {
 		wantVersion := "2.3.3"
 		switch summary.ID {
 		case "org.yin.default":
-			wantVersion = "2.3.82"
+			wantVersion = "2.3.86"
 		case "org.yin.directory":
-			wantVersion = "2.4.0"
+			wantVersion = "2.10.2"
 		}
 		if pkg.Manifest.Version != wantVersion {
 			t.Errorf("%s builtin version = %q, want %q", summary.ID, pkg.Manifest.Version, wantVersion)
@@ -436,15 +436,15 @@ func TestBuiltinHomeAssetsLoadFromPackagedThemeSources(t *testing.T) {
 func TestBuiltinHomeResourceHashesPinTheEmbeddedThemes(t *testing.T) {
 	expected := map[string]map[string]string{
 		"org.yin.default": {
-			// 默认主题拆成「shell + standard 布局」，视图哈希随之改变；样式表移出
-			// 目录规则后也变。
-			"views/home.mjs":  "42aaf065d0598dd6e1b8c31dd805f7074246f031e85941b43e0015970149d526",
+			// shell 增加了布局钩子（空组隐藏、导航动作对象），视图哈希随之改变；
+			// 样式表未动。
+			"views/home.mjs":  "901a5f3ae238bcc37b2176c7c7a955adbaafdbd5f56879f371e8fc00d7251dbc",
 			"styles/home.css": "b9c2dc1c6408a9d95b660f9f744fb241017673630174d071589abdbf7dbf0f57",
 		},
 		"org.yin.directory": {
-			// 目录主题是「shell + directory 布局」，样式为共享样式表加目录样式表。
-			"views/home.mjs":  "17f4043d0fbc73c37e0f469a9b4002255f66962f80b4ce448cac7861498ef177",
-			"styles/home.css": "fea4b4150ffbb360b6aef22d42f5e0d357d392b66dbf85ee75a9434ff2ee5a5c",
+			// 目录主题改为「标签页 + 行标签 + 书签网格 + 行内分组菜单」。
+			"views/home.mjs":  "a33ce40f2dbc72bb780121809a39990a24bc3112d1dfbf8d56d37437c98f8a26",
+			"styles/home.css": "0bea421b75c5bbd6a6b6b285a4206b5e396cff130f8f6bcfa9dc88c2c9efecc8",
 		},
 		"org.yin.glass": {
 			// Glass 复用 shared/home.mjs 与 shared/home.css，两者都改了。
@@ -454,9 +454,8 @@ func TestBuiltinHomeResourceHashesPinTheEmbeddedThemes(t *testing.T) {
 	}
 	for id, want := range expected {
 		resources := builtinHomeResourcesV2(id)
-		if len(resources) != len(want) {
-			t.Errorf("%s resource count = %d, want %d", id, len(resources), len(want))
-		}
+		// The directory package also ships the wallpaper catalogue, so only the
+		// pinned entries are compared rather than the total resource count.
 		for path, wantHash := range want {
 			resource, ok := resources[path]
 			if !ok {
@@ -516,7 +515,7 @@ func TestEnsureBuiltinV2UpgradesOnlyActivationForSelectedBuiltin(t *testing.T) {
 		t.Fatal(err)
 	}
 	latest, err := LatestPackageRevisionV2(db, "org.yin.default")
-	if err != nil || latest.Version != "2.3.82" || activation.ActiveRevisionID != latest.ID {
+	if err != nil || latest.Version != "2.3.86" || activation.ActiveRevisionID != latest.ID {
 		t.Fatalf("selected builtin activation = %+v, latest=%s, err=%v", activation, latest.ID, err)
 	}
 	if latest.ID == old.Revision {

@@ -137,17 +137,14 @@ async function start() {
 
     const script = await loadTextResource(props.theme, scriptPath, 'text/javascript')
     const assets: Record<string, string> = {}
+    // Media resources resolve to the revision's own asset URL rather than being
+    // downloaded and blobbed on mount: a wallpaper catalogue is hundreds of
+    // images and only the one on screen should ever be fetched. The URL is
+    // same-origin, so the app's `img-src 'self'` policy already covers it.
     for (const resource of manifest.resources || []) {
-      if (!isThemeMediaResource(resource.mediaType)) continue
-      const bytes = await loadResource(props.theme, resource, 48 * 1024 * 1024)
-      if (resource.mediaType === 'image/svg+xml') {
-        assets[resource.path] = new URL(resource.url!, window.location.origin).href
+      if (!isThemeMediaResource(resource.mediaType) || !resource.url)
         continue
-      }
-      const blob = new Blob([bytes], { type: resource.mediaType })
-      const url = URL.createObjectURL(blob)
-      createdAssetURLs.push(url)
-      assets[resource.path] = url
+      assets[resource.path] = new URL(resource.url, window.location.origin).href
     }
     const styles: ThemeSandboxStylesheet[] = []
     for (const stylePath of manifest.entrypoints?.styles || []) {

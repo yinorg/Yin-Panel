@@ -3,9 +3,10 @@ package theme
 import (
 	"embed"
 	"fmt"
+	"io/fs"
 )
 
-//go:embed builtin_themes/shared/home.mjs builtin_themes/shared/home.css builtin_themes/yin/home/*.mjs builtin_themes/yin/styles/theme-home.css builtin_themes/yin/styles/directory.css builtin_themes/*/styles/home.css
+//go:embed builtin_themes/shared/home.mjs builtin_themes/shared/home.css builtin_themes/yin/home/*.mjs builtin_themes/yin/styles/theme-home.css builtin_themes/yin/styles/directory.css builtin_themes/yin/wallpapers/*/*.jpg builtin_themes/*/styles/home.css
 var builtinThemeFiles embed.FS
 
 // builtinHomeSpecV2 describes how one built-in home package is assembled. The
@@ -44,30 +45,72 @@ func builtinHomeResourcesV2(id string) map[string]ResourceData {
 	if err != nil {
 		panic(fmt.Sprintf("missing built-in theme stylesheet for %q: %v", id, err))
 	}
-	return map[string]ResourceData{
+	resources := map[string]ResourceData{
 		"views/home.mjs":  {MediaType: "text/javascript", Content: view},
 		"styles/home.css": {MediaType: "text/css", Content: style},
 	}
+	if spec.layout == "directory" {
+		for path, asset := range builtinWallpaperResourcesV2() {
+			resources[path] = asset
+		}
+	}
+	return resources
+}
+
+// builtinWallpaperResourcesV2 walks the packaged wallpaper images. They are
+// resources rather than part of the view because the runtime resolves each one
+// by URL, so only the wallpaper actually on screen is ever fetched.
+func builtinWallpaperResourcesV2() map[string]ResourceData {
+	resources := map[string]ResourceData{}
+	groups, err := fs.ReadDir(builtinThemeFiles, "builtin_themes/yin/wallpapers")
+	if err != nil {
+		return resources
+	}
+	for _, group := range groups {
+		if !group.IsDir() {
+			continue
+		}
+		files, err := fs.ReadDir(builtinThemeFiles, "builtin_themes/yin/wallpapers/"+group.Name())
+		if err != nil {
+			continue
+		}
+		for _, file := range files {
+			if file.IsDir() {
+				continue
+			}
+			content, err := builtinThemeFiles.ReadFile("builtin_themes/yin/wallpapers/" + group.Name() + "/" + file.Name())
+			if err != nil {
+				continue
+			}
+			resources["wallpapers/"+group.Name()+"/"+file.Name()] = ResourceData{MediaType: "image/jpeg", Content: content}
+		}
+	}
+	return resources
 }
 
 // builtinHomeViewV2 returns the shared view for an empty layout, and the shared
-// shell composed with one layout module otherwise.
+// shell composed with the layout's own modules otherwise. The directory layout
+// also carries the wallpaper implementations, which only it uses.
 func builtinHomeViewV2(layout string) ([]byte, error) {
 	if layout == "" {
 		return builtinThemeFiles.ReadFile("builtin_themes/shared/home.mjs")
 	}
-	shell, err := builtinThemeFiles.ReadFile("builtin_themes/yin/home/shell.mjs")
-	if err != nil {
-		return nil, err
+	sources := []string{"builtin_themes/yin/home/shell.mjs"}
+	if layout == "directory" {
+		sources = append(sources, "builtin_themes/yin/home/wallpapers.mjs", "builtin_themes/yin/home/wallpapers-catalogue.mjs")
 	}
-	module, err := builtinThemeFiles.ReadFile("builtin_themes/yin/home/" + layout + ".mjs")
-	if err != nil {
-		return nil, err
+	sources = append(sources, "builtin_themes/yin/home/"+layout+".mjs")
+	var view []byte
+	for index, path := range sources {
+		part, err := builtinThemeFiles.ReadFile(path)
+		if err != nil {
+			return nil, err
+		}
+		if index > 0 {
+			view = append(view, '\n')
+		}
+		view = append(view, part...)
 	}
-	view := make([]byte, 0, len(shell)+len(module)+64)
-	view = append(view, shell...)
-	view = append(view, '\n')
-	view = append(view, module...)
 	view = append(view, []byte("\nexport default createYinHome(yinHomeLayout)\n")...)
 	return view, nil
 }
