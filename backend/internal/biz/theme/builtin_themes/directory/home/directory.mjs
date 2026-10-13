@@ -111,7 +111,17 @@ const yinHomeLayout = (() => {
         button = element('button', 'directory-folder-button')
         button.type = 'button'
         button.addEventListener('click', () => {
-          if (editing) { activateRoot(button.dataset.groupId); return }
+          // In edit mode the active tab is already the one on screen, so clicking
+          // it renames that root instead of switching to it.
+          if (editing) {
+            if (String(button.dataset.groupId) === String(rootId)) {
+              const section = sections.get(String(button.dataset.groupId))
+              const rename = section && section._yin && section._yin.editGroup
+              if (rename) { rename.click(); return }
+            }
+            activateRoot(button.dataset.groupId)
+            return
+          }
           rootId = button.dataset.groupId
           requestRender()
         })
@@ -127,6 +137,14 @@ const yinHomeLayout = (() => {
       button.textContent = group.title || 'Untitled group'
       button.classList.toggle('active', key === rootId)
       button.setAttribute('aria-pressed', key === rootId ? 'true' : 'false')
+      // The active tab is the one a user reaches for, and in edit mode it is the
+      // only tab that renames its root, so it is the only one that says so. The
+      // wording comes off the shell's rename button, which is already localised.
+      const section = sections.get(key)
+      const rename = section && section._yin && section._yin.editGroup
+      const renameLabel = rename && rename.getAttribute('aria-label')
+      if (editing && key === rootId && renameLabel) button.title = renameLabel
+      else button.removeAttribute('title')
       tabs.append(button)
     }
     for (const [key, button] of nodes) {

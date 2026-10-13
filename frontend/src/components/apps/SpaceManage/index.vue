@@ -384,7 +384,7 @@ onMounted(load)
         <NCard v-if="selectedSpaceId" size="small" :title="$t('spaceManage.sectionContent')">
           <div class="w-full">
             <div class="flex items-center gap-2"><span>{{ $t('spaceManage.groups') }}</span><NButton size="tiny" type="primary" @click="openAddGroup(selectedSpaceId!)">{{ $t('spaceManage.addGroup') }}</NButton><span v-if="!groups[selectedSpaceId]?.length" class="yin-text-muted">{{ $t('common.noData') }}</span></div>
-            <NSpace vertical size="small" class="mt-1"><NButton v-for="group in groups[selectedSpaceId]" :key="group.id" size="tiny" secondary @click="editGroup(selectedSpaceId!, group)">{{ group.title }}{{ group.parentId ? ` ${$t('spaceManage.childGroupLabel')}` : '' }}</NButton></NSpace>
+            <NList class="mt-1"><NListItem v-for="group in groups[selectedSpaceId]" :key="group.id"><NSpace justify="space-between" align="center" class="w-full"><span>{{ group.title }}{{ group.parentId ? ` ${$t('spaceManage.childGroupLabel')}` : '' }}</span><NButton data-testid="group-rename" size="tiny" @click="editGroup(selectedSpaceId!, group)">{{ $t('common.edit') }}</NButton></NSpace></NListItem></NList>
           </div>
           <NModal v-model:show="groupDialogVisible" preset="dialog" :title="editing ? $t('common.edit') : $t('spaceManage.addGroup')" :positive-text="$t('common.confirm')" :negative-text="$t('common.cancel')" @positive-click="saveGroup(selectedSpaceId!)">
             <NSpace vertical>

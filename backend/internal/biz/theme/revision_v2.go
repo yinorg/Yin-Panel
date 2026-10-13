@@ -957,7 +957,7 @@ func builtinPackagesV2() []*PackageV2 {
 			version = "2.3.94"
 			homeLayout = &HomeLayoutV2{Kind: "standard", Editable: true}
 			if palette.id == "org.yin.directory" {
-				version = "2.11.12"
+				version = "2.11.14"
 				homeLayout = &HomeLayoutV2{Kind: "directory", Editable: true}
 			}
 			requiredPermissions = append(requiredPermissions,

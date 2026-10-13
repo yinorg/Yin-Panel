@@ -371,7 +371,7 @@ func TestBuiltinPackagesV2AreCompleteDTCGAndRepeatable(t *testing.T) {
 		case "org.yin.default":
 			wantVersion = "2.3.94"
 		case "org.yin.directory":
-			wantVersion = "2.11.12"
+			wantVersion = "2.11.14"
 		}
 		if pkg.Manifest.Version != wantVersion {
 			t.Errorf("%s builtin version = %q, want %q", summary.ID, pkg.Manifest.Version, wantVersion)
@@ -449,7 +449,7 @@ func TestBuiltinHomeResourceHashesPinTheEmbeddedThemes(t *testing.T) {
 			// 悬停打开文件夹，根分组由标签拖拽排序。
 			// 收集态的图标方块只有 20px，而文字层原先按 70px 硬编码，
 			// 多字标签会被裁成中间的一条；现在文字层跟随方块尺寸，并只画一个字。
-			"views/home.mjs":  "bfc946acb232d28f0c74ebbdb9b9f7e0df7d534a3e9da50961aa61b358f94acb",
+			"views/home.mjs":  "8df6900ec3218ba49c6091711eeeb8fc44a3b39748497b740a9f3a7f149cfa7d",
 			"styles/home.css": "c7a1e6bec089f5cb2c012fa955aea1fad4fc5a299dbdc7a7c67c956b27a09aae",
 		},
 		"org.yin.glass": {
