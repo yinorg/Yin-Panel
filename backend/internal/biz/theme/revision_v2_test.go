@@ -371,7 +371,7 @@ func TestBuiltinPackagesV2AreCompleteDTCGAndRepeatable(t *testing.T) {
 		case "org.yin.default":
 			wantVersion = "2.3.94"
 		case "org.yin.directory":
-			wantVersion = "2.11.11"
+			wantVersion = "2.11.12"
 		}
 		if pkg.Manifest.Version != wantVersion {
 			t.Errorf("%s builtin version = %q, want %q", summary.ID, pkg.Manifest.Version, wantVersion)
@@ -447,8 +447,10 @@ func TestBuiltinHomeResourceHashesPinTheEmbeddedThemes(t *testing.T) {
 			// 目录主题改为「标签页 + 行标签 + 书签网格 + 行内分组菜单」，
 			// 编辑模式保持文件夹视图：整棵树在 DOM 中、只显示打开的根，
 			// 悬停打开文件夹，根分组由标签拖拽排序。
-			"views/home.mjs":  "6e8be4ade38740ace0ab907f71b6406056c68453f191e78851bec2381dc3e4c8",
-			"styles/home.css": "151ce0edcf3e67ef4ea5fc4264ca1fd5e6ddd0c13f3b17d1a3d7439c92d429be",
+			// 收集态的图标方块只有 20px，而文字层原先按 70px 硬编码，
+			// 多字标签会被裁成中间的一条；现在文字层跟随方块尺寸，并只画一个字。
+			"views/home.mjs":  "bfc946acb232d28f0c74ebbdb9b9f7e0df7d534a3e9da50961aa61b358f94acb",
+			"styles/home.css": "c7a1e6bec089f5cb2c012fa955aea1fad4fc5a299dbdc7a7c67c956b27a09aae",
 		},
 		"org.yin.glass": {
 			// Glass 复用 shared/home.mjs 与 shared/home.css，两者都改了。

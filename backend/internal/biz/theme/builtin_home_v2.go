@@ -5,26 +5,31 @@ import (
 	"fmt"
 )
 
-//go:embed builtin_themes/shared/home.mjs builtin_themes/shared/home.css builtin_themes/yin/home/*.mjs builtin_themes/yin/styles/theme-home.css builtin_themes/yin/styles/directory.css builtin_themes/*/styles/home.css
+//go:embed builtin_themes/shared/home.mjs builtin_themes/shared/home.css builtin_themes/yin/styles/theme-home.css builtin_themes/*/home/*.mjs builtin_themes/*/styles/home.css
 var builtinThemeFiles embed.FS
 
-// builtinHomeSpecV2 describes how one built-in home package is assembled. The
-// two Yin packages share a single layout-agnostic shell and differ only in the
-// layout module concatenated after it, so the default package never ships the
-// directory layout code and the directory package never ships the standard one.
+// builtinHomeSpecV2 describes how one built-in home package is assembled. A
+// package owns everything it renders — its shell, its layout module and its
+// stylesheets all come from its own directory — so its revision, which is
+// immutable once published, covers exactly the bytes it ships. Two packages
+// sharing a source file would make that promise untrue: a change for one would
+// move the other's version as well.
 type builtinHomeSpecV2 struct {
-	layout string   // layout module under builtin_themes/yin/home/, or "" for the shared view
+	layout string   // layout module at <home>/home/<layout>.mjs, or "" for the shared view
+	home   string   // source root holding this package's home/ and styles/
 	styles []string // stylesheet sources, concatenated in order
 }
 
 var builtinHomeSpecsV2 = map[string]builtinHomeSpecV2{
 	"org.yin.default": {
 		layout: "standard",
+		home:   "builtin_themes/yin",
 		styles: []string{"builtin_themes/yin/styles/theme-home.css"},
 	},
 	"org.yin.directory": {
 		layout: "directory",
-		styles: []string{"builtin_themes/yin/styles/theme-home.css", "builtin_themes/yin/styles/directory.css"},
+		home:   "builtin_themes/directory",
+		styles: []string{"builtin_themes/directory/styles/home.css"},
 	},
 	"org.yin.glass": {
 		styles: []string{"builtin_themes/shared/home.css", "builtin_themes/glass/styles/home.css"},
@@ -36,7 +41,7 @@ func builtinHomeResourcesV2(id string) map[string]ResourceData {
 	if !ok {
 		panic(fmt.Sprintf("unknown built-in theme %q", id))
 	}
-	view, err := builtinHomeViewV2(spec.layout)
+	view, err := builtinHomeViewV2(spec.home, spec.layout)
 	if err != nil {
 		panic(fmt.Sprintf("missing built-in theme view for %q: %v", id, err))
 	}
@@ -51,14 +56,13 @@ func builtinHomeResourcesV2(id string) map[string]ResourceData {
 	return resources
 }
 
-
-// builtinHomeViewV2 returns the shared view for an empty layout, and the shared
-// shell composed with the layout's own modules otherwise.
-func builtinHomeViewV2(layout string) ([]byte, error) {
+// builtinHomeViewV2 returns the shared view for an empty layout, and the
+// package's own shell composed with its layout module otherwise.
+func builtinHomeViewV2(home, layout string) ([]byte, error) {
 	if layout == "" {
 		return builtinThemeFiles.ReadFile("builtin_themes/shared/home.mjs")
 	}
-	sources := []string{"builtin_themes/yin/home/shell.mjs", "builtin_themes/yin/home/" + layout + ".mjs"}
+	sources := []string{home + "/home/shell.mjs", home + "/home/" + layout + ".mjs"}
 	var view []byte
 	for index, path := range sources {
 		part, err := builtinThemeFiles.ReadFile(path)
