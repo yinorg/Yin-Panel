@@ -354,6 +354,7 @@
     "importConfirm": "About to import {count} items. Continue?",
     "importConfirmAgain": "This is the second confirmation. Import the bookmarks?",
     "importSuccess": "Bookmarks imported successfully",
+    "importIconFallback": "{count} sites had no favicon; text icons were used",
     "clearConfirm": "Clear all groups and items in this space?",
     "clearSuccess": "Space cleared",
     "publicIdInvalid": "FN ID must be 6-30 lowercase letters, numbers, or hyphens",

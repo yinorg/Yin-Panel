@@ -17,8 +17,19 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
-func GetOneFaviconURL(urlStr string) (string, error) {
-	iconURLs, err := getFaviconURL(urlStr)
+const (
+	// A page fetch is discovery only, so it stays well inside the caller's budget.
+	faviconPageTimeout = 8 * time.Second
+	// The icon itself can be larger, but a stalled host must still free its slot.
+	faviconImageTimeout = 10 * time.Second
+)
+
+// ErrIconUnavailable separates "this site serves no icon" — an answer the caller
+// acts on with a text fallback — from a transport failure, which is a real fault.
+var ErrIconUnavailable = errors.New("icon unavailable")
+
+func GetOneFaviconURL(ctx context.Context, urlStr string) (string, error) {
+	iconURLs, err := getFaviconURL(ctx, urlStr)
 	if err != nil {
 		return "", err
 	}
@@ -38,19 +49,19 @@ func GetOneFaviconURL(urlStr string) (string, error) {
 			return resolved.String(), nil
 		}
 	}
-	return "", fmt.Errorf("not found ico")
+	return "", ErrIconUnavailable
 }
 
 // 下载图片
 func DownloadImage(ctx context.Context, url string) (string, error) {
 	// 创建请求
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return "", err
 	}
 
 	// 发送请求
-	client := &http.Client{Timeout: 10 * time.Second}
+	client := &http.Client{Timeout: faviconImageTimeout}
 	response, err := client.Do(req)
 	if err != nil {
 		return "", err
@@ -89,11 +100,11 @@ func DownloadImage(ctx context.Context, url string) (string, error) {
 	return fileName, nil
 }
 
-func getFaviconURL(pageURLString string) ([]string, error) {
+func getFaviconURL(ctx context.Context, pageURLString string) ([]string, error) {
 	var icons []string
 	icons = make([]string, 0)
-	client := &http.Client{}
-	req, err := http.NewRequest("GET", pageURLString, nil)
+	client := &http.Client{Timeout: faviconPageTimeout}
+	req, err := http.NewRequestWithContext(ctx, "GET", pageURLString, nil)
 	if err != nil {
 		return icons, err
 	}
@@ -140,7 +151,7 @@ func getFaviconURL(pageURLString string) ([]string, error) {
 		if parseErr == nil && pageURL.Scheme != "" && pageURL.Host != "" {
 			return []string{pageURL.Scheme + "://" + pageURL.Host + "/favicon.ico"}, nil
 		}
-		return icons, errors.New("favicon not found on the page")
+		return icons, ErrIconUnavailable
 	}
 
 	return icons, nil

@@ -354,6 +354,7 @@
     "importConfirm": "Za chwilę zaimportowanych zostanie {count} elementów. Kontynuować?",
     "importConfirmAgain": "To drugie potwierdzenie. Zaimportować zakładki?",
     "importSuccess": "Zakładki zaimportowane pomyślnie",
+    "importIconFallback": "Brak favikony dla {count} witryn; użyto ikon tekstowych",
     "clearConfirm": "Wyczyścić wszystkie grupy i elementy w tej przestrzeni?",
     "clearSuccess": "Przestrzeń wyczyszczona",
     "publicIdInvalid": "FN ID musi składać się z 6-30 małych liter, cyfr lub myślników",

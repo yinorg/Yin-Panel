@@ -354,6 +354,7 @@
     "importConfirm": "Er worden {count} items geïmporteerd. Doorgaan?",
     "importConfirmAgain": "Dit is de tweede bevestiging. Bladwijzers importeren?",
     "importSuccess": "Bladwijzers succesvol geïmporteerd",
+    "importIconFallback": "{count} sites zonder favicon; er zijn tekstpictogrammen gebruikt",
     "clearConfirm": "Alle groepen en items in deze ruimte wissen?",
     "clearSuccess": "Ruimte gewist",
     "publicIdInvalid": "FN ID moet bestaan uit 6-30 kleine letters, cijfers of koppeltekens",

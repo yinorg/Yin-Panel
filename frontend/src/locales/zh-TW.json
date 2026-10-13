@@ -401,6 +401,7 @@
     "importConfirm": "即將導入 {count} 個項目，確認繼續嗎？",
     "importConfirmAgain": "這是第二次確認：確認執行書籤導入嗎？",
     "importSuccess": "書籤導入成功",
+    "importIconFallback": "有 {count} 個站點未取得圖示，已改用文字圖示",
     "clearConfirm": "確認清空當前空間的全部分組和項目嗎？",
     "clearSuccess": "空間已清空",
     "publicIdInvalid": "FN ID需為6-30位小寫字母、數字或連字符",

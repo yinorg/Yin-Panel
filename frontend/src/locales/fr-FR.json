@@ -401,6 +401,7 @@
     "importConfirm": "Importation imminente de {count} éléments. Continuer ?",
     "importConfirmAgain": "Deuxième confirmation. Importer les signets ?",
     "importSuccess": "Signets importés avec succès",
+    "importIconFallback": "{count} sites sans favicon ; des icônes textuelles ont été utilisées",
     "clearConfirm": "Vider tous les groupes et éléments de cet espace ?",
     "clearSuccess": "Espace vidé",
     "publicIdInvalid": "L'ID FN doit comporter 6 à 30 lettres minuscules, chiffres ou tirets",

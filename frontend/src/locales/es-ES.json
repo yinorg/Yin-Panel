@@ -401,6 +401,7 @@
     "importConfirm": "Se van a importar {count} elementos. ¿Continuar?",
     "importConfirmAgain": "Esta es la segunda confirmación. ¿Importar los marcadores?",
     "importSuccess": "Marcadores importados correctamente",
+    "importIconFallback": "{count} sitios sin favicon; se usaron iconos de texto",
     "clearConfirm": "¿Vaciar todos los grupos y elementos de este espacio?",
     "clearSuccess": "Espacio vaciado",
     "publicIdInvalid": "El FN ID debe tener entre 6 y 30 letras minúsculas, números o guiones",

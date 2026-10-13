@@ -354,6 +354,7 @@
     "importConfirm": "{count} öğe içe aktarılmak üzere. Devam edilsin mi?",
     "importConfirmAgain": "Bu ikinci onaydır. Yer işaretleri içe aktarılsın mı?",
     "importSuccess": "Yer işaretleri başarıyla içe aktarıldı",
+    "importIconFallback": "{count} sitede favicon bulunamadı; metin simgeleri kullanıldı",
     "clearConfirm": "Bu alandaki tüm gruplar ve öğeler temizlensin mi?",
     "clearSuccess": "Alan temizlendi",
     "publicIdInvalid": "FN ID 6-30 küçük harf, sayı veya tire olmalıdır",

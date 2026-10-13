@@ -401,6 +401,7 @@
     "importConfirm": "Es werden {count} Einträge importiert. Fortfahren?",
     "importConfirmAgain": "Dies ist die zweite Bestätigung. Lesezeichen importieren?",
     "importSuccess": "Lesezeichen erfolgreich importiert",
+    "importIconFallback": "{count} Websites ohne Favicon; es wurden Textsymbole verwendet",
     "clearConfirm": "Alle Gruppen und Einträge in diesem Bereich leeren?",
     "clearSuccess": "Bereich geleert",
     "publicIdInvalid": "Die FN ID muss aus 6-30 Kleinbuchstaben, Zahlen oder Bindestrichen bestehen",

@@ -13,6 +13,10 @@ export interface HttpOption {
   headers?: any
   onDownloadProgress?: (progressEvent: AxiosProgressEvent) => void
   signal?: GenericAbortSignal
+  /** Per-call bound. Without it a slow host holds a connection until the browser gives up. */
+  timeout?: number
+  /** Bulk callers (the bookmark-import icon backfill) opt out of per-item console output. */
+  quiet?: boolean
   beforeRequest?: () => void
   afterRequest?: () => void
 }
@@ -24,7 +28,7 @@ export interface Response<T = any> {
 }
 
 function http<T = any>(
-  { url, data, method, headers, onDownloadProgress, signal, beforeRequest, afterRequest }: HttpOption,
+  { url, data, method, headers, onDownloadProgress, signal, timeout, quiet, beforeRequest, afterRequest }: HttpOption,
 ) {
   const authStore = useAuthStore()
   const appStore = useAppStore()
@@ -45,10 +49,10 @@ function http<T = any>(
       case 1005:
       case -1:
         // Expected refusals, handled below rather than surfaced as faults.
-        console.warn(failure)
+        if (!quiet) console.warn(failure)
         break
       default:
-        console.error(failure)
+        if (!quiet) console.error(failure)
     }
 
     if (res.data.code === 1001 && !window.location.pathname.match(/^\/[a-z][a-z0-9-]{4,28}[a-z0-9]\/?$/)) {
@@ -96,11 +100,13 @@ function http<T = any>(
     afterRequest?.()
     if (signal?.aborted)
       throw error
-    console.error(`[api] ${method} ${url} -> transport failure`, error?.msg || error)
-    message.error(t('common.networkError'), {
-      duration: 50000,
-      closable: true,
-    })
+    if (!quiet) {
+      console.error(`[api] ${method} ${url} -> transport failure`, error?.msg || error)
+      message.error(t('common.networkError'), {
+        duration: 50000,
+        closable: true,
+      })
+    }
     throw new Error(error?.msg || 'Error')
   }
 
@@ -114,12 +120,12 @@ function http<T = any>(
 
   headers.lang = appStore.language
   return method === 'GET'
-    ? request.get(url, { params, signal, onDownloadProgress }).then(successHandler, failHandler)
-    : request.post(url, params, { headers, signal, onDownloadProgress }).then(successHandler, failHandler)
+    ? request.get(url, { params, signal, timeout, onDownloadProgress }).then(successHandler, failHandler)
+    : request.post(url, params, { headers, signal, timeout, onDownloadProgress }).then(successHandler, failHandler)
 }
 
 export function get<T = any>(
-  { url, data, method = 'GET', onDownloadProgress, signal, beforeRequest, afterRequest }: HttpOption,
+  { url, data, method = 'GET', onDownloadProgress, signal, timeout, quiet, beforeRequest, afterRequest }: HttpOption,
 ): Promise<Response<T>> {
   return http<T>({
     url,
@@ -127,13 +133,15 @@ export function get<T = any>(
     data,
     onDownloadProgress,
     signal,
+    timeout,
+    quiet,
     beforeRequest,
     afterRequest,
   })
 }
 
 export function post<T = any>(
-  { url, data, method = 'POST', headers, onDownloadProgress, signal, beforeRequest, afterRequest }: HttpOption,
+  { url, data, method = 'POST', headers, onDownloadProgress, signal, timeout, quiet, beforeRequest, afterRequest }: HttpOption,
 ): Promise<Response<T>> {
   return http<T>({
     url,
@@ -142,6 +150,8 @@ export function post<T = any>(
     headers,
     onDownloadProgress,
     signal,
+    timeout,
+    quiet,
     beforeRequest,
     afterRequest,
   })

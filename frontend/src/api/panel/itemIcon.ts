@@ -35,9 +35,15 @@ export function saveSort<T>(data: Panel.ItemIconSortRequest) {
   })
 }
 
-export function getSiteFavicon<T>(url: string) {
+export function getSiteFavicon<T>(
+  url: string,
+  options: { timeout?: number, signal?: AbortSignal, quiet?: boolean } = {},
+) {
   return post<T>({
     url: '/panel/itemIcon/getSiteFavicon',
     data: { url },
+    timeout: options.timeout,
+    signal: options.signal,
+    quiet: options.quiet,
   })
 }

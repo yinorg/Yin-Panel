@@ -354,6 +354,7 @@
     "importConfirm": "Akan mengimpor {count} item. Lanjutkan?",
     "importConfirmAgain": "Ini konfirmasi kedua. Impor bookmark?",
     "importSuccess": "Bookmark berhasil diimpor",
+    "importIconFallback": "{count} situs tidak memiliki favicon; ikon teks digunakan",
     "clearConfirm": "Bersihkan semua grup dan item di ruang ini?",
     "clearSuccess": "Ruang dibersihkan",
     "publicIdInvalid": "FN ID harus 6-30 huruf kecil, angka, atau tanda hubung",

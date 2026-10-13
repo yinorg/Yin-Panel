@@ -53,10 +53,14 @@ function createTextIcon(title: string): Panel.ItemIcon {
 function flattenBookmarkLinks(nodes: BookmarkNode[]): BookmarkLink[] {
   return nodes.flatMap(node => [...node.items, ...flattenBookmarkLinks(node.children)])
 }
+/** One slow host must not hold a pool slot; a thousand parallel probes is what flooded the log. */
+const ICON_FETCH_CONCURRENCY = 6
+const ICON_FETCH_TIMEOUT = 12000
+
 async function enrichBookmarkIcons(groups: BookmarkNode[], onProgress: (completed: number) => void) {
   const items = flattenBookmarkLinks(groups)
   let nextIndex = 0; const uploads = new Map<string, File>()
-  let completed = 0
+  let completed = 0; let fallbackCount = 0
   const extensionResults = await (await isIconExtensionAvailable() ? fetchIconsFromExtension(items.map(item => item.url)) : Promise.resolve(null))
   const extensionIcons = new Map((extensionResults || []).map(item => [item.url, item]))
   const worker = async () => {
@@ -64,17 +68,31 @@ async function enrichBookmarkIcons(groups: BookmarkNode[], onProgress: (complete
       const item = items[nextIndex++]
       try {
         const fetched = await iconFileFromBytes(extensionIcons.get(item.url)!)
-        if (fetched) { const key = `${fetched.hash}${fetched.ext}`; uploads.set(key, fetched.file); item.uploadKey = key; item.icon = { itemType: 2, fileName: fetched.file.name } }
-        else item.icon = await getIconByUrl(item.url) || createTextIcon(item.title)
+        if (fetched) {
+          const key = `${fetched.hash}${fetched.ext}`
+          uploads.set(key, fetched.file); item.uploadKey = key; item.icon = { itemType: 2, fileName: fetched.file.name }
+        }
+        else {
+          const controller = new AbortController()
+          const timer = window.setTimeout(() => controller.abort(), ICON_FETCH_TIMEOUT)
+          let serverIcon: Panel.ItemIcon | null = null
+          try {
+            serverIcon = await getIconByUrl(item.url, { signal: controller.signal })
+          } finally {
+            window.clearTimeout(timer)
+          }
+          if (serverIcon) item.icon = serverIcon
+          else { item.icon = createTextIcon(item.title); fallbackCount++ }
+        }
       } catch {
-        item.icon = createTextIcon(item.title)
+        item.icon = createTextIcon(item.title); fallbackCount++
       } finally {
         onProgress(++completed)
       }
     }
   }
-  await Promise.all(Array.from({ length: Math.min(1000, items.length) }, () => worker()))
-  return uploads
+  await Promise.all(Array.from({ length: Math.min(ICON_FETCH_CONCURRENCY, items.length) }, () => worker()))
+  return { uploads, fallbackCount }
 }
 /**
  * The picker writes the file, not the server: the format is the browser's, and
@@ -117,7 +135,7 @@ async function confirmImport() {
   importProgress.value = 5
   try {
     importProgress.value = count ? 10 : 80
-    const uploads = await enrichBookmarkIcons(bookmarkPreview.value, completed => {
+    const { uploads, fallbackCount } = await enrichBookmarkIcons(bookmarkPreview.value, completed => {
       importProgress.value = 10 + Math.round(completed / Math.max(count, 1) * 70)
     })
     importProgress.value = 85
@@ -128,6 +146,8 @@ async function confirmImport() {
       invalidateSpaceCache(selectedSpaceId.value)
       importProgress.value = 100
       message.success(t('spaceManage.importSuccess'))
+      if (fallbackCount > 0)
+        message.info(t('spaceManage.importIconFallback', { count: fallbackCount }))
       bookmarkPreview.value = null
       loadGroups(selectedSpaceId.value)
       emit('spaces-changed')

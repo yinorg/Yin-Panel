@@ -12,6 +12,9 @@
 export interface BookmarkLink {
   title: string
   url: string
+  /** Attached by the importer while it resolves icons; never part of the file format. */
+  icon?: Panel.ItemIcon
+  uploadKey?: string
 }
 
 export interface BookmarkNode {

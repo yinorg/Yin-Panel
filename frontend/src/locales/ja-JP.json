@@ -354,6 +354,7 @@
     "importConfirm": "{count} 件をインポートします。続行しますか？",
     "importConfirmAgain": "2回目の確認です。ブックマークをインポートしますか？",
     "importSuccess": "ブックマークをインポートしました",
+    "importIconFallback": "{count} 件のサイトはファビコンを取得できなかったため、文字アイコンを使用しました",
     "clearConfirm": "このスペースのすべてのグループと項目をクリアしますか？",
     "clearSuccess": "スペースをクリアしました",
     "publicIdInvalid": "FN IDは6～30文字の小文字、数字、ハイフンで入力してください",

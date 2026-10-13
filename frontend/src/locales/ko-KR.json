@@ -401,6 +401,7 @@
     "importConfirm": "{count}개의 항목을 가져오려고 합니다. 계속하시겠습니까?",
     "importConfirmAgain": "두 번째 확인입니다. 북마크를 가져오시겠습니까?",
     "importSuccess": "북마크를 가져왔습니다",
+    "importIconFallback": "{count}개 사이트의 파비콘을 가져오지 못해 텍스트 아이콘을 사용했습니다",
     "clearConfirm": "이 공간의 모든 그룹과 항목을 비우시겠습니까?",
     "clearSuccess": "공간을 비웠습니다",
     "publicIdInvalid": "FN ID는 6-30자의 소문자, 숫자 또는 하이픈이어야 합니다",

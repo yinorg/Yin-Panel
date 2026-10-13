@@ -354,6 +354,7 @@
     "importConfirm": "Stai per importare {count} elementi. Continuare?",
     "importConfirmAgain": "Questa è la seconda conferma. Importare i segnalibri?",
     "importSuccess": "Segnalibri importati correttamente",
+    "importIconFallback": "{count} siti senza favicon; sono state usate icone di testo",
     "clearConfirm": "Svuotare tutti i gruppi e gli elementi in questo spazio?",
     "clearSuccess": "Spazio svuotato",
     "publicIdInvalid": "FN ID deve contenere da 6 a 30 lettere minuscole, numeri o trattini",

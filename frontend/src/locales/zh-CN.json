@@ -354,6 +354,7 @@
     "importConfirm": "即将导入 {count} 个项目，确认继续吗？",
     "importConfirmAgain": "这是第二次确认：确认执行书签导入吗？",
     "importSuccess": "书签导入成功",
+    "importIconFallback": "有 {count} 个站点未取到图标，已使用文字图标",
     "clearConfirm": "确认清空当前空间的全部分组和项目吗？",
     "clearSuccess": "空间已清空",
     "publicIdInvalid": "FN ID需为6-30位小写字母、数字或连字符",

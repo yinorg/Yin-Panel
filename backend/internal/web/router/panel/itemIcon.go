@@ -1,7 +1,9 @@
 package panel
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"github.com/yinorg/Yin-Panel/backend/internal/biz/repository"
 	"github.com/yinorg/Yin-Panel/backend/internal/constant"
 	"github.com/yinorg/Yin-Panel/backend/internal/global"
@@ -14,6 +16,7 @@ import (
 	"github.com/yinorg/Yin-Panel/backend/internal/web/model/response"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
@@ -23,6 +26,10 @@ type ItemIconRouter struct {
 }
 
 var urlPrefix string
+
+// The page fetch and the icon download share one budget, so a slow host cannot
+// outlive the request that asked for it.
+const itemIconRequestTimeout = 15 * time.Second
 
 func NewItemIconRouter() *ItemIconRouter {
 	urlPrefix = global.Config.Base.URLPrefix
@@ -155,8 +162,20 @@ func (a *ItemIconRouter) GetSiteFavicon(c *gin.Context) {
 	}
 
 	resp := panelApi.ItemIconGetSiteFaviconResp{}
+
+	// One budget covers the page fetch and the icon download.
+	ctx, cancel := context.WithTimeout(c.Request.Context(), itemIconRequestTimeout)
+	defer cancel()
+
 	fullUrl := ""
-	if iconUrl, err := favicon.GetOneFaviconURL(req.Url); err != nil {
+	if iconUrl, err := favicon.GetOneFaviconURL(ctx, req.Url); err != nil {
+		if errors.Is(err, favicon.ErrIconUnavailable) {
+			// The site simply has no icon. That is an answer the caller acts on
+			// (it falls back to a text icon), not a fault that should fail the
+			// whole bookmark import.
+			response.SuccessData(c, resp)
+			return
+		}
 		response.Error(c, "acquisition failed: get ico error:"+err.Error())
 		return
 	} else {
@@ -175,8 +194,8 @@ func (a *ItemIconRouter) GetSiteFavicon(c *gin.Context) {
 	if strings.HasPrefix(fullUrl, "//") {
 		fullUrl = protocol + "://" + fullUrl[2:]
 	} else if !strings.HasPrefix(fullUrl, "http://") && !strings.HasPrefix(fullUrl, "https://") {
-		// 如果URL既不以http://开头也不以https://开头，则默认为http协议
-		fullUrl = "http://" + fullUrl
+		// 相对地址沿用页面自身的协议：https 页面不该被要求用 http 取图标
+		fullUrl = protocol + "://" + fullUrl
 	}
 
 	// 去除图标的get参数
@@ -188,10 +207,9 @@ func (a *ItemIconRouter) GetSiteFavicon(c *gin.Context) {
 		}
 		fullUrl = parsedIcoURL.Scheme + "://" + parsedIcoURL.Host + parsedIcoURL.Path
 	}
-	zaplog.Logger.Debug("fullUrl:", fullUrl)
 
 	// 下载图标
-	fileName, err := favicon.DownloadImage(c.Request.Context(), fullUrl)
+	fileName, err := favicon.DownloadImage(ctx, fullUrl)
 	if err != nil {
 		response.Error(c, "acquisition failed: download "+err.Error())
 		return

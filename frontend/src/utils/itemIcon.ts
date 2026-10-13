@@ -1,8 +1,15 @@
 import { getSiteFavicon } from '@/api/panel/itemIcon'
 
-export async function getIconByUrl(url: string): Promise<Panel.ItemIcon | null> {
+export async function getIconByUrl(
+  url: string,
+  options: { timeout?: number, signal?: AbortSignal } = {},
+): Promise<Panel.ItemIcon | null> {
   try {
-    const { code, data } = await getSiteFavicon<{ iconUrl: string; fileName: string }>(url)
+    const { code, data } = await getSiteFavicon<{ iconUrl: string; fileName: string }>(url, {
+      timeout: options.timeout ?? 12000,
+      signal: options.signal,
+      quiet: true,
+    })
     if (code !== 0 || !data?.iconUrl)
       return null
 
