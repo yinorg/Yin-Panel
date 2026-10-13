@@ -31,7 +31,7 @@ var themeWallpaperEntryV2 = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,63}
 // rejected rather than stored. `auto` is the explicit choice to follow the
 // browser, and an empty value means the user has never chosen.
 var supportedLanguages = map[string]bool{
-	"auto": true,
+	"auto":  true,
 	"en-US": true, "zh-CN": true, "zh-TW": true, "ja-JP": true, "ko-KR": true,
 	"de-DE": true, "fr-FR": true, "es-ES": true, "pt-BR": true, "ru-RU": true,
 	"id-ID": true, "tr-TR": true, "pl-PL": true, "it-IT": true, "nl-NL": true,
