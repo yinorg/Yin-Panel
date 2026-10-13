@@ -7,6 +7,8 @@ import { t } from '../../../locales'
 import { clearSpaceCache, readSpaceCache, writeSpaceCache } from '@/utils/spaceCache'
 import { fetchIconsFromExtension, getIconByUrl, iconFileFromBytes, isIconExtensionAvailable } from '@/utils/itemIcon'
 import { importBookmarksBatch } from '@/api/panel/space'
+import { getBookmarkTree } from '@/api/panel/space'
+import { buildBookmarkHtml, parseBookmarkHtml, type BookmarkLink, type BookmarkNode } from '@/utils/bookmarks'
 import { getInstalledThemes, clearSpaceTheme, getSpaceTheme, setSpaceTheme } from '@/api/theme'
 import { searchEngineList } from '@/components/deskModule/SearchBox/engines'
 import { useConfirmAction } from '@/hooks/useConfirmAction'
@@ -31,7 +33,7 @@ const members = ref<SpaceMember[]>([]); const oidcRules = ref<any[]>([])
 const rename = ref(''); const memberEmail = ref(''); const memberRole = ref('viewer'); const oidcProvider = ref('authentik'); const oidcGroup = ref(''); const oidcRole = ref('viewer')
 const publicEnabled = ref(false); const publicId = ref(''); const publicMode = ref<'direct' | 'code'>('direct'); const publicAccessCode = ref(''); const publicSaving = ref(false)
 const publicOrigin = typeof window !== 'undefined' ? window.location.origin : ''
-const bookmarkPreview = ref<any[] | null>(null)
+const bookmarkPreview = ref<BookmarkNode[] | null>(null)
 const importing = ref(false); const importProgress = ref(0)
 const bookmarkFileInput = ref<HTMLInputElement | null>(null)
 // The space's own theme and its default search engine are properties of the
@@ -47,8 +49,12 @@ function createTextIcon(title: string): Panel.ItemIcon {
   const english = title.match(/[A-Za-z]/g)?.join('').slice(0, 8) || ''
   return { itemType: 1, text: chinese || english || title.trim().slice(0, 5) || '?', backgroundColor: '#2a2a2a6b' }
 }
-async function enrichBookmarkIcons(groups: any[], onProgress: (completed: number) => void) {
-  const items = groups.flatMap(group => group.items)
+/** Every link in the tree, at any depth: the folder level is not where the links stop. */
+function flattenBookmarkLinks(nodes: BookmarkNode[]): BookmarkLink[] {
+  return nodes.flatMap(node => [...node.items, ...flattenBookmarkLinks(node.children)])
+}
+async function enrichBookmarkIcons(groups: BookmarkNode[], onProgress: (completed: number) => void) {
+  const items = flattenBookmarkLinks(groups)
   let nextIndex = 0; const uploads = new Map<string, File>()
   let completed = 0
   const extensionResults = await (await isIconExtensionAvailable() ? fetchIconsFromExtension(items.map(item => item.url)) : Promise.resolve(null))
@@ -70,11 +76,41 @@ async function enrichBookmarkIcons(groups: any[], onProgress: (completed: number
   await Promise.all(Array.from({ length: Math.min(1000, items.length) }, () => worker()))
   return uploads
 }
-function exportBookmarks() { if (!selectedSpaceId.value) return; fetch(`/api/spaces/${selectedSpaceId.value}/bookmarks/export`, { credentials: 'include' }).then(r => r.blob()).then(blob => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `space-${selectedSpaceId.value}-bookmarks.html`; a.click(); URL.revokeObjectURL(a.href) }) }
-function previewBookmarks(event: Event) { const file = (event.target as HTMLInputElement).files?.[0]; if (!file) return; file.text().then(text => { const doc = new DOMParser().parseFromString(text, 'text/html'); const groups: any[] = []; doc.querySelectorAll('h3').forEach(h3 => { const group: any = { title: h3.textContent?.trim() || t('spaceManage.untitledGroup'), items: [] }; let node = h3.parentElement?.nextElementSibling; while (node) { node.querySelectorAll?.('a').forEach((a: HTMLAnchorElement) => group.items.push({ title: a.textContent?.trim() || a.href, url: a.href })); node = node.nextElementSibling } groups.push(group) }); bookmarkPreview.value = groups }) }
+/**
+ * The picker writes the file, not the server: the format is the browser's, and
+ * the same module reads it back on import, so one place owns both directions.
+ */
+async function exportBookmarks() {
+  if (!selectedSpaceId.value) return
+  const { code, data } = await getBookmarkTree<{ groups: BookmarkNode[] }>(selectedSpaceId.value)
+  if (code !== 0 || !data) return
+  const blob = new Blob([buildBookmarkHtml(data.groups)], { type: 'text/html' })
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(blob)
+  a.download = `space-${selectedSpaceId.value}-bookmarks.html`
+  a.click()
+  URL.revokeObjectURL(a.href)
+}
+async function previewBookmarks(event: Event) {
+  const file = (event.target as HTMLInputElement).files?.[0]
+  if (!file) return
+  bookmarkPreview.value = parseBookmarkHtml(await file.text(), t('spaceManage.untitledGroup'))
+}
+/** The preview is the tree flattened with a depth, so nesting is visible at a glance. */
+const bookmarkPreviewRows = computed(() => {
+  const rows: { title: string; count: number; depth: number }[] = []
+  const walk = (nodes: BookmarkNode[], depth: number) => {
+    for (const node of nodes) {
+      rows.push({ title: node.title, count: node.items.length, depth })
+      walk(node.children, depth + 1)
+    }
+  }
+  walk(bookmarkPreview.value || [], 0)
+  return rows
+})
 async function confirmImport() {
   if (!selectedSpaceId.value || !bookmarkPreview.value || importing.value) return
-  const count = bookmarkPreview.value.reduce((sum, group) => sum + group.items.length, 0)
+  const count = flattenBookmarkLinks(bookmarkPreview.value).length
   if (count > 2000 && !(await confirmAction({ content: t('spaceManage.importConfirm', { count }) }))) return
   if (count > 2000 && !(await confirmAction({ content: t('spaceManage.importConfirmAgain') }))) return
   importing.value = true
@@ -320,7 +356,7 @@ onMounted(load)
     <NCard :title="$t('spaceManage.title')">
       <NSpace vertical>
         <NSpace>
-          <NSelect v-model:value="selectedSpaceId" class="min-w-[220px]" :options="spaceOptions(spaces, authStore.userInfo?.id)" @update:value="(id) => selectSpace(Number(id))" />
+          <NSelect v-model:value="selectedSpaceId" data-testid="space-select" class="min-w-[220px]" :options="spaceOptions(spaces, authStore.userInfo?.id)" @update:value="(id) => selectSpace(Number(id))" />
           <NButton type="primary" @click="openCreateDialog">{{ $t('spaceManage.createSpace') }}</NButton>
         </NSpace>
         <NModal v-model:show="createDialogVisible" preset="dialog" :title="$t('spaceManage.createSpace')" :positive-text="$t('common.confirm')" :negative-text="$t('common.cancel')" :loading="loading" @positive-click="create">
@@ -369,8 +405,8 @@ onMounted(load)
 
           <div class="mt-3">
             <div class="mb-1">{{ $t('spaceManage.bookmarkTransfer') }}</div>
-            <NSpace><NButton @click="exportBookmarks">{{ $t('spaceManage.exportBookmarks') }}</NButton><NButton @click="bookmarkFileInput?.click()">{{ $t('spaceManage.chooseFile') }}</NButton><input ref="bookmarkFileInput" class="hidden" type="file" accept=".html,text/html" @change="previewBookmarks"></NSpace>
-            <NList v-if="bookmarkPreview" class="mt-2"><NListItem v-for="group in bookmarkPreview" :key="group.title"><span>{{ group.title }} {{ $t('spaceManage.bookmarkGroupCount', { n: group.items.length }) }}</span></NListItem><NProgress v-if="importing" type="line" :percentage="importProgress" processing /><NButton type="primary" :loading="importing" @click="confirmImport">{{ $t('spaceManage.confirmImport') }}</NButton></NList>
+            <NSpace><NButton data-testid="bookmark-export" @click="exportBookmarks">{{ $t('spaceManage.exportBookmarks') }}</NButton><NButton data-testid="bookmark-choose-file" @click="bookmarkFileInput?.click()">{{ $t('spaceManage.chooseFile') }}</NButton><input ref="bookmarkFileInput" data-testid="bookmark-file-input" class="hidden" type="file" accept=".html,text/html" @change="previewBookmarks"></NSpace>
+            <NList v-if="bookmarkPreview" class="mt-2"><NListItem v-for="(row, index) in bookmarkPreviewRows" :key="index" data-testid="bookmark-preview-row"><span :style="{ paddingLeft: `${row.depth * 16}px` }">{{ row.title }} {{ $t('spaceManage.bookmarkGroupCount', { n: row.count }) }}</span></NListItem><NProgress v-if="importing" type="line" :percentage="importProgress" processing /><NButton data-testid="bookmark-import-confirm" type="primary" :loading="importing" @click="confirmImport">{{ $t('spaceManage.confirmImport') }}</NButton></NList>
           </div>
         </NCard>
 

@@ -13,7 +13,6 @@ import (
 	"github.com/yinorg/Yin-Panel/backend/internal/web/interceptor"
 	"github.com/yinorg/Yin-Panel/backend/internal/web/model/base"
 	"github.com/yinorg/Yin-Panel/backend/internal/web/model/response"
-	"html"
 	"io"
 	"mime/multipart"
 	"path"
@@ -55,8 +54,7 @@ func (r *SpaceRouter) InitRouter(router *gin.RouterGroup) {
 	g.POST("/:spaceId/items/sort", r.SortItems)
 	g.DELETE("/:spaceId/items/:itemId", r.DeleteItem)
 	g.POST("/:spaceId/items/:itemId/delete", r.DeleteItem)
-	g.GET("/:spaceId/bookmarks/export", r.ExportBookmarks)
-	g.POST("/:spaceId/bookmarks/import", r.ImportBookmarks)
+	g.GET("/:spaceId/bookmarks/tree", r.BookmarkTree)
 	g.POST("/:spaceId/bookmarks/import-batch", r.ImportBookmarksBatch)
 	g.POST("/:spaceId/clear", r.ClearSpace)
 	g.POST("/:spaceId/groups", r.CreateGroup)
@@ -118,35 +116,26 @@ type publicConfigRequest struct {
 	AccessCode string `json:"accessCode"`
 }
 
-type bookmarkImportRequest struct {
-	Groups []struct {
-		Title    string `json:"title"`
-		Children []struct {
-			Title string `json:"title"`
-			Items []struct {
-				Title string                      `json:"title"`
-				URL   string                      `json:"url"`
-				Icon  repository.ItemIconIconInfo `json:"icon"`
-			} `json:"items"`
-		} `json:"children"`
-		Items []struct {
-			Title string                      `json:"title"`
-			URL   string                      `json:"url"`
-			Icon  repository.ItemIconIconInfo `json:"icon"`
-		} `json:"items"`
-	} `json:"groups"`
+// A bookmark file is a tree, so the request is one too. The shape this replaces
+// could express two levels at most and ignored even those, so folders sharing a
+// name under different parents were merged into a single group and the file came
+// back flat.
+type bookmarkBatchItem struct {
+	Title     string                      `json:"title"`
+	URL       string                      `json:"url"`
+	UploadKey string                      `json:"uploadKey"`
+	Icon      repository.ItemIconIconInfo `json:"icon"`
+}
+
+type bookmarkBatchNode struct {
+	Title    string              `json:"title"`
+	Icon     string              `json:"icon"`
+	Items    []bookmarkBatchItem `json:"items"`
+	Children []bookmarkBatchNode `json:"children"`
 }
 
 type bookmarkBatchRequest struct {
-	Groups []struct {
-		Title string `json:"title"`
-		Items []struct {
-			Title     string                      `json:"title"`
-			URL       string                      `json:"url"`
-			UploadKey string                      `json:"uploadKey"`
-			Icon      repository.ItemIconIconInfo `json:"icon"`
-		} `json:"items"`
-	} `json:"groups"`
+	Groups []bookmarkBatchNode `json:"groups"`
 }
 
 func (r *SpaceRouter) ImportBookmarksBatch(c *gin.Context) {
@@ -221,6 +210,7 @@ func (r *SpaceRouter) ImportBookmarksBatch(c *gin.Context) {
 			return
 		}
 	}
+	summary := &bookmarkImportSummary{seen: map[string]bool{}}
 	err = repository.Db.Transaction(func(tx *gorm.DB) error {
 		newFiles := []repository.File{}
 		for _, icon := range icons {
@@ -237,48 +227,13 @@ func (r *SpaceRouter) ImportBookmarksBatch(c *gin.Context) {
 				return e
 			}
 		}
-		groups := []repository.ItemIconGroup{}
-		items := []repository.ItemIcon{}
-		for _, g := range req.Groups {
-			if strings.TrimSpace(g.Title) == "" {
-				continue
-			}
-			var target repository.ItemIconGroup
-			e := tx.Where("space_id=? AND title=?", id, g.Title).First(&target).Error
-			if e == gorm.ErrRecordNotFound {
-				target = repository.ItemIconGroup{Title: g.Title, UserId: user.ID, SpaceID: id, Sort: 9999}
-				if e = tx.Create(&target).Error; e != nil {
-					return e
-				}
-			} else if e != nil {
+		for index, node := range req.Groups {
+			if e := importBookmarkNode(tx, icons, id, user.ID, nil, node, index, summary); e != nil {
 				return e
 			}
-			groups = append(groups, target)
-			for _, b := range g.Items {
-				if strings.TrimSpace(b.URL) == "" {
-					continue
-				}
-				icon := b.Icon
-				if b.UploadKey != "" {
-					var exists bool
-					_, exists = icons[b.UploadKey]
-					if !exists {
-						return fmt.Errorf("invalid uploadKey")
-					}
-					icon = icons[b.UploadKey]
-				}
-				if icon.ItemType == 0 {
-					icon.ItemType = 4
-				}
-				item := repository.ItemIcon{Title: limitTitle(b.Title), Url: b.URL, OpenMethod: 2, ItemIconGroupId: target.ID, UserId: user.ID, SpaceID: id, Icon: icon}
-				ensureItemIcon(&item)
-				data, _ := json.Marshal(icon)
-				item.IconJson = string(data)
-				items = append(items, item)
-			}
 		}
-		if len(items) > 0 {
-			return tx.CreateInBatches(&items, 100).Error
+		if len(summary.items) > 0 {
+			return tx.CreateInBatches(&summary.items, 100).Error
 		}
 		return nil
 	})
@@ -286,10 +241,13 @@ func (r *SpaceRouter) ImportBookmarksBatch(c *gin.Context) {
 		response.ErrorDatabase(c, err.Error())
 		return
 	}
-	response.SuccessData(c, gin.H{"files": icons})
+	response.SuccessData(c, gin.H{"files": icons, "groups": summary.groups, "skipped": summary.skipped})
 }
 
-func (r *SpaceRouter) ExportBookmarks(c *gin.Context) {
+// BookmarkTree returns the space as a tree. It is the read side of the import's
+// shape: the picker turns this into the file itself, so the browser owns the
+// bookmark format in both directions and the server only carries the data.
+func (r *SpaceRouter) BookmarkTree(c *gin.Context) {
 	user, ok := base.GetCurrentUserInfo(c)
 	if !ok {
 		response.Error(c, "not logged in")
@@ -310,10 +268,7 @@ func (r *SpaceRouter) ExportBookmarks(c *gin.Context) {
 		response.ErrorDatabase(c, err.Error())
 		return
 	}
-	c.Header("Content-Type", "text/html; charset=utf-8")
-	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=space-%d-bookmarks.html", id))
-	c.String(200, "<!DOCTYPE NETSCAPE-Bookmark-file-1>\n<META HTTP-EQUIV=\"Content-Type\" CONTENT=\"text/html; charset=UTF-8\">\n<TITLE>Bookmarks</TITLE><H1>Bookmarks</H1><DL><p>"+
-		bookmarkHTML(groups, items)+"</DL><p>")
+	response.SuccessData(c, gin.H{"groups": bookmarkTree(groups, items)})
 }
 
 func (r *SpaceRouter) ClearSpace(c *gin.Context) {
@@ -340,80 +295,124 @@ func (r *SpaceRouter) ClearSpace(c *gin.Context) {
 	response.Success(c)
 }
 
-func bookmarkHTML(groups []repository.ItemIconGroup, items []repository.ItemIcon) string {
-	return bookmarkHTMLForParent(groups, items, nil)
+// bookmarkTreeMaxDepth bounds the recursion, so a parent cycle that reached the
+// table some other way cannot turn this into a stack overflow.
+const bookmarkTreeMaxDepth = 64
+
+// bookmarkTree nests groups under their parent. A group whose parent is gone is
+// promoted to the root, which is what the Core's own group tree does with one;
+// dropping it instead would silently lose a branch.
+func bookmarkTree(groups []repository.ItemIconGroup, items []repository.ItemIcon) []gin.H {
+	known := make(map[uint]bool, len(groups))
+	children := make(map[uint][]repository.ItemIconGroup, len(groups))
+	for _, group := range groups {
+		known[group.ID] = true
+	}
+	for _, group := range groups {
+		parent := uint(0)
+		if group.ParentID != nil && known[*group.ParentID] {
+			parent = *group.ParentID
+		}
+		children[parent] = append(children[parent], group)
+	}
+	var build func(parent uint, depth int) []gin.H
+	build = func(parent uint, depth int) []gin.H {
+		out := make([]gin.H, 0, len(children[parent]))
+		for _, group := range children[parent] {
+			entry := gin.H{"title": group.Title, "icon": group.Icon, "parentId": group.ParentID, "items": []gin.H{}, "children": []gin.H{}}
+			for _, item := range items {
+				if item.ItemIconGroupId == group.ID {
+					entry["items"] = append(entry["items"].([]gin.H), gin.H{"title": item.Title, "url": item.Url})
+				}
+			}
+			if depth < bookmarkTreeMaxDepth {
+				entry["children"] = build(group.ID, depth+1)
+			}
+			out = append(out, entry)
+		}
+		return out
+	}
+	return build(0, 0)
 }
 
-func bookmarkHTMLForParent(groups []repository.ItemIconGroup, items []repository.ItemIcon, parent *uint) string {
-	result := ""
-	for _, group := range groups {
-		if (group.ParentID == nil) != (parent == nil) || (parent != nil && *group.ParentID != *parent) {
+// bookmarkImportSummary gathers what one import created, so the caller can report
+// it and write the items in batches.
+type bookmarkImportSummary struct {
+	groups  int
+	skipped int
+	items   []repository.ItemIcon
+	seen    map[string]bool
+}
+
+// importBookmarkNode creates one folder and everything beneath it. The lookup
+// includes the parent: two folders may share a name in different places, and
+// matching on the title alone is what merged them before.
+func importBookmarkNode(tx *gorm.DB, icons map[string]repository.ItemIconIconInfo, spaceID, userID uint, parentID *uint, node bookmarkBatchNode, index int, summary *bookmarkImportSummary) error {
+	title := strings.TrimSpace(node.Title)
+	if title == "" {
+		return nil
+	}
+	query := tx.Where("space_id = ? AND title = ?", spaceID, title)
+	if parentID == nil {
+		query = query.Where("parent_id IS NULL")
+	} else {
+		query = query.Where("parent_id = ?", *parentID)
+	}
+	var target repository.ItemIconGroup
+	if e := query.First(&target).Error; e != nil {
+		if !errors.Is(e, gorm.ErrRecordNotFound) {
+			return e
+		}
+		target = repository.ItemIconGroup{Title: title, Icon: node.Icon, UserId: userID, SpaceID: spaceID, ParentID: parentID, Sort: index}
+		if e = tx.Create(&target).Error; e != nil {
+			return e
+		}
+		summary.groups++
+	}
+	for itemIndex, b := range node.Items {
+		if strings.TrimSpace(b.URL) == "" {
 			continue
 		}
-		result += "<DT><H3>" + html.EscapeString(group.Title) + "</H3><DL><p>"
-		for _, item := range items {
-			if item.ItemIconGroupId == group.ID {
-				result += "<DT><A HREF=\"" + html.EscapeString(item.Url) + "\">" + html.EscapeString(item.Title) + "</A>"
-			}
+		// The same link twice in one folder is the same bookmark, whether it is
+		// already stored or repeated within this very file.
+		key := strconv.FormatUint(uint64(target.ID), 10) + "\t" + b.URL
+		if summary.seen[key] {
+			summary.skipped++
+			continue
 		}
-		result += bookmarkHTMLForParent(groups, items, &group.ID)
-		result += "</DL><p>"
-	}
-	return result
-}
-
-func (r *SpaceRouter) ImportBookmarks(c *gin.Context) {
-	user, ok := base.GetCurrentUserInfo(c)
-	if !ok {
-		response.Error(c, "not logged in")
-		return
-	}
-	id, err := spaceID(c)
-	if err != nil || !canEditSpace(user.ID, id) {
-		response.ErrorNoAccess(c)
-		return
-	}
-	var req bookmarkImportRequest
-	if err = c.ShouldBindJSON(&req); err != nil {
-		response.ErrorParamFomat(c, "invalid bookmarks")
-		return
-	}
-	err = repository.Db.Transaction(func(tx *gorm.DB) error {
-		for _, group := range req.Groups {
-			if strings.TrimSpace(group.Title) == "" {
-				continue
-			}
-			var target repository.ItemIconGroup
-			if err := tx.Where("space_id = ? AND title = ?", id, group.Title).First(&target).Error; err != nil {
-				target = repository.ItemIconGroup{Title: group.Title, UserId: user.ID, SpaceID: id, Sort: 9999}
-				if err := tx.Create(&target).Error; err != nil {
-					return err
-				}
-			}
-			for _, imported := range group.Items {
-				if strings.TrimSpace(imported.URL) == "" {
-					continue
-				}
-				item := repository.ItemIcon{Title: limitTitle(imported.Title), Url: imported.URL, OpenMethod: 2, ItemIconGroupId: target.ID, UserId: user.ID, SpaceID: id}
-				item.Icon = imported.Icon
-				if item.Icon.ItemType == 0 {
-					item.Icon.ItemType = 4
-				}
-				ensureItemIcon(&item)
-				iconData, _ := json.Marshal(item.Icon)
-				item.IconJson = string(iconData)
-				if err := tx.Create(&item).Error; err != nil {
-					return err
-				}
-			}
+		var existing int64
+		if e := tx.Model(&repository.ItemIcon{}).Where("space_id = ? AND item_icon_group_id = ? AND url = ?", spaceID, target.ID, b.URL).Count(&existing).Error; e != nil {
+			return e
 		}
-		return nil
-	})
-	if err != nil {
-		response.ErrorDatabase(c, err.Error())
-		return
+		if existing > 0 {
+			summary.seen[key] = true
+			summary.skipped++
+			continue
+		}
+		summary.seen[key] = true
+		icon := b.Icon
+		if b.UploadKey != "" {
+			uploaded, ok := icons[b.UploadKey]
+			if !ok {
+				return fmt.Errorf("invalid uploadKey")
+			}
+			icon = uploaded
+		}
+		if icon.ItemType == 0 {
+			icon.ItemType = 4
+		}
+		item := repository.ItemIcon{Title: limitTitle(b.Title), Url: b.URL, OpenMethod: 2, ItemIconGroupId: target.ID, UserId: userID, SpaceID: spaceID, Sort: itemIndex, Icon: icon}
+		ensureItemIcon(&item)
+		data, _ := json.Marshal(icon)
+		item.IconJson = string(data)
+		summary.items = append(summary.items, item)
 	}
-	response.Success(c)
+	for childIndex, child := range node.Children {
+		if e := importBookmarkNode(tx, icons, spaceID, userID, &target.ID, child, childIndex, summary); e != nil {
+			return e
+		}
+	}
+	return nil
 }
 
 var publicIDPattern = regexp.MustCompile(`^[a-z][a-z0-9-]{4,28}[a-z0-9]$`)
@@ -1685,6 +1684,7 @@ func (r *SpaceRouter) SortItems(c *gin.Context) {
 	}
 	response.Success(c)
 }
+
 // ArrangeLayout applies a whole home layout — item membership, item order and
 // group order — in one transaction. The theme stages a drag in edit mode and
 // saves it through here, so a half-applied layout can never be observed, which

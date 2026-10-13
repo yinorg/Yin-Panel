@@ -243,6 +243,7 @@ onUnmounted(() => {
                     >
                       <div
                         class="app-starter-menu-item p-[10px] rounded-lg mb-[5px] font-bold cursor-pointer flex items-center"
+                        :data-testid="'settings-app-' + item.componentName"
                       >
                         <div class="flex items-center justify-center">
                           <div class="text-lg">

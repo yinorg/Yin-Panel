@@ -49,7 +49,7 @@ export function getSearchConfig<T>(spaceId: number) { return get<T>({ url: `/spa
 export function setSearchConfig<T>(spaceId: number, data: SpaceSearchConfig) { return post<T>({ url: `/spaces/${spaceId}/search-config`, data }) }
 export function getPublicConfig<T>(spaceId: number) { return get<T>({ url: `/spaces/${spaceId}/public` }) }
 export function setPublicConfig<T>(spaceId: number, data: PublicConfig) { return post<T>({ url: `/spaces/${spaceId}/public`, data }) }
-export function importBookmarks<T>(spaceId: number, data: any) { return post<T>({ url: `/spaces/${spaceId}/bookmarks/import`, data }) }
+export function getBookmarkTree<T>(spaceId: number) { return get<T>({ url: `/spaces/${spaceId}/bookmarks/tree` }) }
 export function importBookmarksBatch<T>(spaceId: number, data: FormData) { return post<T>({ url: `/spaces/${spaceId}/bookmarks/import-batch`, data }) }
 export function clearSpace<T>(spaceId: number) { return post<T>({ url: `/spaces/${spaceId}/clear` }) }
 export function createSpace<T>(name: string) { return post<T>({ url: '/spaces/teams', data: { name } }) }
