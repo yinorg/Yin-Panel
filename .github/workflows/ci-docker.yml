@@ -14,6 +14,10 @@ on:
 permissions:
   contents: read
   packages: write
+  # The notify step records a deployment so GitHub delivers it to the deploy
+  # hook. A direct POST from a runner is refused by the front proxy (403), while
+  # GitHub's own delivery channel is allowed through.
+  deployments: write
 
 jobs:
   frontend:
@@ -199,21 +203,18 @@ jobs:
             -t ghcr.io/yinorg/yin-panel-ce:latest \
             ghcr.io/yinorg/yin-panel-ce@${AMD64_DIGEST} \
             ghcr.io/yinorg/yin-panel-ce@${ARM64_DIGEST}
-      # Tell the deploy side in-band. The GHCR `package` event is not used any
-      # more: it arrives minutes late and out of order, and one build produces
-      # several of them. This runs only after every publish step above succeeded.
-      #
-      # The body mirrors the package event's field paths on purpose, so the
-      # hook's trigger-rule and pass-arguments-to-command match unchanged.
+      # Tell the deploy side through GitHub's own delivery channel. A direct POST
+      # from a runner is refused with 403 by the front proxy (only GitHub's
+      # webhook IPs are let through), and the GHCR `package` event arrives
+      # minutes late and out of order. Recording a deployment is delivered in
+      # about a second and carries the exact image tag in `description`.
       - name: Tell the deploy side
         env:
-          SECRET: ${{ secrets.DEPLOY_HOOK_SECRET }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          # `ref` must resolve to a real ref. A UI dispatch may name a tag that
+          # does not exist, so it falls back to the commit.
+          REF: ${{ github.event_name == 'workflow_dispatch' && github.sha || github.ref_name }}
         run: |
-          TAG="${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}"
-          body=$(printf '{"action":"published","package":{"package_type":"CONTAINER","package_version":{"container_metadata":{"tag":{"name":"%s"}}}}}' "$TAG")
-          sig="sha256=$(printf '%s' "$body" | openssl dgst -sha256 -hmac "$SECRET" | awk '{print $2}')"
-          curl -fsS -X POST "https://nginx-ui.yiniot.com/hooks/yin-panel-prd-deploy" \
-            -H 'Content-Type: application/json' \
-            -H "X-Hub-Signature-256: $sig" \
-            -d "$body"
-          echo "notified: $TAG"
+          printf '{"ref":"%s","description":"%s","auto_merge":false,"required_contexts":[]}' "$REF" "$TAG" \
+            | gh api -X POST "repos/${{ github.repository }}/deployments" --input - --jq '"deployment \(.id) queued for \(.description)"'
