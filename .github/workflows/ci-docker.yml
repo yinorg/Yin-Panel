@@ -199,3 +199,21 @@ jobs:
             -t ghcr.io/yinorg/yin-panel-ce:latest \
             ghcr.io/yinorg/yin-panel-ce@${AMD64_DIGEST} \
             ghcr.io/yinorg/yin-panel-ce@${ARM64_DIGEST}
+      # Tell the deploy side in-band. The GHCR `package` event is not used any
+      # more: it arrives minutes late and out of order, and one build produces
+      # several of them. This runs only after every publish step above succeeded.
+      #
+      # The body mirrors the package event's field paths on purpose, so the
+      # hook's trigger-rule and pass-arguments-to-command match unchanged.
+      - name: Tell the deploy side
+        env:
+          SECRET: ${{ secrets.DEPLOY_HOOK_SECRET }}
+        run: |
+          TAG="${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}"
+          body=$(printf '{"action":"published","package":{"package_type":"CONTAINER","package_version":{"container_metadata":{"tag":{"name":"%s"}}}}}' "$TAG")
+          sig="sha256=$(printf '%s' "$body" | openssl dgst -sha256 -hmac "$SECRET" | awk '{print $2}')"
+          curl -fsS -X POST "https://nginx-ui.yiniot.com/hooks/yin-panel-prd-deploy" \
+            -H 'Content-Type: application/json' \
+            -H "X-Hub-Signature-256: $sig" \
+            -d "$body"
+          echo "notified: $TAG"
