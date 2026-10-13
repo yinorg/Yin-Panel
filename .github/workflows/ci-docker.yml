@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Image tag (for example 0.3.1)
+        description: Image tag (dev, or X.Y.Z-dev.N for a dev build)
         required: true
-        default: latest
+        default: dev
 
 permissions:
   contents: read
@@ -24,8 +24,17 @@ jobs:
       - name: Validate release tag
         if: github.event_name == 'push'
         run: |
-          [[ "${GITHUB_REF_NAME}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
-            echo "Only standard version tags such as 0.3.1 are published."
+          [[ "${GITHUB_REF_NAME}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ || "${GITHUB_REF_NAME}" =~ ^[0-9]+\.[0-9]+\.[0-9]+-dev\.[0-9]+$ ]] || {
+            echo "Only 0.3.1 or 0.3.1-dev.1 style tags are published."
+            exit 1
+          }
+      - name: Validate dispatch tag
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          [[ "${INPUT_TAG}" == "dev" || "${INPUT_TAG}" =~ ^[0-9]+\.[0-9]+\.[0-9]+-dev\.[0-9]+$ ]] || {
+            echo "A manual dispatch may only publish 'dev' or an X.Y.Z-dev.N tag; it must never publish a release version."
             exit 1
           }
       - name: Set up Node.js
@@ -177,6 +186,16 @@ jobs:
           ARM64_DIGEST=$(cat digests/arm64/digest)
           docker buildx imagetools create \
             -t ghcr.io/yinorg/yin-panel-ce:${VERSION} \
+            ghcr.io/yinorg/yin-panel-ce@${AMD64_DIGEST} \
+            ghcr.io/yinorg/yin-panel-ce@${ARM64_DIGEST}
+      # Kept separate so a dev build can never move the release alias: only a
+      # release tag push is allowed to repoint `latest` (a hyphen means dev).
+      - name: Publish the latest alias
+        if: github.event_name == 'push' && !contains(github.ref_name, '-')
+        run: |
+          AMD64_DIGEST=$(cat digests/amd64/digest)
+          ARM64_DIGEST=$(cat digests/arm64/digest)
+          docker buildx imagetools create \
             -t ghcr.io/yinorg/yin-panel-ce:latest \
             ghcr.io/yinorg/yin-panel-ce@${AMD64_DIGEST} \
             ghcr.io/yinorg/yin-panel-ce@${ARM64_DIGEST}
