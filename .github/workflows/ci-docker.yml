@@ -216,5 +216,22 @@ jobs:
           # does not exist, so it falls back to the commit.
           REF: ${{ github.event_name == 'workflow_dispatch' && github.sha || github.ref_name }}
         run: |
-          printf '{"ref":"%s","description":"%s","auto_merge":false,"required_contexts":[]}' "$REF" "$TAG" \
-            | gh api -X POST "repos/${{ github.repository }}/deployments" --input - --jq '"deployment \(.id) queued for \(.description)"'
+          # Which environment this tag belongs to. Mirrors hook.sh exactly:
+          # dev/stg by keyword, prd only for a bare x.y.z, anything else is
+          # refused here rather than silently landing somewhere.
+          case "$TAG" in
+            *dev*) CHANNEL=dev ;;
+            *stg*) CHANNEL=stg ;;
+            *)
+              if printf '%s' "$TAG" | grep -Eq '^[0-9]+[.][0-9]+[.][0-9]+$'; then
+                CHANNEL=prd
+              else
+                echo "reject: unroutable tag: $TAG"
+                exit 1
+              fi
+              ;;
+          esac
+          printf '{"ref":"%s","description":"%s","environment":"%s","auto_merge":false,"required_contexts":[]}' \
+            "$REF" "$TAG" "$CHANNEL" \
+            | gh api -X POST "repos/${{ github.repository }}/deployments" --input - \
+                --jq '"deployment \(.id) queued for \(.description) [\(.environment)]"'
