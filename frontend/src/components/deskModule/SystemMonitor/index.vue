@@ -81,8 +81,46 @@ function handleClick(index: number, item: MonitorData) {
   editIndex.value = index
 }
 
+/**
+ * Values the pre-theme build wrote into the stored card config.
+ *
+ * A card still carrying one of these is not expressing a choice — it is stuck on
+ * a literal the old theme put there — so it is normalised back to the token that
+ * now says the same thing. Without this a card keeps a fixed dark fill and white
+ * text whatever scheme the page is in, which is what left the band as dark blobs
+ * on a light home while everything around it followed the wallpaper.
+ */
+const LEGACY_CARD_COLORS: Record<string, string> = {
+  backgroundColor: 'var(--yin-component-app-icon-surface)',
+  color: 'var(--yin-text)',
+  progressColor: 'var(--yin-primary)',
+  progressRailColor: 'var(--yin-border)',
+}
+
+const LEGACY_CARD_VALUES = new Set([
+  '#2a2a2a6b',
+  'rgba(42,42,42,0.42)',
+  'rgba(42, 42, 42, 0.42)',
+  'rgb(42 42 42 / 42%)',
+  '#fff',
+  '#ffffff',
+  'white',
+  'rgb(255, 255, 255)',
+  'rgb(255,255,255)',
+])
+
+function normalizeCardExtend(extend: unknown) {
+  if (!extend || typeof extend !== 'object') return extend
+  const next = { ...(extend as Record<string, unknown>) }
+  for (const [key, replacement] of Object.entries(LEGACY_CARD_COLORS)) {
+    const value = typeof next[key] === 'string' ? (next[key] as string).trim().toLowerCase() : ''
+    if (value && LEGACY_CARD_VALUES.has(value)) next[key] = replacement
+  }
+  return next
+}
+
 async function getData() {
-  monitorDatas.value = await getAll()
+  monitorDatas.value = (await getAll()).map(item => ({ ...item, extendParam: normalizeCardExtend(item.extendParam) }))
 
   const defaultExtendParam = {
     backgroundColor: 'var(--yin-component-app-icon-surface, #2a2a2a6b)', color: 'var(--yin-text)', progressColor: 'var(--yin-primary)', progressRailColor: 'var(--yin-border)',
@@ -335,9 +373,9 @@ function handleRightMenuSelect(key: string | number) {
 
 .system-monitor-content { margin-top: var(--yin-component-system-monitor-gap); border-radius: var(--yin-component-system-monitor-radius); transition: box-shadow var(--yin-component-state-hover-duration) var(--yin-component-state-easing), border-color var(--yin-component-state-hover-duration) var(--yin-component-state-easing), padding var(--yin-component-state-hover-duration) var(--yin-component-state-easing); }
 .system-monitor-content--sorting { padding: var(--yin-component-system-monitor-padding); border: var(--yin-component-card-border-width) var(--yin-component-card-border-style) var(--yin-border); box-shadow: var(--yin-component-card-shadow); }
-.system-monitor-header { margin: 0 0 var(--yin-component-system-monitor-gap) var(--yin-spaceSm); color: var(--yin-text); font-family: var(--yin-fontDisplay); font-size: var(--yin-component-system-monitor-heading-size); font-weight: var(--yin-component-system-monitor-heading-weight); }
+.system-monitor-header { margin: 0 0 var(--yin-component-system-monitor-gap) var(--yin-spaceSm); color: var(--yin-onWallpaper); font-family: var(--yin-fontDisplay); font-size: var(--yin-component-system-monitor-heading-size); font-weight: var(--yin-component-system-monitor-heading-weight); }
 .system-monitor-buttons { margin-left: var(--yin-spaceSm); transition: opacity var(--yin-component-state-hover-duration) var(--yin-component-state-easing); }
-.system-monitor-buttons > span { margin-right: var(--yin-spaceSm); color: var(--yin-text); cursor: pointer; }
+.system-monitor-buttons > span { margin-right: var(--yin-spaceSm); color: var(--yin-onWallpaper); cursor: pointer; }
 .system-monitor-action-icon { font-size: 20px; }
 
 .icon-info-box {

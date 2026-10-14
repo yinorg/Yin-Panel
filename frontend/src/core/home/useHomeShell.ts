@@ -15,7 +15,6 @@ import { useThemeRuntime } from '@/core/home/useThemeRuntime'
 import { useThemeMonitor } from '@/core/home/useThemeMonitor'
 import { useHomeCommands } from '@/core/home/useHomeCommands'
 import { setThemeMonitorBridge, themeEmbeddedMonitorCount } from '@/core/home/monitorBridge'
-import { suggestedForeground, wallpaperPainted, wallpaperTone } from '@/core/home/wallpaperTone'
 import type { MonitorSnapshot } from '@/components/deskModule/SystemMonitor/snapshot'
 import { setBridgeAppContext, setBridgeHandlers } from '@/theme/bridge/registry'
 // Register the Core's embeddable custom elements so a theme can render Core pages
@@ -66,15 +65,7 @@ export function useHomeShell() {
       || !!config.backgroundImageSrc
       || !!activeThemeWallpaper.value
   })
-  // The band's card text is painted on the artwork too, and it arrives through
-  // the component bridge rather than a stylesheet token, so it has to follow the
-  // same derived foreground. The panel's own icon colour still decides whenever
-  // nothing is painted behind the page.
-  const panelIconTextColor = computed(() => {
-    if (wallpaperPainted.value && wallpaperTone.value)
-      return suggestedForeground(wallpaperTone.value).onWallpaper
-    return resolvePanelValue('var(--yin-text)', panelState.panelConfig.iconTextColor, useThemeDefaults.value)
-  })
+  const panelIconTextColor = computed(() => resolvePanelValue('var(--yin-text)', panelState.panelConfig.iconTextColor, useThemeDefaults.value))
   // The home layout follows the mounted package: each built-in home package
   // renders exactly one layout, so the Core reads it from the theme rather than
   // from a separate panel preference.

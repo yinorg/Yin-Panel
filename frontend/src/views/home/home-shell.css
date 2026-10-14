@@ -45,9 +45,9 @@
    global `--yin-controlHeight: 36px`, while the pre-theme build used Naive's
    34px default. That token is app-wide, so pinning it is a global decision
    rather than a replica fix, and `height` cannot lift a `min-height` floor. */
-.sun-main.theme-runtime-yin .space-status-bar { padding: 3px; border-color: rgb(255 255 255 / 22%) !important; border-radius: 999px; background: rgb(18 22 28 / 46%) !important; backdrop-filter: blur(14px); box-shadow: 0 8px 30px rgb(0 0 0 / 18%); }
-.sun-main.theme-runtime-yin .space-status-button { min-width: 140px !important; color: #fff !important; }
-.sun-main.theme-runtime-yin .space-status-dot { background: #7dd3fc; box-shadow: 0 0 10px #7dd3fc; }
+.sun-main.theme-runtime-yin .space-status-bar { padding: 3px; border-color: color-mix(in srgb, var(--yin-onWallpaper) 22%, transparent) !important; border-radius: 999px; background: color-mix(in srgb, var(--yin-surface) 68%, transparent) !important; backdrop-filter: blur(14px); box-shadow: 0 8px 30px rgb(0 0 0 / 18%); }
+.sun-main.theme-runtime-yin .space-status-button { min-width: 140px !important; color: var(--yin-onWallpaper) !important; }
+.sun-main.theme-runtime-yin .space-status-dot { background: var(--yin-primary); box-shadow: 0 0 10px var(--yin-primary); }
 .space-status-dot { width: 7px; height: 7px; margin-right: 8px; border-radius: 50%; background: var(--yin-success); box-shadow: 0 0 var(--yin-component-surface-glow) var(--yin-success); }
 .offline-status { position: fixed; z-index: 21; top: 14px; right: 18px; display: flex; gap: var(--yin-component-group-gap); color: var(--yin-text); font-size: var(--yin-fontSmallSize); text-shadow: var(--yin-effect-text-shadow); }
 .theme-safe-mode-banner { position: fixed; z-index: 22; top: 48px; right: 18px; display: flex; align-items: center; gap: 12px; max-width: min(440px, calc(100vw - 36px)); padding: 8px 12px; border: 1px solid var(--yin-border); border-radius: var(--yin-component-card-radius); background: var(--yin-surfaceElevated); color: var(--yin-text); font-size: var(--yin-fontSmallSize); }
@@ -61,7 +61,7 @@
    for its own layout (marginTopPercent of the viewport + a fixed masthead and
    search height). Anchoring the monitor layer to that keeps it below the search
    box instead of the old viewport-height guess, which sat on top of it. */
-.theme-runtime-monitor-layer--yin { top: var(--yin-theme-monitor-top, calc(var(--yin-theme-content-top, 10vh) + 187px)); right: auto; left: 50%; width: min(calc(var(--yin-contentMaxWidth, 1200px) - 30px), calc(100vw - 30px)); max-width: none; max-height: 286px; padding-top: 26px; box-sizing: border-box; transform: translateX(-50%); --yin-text: #fff; --yin-textMuted: rgb(255 255 255 / 82%); --yin-primary: #fff; --yin-border: transparent; --yin-component-app-icon-surface: rgb(42 42 42 / 42%); --yin-component-system-monitor-heading-size: 18px; }
+.theme-runtime-monitor-layer--yin { top: var(--yin-theme-monitor-top, calc(var(--yin-theme-content-top, 10vh) + 187px)); right: auto; left: 50%; width: min(calc(var(--yin-contentMaxWidth, 1200px) - 30px), calc(100vw - 30px)); max-width: none; max-height: 286px; padding-top: 26px; box-sizing: border-box; transform: translateX(-50%); --yin-text: var(--yin-onWallpaper); --yin-textMuted: var(--yin-onWallpaperMuted); --yin-component-app-icon-surface: color-mix(in srgb, var(--yin-surface) 72%, transparent); --yin-component-system-monitor-heading-size: 18px; }
 .theme-runtime-monitor-layer--yin .n-progress-graph-circle-rail { stroke: rgb(255 255 255 / 36%) !important; }
 /* This layer forces --yin-border transparent, and the detail (line) progress
    borrows it for its rail, so the 100% track vanished and the filled length was
@@ -169,9 +169,13 @@ html {
   color: var(--yin-onWallpaper, #ffffff);
 }
 
-.sun-main.wallpaper-active .space-status-button,
+/* The pill carries a surface of its own, so its label is the scheme's text; the
+   offline status line has no surface and stays on the on-wallpaper colour. */
 .sun-main.wallpaper-active .offline-status {
   color: var(--yin-onWallpaper, #ffffff) !important;
+}
+.sun-main.wallpaper-active .space-status-button {
+  color: var(--yin-text) !important;
 }
 
 .sun-main.side-switching {
@@ -354,9 +358,11 @@ html {
   height: 34px;
   padding: 0;
   border: 0;
-  /* The old buttons were Naive's `color="#2a2a2a6b"`: a 42%-opaque dark fill. */
-  background: rgba(42, 42, 42, 0.42);
-  color: #fff;
+  /* Same surface as every other pill on the home: it is derived from the
+     theme's own surface, so it follows the scheme the wallpaper chose instead
+     of staying a dark blob on a light page. */
+  background: color-mix(in srgb, var(--yin-surface) 72%, transparent);
+  color: var(--yin-text);
   cursor: pointer;
 }
 
@@ -366,13 +372,14 @@ html {
 }
 
 .home-floating-button:hover {
-  background: rgba(42, 42, 42, 0.6);
+  background: color-mix(in srgb, var(--yin-surface) 88%, transparent);
 }
 
 /* The theme reports whether it is editing, so the entry turns into the way out:
    the same button, in red, closing the edit instead of opening it. */
 .home-floating-button--cancel {
-  background: color-mix(in srgb, var(--yin-danger) 80%, rgba(42, 42, 42, 0.42));
+  background: color-mix(in srgb, var(--yin-danger) 80%, transparent);
+  color: var(--yin-onPrimary);
 }
 
 .home-floating-button--cancel:hover {

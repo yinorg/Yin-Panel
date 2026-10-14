@@ -6,6 +6,7 @@ import { useAuthStore } from '../store'
 import { getCurrentTheme, getEffectiveTheme, getMyTheme, getPreviewTheme, getThemePackage } from '../api/theme'
 import { parsePublicCodeFromPath } from '../utils/request/axios'
 import { isYinThemePackage, resolveThemeSlots, resolveWallpaper, selectThemeScheme, type ThemePackage } from '../utils/theme'
+import { suggestedForeground, wallpaperPainted, wallpaperTone } from '@/core/home/wallpaperTone'
 import { isThemeSafeMode } from '../theme/recovery/safeMode'
 
 export const activeThemePackage = ref<ThemePackage | null>(null)
@@ -200,8 +201,43 @@ export function useTheme() {
   const selectedScheme = computed(() => {
     const schemes = activeThemePackage.value?.manifest.schemes || []
     const mode = previewToken && (previewMode === 'light' || previewMode === 'dark') ? previewMode : appStore.theme
-    return selectThemeScheme(schemes, mode, OsTheme.value === 'dark' ? 'dark' : 'light')
+    // `auto` follows the artwork, not the operating system.
+    //
+    // The home is painted on the wallpaper, so the theme's whole token set has to
+    // agree with what is behind it: a light wallpaper with a dark OS theme used to
+    // put the dark tokens on a light background, and every text, accent, card fill
+    // and border fought the surface under it. Only the few rules that happened to
+    // read the derived tone looked right, which is exactly the mixed page that
+    // exposed this. With no artwork behind the page there is nothing to follow, so
+    // the OS theme still decides.
+    const ambient = wallpaperPainted.value && wallpaperTone.value
+      ? wallpaperTone.value
+      : OsTheme.value === 'dark' ? 'dark' : 'light'
+    return selectThemeScheme(schemes, mode, ambient)
   })
+
+  /**
+   * The on-wallpaper text pair every element without a background of its own
+   * reads.
+   *
+   * Their compatibility defaults are a fixed white, which is only right over
+   * dark artwork, so the derived tone replaces them whenever artwork is painted.
+   * Together with the scheme following the same tone, this is what makes the
+   * page coherent: a light wallpaper gives dark on-wallpaper text and pale
+   * surface fills, a dark one gives light text and dark fills, and the two never
+   * disagree.
+   */
+  watch([wallpaperPainted, wallpaperTone], ([painted, tone]) => {
+    const root = document.documentElement
+    if (!painted || !tone) {
+      root.style.removeProperty('--yin-onWallpaper')
+      root.style.removeProperty('--yin-onWallpaperMuted')
+      return
+    }
+    const foreground = suggestedForeground(tone)
+    root.style.setProperty('--yin-onWallpaper', foreground.onWallpaper)
+    root.style.setProperty('--yin-onWallpaperMuted', foreground.onWallpaperMuted)
+  }, { immediate: true })
 
   const isDark = computed(() => {
     return selectedScheme.value === 'dark'
@@ -298,6 +334,16 @@ export function useTheme() {
     for (const [slot, value] of Object.entries(slots))
       root.style.setProperty(`--yin-${slot}`, value)
     appliedSlots = Object.keys(slots)
+    // The elevated surface is a pre-theme variable, not part of the token set, so
+    // it kept the Core's light default whatever the theme chose. Everything that
+    // reads it — the group panel, the menus, the icon tiles — stayed white in a
+    // dark scheme. Deriving it from the theme's own surface puts them back on the
+    // scheme their text is drawn in.
+    const surface = slots.surface || slots.canvas
+    if (surface) {
+      root.style.setProperty('--yin-surfaceElevated', surface)
+      root.style.setProperty('--yin-searchBoxSurface', surface)
+    }
     const surfaceOpacity = Number(slots['component-card-surface-opacity'] || 1)
     const surfaceBlur = Number.parseFloat(slots['component-card-surface-blur'] || '0')
     const surfaceGlow = Number.parseFloat(slots['component-card-surface-glow'] || '0')

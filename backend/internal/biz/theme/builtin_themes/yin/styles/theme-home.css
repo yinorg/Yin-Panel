@@ -58,7 +58,7 @@ select {
   justify-content: center;
   gap: 0;
   min-width: 0;
-  color: var(--yin-icon-text-color, #fff);
+  color: var(--yin-onWallpaper);
   text-shadow: 0 2px 5px rgb(0 0 0 / 75%);
 }
 
@@ -115,20 +115,20 @@ select {
   font-size: 14px;
   font-weight: 400;
   line-height: 1.6;
-  /* Secondary text on the artwork follows the Core's muted suggestion; without
-     one it falls back to the primary on-wallpaper colour. */
-  color: var(--yin-icon-text-muted, var(--yin-icon-text-color, #fff));
+  /* Secondary text follows the theme's own muted token, like every other
+     heading and caption on the page. */
+  color: var(--yin-onWallpaperMuted);
 }
 
 .yin-logo-divider {
   margin-inline: 10px;
-  color: var(--yin-icon-text-color, #fff);
+  color: var(--yin-onWallpaper);
   font-size: 24px;
   font-weight: 300;
 }
 
 .yin-search-submit {
-  color: var(--yin-icon-text-color, #fff);
+  color: var(--yin-text, #20282c);
   cursor: pointer;
 }
 
@@ -177,10 +177,10 @@ select {
   width: 100%;
   height: 46px;
   padding: 2px 10px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--yin-border);
   border-radius: 16px;
-  background: rgb(42 42 42 / 42%);
-  color: var(--yin-icon-text-color, #fff);
+  background: color-mix(in srgb, var(--yin-surface) 72%, transparent);
+  color: var(--yin-text, #20282c);
   backdrop-filter: blur(2px);
 }
 
@@ -244,9 +244,9 @@ select {
   gap: 8px;
   max-width: min(320px, 80vw);
   padding: 8px;
-  border: 1px solid var(--yin-border, rgb(255 255 255 / 22%));
+  border: 1px solid var(--yin-border);
   border-radius: var(--yin-radiusControl, 8px);
-  background: var(--yin-component-menu-surface, rgb(24 28 32 / 92%));
+  background: var(--yin-surfaceElevated, var(--yin-surface, #fff));
   box-shadow: 0 8px 24px rgb(0 0 0 / 35%);
 }
 
@@ -262,15 +262,15 @@ select {
   background-repeat: no-repeat;
   background-position: center;
   background-size: 22px 22px;
-  color: #fff;
+  color: var(--yin-text);
   font-size: 14px;
   cursor: pointer;
 }
 
 .yin-search-engine-option:hover,
 .yin-search-engine-option:focus-visible {
-  border-color: rgb(255 255 255 / 60%);
-  background-color: rgb(255 255 255 / 12%);
+  border-color: var(--yin-primary);
+  background-color: color-mix(in srgb, var(--yin-primary) 14%, transparent);
 }
 
 .yin-search-engine-option[aria-selected='true'] {
@@ -285,7 +285,7 @@ select {
   padding: 0;
   border: 0;
   background: transparent;
-  color: var(--yin-icon-text-color, #fff);
+  color: var(--yin-text, #20282c);
   font-size: 0;
   cursor: pointer;
 }
@@ -313,7 +313,7 @@ select {
   padding: 0;
   border: 0;
   background: transparent;
-  color: var(--yin-icon-text-color, #fff);
+  color: var(--yin-text, #20282c);
   font-size: 0;
   cursor: pointer;
 }
@@ -358,19 +358,18 @@ select {
   padding-top: 26px;
   max-height: 286px;
   overflow: auto;
-  /* The band is the Core's component, so the theme colours it the same way it
-     colours everything else on the artwork: through the derived foreground the
-     Core hands over in the snapshot. These used to be hardcoded white, which is
-     what made the band the one surface that never followed the wallpaper. */
-  --yin-text: var(--yin-icon-text-color, #fff);
-  --yin-textMuted: var(--yin-icon-text-muted, rgb(255 255 255 / 82%));
-  --yin-primary: var(--yin-icon-text-color, #fff);
+  /* The cards carry a surface of their own, so their text is the scheme's, like
+     every other card on the page — a dark fill must not be given dark text just
+     because the artwork happens to be light. The band's own heading sits
+     straight on the artwork, so it takes the on-wallpaper colour here; the cards
+     override it with their own. */
+  color: var(--yin-onWallpaper);
   --yin-border: transparent;
-  --yin-component-app-icon-surface: rgb(42 42 42 / 42%);
+  --yin-component-app-icon-surface: color-mix(in srgb, var(--yin-surface) 72%, transparent);
   --yin-component-system-monitor-heading-size: 18px;
 }
-.yin-monitor .n-progress-graph-circle-rail { stroke: color-mix(in srgb, var(--yin-icon-text-color, #fff) 36%, transparent) !important; }
-.yin-monitor .n-progress-graph-line-rail { background-color: color-mix(in srgb, var(--yin-icon-text-color, #fff) 24%, transparent) !important; }
+.yin-monitor .n-progress-graph-circle-rail { stroke: color-mix(in srgb, var(--yin-text, #20282c) 36%, transparent) !important; }
+.yin-monitor .n-progress-graph-line-rail { background-color: color-mix(in srgb, var(--yin-text, #20282c) 24%, transparent) !important; }
 
 .yin-collection {
   display: block;
@@ -454,12 +453,12 @@ select {
 .yin-action-button--primary {
   border-color: var(--yin-primary, #176b80);
   background: var(--yin-primary, #176b80);
-  color: #fff;
+  color: var(--yin-onPrimary);
 }
 
 .yin-action-button--primary:hover:not(:disabled) {
   background: color-mix(in srgb, var(--yin-primary, #176b80) 88%, #000);
-  color: #fff;
+  color: var(--yin-onPrimary);
 }
 
 .yin-actions {
@@ -532,12 +531,12 @@ select {
 .yin-action-button--primary {
   border-color: var(--yin-primary, #176b80);
   background: var(--yin-primary, #176b80);
-  color: #fff;
+  color: var(--yin-onPrimary);
 }
 
 .yin-action-button--primary:hover:not(:disabled) {
   background: color-mix(in srgb, var(--yin-primary, #176b80) 88%, #000);
-  color: #fff;
+  color: var(--yin-onPrimary);
 }
 
 .yin-actions {
@@ -586,8 +585,8 @@ select {
   padding: 0;
   border: 0;
   /* The old buttons were Naive's `color="#2a2a2a6b"`: a 42%-opaque dark fill. */
-  background: rgba(42, 42, 42, 0.42);
-  color: #fff;
+  background: color-mix(in srgb, var(--yin-surface) 72%, transparent);
+  color: var(--yin-text);
   cursor: pointer;
 }
 
@@ -597,7 +596,7 @@ select {
 }
 
 .yin-floating-button:hover {
-  background: rgba(42, 42, 42, 0.6);
+  background: color-mix(in srgb, var(--yin-surface) 88%, transparent);
 }
 
 .yin-floating-button:focus-visible {
@@ -618,7 +617,7 @@ select {
   min-width: 0;
   margin: 0;
   font-family: var(--yin-fontDisplay, var(--yin-fontBody, Inter, system-ui, sans-serif));
-  color: var(--yin-icon-text-color, #fff);
+  color: var(--yin-text, #20282c);
   font-size: 20px;
   font-weight: 800;
   line-height: 28px;
@@ -637,7 +636,7 @@ select {
   border: 0;
   border-radius: var(--yin-radiusControl, 8px);
   background: transparent;
-  color: var(--yin-icon-text-color, #fff);
+  color: var(--yin-text, #20282c);
   /* The affordance is drawn rather than typed: the pre-theme build used an
      mdi-chevron-up/down icon, and a "+"/"-" character does not read the same. */
   font-size: 0;
@@ -780,7 +779,7 @@ select {
   border: 0;
   border-radius: 0;
   background: transparent;
-  color: var(--yin-icon-text-color, #fff);
+  color: var(--yin-text, #20282c);
   box-shadow: none;
   cursor: pointer;
   text-align: left;
@@ -827,9 +826,9 @@ select {
   overflow: hidden;
   border: 1px solid transparent;
   border-radius: 16px;
-  background: rgb(42 42 42 / 42%);
+  background: var(--yin-component-app-icon-surface);
   background-clip: padding-box;
-  color: var(--yin-icon-text-color, #fff);
+  color: var(--yin-text, #20282c);
   font-size: 14px;
   font-weight: 400;
   line-height: 1.25;
@@ -883,7 +882,7 @@ select {
 
 .yin-item-title {
   max-width: 100%;
-  color: var(--yin-icon-text-color, #fff);
+  color: var(--yin-text, #20282c);
   font-size: 14px;
   font-weight: 400;
   text-shadow: 0 2px 4px rgb(0 0 0 / 80%);
@@ -1001,13 +1000,13 @@ select {
    label goes back to the panel's wallpaper text colour (white by default)
    instead of the scheme text colour. */
 .yin-item--info.yin-item--tinted {
-  color: var(--yin-icon-text-color, #fff);
+  color: var(--yin-text, #20282c);
   border-color: rgb(255 255 255 / 26%);
 }
 
 .yin-item--info.yin-item--tinted .yin-item-icon,
 .yin-item--info.yin-item--tinted .yin-item-title {
-  color: var(--yin-icon-text-color, #fff);
+  color: var(--yin-text, #20282c);
 }
 
 .yin-item--info.yin-item--tinted .yin-item-description {
@@ -1035,7 +1034,7 @@ select {
   justify-content: center;
   width: auto;
   margin: 100px 0 0;
-  color: #cbd5e1;
+  color: var(--yin-onWallpaperMuted);
   font-size: 14px;
   line-height: 1.6;
 }
@@ -1220,7 +1219,7 @@ select {
 }
 [data-editing='true'] .yin-content {
   transform: scale(0.85);
-  outline: 2px dashed rgb(255 255 255 / 72%);
+  outline: 2px dashed var(--yin-primary);
   outline-offset: 10px;
 }
 
@@ -1259,7 +1258,7 @@ select {
   border: 0;
   border-radius: var(--yin-radiusControl, 8px);
   background: transparent;
-  color: var(--yin-icon-text-color, #fff);
+  color: var(--yin-text, #20282c);
   text-shadow: 0 2px 4px rgb(0 0 0 / 80%);
   cursor: pointer;
 }
@@ -1290,7 +1289,7 @@ select {
    断点给条目的盒子尺寸——行数和行高在任何条目到达之前就已确定，数据落地时不会
    有任何位移。这里只补上属于它自己的那块表面。 */
 .yin-collection .yin-item-placeholder {
-  background: color-mix(in srgb, var(--yin-icon-text-color, #fff) 9%, transparent);
+  background: color-mix(in srgb, var(--yin-text, #20282c) 9%, transparent);
   cursor: default;
   animation: yin-item-placeholder-pulse 1.5s ease-in-out infinite;
 }
@@ -1298,7 +1297,7 @@ select {
 .yin-collection .yin-item-placeholder:hover,
 .yin-collection .yin-item-placeholder:active {
   transform: none;
-  background: color-mix(in srgb, var(--yin-icon-text-color, #fff) 9%, transparent);
+  background: color-mix(in srgb, var(--yin-text, #20282c) 9%, transparent);
 }
 
 @keyframes yin-item-placeholder-pulse {

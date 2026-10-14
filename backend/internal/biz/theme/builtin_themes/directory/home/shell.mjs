@@ -1507,9 +1507,10 @@ const createYinHome = yinLayout => ({
       // artwork. The Core reads the wallpaper and hands over a tone plus its own
       // suggestion; a theme is free to ignore the suggestion, and a panel that
       // set an explicit icon colour still wins when nothing is painted.
-      page.style.setProperty('--yin-icon-text-color', snapshot.wallpaper && snapshot.wallpaper.onWallpaper ? snapshot.wallpaper.onWallpaper : (presentation.iconTextColor || '#ffffff'))
-      if (snapshot.wallpaper && snapshot.wallpaper.onWallpaperMuted) page.style.setProperty('--yin-icon-text-muted', snapshot.wallpaper.onWallpaperMuted)
-      else page.style.removeProperty('--yin-icon-text-muted')
+      // The icon and tile text colour is the theme's own setting. The page's text
+      // already follows the wallpaper, because the scheme is chosen from its
+      // lightness, so there is nothing extra to derive here.
+      page.style.setProperty('--yin-icon-text-color', presentation.iconTextColor || '#ffffff')
       const reservedHeight = Number(presentation.monitor?.reservedHeight)
       page.style.setProperty('--yin-monitor-reserved-height', `${Number.isFinite(reservedHeight) && reservedHeight > 0 ? reservedHeight : 0}px`)
       // The theme renders the monitor itself; only show it when the Core says it is

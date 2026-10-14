@@ -48,7 +48,7 @@ defineProps<Prop>()
         :percentage="percentage" :stroke-width="15"
         style="width: 50px;"
       >
-        <div class="text-white" style="font-size: 8px;" :style="{ color: textColor }">
+        <div style="font-size: 8px;" :style="{ color: textColor }">
           {{ percentage }}%
         </div>
       </NProgress>
