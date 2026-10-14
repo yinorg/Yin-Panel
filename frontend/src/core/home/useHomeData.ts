@@ -37,7 +37,11 @@ interface MonitorEnableData {
 // second), short enough that a genuinely offline panel still falls back to the
 // cached home promptly. Every request has its own cached fallback, so a longer
 // budget only delays the "offline" verdict, never blocks the view.
-const HOME_REQUEST_TIMEOUT = 5000
+//
+// Raised from 5s alongside the group retry in `collection.ts`: on a weak link a
+// group that timed out used to stay missing for the whole visit, and a budget
+// that trips on an ordinary slow round is worse than waiting a little longer.
+const HOME_REQUEST_TIMEOUT = 8000
 const SIDE_SWITCH_ANIMATION_MS = 1000
 
 /**
@@ -83,6 +87,29 @@ export function useHomeData(input: {
   const items = ref<HomeGroupNode[]>([])
   const collectionSpaceId = ref<number | null>(null)
 
+  /**
+   * A group list requested ahead of the Space list.
+   *
+   * A returning visitor's active Space is already known from the Space cache, so
+   * its groups can be asked for in parallel with `getSpaces` instead of after it
+   * — one whole round trip off the critical path on a slow link. The result is
+   * handed to the loader only when it is for the Space the loader actually asks
+   * about; otherwise it is dropped and the loader fetches its own.
+   */
+  let prefetchedGroups: { spaceId: number, promise: Promise<ApiResponse<HomeGroupNode[]>> } | undefined
+  let prefetchController: AbortController | undefined
+  function prefetchGroups(spaceId: number) {
+    if (prefetchedGroups?.spaceId === spaceId) return
+    prefetchController?.abort()
+    prefetchController = new AbortController()
+    prefetchedGroups = { spaceId, promise: getGroups<HomeGroupNode[]>(spaceId, prefetchController.signal) }
+  }
+  function dropPrefetchedGroups() {
+    prefetchController?.abort()
+    prefetchController = undefined
+    prefetchedGroups = undefined
+  }
+
   // A public link stores its cache per session: it must not survive into a later
   // signed-in visit under the same browser profile.
   const sessionOnlyCache = !!input.publicCode
@@ -114,8 +141,20 @@ export function useHomeData(input: {
   }
 
   const homeCollectionLoader = createHomeCollectionLoader<HomeGroupNode, Panel.ItemInfo>({
-    getGroups: (spaceId, signal) => getGroups<HomeGroupNode[]>(spaceId, signal),
+    getGroups: (spaceId, signal) => {
+      if (prefetchedGroups?.spaceId === spaceId) {
+        const prefetched = prefetchedGroups
+        prefetchedGroups = undefined
+        return prefetched.promise
+      }
+      return getGroups<HomeGroupNode[]>(spaceId, signal)
+    },
     getItems: (spaceId, groupId, page, pageSize, signal) => getItems<Panel.ItemInfo[]>(spaceId, groupId, page, pageSize, signal),
+    // The endpoint takes `groupId` optionally, so one page of the whole Space can
+    // replace one request per group. That is the difference between a single
+    // round trip and `ceil(groups / concurrency)` of them on a slow link; a Space
+    // too large for one page falls back to the per-group walk on its own.
+    getSpaceItems: (spaceId, page, pageSize, signal) => getItems<Panel.ItemInfo[]>(spaceId, undefined, page, pageSize, signal),
     readCache: getCachedSpace,
     writeCache: saveCachedSpace,
     isOnline: () => input.isOnline.value,
@@ -197,6 +236,7 @@ export function useHomeData(input: {
   function selectSpace(key: string | number) {
     homeTransitionGeneration++
     homeCollectionLoader.cancel()
+    dropPrefetchedGroups()
     homeSearch.invalidate()
     homeCommandSearch.invalidate()
     input.onCollectionInvalidated()
@@ -238,6 +278,8 @@ export function useHomeData(input: {
       const cache = getCachedSpace(cachedSpace.id)
       hasValidCachedHome.value = !!cache
       cacheUpdatedAt.value = cache?.updatedAt || null
+      // Start the group list now so it runs alongside the bootstrap below.
+      if (input.isOnline.value) prefetchGroups(cachedSpace.id)
     }
     homeReady.value = true
     performance.mark('home-ready')
@@ -313,6 +355,7 @@ export function useHomeData(input: {
 
   onUnmounted(() => {
     if (sideSwitchTimer) clearTimeout(sideSwitchTimer)
+    dropPrefetchedGroups()
     homeCollectionLoader.cancel()
     homeBootstrap.cancel()
     homeSpaceController.cancel()

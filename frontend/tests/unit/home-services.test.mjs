@@ -4,7 +4,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 // The frontend does not depend on a unit-test framework; use Node's built-in runner.
 // eslint-disable-next-line test/no-import-node-test
 import test from 'node:test'
-import { createHomeCollectionLoader } from '../../src/core/home/collection.ts'
+import { createHomeCollectionLoader, HOME_ITEM_CONCURRENCY } from '../../src/core/home/collection.ts'
 import { createHomeBootstrap } from '../../src/core/home/bootstrap.ts'
 import { createHomeSpaceController } from '../../src/core/home/spaceController.ts'
 import { createHomeMutationService } from '../../src/core/home/mutations.ts'
@@ -377,7 +377,7 @@ test('Core Home snapshot exposes stable DTO IDs and omits internal item URLs', (
   })
 
   assert.deepEqual(snapshot.spaces[0], { id: '10', name: 'Work', side: 'yin', pairedSpaceId: '11', capabilities: ['space.select'] })
-  assert.deepEqual(snapshot.groups[0], { id: '20', spaceId: '10', parentId: undefined, title: 'Tools', icon: undefined, itemIds: ['30'], capabilities: [] })
+  assert.deepEqual(snapshot.groups[0], { id: '20', spaceId: '10', parentId: undefined, title: 'Tools', icon: undefined, itemIds: ['30'], itemCount: 1, capabilities: [] })
   assert.equal(snapshot.items[0].id, '30')
   assert.deepEqual(snapshot.items[0].capabilities, ['item.open'])
   // 主题要自己开窗，所以快照带解析后的地址。这是当前设计：主题帧有
@@ -387,6 +387,22 @@ test('Core Home snapshot exposes stable DTO IDs and omits internal item URLs', (
   // 未解析的变体仍然不外泄。
   assert.equal('lanUrl' in snapshot.items[0], false)
   assert.equal('mobileUrl' in snapshot.items[0], false)
+})
+
+test('Core Home snapshot reports the server item count before any item has loaded', () => {
+  const snapshot = createThemeHomeSnapshot({
+    version: 1,
+    status: 'loading',
+    spaces: [{ id: 10, name: 'Work', side: 'yin' }],
+    activeSpaceId: 10,
+    groups: [{ id: 20, title: 'Tools', itemCount: 6 }],
+    canWrite: false,
+  })
+
+  // No items have arrived, so `itemIds` is empty. The count is what lets a home
+  // reserve the group's final footprint instead of growing a row at a time.
+  assert.deepEqual(snapshot.groups[0].itemIds, [])
+  assert.equal(snapshot.groups[0].itemCount, 6)
 })
 
 test('Core Home snapshot keeps Item and Group write capabilities independent and read-only by default', () => {
@@ -597,10 +613,15 @@ test('home collection loads groups with bounded concurrency and retains partial 
     readCache: () => null,
     writeCache: (_spaceId, cache) => { saved = cache },
     isOnline: () => true,
+    // No retry: this test is about the failure verdict, and a retry would only
+    // delay the same answer.
+    retries: 0,
   })
 
   const result = await loader.load(7)
-  assert.equal(peak, 2)
+  // Every group is asked for at once now, so the peak is the group count rather
+  // than a limit that serialised the load into rounds.
+  assert.equal(peak, 3)
   assert.equal(result.failedGroups, 1)
   assert.equal(result.stale, true)
   assert.equal(result.error.code, 'PARTIAL_LOAD')
@@ -650,6 +671,125 @@ test('home collection follows item pages and deduplicates records across page bo
   const result = await loader.load(8)
   assert.deepEqual(requestedPages, [1, 2, 3])
   assert.deepEqual(result.itemsByGroup.get(4).map(item => item.id), [1, 2, 3, 4])
+})
+
+test('home collection takes a whole Space in one request and buckets it by group', async () => {
+  const perGroup = []
+  const spacePages = []
+  let progress = 0
+  let saved
+  const loader = createHomeCollectionLoader({
+    getGroups: async () => ({ data: [{ id: 1 }, { id: 2 }, { id: 3 }] }),
+    getItems: async (_spaceId, groupId, page) => {
+      perGroup.push([groupId, page])
+      return { data: [] }
+    },
+    getSpaceItems: async (_spaceId, page, pageSize) => {
+      spacePages.push([page, pageSize])
+      // Ordered `sort, created_at` across the whole Space, exactly as the
+      // endpoint returns it; the loader buckets without reordering.
+      return {
+        data: [
+          { id: 11, itemIconGroupId: 2 },
+          { id: 12, itemIconGroupId: 1 },
+          { id: 13, itemIconGroupId: 2 },
+          { id: 14, itemIconGroupId: 3 },
+        ],
+      }
+    },
+    readCache: () => null,
+    writeCache: (_spaceId, cache) => { saved = cache },
+    isOnline: () => true,
+    onProgress: () => { progress++ },
+  })
+
+  const result = await loader.load(5)
+  assert.deepEqual(spacePages, [[1, 200]])
+  assert.deepEqual(perGroup, [])
+  assert.deepEqual(result.itemsByGroup.get(1).map(item => item.id), [12])
+  assert.deepEqual(result.itemsByGroup.get(2).map(item => item.id), [11, 13])
+  assert.deepEqual(result.itemsByGroup.get(3).map(item => item.id), [14])
+  assert.equal(result.failedGroups, 0)
+  assert.equal(saved.items['2'].map(item => item.id).join(','), '11,13')
+  // One publish for the cached paint, one for the Space-wide page.
+  assert.equal(progress, 2)
+})
+
+test('home collection falls back to the per-group walk when one page cannot hold the Space', async () => {
+  const probes = []
+  const perGroup = []
+  const loader = createHomeCollectionLoader({
+    getGroups: async () => ({ data: [{ id: 1 }, { id: 2 }] }),
+    getItems: async (_spaceId, groupId, page) => {
+      perGroup.push([groupId, page])
+      return { data: [{ id: groupId * 10, itemIconGroupId: groupId }] }
+    },
+    getSpaceItems: async (_spaceId, page, pageSize) => {
+      probes.push([page, pageSize])
+      // A full page means the Space holds more than one page's worth.
+      return { data: Array.from({ length: pageSize }, (_, index) => ({ id: index + 1, itemIconGroupId: 1 })) }
+    },
+    readCache: () => null,
+    writeCache: () => {},
+    isOnline: () => true,
+    spacePageSize: 2,
+  })
+
+  const first = await loader.load(6)
+  assert.deepEqual(probes, [[1, 2]])
+  assert.deepEqual(perGroup, [[1, 1], [2, 1]])
+  assert.deepEqual(first.itemsByGroup.get(1).map(item => item.id), [10])
+
+  // The Space is now known to be oversized, so the probe is not paid for twice.
+  perGroup.length = 0
+  const second = await loader.load(6, true)
+  assert.deepEqual(probes, [[1, 2]])
+  assert.deepEqual(perGroup, [[1, 1], [2, 1]])
+  assert.deepEqual(second.itemsByGroup.get(1).map(item => item.id), [10])
+})
+
+test('home collection retries a failed group once before writing it off', async () => {
+  let attempts = 0
+  const loader = createHomeCollectionLoader({
+    getGroups: async () => ({ data: [{ id: 1 }] }),
+    getItems: async () => {
+      attempts++
+      if (attempts === 1) throw new Error('transient')
+      return { data: [{ id: 7 }] }
+    },
+    readCache: () => null,
+    writeCache: () => {},
+    isOnline: () => true,
+  })
+
+  const result = await loader.load(9)
+  assert.equal(attempts, 2)
+  assert.equal(result.failedGroups, 0)
+  assert.equal(result.stale, false)
+  assert.deepEqual(result.itemsByGroup.get(1).map(item => item.id), [7])
+})
+
+test('home collection keeps the per-group walk inside the concurrency bound', async () => {
+  let active = 0
+  let peak = 0
+  const groups = Array.from({ length: 12 }, (_, index) => ({ id: index + 1 }))
+  const loader = createHomeCollectionLoader({
+    getGroups: async () => ({ data: groups }),
+    getItems: async () => {
+      active++
+      peak = Math.max(peak, active)
+      await delay(5)
+      active--
+      return { data: [] }
+    },
+    readCache: () => null,
+    writeCache: () => {},
+    isOnline: () => true,
+    retries: 0,
+  })
+
+  await loader.load(11)
+  assert.equal(peak, HOME_ITEM_CONCURRENCY)
 })
 
 test('home search walks pages, deduplicates IDs and caches the complete Space result', async () => {

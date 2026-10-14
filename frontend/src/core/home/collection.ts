@@ -6,6 +6,8 @@ export interface HomeCollectionGroup {
 
 export interface HomeCollectionItem {
   id?: number
+  /** The group an item belongs to; lets one Space-wide page replace the fan-out. */
+  itemIconGroupId?: number
 }
 
 export interface HomeCollectionResult<Group extends HomeCollectionGroup, Item extends HomeCollectionItem> {
@@ -22,18 +24,63 @@ export interface HomeCollectionResult<Group extends HomeCollectionGroup, Item ex
 export interface HomeCollectionOptions<Group extends HomeCollectionGroup, Item extends HomeCollectionItem> {
   getGroups: (spaceId: number, signal: AbortSignal) => Promise<{ data?: Group[] }>
   getItems: (spaceId: number, groupId: number, page: number, pageSize: number, signal: AbortSignal) => Promise<{ data?: Item[] }>
+  /**
+   * One page of the whole Space, in `sort, created_at` order. When supplied, the
+   * loader asks for this first: a Space of ordinary size then arrives in a single
+   * round trip instead of one request per group, which is the difference between
+   * one network round and `ceil(groups / concurrency)` of them on a slow link.
+   *
+   * A page that comes back full means the Space holds more than we are willing to
+   * pull at once, and the loader falls back to the per-group walk rather than
+   * dragging everything down. Omitting the option keeps the per-group walk only.
+   */
+  getSpaceItems?: (spaceId: number, page: number, pageSize: number, signal: AbortSignal) => Promise<{ data?: Item[] }>
   readCache: (spaceId: number) => SpaceCache | null
   writeCache: (spaceId: number, cache: SpaceCache) => void
   isOnline: () => boolean
   timeoutMs?: number
   concurrency?: number
   pageSize?: number
+  spacePageSize?: number
+  retries?: number
   onProgress?: (result: HomeCollectionResult<Group, Item>) => void
 }
+
+/**
+ * Item requests in flight per load.
+ *
+ * The deployment is HTTP/2 + HTTP/3, where streams multiplex over one connection
+ * and the browser's six-connections-per-origin ceiling does not apply, so every
+ * group of a Space can be asked for at once. Over HTTP/1.1 the browser applies
+ * that ceiling itself, which makes this value inert rather than wrong.
+ */
+export const HOME_ITEM_CONCURRENCY = 10
+
+/**
+ * Extra attempts per group before it counts as failed.
+ *
+ * A group that loses a packet used to stay missing for the rest of the visit —
+ * `failedGroups` only marks the result stale, nothing retried it. One retry turns
+ * that into a slow group instead of an absent one.
+ */
+export const HOME_ITEM_RETRIES = 1
+
+/** Pause before a retry, long enough to let a congested link recover. */
+const HOME_ITEM_RETRY_DELAY_MS = 200
+
+/** The page size of a Space-wide read; the endpoint caps `pageSize` at 200. */
+const HOME_SPACE_PAGE_SIZE = 200
 
 export function createHomeCollectionLoader<Group extends HomeCollectionGroup, Item extends HomeCollectionItem>(options: HomeCollectionOptions<Group, Item>) {
   let generation = 0
   let controller: AbortController | undefined
+  /**
+   * Spaces already known to be too large for a Space-wide page.
+   *
+   * Without this the fallback would pay for the probe again on every load. Kept
+   * per loader rather than per module so two panels in one session never share it.
+   */
+  const oversizedSpaces = new Set<number>()
 
   function cancel() {
     generation++
@@ -106,6 +153,8 @@ export function createHomeCollectionLoader<Group extends HomeCollectionGroup, It
       return result
     }
 
+    if (await loadWholeSpace()) return result
+
     let next = 0
     const worker = async () => {
       while (active() && next < pending.length) {
@@ -118,7 +167,7 @@ export function createHomeCollectionLoader<Group extends HomeCollectionGroup, It
           const pageSize = options.pageSize ?? 100
           let page = 1
           while (active()) {
-            const response = await withTimeout(signal => options.getItems(spaceId, groupId, page, pageSize, signal), options.timeoutMs ?? 3000, requestController.signal)
+            const response = await fetchGroupPage(groupId, page, pageSize)
             if (!active()) return
             const pageItems = response.data || []
             for (const item of pageItems) {
@@ -147,7 +196,89 @@ export function createHomeCollectionLoader<Group extends HomeCollectionGroup, It
         publish()
       }
     }
-    await Promise.all(Array.from({ length: Math.min(options.concurrency ?? 2, pending.length) }, worker))
+
+    /** One group page, retried once so a lost packet costs a delay and not a group. */
+    const fetchGroupPage = async (groupId: number, page: number, pageSize: number) => {
+      const attempts = Math.max(0, options.retries ?? HOME_ITEM_RETRIES) + 1
+      let lastError: unknown
+      for (let attempt = 0; attempt < attempts; attempt++) {
+        if (!active()) throw new Error('Home request was cancelled')
+        if (attempt) await delay(HOME_ITEM_RETRY_DELAY_MS)
+        try {
+          return await withTimeout(signal => options.getItems(spaceId, groupId, page, pageSize, signal), options.timeoutMs ?? 3000, requestController.signal)
+        }
+        catch (error) {
+          lastError = error
+          // A cancelled or superseded load must not be retried into life.
+          if (!active()) throw error
+        }
+      }
+      throw lastError
+    }
+
+    /**
+     * Replaces the per-group fan-out with a single Space-wide page.
+     *
+     * Returns true when it produced the items, false when the caller should walk
+     * the groups instead. Never throws: this is an optimisation, so anything that
+     * goes wrong here just hands the work back to the walk.
+     */
+    async function loadWholeSpace(): Promise<boolean> {
+      if (!options.getSpaceItems || pending.length < 2 || !active()) return false
+      if (oversizedSpaces.has(spaceId)) return false
+      const pageSize = options.spacePageSize ?? HOME_SPACE_PAGE_SIZE
+      let page: Item[]
+      try {
+        const response = await withTimeout(
+          signal => options.getSpaceItems!(spaceId, 1, pageSize, signal),
+          options.timeoutMs ?? 3000,
+          requestController.signal,
+        )
+        if (!active()) return false
+        page = response.data || []
+      }
+      catch {
+        return false
+      }
+      if (page.length >= pageSize) {
+        oversizedSpaces.add(spaceId)
+        return false
+      }
+
+      // The Space-wide page is ordered `sort, created_at`, the same order each
+      // per-group page uses, so bucketing preserves every group's own order.
+      const pendingIds = new Set(pending.map(group => Number(group.id)))
+      const buckets = new Map<number, Item[]>()
+      const seen = new Map<number, Set<number>>()
+      for (const item of page) {
+        const groupId = Number(item.itemIconGroupId)
+        const itemId = Number(item.id)
+        if (!Number.isSafeInteger(groupId) || !Number.isSafeInteger(itemId) || !pendingIds.has(groupId)) continue
+        let bucket = buckets.get(groupId)
+        if (!bucket) {
+          bucket = []
+          buckets.set(groupId, bucket)
+          seen.set(groupId, new Set())
+        }
+        if (seen.get(groupId)!.has(itemId)) continue
+        seen.get(groupId)!.add(itemId)
+        bucket.push(item)
+      }
+      for (const group of pending) {
+        const groupId = Number(group.id)
+        // A group the page did not mention is empty, and an empty array is what
+        // tells the next load not to ask for it again.
+        const bucket = buckets.get(groupId) || []
+        itemsByGroup.set(groupId, bucket)
+        cache.items[String(groupId)] = bucket
+      }
+      publish()
+      options.writeCache(spaceId, cache)
+      result.stale ||= result.failedGroups > 0
+      return true
+    }
+
+    await Promise.all(Array.from({ length: Math.min(options.concurrency ?? HOME_ITEM_CONCURRENCY, pending.length) }, worker))
     if (!active()) return { ...result, cancelled: true }
 
     options.writeCache(spaceId, cache)
@@ -158,6 +289,10 @@ export function createHomeCollectionLoader<Group extends HomeCollectionGroup, It
   }
 
   return { load, cancel }
+}
+
+function delay(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms))
 }
 
 function withTimeout<T>(request: (signal: AbortSignal) => Promise<T>, timeoutMs: number, parentSignal: AbortSignal): Promise<T> {
