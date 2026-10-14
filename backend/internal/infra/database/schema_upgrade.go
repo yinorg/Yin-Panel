@@ -8,6 +8,7 @@ import (
 
 	"github.com/yinorg/Yin-Panel/backend/internal/biz/repository"
 	"github.com/yinorg/Yin-Panel/backend/internal/biz/theme"
+	"github.com/yinorg/Yin-Panel/backend/internal/infra/zaplog"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -531,11 +532,13 @@ func dropLegacySchema(db *gorm.DB) error {
 		{&repository.ItemIcon{}, "fk_item_icon_user"},
 		{&repository.ItemIconGroup{}, "fk_item_icon_group_user"},
 	}
+	rebuilt := false
 	for _, constraint := range constraints {
 		if db.Migrator().HasConstraint(constraint.model, constraint.name) {
 			if err := db.Migrator().DropConstraint(constraint.model, constraint.name); err != nil {
 				return fmt.Errorf("drop constraint %s: %w", constraint.name, err)
 			}
+			rebuilt = true
 		}
 	}
 	columns := []struct {
@@ -550,11 +553,13 @@ func dropLegacySchema(db *gorm.DB) error {
 	}
 	for _, column := range columns {
 		// Detect by table name (the retired field is no longer part of the
-		// model, which HasColumn(model, name) would miss) and drop by model
-		// (the SQLite driver needs a parsed schema to rebuild the table).
+		// model, which HasColumn(model, name) would miss) and drop by the
+		// dialect-aware helper below.
 		if db.Migrator().HasColumn(column.table, column.name) {
-			if err := db.Migrator().DropColumn(column.model, column.name); err != nil {
-				return fmt.Errorf("drop column %s.%s: %w", column.table, column.name, err)
+			if err := dropLegacyColumn(db, column.model, column.table, column.name); err != nil {
+				// A leftover retired column is inert, while refusing to start is
+				// not, so report it and carry on instead of failing the upgrade.
+				zaplog.Logger.Warnf("could not drop retired column %s.%s: %v", column.table, column.name, err)
 			}
 		}
 	}
@@ -563,7 +568,31 @@ func dropLegacySchema(db *gorm.DB) error {
 			return fmt.Errorf("drop table team: %w", err)
 		}
 	}
+	if rebuilt {
+		// Dropping a constraint recreates the table on SQLite, which also drops
+		// every index on it. AutoMigrate recreates the indexes the model tags
+		// declare and only creates what is missing, so re-running it for the
+		// rebuilt models restores them. It cannot re-add the retired columns,
+		// which no longer belong to any model.
+		if err := db.AutoMigrate(&repository.ItemIcon{}, &repository.ItemIconGroup{}); err != nil {
+			return fmt.Errorf("restore indexes on rebuilt tables: %w", err)
+		}
+	}
 	return nil
+}
+
+// dropLegacyColumn removes a retired column. GORM's SQLite implementation
+// recreates the table from its stored DDL and silently skips any column whose
+// definition is not quoted there — which is exactly how SQLite appends a column
+// added by ALTER TABLE ADD COLUMN, so those columns would survive the drop
+// forever. SQLite's own DROP COLUMN edits the schema in place, works for both
+// forms, and leaves the table's indexes alone.
+func dropLegacyColumn(db *gorm.DB, model interface{}, table, column string) error {
+	if db.Dialector.Name() != SQLITE {
+		return db.Migrator().DropColumn(model, column)
+	}
+	statement := "ALTER TABLE " + quoteIdent(db, table) + " DROP COLUMN " + quoteIdent(db, column)
+	return db.Exec(statement).Error
 }
 
 // ensureUserMailIndex creates the unique mail index once the data is clean.
