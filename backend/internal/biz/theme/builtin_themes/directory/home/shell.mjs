@@ -7,6 +7,55 @@ const element = (tag, className, text) => {
 
 const textValue = value => typeof value === 'string' ? value : ''
 
+// ---- Contrast sampling -------------------------------------------------------
+//
+// The artwork behind the home decides how legible a colour is, so the icon tiles
+// and the brand mark derive their tone from the pixels they actually sit on
+// instead of a fixed palette slot. Sampling needs a canvas, and the two sources
+// that can taint one — a remote wallpaper and a cross-origin icon — resolve to
+// `null`, which leaves the stylesheet's own default in place.
+const sampleImage = (source, size, topAnchored) => new Promise(resolve => {
+  const probe = new Image()
+  probe.referrerPolicy = 'no-referrer'
+  probe.onload = () => {
+    try {
+      const canvas = document.createElement('canvas')
+      canvas.width = size
+      canvas.height = size
+      const context = canvas.getContext('2d', { willReadFrequently: true })
+      if (!context) { resolve(null); return }
+      const scale = Math.max(size / probe.width, size / probe.height)
+      const width = probe.width * scale
+      const height = probe.height * scale
+      // Cover-fit, anchored to the top for a wallpaper: the masthead sits over
+      // the upper band, and that is the part that has to carry the brand mark.
+      context.drawImage(probe, (size - width) / 2, topAnchored ? 0 : (size - height) / 2, width, height)
+      const { data } = context.getImageData(0, 0, size, size)
+      let luma = 0
+      let weight = 0
+      for (let index = 0; index < data.length; index += 4) {
+        const alpha = data[index + 3] / 255
+        if (alpha < 0.1) continue
+        luma += (0.2126 * data[index] + 0.7152 * data[index + 1] + 0.0722 * data[index + 2]) * alpha
+        weight += alpha
+      }
+      if (!weight) { resolve(null); return }
+      resolve({ luma: luma / weight, transparency: 1 - weight / (data.length / 4) })
+    }
+    catch { resolve(null) }
+  }
+  probe.onerror = () => resolve(null)
+  probe.src = source
+})
+
+// The midpoint between the two tones: a source close to the tile's own luminance
+// keeps the tile the stylesheet already gave it.
+const DARK_LUMA = 140
+
+// Below this much transparency the icon's own artwork covers the tile, so the
+// tile behind it cannot affect how the icon reads.
+const TRANSPARENCY_FLOOR = 0.05
+
 // 诊断开关来自 Core 快照的 `diagnostics.showClickTrace`。
 //
 // 它不能从 URL 读。主题文档是 `srcdoc`，实测三条路都不通：
@@ -108,6 +157,21 @@ const createYinHome = yinLayout => ({
     const collapsedGroups = new Set()
     const groupNodes = new Map()
     const itemNodes = new Map()
+
+    const iconTones = new Map()
+    // A transparent logo on the default dark tile is unreadable, so the tile
+    // takes the opposite tone from the icon's own pixels. Icons repeat across a
+    // space, so the answer is cached by source and each source is sampled once.
+    const applyIconTone = (icon, src) => {
+      const known = iconTones.get(src)
+      if (known) { icon.dataset.iconTone = known; return }
+      void sampleImage(src, 24, false).then(sample => {
+        if (!sample || sample.transparency < TRANSPARENCY_FLOOR) return
+        const tone = sample.luma < DARK_LUMA ? 'light' : 'dark'
+        iconTones.set(src, tone)
+        if (icon.isConnected) icon.dataset.iconTone = tone
+      })
+    }
 
     // Drag edit mode (see enterEditMode): while editing, the DOM is the source of
     // truth, so renderCollection is frozen and the saved layout is diffed against
@@ -581,10 +645,11 @@ const createYinHome = yinLayout => ({
       contextMenu.setAttribute('role', 'menu')
       contextMenu.setAttribute('aria-label', 'Item actions')
       headerSection.append(masthead, actionBar, searchSection)
-      // The system monitor is rendered by the theme itself, in normal flow, through
-      // the Core component bridge (`<yin-system-monitor>`). The Core only keeps its
-      // own overlay as the fallback for a theme that does not embed it, and the
-      // element's presence is what tells the Core to step aside.
+      // The band is the Core's component, embedded through the bridge. Redrawing
+      // it in the theme is what drifted from the Core's own rendering, so the
+      // theme owns how it *looks* instead: it sets the tokens the component reads
+      // (see `.yin-monitor` in the stylesheet), which is what makes the band
+      // follow the same derived foreground as the rest of the page.
       monitorSection = element('section', 'yin-monitor')
       monitorSection.dataset.testid = 'theme-home-monitor'
       monitorSection.hidden = true
@@ -897,7 +962,9 @@ const createYinHome = yinLayout => ({
       icon.replaceChildren()
       icon.removeAttribute('style')
       const itemIcon = item.icon
+      icon.removeAttribute('data-icon-tone')
       if (itemIcon?.backgroundColor) icon.style.backgroundColor = itemIcon.backgroundColor
+      else if (itemIcon?.src) applyIconTone(icon, itemIcon.src)
       // The letter sits on its own layer the size of the tile, so it centres on
       // the whole box rather than on the 1px-inset content area left by the
       // transparent border. It is always the base layer: the item only shows the
@@ -1388,7 +1455,13 @@ const createYinHome = yinLayout => ({
       page.style.setProperty('--yin-margin-x', `${presentation.content?.marginX || 0}px`)
       page.style.setProperty('--yin-content-top', `${(viewportWidth() * (presentation.content?.marginTopPercent || 0)) / 100}px`)
       page.style.setProperty('--yin-content-bottom', `${(viewportWidth() * (presentation.content?.marginBottomPercent || 0)) / 100}px`)
-      page.style.setProperty('--yin-icon-text-color', presentation.iconTextColor || '#ffffff')
+      // One derived foreground drives every piece of text the theme paints on the
+      // artwork. The Core reads the wallpaper and hands over a tone plus its own
+      // suggestion; a theme is free to ignore the suggestion, and a panel that
+      // set an explicit icon colour still wins when nothing is painted.
+      page.style.setProperty('--yin-icon-text-color', snapshot.wallpaper && snapshot.wallpaper.onWallpaper ? snapshot.wallpaper.onWallpaper : (presentation.iconTextColor || '#ffffff'))
+      if (snapshot.wallpaper && snapshot.wallpaper.onWallpaperMuted) page.style.setProperty('--yin-icon-text-muted', snapshot.wallpaper.onWallpaperMuted)
+      else page.style.removeProperty('--yin-icon-text-muted')
       const reservedHeight = Number(presentation.monitor?.reservedHeight)
       page.style.setProperty('--yin-monitor-reserved-height', `${Number.isFinite(reservedHeight) && reservedHeight > 0 ? reservedHeight : 0}px`)
       // The theme renders the monitor itself; only show it when the Core says it is

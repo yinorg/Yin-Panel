@@ -115,6 +115,9 @@ select {
   font-size: 14px;
   font-weight: 400;
   line-height: 1.6;
+  /* Secondary text on the artwork follows the Core's muted suggestion; without
+     one it falls back to the primary on-wallpaper colour. */
+  color: var(--yin-icon-text-muted, var(--yin-icon-text-color, #fff));
 }
 
 .yin-logo-divider {
@@ -355,15 +358,19 @@ select {
   padding-top: 26px;
   max-height: 286px;
   overflow: auto;
-  --yin-text: #fff;
-  --yin-textMuted: rgb(255 255 255 / 82%);
-  --yin-primary: #fff;
+  /* The band is the Core's component, so the theme colours it the same way it
+     colours everything else on the artwork: through the derived foreground the
+     Core hands over in the snapshot. These used to be hardcoded white, which is
+     what made the band the one surface that never followed the wallpaper. */
+  --yin-text: var(--yin-icon-text-color, #fff);
+  --yin-textMuted: var(--yin-icon-text-muted, rgb(255 255 255 / 82%));
+  --yin-primary: var(--yin-icon-text-color, #fff);
   --yin-border: transparent;
   --yin-component-app-icon-surface: rgb(42 42 42 / 42%);
   --yin-component-system-monitor-heading-size: 18px;
 }
-.yin-monitor .n-progress-graph-circle-rail { stroke: rgb(255 255 255 / 36%) !important; }
-.yin-monitor .n-progress-graph-line-rail { background-color: rgb(255 255 255 / 24%) !important; }
+.yin-monitor .n-progress-graph-circle-rail { stroke: color-mix(in srgb, var(--yin-icon-text-color, #fff) 36%, transparent) !important; }
+.yin-monitor .n-progress-graph-line-rail { background-color: color-mix(in srgb, var(--yin-icon-text-color, #fff) 24%, transparent) !important; }
 
 .yin-collection {
   display: block;
@@ -846,6 +853,18 @@ select {
   width: 100%;
   height: 100%;
   object-fit: contain;
+}
+
+/* A transparent logo would otherwise sit on the tile's dark default and lose its
+   own contrast, so the shell samples the icon and marks the tile with the tone
+   the logo needs. An icon with no transparency covers the tile itself, gets no
+   marker, and keeps the default. */
+.yin-item-icon[data-icon-tone='light'] {
+  background: rgb(255 255 255 / 92%);
+}
+
+.yin-item-icon[data-icon-tone='dark'] {
+  background: rgb(18 22 26 / 62%);
 }
 
 .yin-item-copy {
