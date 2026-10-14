@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { NButton, NCard, NInput, NList, NListItem, NModal, NProgress, NSelect, NSpace, useMessage } from 'naive-ui'
 import { computed, onMounted, ref } from 'vue'
-import { addMember, addOIDCGroup, clearSpace, copySpace, createGroup, createSpace, deleteOIDCGroup, deleteSpace, getGroups, getMembers, getOIDCGroups, getPublicConfig, getSearchConfig, getSpaces, removeMember, renameSpace, resolveSpace, setPublicConfig, setSearchConfig, spaceOptions, updateGroup, updateMember, type Space, type SpaceMember, type SpaceSearchConfig } from '../../../api/panel/space'
+import { addMember, addOIDCGroup, clearSpace, copySpace, createGroup, createSpace, deleteGroup, deleteOIDCGroup, deleteSpace, getGroups, getMembers, getOIDCGroups, getPublicConfig, getSearchConfig, getSpaces, removeMember, renameSpace, resolveSpace, setPublicConfig, setSearchConfig, spaceOptions, updateGroup, updateMember, type Space, type SpaceMember, type SpaceSearchConfig } from '../../../api/panel/space'
 import { useAuthStore } from '../../../store'
 import { t } from '../../../locales'
 import { clearSpaceCache, readSpaceCache, writeSpaceCache } from '@/utils/spaceCache'
@@ -186,6 +186,22 @@ function saveGroup(spaceId: number) {
 }
 function openAddGroup(spaceId: number) { editing.value = null; groupName.value = ''; groupParentId.value = null; groupDialogVisible.value = true }
 function editGroup(spaceId: number, group: { id: number; title: string; parentId?: number | null }) { editing.value = { spaceId, id: group.id }; groupName.value = group.title; groupParentId.value = group.parentId || null; groupDialogVisible.value = true }
+async function removeGroup(spaceId: number, group: { id: number, title: string }) {
+  const confirmed = await confirmAction({
+    content: t('apps.itemGroupManage.deleteWarnText', { name: group.title || t('spaceManage.untitledGroup') }),
+    positiveText: t('common.delete'),
+    variant: 'error',
+  })
+  if (!confirmed) return
+  const { code } = await deleteGroup<{ code: number }>(spaceId, group.id)
+  if (code !== 0) {
+    message.error(t('common.deleteFail'))
+    return
+  }
+  message.success(t('common.deleteSuccess'))
+  invalidateSpaceCache(spaceId)
+  loadGroups(spaceId)
+}
 function openCreateDialog() {
   name.value = ''
   createDialogVisible.value = true
@@ -404,7 +420,7 @@ onMounted(load)
         <NCard v-if="selectedSpaceId" size="small" :title="$t('spaceManage.sectionContent')">
           <div class="w-full">
             <div class="flex items-center gap-2"><span>{{ $t('spaceManage.groups') }}</span><NButton size="tiny" type="primary" @click="openAddGroup(selectedSpaceId!)">{{ $t('spaceManage.addGroup') }}</NButton><span v-if="!groups[selectedSpaceId]?.length" class="yin-text-muted">{{ $t('common.noData') }}</span></div>
-            <NList class="mt-1"><NListItem v-for="group in groups[selectedSpaceId]" :key="group.id"><NSpace justify="space-between" align="center" class="w-full"><span>{{ group.title }}{{ group.parentId ? ` ${$t('spaceManage.childGroupLabel')}` : '' }}</span><NButton data-testid="group-rename" size="tiny" @click="editGroup(selectedSpaceId!, group)">{{ $t('common.edit') }}</NButton></NSpace></NListItem></NList>
+            <NList class="mt-1"><NListItem v-for="group in groups[selectedSpaceId]" :key="group.id"><NSpace justify="space-between" align="center" class="w-full"><span>{{ group.title }}{{ group.parentId ? ` ${$t('spaceManage.childGroupLabel')}` : '' }}</span><NSpace :size="6"><NButton data-testid="group-rename" size="tiny" @click="editGroup(selectedSpaceId!, group)">{{ $t('common.edit') }}</NButton><NButton data-testid="group-delete" size="tiny" tertiary type="error" @click="removeGroup(selectedSpaceId!, group)">{{ $t('common.delete') }}</NButton></NSpace></NSpace></NListItem></NList>
           </div>
           <NModal v-model:show="groupDialogVisible" preset="dialog" :title="editing ? $t('common.edit') : $t('spaceManage.addGroup')" :positive-text="$t('common.confirm')" :negative-text="$t('common.cancel')" @positive-click="saveGroup(selectedSpaceId!)">
             <NSpace vertical>

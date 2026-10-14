@@ -336,7 +336,7 @@ export function useHomeCommands(input: {
     createGroup: group => input.homeMutations.createGroup({ title: group.title, icon: group.icon || '', parentId: group.parentId ?? null }),
     updateGroup: (groupId, group) => input.homeMutations.updateGroup(groupId, { title: group.title, icon: group.icon || '', parentId: group.parentId ?? null }),
     deleteGroup: group => input.confirmThemeDelete(
-      t('spaceManage.deleteWarnText', { name: group.title || '' }),
+      t('apps.itemGroupManage.deleteWarnText', { name: group.title || '' }),
       spaceId => input.homeMutations.deleteGroup(group.id, spaceId),
     ),
     reorderGroups: (parentId, groupIds) => input.homeMutations.reorderGroups(parentId, groupIds),
