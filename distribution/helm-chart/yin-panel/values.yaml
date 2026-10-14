@@ -11,10 +11,10 @@ image:
 resources:
   limits:
     cpu: 1000m
-    memory: 100Mi
+    memory: 256Mi
   requests:
     cpu: 100m
-    memory: 20Mi
+    memory: 64Mi
 
 service:
   type: ClusterIP
@@ -44,6 +44,9 @@ appConfig:
     enable_metrics: false
     # Metrics listener port. Default:9091
     metrics_port: 9091
+    # Soft memory limit derived from the container's cgroup limit. 0 uses the
+    # built-in 0.75 ratio; a negative value disables the adaptation.
+    memory_limit_ratio: 0
     # Enable proxy feature to solve some network issues. Default:false
     enable_node_proxy: false
     # Used as prefix to generate file url. For example, it will lookup to "/uploads/xxxx.png"

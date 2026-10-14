@@ -4,6 +4,12 @@ services:
     pull_policy: missing
     container_name: yin-panel
     restart: unless-stopped
+    # GOMEMLIMIT is derived from this limit by the binary itself, so keep the
+    # limit generous enough for the cgo SQLite heap that GOMEMLIMIT excludes.
+    deploy:
+      resources:
+        limits:
+          memory: 256m
     volumes:
       - ./conf.yaml:/app/conf.yaml
       - ./uploads:/app/uploads

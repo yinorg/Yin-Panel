@@ -45,6 +45,10 @@ type BaseConfig struct {
 	EnableMetrics bool `yaml:"enable_metrics"`
 	// MetricsPort is the port of that listener. Defaults to 9091 when unset.
 	MetricsPort string `yaml:"metrics_port"`
+	// MemoryLimitRatio derives GOMEMLIMIT from the cgroup memory limit when it
+	// is positive. Zero selects the built-in ratio and a negative value disables
+	// the adaptation entirely.
+	MemoryLimitRatio float64 `yaml:"memory_limit_ratio"`
 }
 
 // SQLiteConfig represents the sqlite section configuration

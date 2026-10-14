@@ -18,6 +18,16 @@ type cgroupMemoryReading struct {
 // （PAGE_COUNTER_MAX，见内核 page_counter.h）。
 const cgroupV1UnlimitedThreshold = uint64(0x7FFFFFFFFFFFF000)
 
+// CgroupMemoryLimit 返回当前进程所在 cgroup 的内存限额。
+// 无 cgroup、未探测到有效限额时返回 ok=false，调用方应回退到宿主机口径。
+func CgroupMemoryLimit() (uint64, bool) {
+	reading, ok := readCgroupMemory()
+	if !ok || reading.limit == 0 {
+		return 0, false
+	}
+	return reading.limit, true
+}
+
 // parseCgroupV2MemoryMax 解析 cgroup v2 的 memory.max。
 // "max"、空值或非法值返回 ok=false。
 func parseCgroupV2MemoryMax(content string) (uint64, bool) {

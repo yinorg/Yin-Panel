@@ -34,6 +34,7 @@ func Init(configPath string) error {
 	if err != nil {
 		return err
 	}
+	applyMemoryLimit()
 	i18n.LangInit("zh-cn")
 	global.UserService = service.NewUserService(global.UserRepo, global.ItemIconGroupRepo)
 
