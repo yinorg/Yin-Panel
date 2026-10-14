@@ -21,6 +21,8 @@ declare namespace Panel {
         title?: string
         sort?:number
         parentId?: number | null
+        /** Server-reported item count; absent when the group is empty. */
+        itemCount?: number
     }
 
     interface ItemIcon {

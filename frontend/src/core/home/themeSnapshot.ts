@@ -143,6 +143,10 @@ export function createThemeHomeSnapshot(input: {
       title: group.title || '',
       icon: group.icon,
       itemIds: (group.items || []).map(item => String(item.id)),
+      // The server's own count, so a home can size its loading placeholders
+      // before any item has arrived. Falling back to what is loaded keeps the
+      // field meaningful against a backend that does not report it yet.
+      itemCount: group.itemCount ?? (group.items || []).length,
       capabilities: input.activeSpaceCanEdit === true && input.canWriteGroups ? ['groups.write'] : [],
     })
     for (const item of group.items || []) {

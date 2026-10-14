@@ -30,6 +30,10 @@ type ItemIconGroup struct {
 	UserId      uint   `gorm:"index" json:"userId"`
 	SpaceID     uint   `json:"spaceId"`
 	ParentID    *uint  `gorm:"index" json:"parentId,omitempty"`
+	// How many items the group holds. Only the group list fills it in, and the
+	// home page sizes its loading placeholders from it so the final layout can be
+	// painted before any item has arrived. Never persisted.
+	ItemCount int `gorm:"-" json:"itemCount,omitempty"`
 }
 
 func (r *ItemIconGroupRepo) Save(itemIconGroup *ItemIconGroup) error {

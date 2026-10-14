@@ -97,6 +97,14 @@ export interface ThemeGroup {
   title: string
   icon?: string
   itemIds: readonly string[]
+  /**
+   * How many items the group holds, as the server reports it.
+   *
+   * Present before `itemIds` fills in, so a home can reserve a group's final
+   * footprint while its items are still in flight instead of growing the page
+   * one group at a time as they arrive.
+   */
+  itemCount?: number
   capabilities?: readonly string[]
 }
 

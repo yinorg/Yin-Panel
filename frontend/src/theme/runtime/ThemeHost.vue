@@ -283,6 +283,9 @@ function scopedSnapshot(snapshot: ThemeHomeSnapshot): ThemeHomeSnapshot {
       title: String(group.title),
       icon: group.icon === undefined ? undefined : String(group.icon),
       itemIds: canReadItems ? group.itemIds.map(id => String(id)) : [],
+      // Same gate as `itemIds`: a count describes items the theme may not be
+      // allowed to read, and this mapping is the only way content reaches it.
+      itemCount: canReadItems && group.itemCount !== undefined ? Number(group.itemCount) || 0 : undefined,
       capabilities: permissions.has('groups.write') && group.capabilities?.includes('groups.write') ? ['groups.write'] : [],
     })) : [],
     items: canReadItems ? snapshot.items.map(item => ({

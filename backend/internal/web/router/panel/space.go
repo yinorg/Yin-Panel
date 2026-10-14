@@ -1366,6 +1366,29 @@ func (r *SpaceRouter) Groups(c *gin.Context) {
 		response.ErrorDatabase(c, err.Error())
 		return
 	}
+	// One grouped count for the whole Space. The home page reserves each group's
+	// final footprint from this while the items are still in flight, and a single
+	// query is cheaper than asking per group.
+	type groupItemCount struct {
+		ItemIconGroupId uint `gorm:"column:item_icon_group_id"`
+		Total           int  `gorm:"column:total"`
+	}
+	var counts []groupItemCount
+	if err := repository.Db.Model(&repository.ItemIcon{}).
+		Select("item_icon_group_id, COUNT(*) AS total").
+		Where("space_id = ?", id).
+		Group("item_icon_group_id").
+		Scan(&counts).Error; err != nil {
+		response.ErrorDatabase(c, err.Error())
+		return
+	}
+	countByGroup := make(map[uint]int, len(counts))
+	for _, row := range counts {
+		countByGroup[row.ItemIconGroupId] = row.Total
+	}
+	for i := range groups {
+		groups[i].ItemCount = countByGroup[groups[i].ID]
+	}
 	response.SuccessData(c, groups)
 }
 

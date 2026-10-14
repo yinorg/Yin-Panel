@@ -1719,3 +1719,30 @@ select {
 
 @media (max-width: 640px) {
   }
+
+/* 加载占位块。每个都是一个空的真实 `.yin-item`，所以它自动继承当前显示形态与
+   断点给条目的盒子尺寸——行数和行高在任何条目到达之前就已确定，数据落地时不会
+   有任何位移。这里只补上属于它自己的那块表面。 */
+.yin-collection .yin-item-placeholder {
+  background: color-mix(in srgb, var(--yin-icon-text-color, #fff) 9%, transparent);
+  cursor: default;
+  animation: yin-item-placeholder-pulse 1.5s ease-in-out infinite;
+}
+
+.yin-collection .yin-item-placeholder:hover,
+.yin-collection .yin-item-placeholder:active {
+  transform: none;
+  background: color-mix(in srgb, var(--yin-icon-text-color, #fff) 9%, transparent);
+}
+
+@keyframes yin-item-placeholder-pulse {
+  0%, 100% { opacity: .5; }
+  50% { opacity: .85; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .yin-collection .yin-item-placeholder {
+    animation: none;
+    opacity: .6;
+  }
+}

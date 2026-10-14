@@ -1103,6 +1103,34 @@ const createYinHome = yinLayout => ({
       void Promise.resolve(api.commands.execute('layout.report', { searchBottom: bottom })).catch(() => {})
     }
 
+    // Loading placeholders are capped at the same threshold a large group is
+    // collapsed at, so a huge group never reserves more space than it shows.
+    const MAX_ITEM_PLACEHOLDERS = 40
+
+    /**
+     * Keeps exactly `count` loading placeholders in a group's item list.
+     *
+     * Each placeholder is a real `.yin-item` with nothing inside it, so it
+     * inherits whatever box the active display style and breakpoint give an item.
+     * That is what makes the reservation exact — the grid's rows and their height
+     * are settled before any item has arrived, and nothing moves when they land.
+     */
+    const syncItemPlaceholders = (list, count, info) => {
+      let current = list.querySelectorAll('.yin-item-placeholder').length
+      while (current < count) {
+        const node = element('div', info ? 'yin-item yin-item-placeholder yin-item--info' : 'yin-item yin-item-placeholder')
+        node.setAttribute('aria-hidden', 'true')
+        list.append(node)
+        current++
+      }
+      while (current > count) {
+        const node = list.querySelector('.yin-item-placeholder')
+        if (!node) break
+        node.remove()
+        current--
+      }
+    }
+
     const renderCollection = () => {
       if (!snapshot || !collection) return
       // Frozen while editing: the drag mutates the DOM directly and the layout is
@@ -1149,6 +1177,14 @@ const createYinHome = yinLayout => ({
         section._yin.moveGroupDown.hidden = !canMutateGroup('reorder') || siblingIndex < 0 || siblingIndex >= siblings.length - 1
         section._yin.moveGroupUp.disabled = inFlight.has(`groups-reorder-${group.parentId ?? 'root'}`)
         section._yin.moveGroupDown.disabled = section._yin.moveGroupUp.disabled
+        // Items are still in flight for this group. The group list already knows
+        // how many it holds, so the group's final footprint can be reserved now:
+        // without this the group stayed hidden until its items arrived, and the
+        // page grew a row at a time — the whole of the slow-link complaint.
+        const expectedCount = Math.max(0, Number(group.itemCount) || 0)
+        const awaitingItems = snapshot.status === 'loading'
+          && expectedCount > 0
+          && !(group.itemIds || []).length
         const list = section._yin.list
         const visibleItemIds = new Set()
         if (!collapsed) {
@@ -1167,8 +1203,12 @@ const createYinHome = yinLayout => ({
             visibleItemIds.add(String(item.id))
           }
           for (const child of [...list.children]) {
+            // Placeholders carry no item id, so the id sweep must not take them
+            // for stale rows; they are reconciled on the line below.
+            if (child.classList.contains('yin-item-placeholder')) continue
             if (!visibleItemIds.has(child.dataset.itemId)) child.remove()
           }
+          syncItemPlaceholders(list, awaitingItems ? Math.min(expectedCount, MAX_ITEM_PLACEHOLDERS) : 0, yinLayout.itemChrome(presentation).info === true)
         }
         const hasVisibleItem = (group.itemIds || []).some(itemId => {
           const item = itemById.get(String(itemId))
@@ -1176,7 +1216,9 @@ const createYinHome = yinLayout => ({
             || `${item.title || ''} ${item.description || ''}`.toLocaleLowerCase().includes(needle))
         })
         const hasAnyItem = (group.itemIds || []).some(itemId => itemById.has(String(itemId)))
-        const emptyRow = hideEmptyGroups && !hasAnyItem && !(depth === 0 && !tabHasItems)
+        // A group awaiting its items is not an empty group — it is showing
+        // placeholders, so it has to stay visible.
+        const emptyRow = hideEmptyGroups && !hasAnyItem && !awaitingItems && !(depth === 0 && !tabHasItems)
         section.hidden = emptyRow
           || (!!needle && presentation.search?.itemFilterEnabled !== false && !hasVisibleItem)
         yinLayout.decorateGroup(section, group, depth)
@@ -1188,7 +1230,11 @@ const createYinHome = yinLayout => ({
       }
       // Re-appending a group moves it to the end, so keep the empty state last.
       collection.append(emptyState)
-      emptyState.hidden = snapshot.status === 'loading' || visibleGroups.some(({ group }) => {
+      // The empty state steps aside as soon as any group is on screen — and a
+      // group showing placeholders counts, because its list is not empty. It used
+      // to be hidden unconditionally while loading, which is why a slow load
+      // showed a blank page instead of this very message.
+      emptyState.hidden = visibleGroups.some(({ group }) => {
         const section = groupNodes.get(String(group.id))
         return section && !section.hidden && section._yin.list.children.length > 0
       })
@@ -1226,7 +1272,9 @@ const createYinHome = yinLayout => ({
       for (const section of collection.querySelectorAll('.yin-group')) {
         const groupId = section.dataset.groupId
         const ids = [...section._yin.list.children]
-          .filter(node => node.classList && node.classList.contains('yin-item'))
+          // Placeholders are `.yin-item` too, but carry no id and are not part of
+          // the order the layout is serialised from.
+          .filter(node => node.classList && node.classList.contains('yin-item') && node.dataset.itemId)
           .map(node => node.dataset.itemId)
         itemOrder.set(groupId, ids)
         ids.forEach((id, index) => { itemGroup.set(id, groupId); itemIndex.set(id, index) })
