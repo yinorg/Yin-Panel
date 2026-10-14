@@ -12,6 +12,11 @@ base:
   enable_monitor: true
   # System monitor snapshot refresh interval in seconds. Default:10
   monitor_refresh_interval: 10
+  # Serve Prometheus metrics on a separate, unauthenticated listener. Default:false
+  # Never publish this port: it is meant for an in-network scraper only.
+  enable_metrics: false
+  # Metrics listener port. Default:9091
+  metrics_port: 9091
   # Enable proxy feature to solve some network issues. Default:false
   enable_node_proxy: false
   # Used as prefix to generate file url. For example, it will lookup to "/uploads/xxxx.png"

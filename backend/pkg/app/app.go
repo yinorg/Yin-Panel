@@ -57,6 +57,11 @@ func Init(configPath string) error {
 	if err := jwt.InitJWT(); err != nil {
 		return fmt.Errorf("JWT initialization error: %w", err)
 	}
+	if config.AppConfig.Base.EnableMetrics {
+		if err := router.StartMetricsServer(); err != nil {
+			return fmt.Errorf("metrics listener: %w", err)
+		}
+	}
 	return router.InitRouters(":" + config.AppConfig.Base.HTTPPort)
 }
 

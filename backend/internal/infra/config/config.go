@@ -39,6 +39,12 @@ type BaseConfig struct {
 	MonitorRefreshInterval int    `yaml:"monitor_refresh_interval"`
 	EnableNodeProxy        bool   `yaml:"enable_node_proxy"`
 	URLPrefix              string `yaml:"url_prefix"`
+	// EnableMetrics starts a second HTTP listener that serves Prometheus
+	// metrics. It is off by default and its port must never be published: the
+	// endpoint is unauthenticated and is meant for an in-network scraper only.
+	EnableMetrics bool `yaml:"enable_metrics"`
+	// MetricsPort is the port of that listener. Defaults to 9091 when unset.
+	MetricsPort string `yaml:"metrics_port"`
 }
 
 // SQLiteConfig represents the sqlite section configuration

@@ -39,6 +39,11 @@ appConfig:
     enable_static_server: true
     # Enable system monitor feature. Default:true
     enable_monitor: false
+    # Serve Prometheus metrics on a separate, unauthenticated listener. Default:false
+    # Never publish this port: it is meant for an in-network scraper only.
+    enable_metrics: false
+    # Metrics listener port. Default:9091
+    metrics_port: 9091
     # Enable proxy feature to solve some network issues. Default:false
     enable_node_proxy: false
     # Used as prefix to generate file url. For example, it will lookup to "/uploads/xxxx.png"
