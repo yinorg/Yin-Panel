@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { usePanelState } from '@/store'
 import { activeThemeWallpaper } from '@/hooks/useTheme'
 import { useWallpaperLibrary } from '@/hooks/useWallpaperLibrary'
+import { publishWallpaperTone } from '@/core/home/wallpaperTone'
 
 const panelState = usePanelState()
 // The Core wallpaper library: a stored selection is an id, so the layer resolves
@@ -63,6 +64,10 @@ const maskColor = computed(() => {
   return `rgba(0,0,0,${panelState.panelConfig.backgroundMaskNumber ?? 0})`
 })
 watch(() => wallpaper.value?.source, () => { failed.value = false; posterFailed.value = false })
+// The Core owns the wallpaper, so this is the one place that can read it. The
+// tone travels to the theme through the snapshot; a framed or cross-origin
+// artwork resolves to no tone rather than a guessed one.
+watch(() => wallpaper.value?.poster || wallpaper.value?.source || null, source => { void publishWallpaperTone(source) }, { immediate: true })
 // The library must be loaded whenever a selection exists — not only at mount:
 // the panel config arrives after the layer mounts on a cold load, and the picker
 // can switch the mode while the page is open.

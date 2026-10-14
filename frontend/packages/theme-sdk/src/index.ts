@@ -152,6 +152,21 @@ export interface ThemeSearchEngine {
   iconSrc: string
 }
 
+export interface ThemeMonitorCard {
+  type: 'cpu' | 'memory' | 'disk' | 'network'
+  /** Disk cards carry the mount path they read. */
+  path?: string
+  /**
+   * Colours the visitor chose for this card. A theme that draws its own band may
+   * honour them or use its own; they exist so a themed band can match what the
+   * visitor configured in the Core.
+   */
+  backgroundColor?: string
+  color?: string
+  progressColor?: string
+  progressRailColor?: string
+}
+
 export interface ThemeHomePresentation {
   /**
    * Informational: the layout of the theme package that is mounted. Each built-in
@@ -174,7 +189,7 @@ export interface ThemeHomePresentation {
   }
   content: { marginTopPercent: number; marginBottomPercent: number; maxWidth: number; maxWidthUnit: 'px' | '%' | 'rem' | 'vw'; marginX: number }
   footerHtml: string
-  monitor: { visible: boolean; showTitle: boolean; reservedHeight?: number }
+  monitor: { visible: boolean; showTitle: boolean; reservedHeight?: number, cards?: readonly ThemeMonitorCard[] }
   /**
    * The LAN/WAN mode the Core currently opens items with. `switchVisible`
    * mirrors the user's "show the network switch" preference, so a theme can
@@ -189,6 +204,23 @@ export interface ThemeHomePresentation {
    * so a theme can hide the entry instead of offering a dead button.
    */
   signedIn: boolean
+}
+
+export interface ThemeWallpaper {
+  /**
+   * How light the artwork is, or `null` when artwork is painted but cannot be
+   * read — a sandboxed page, a cross-origin frame, a picture that taints the
+   * canvas. The suggestions are absent in that case and the theme decides what
+   * to draw on it.
+   */
+  tone: 'light' | 'dark' | null
+  /**
+   * A foreground that reads against this tone. This is what the Core would use,
+   * not a rule: a theme is free to ignore it and pick its own colours.
+   */
+  onWallpaper?: string
+  /** The same, for secondary text. */
+  onWallpaperMuted?: string
 }
 
 export interface ThemeHomeSnapshot {
@@ -223,6 +255,12 @@ export interface ThemeHomeSnapshot {
    * the channel the theme already uses for everything else.
    */
   diagnostics?: { showClickTrace?: boolean }
+  /**
+   * The artwork behind the home, so a theme can choose readable colours without
+   * resolving the wallpaper itself. Absent when nothing is painted; the Core
+   * owns the wallpaper, so it is the only side that can read it.
+   */
+  wallpaper?: ThemeWallpaper
 }
 
 export interface ThemeSearchPage {
@@ -243,11 +281,22 @@ export interface ThemePageOptions {
   cursor?: string
 }
 
+export interface ThemeMonitorDisk {
+  /** The mount path this reading belongs to. */
+  path: string
+  total: number
+  used: number
+  free: number
+  usedPercent: number
+}
+
 export interface ThemeMonitorSnapshot {
   capturedAt: string
   cpu?: { coreCount: number; model: string; usagePercent: number }
   memory?: { total: number; used: number; free: number; usedPercent: number }
   network?: readonly { name: string; bytesSent: number; bytesRecv: number }[]
+  /** One entry per disk card the visitor configured. */
+  disks?: readonly ThemeMonitorDisk[]
 }
 
 export type ThemeEventName =

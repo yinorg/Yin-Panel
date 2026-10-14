@@ -45,6 +45,15 @@ if (firstItem) await api.commands.execute('item.open', { itemId: firstItem.id })
 
 List cursors are opaque to themes. Select a Space with `commands.execute('space.select', { spaceId })`; Core then publishes the new Space snapshot. Item DTOs intentionally omit destination URLs; open an Item through `commands.execute('item.open', { itemId })` so Core retains URL and LAN/WAN policy.
 
+## Data the Core derives for you
+
+The Core owns the wallpaper, so it is the only side that can read it. It samples the artwork it paints and hands the result over rather than letting every theme sample it again:
+
+- `snapshot.wallpaper?: { tone: 'light' | 'dark' | null, onWallpaper?, onWallpaperMuted? }` — absent when nothing is painted; `tone` is `null` when artwork is painted but cannot be read. The `onWallpaper*` values are what the Core would use; a theme is free to ignore them and pick its own colours from `tone`.
+- `api.events.subscribe('monitor.updated', …)` — monitor samples arrive as events, not in the snapshot, because the band refreshes on its own cadence. Read the first value with `api.monitor.getSnapshot()`.
+
+Nothing here is a rule. A theme may use it, ignore it, or derive something else entirely.
+
 Write commands accept Core-owned Item and Group fields. Item URLs are limited to HTTP and HTTPS; an update may omit unchanged fields. `item.delete` and `group.delete` always use Core confirmation UI. `items.reorder` requires the complete Item ID order for its Group, while `groups.reorder` requires the complete sibling ID order and optional `parentId`.
 
 `editor.open` accepts an optional `groupId` only when that Group is in the active Space. Core validates the current Space again when applying a mutation, and Themes never supply the destination URL used by `item.open`.

@@ -15,6 +15,8 @@ import { useThemeRuntime } from '@/core/home/useThemeRuntime'
 import { useThemeMonitor } from '@/core/home/useThemeMonitor'
 import { useHomeCommands } from '@/core/home/useHomeCommands'
 import { setThemeMonitorBridge, themeEmbeddedMonitorCount } from '@/core/home/monitorBridge'
+import { suggestedForeground, wallpaperPainted, wallpaperTone } from '@/core/home/wallpaperTone'
+import type { MonitorSnapshot } from '@/components/deskModule/SystemMonitor/snapshot'
 import { setBridgeAppContext, setBridgeHandlers } from '@/theme/bridge/registry'
 // Register the Core's embeddable custom elements so a theme can render Core pages
 // itself. See `theme/bridge/systemMonitor.ts` and `theme/bridge/appSurfaces.ts`.
@@ -64,7 +66,15 @@ export function useHomeShell() {
       || !!config.backgroundImageSrc
       || !!activeThemeWallpaper.value
   })
-  const panelIconTextColor = computed(() => resolvePanelValue('var(--yin-text)', panelState.panelConfig.iconTextColor, useThemeDefaults.value))
+  // The band's card text is painted on the artwork too, and it arrives through
+  // the component bridge rather than a stylesheet token, so it has to follow the
+  // same derived foreground. The panel's own icon colour still decides whenever
+  // nothing is painted behind the page.
+  const panelIconTextColor = computed(() => {
+    if (wallpaperPainted.value && wallpaperTone.value)
+      return suggestedForeground(wallpaperTone.value).onWallpaper
+    return resolvePanelValue('var(--yin-text)', panelState.panelConfig.iconTextColor, useThemeDefaults.value)
+  })
   // The home layout follows the mounted package: each built-in home package
   // renders exactly one layout, so the Core reads it from the theme rather than
   // from a separate panel preference.
@@ -296,6 +306,14 @@ export function useHomeShell() {
     getMonitorSnapshot,
   } = useThemeMonitor({ isThemeActive: () => themeRuntimeActive.value })
 
+  // Monitor samples reach the theme as `monitor.updated` events rather than
+  // through the snapshot: the band refreshes on its own cadence, and folding it
+  // in would re-announce `state.updated` on every tick and re-render the home.
+  // Subscribing does not start the poller — the Core's own layer still owns that.
+  const monitorSnapshot = ref<MonitorSnapshot | undefined>(undefined)
+  const unsubscribeMonitor = monitorSnapshotController.subscribe(next => { monitorSnapshot.value = next })
+  onUnmounted(() => { unsubscribeMonitor() })
+
   const {
     commandCenterVisible,
     commandCenterQuery,
@@ -491,6 +509,7 @@ export function useHomeShell() {
     monitorShowTitle,
     setMonitorLayerElement,
     monitorSnapshotController,
+    monitorSnapshot,
     panelIconTextColor,
     themeMonitorTop,
     contentTopVh,

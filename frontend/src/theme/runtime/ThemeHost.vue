@@ -21,6 +21,12 @@ const DIRECT_LIGHT_MOUNT = true
 const props = defineProps<{
   theme: ThemePackage
   snapshot: ThemeHomeSnapshot
+  /**
+   * The latest monitor sample, pushed to the theme as `monitor.updated` rather
+   * than carried in the snapshot: the band refreshes on its own cadence, and
+   * folding it in would re-announce `state.updated` on every tick.
+   */
+  monitorSnapshot?: unknown
   environment: Omit<ThemeEnvironment, 'apiVersion'>
   permissions: ThemePermission[]
   executionMode?: 'sandbox' | 'trusted'
@@ -227,6 +233,16 @@ function publishSnapshot(next: ThemeHomeSnapshot) {
   if (JSON.stringify(previous.items) !== JSON.stringify(next.items))
     runtime.emit('items.changed', { items: next.items })
 }
+
+/**
+ * Monitor samples arrive on their own cadence, so they are announced as events
+ * instead of being folded into the snapshot — which would re-announce
+ * `state.updated` on every tick and make the theme re-render the whole home.
+ */
+watch(() => props.monitorSnapshot, (next, previous) => {
+  if (!runtime || !next || next === previous) return
+  runtime.emit('monitor.updated', { monitor: next })
+})
 
 function scrollToTop() {
   if (mountMode.value === 'direct' && trustedTakeover.value) {

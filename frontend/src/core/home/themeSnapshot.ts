@@ -1,4 +1,4 @@
-import type { ThemeCollectionStatus, ThemeGroup, ThemeHomePresentation, ThemeHomeSnapshot, ThemeItem, ThemeSearchEngine, ThemeSpace } from '../../theme/api/v1'
+import type { ThemeCollectionStatus, ThemeGroup, ThemeHomePresentation, ThemeHomeSnapshot, ThemeItem, ThemeMonitorCard, ThemeSearchEngine, ThemeSpace, ThemeWallpaper } from '../../theme/api/v1'
 // @ts-expect-error Node's strip-types runner requires an explicit source extension.
 import { toThemeItemIcon } from './iconifyResource.ts'
 // @ts-expect-error Node's strip-types runner requires an explicit source extension.
@@ -119,6 +119,10 @@ export function createThemeHomeSnapshot(input: {
    * cannot read the panel's URL by any other route.
    */
   showClickTrace?: boolean
+  /** Derived from the wallpaper the Core paints; see `ThemeWallpaper`. */
+  wallpaper?: ThemeWallpaper
+  /** The visitor's monitor cards, fetched from the module config. */
+  monitorCards?: readonly ThemeMonitorCard[]
   error?: { code: string; message: string }
 }): ThemeHomeSnapshot {
   const spaces: ThemeSpace[] = input.spaces.map(space => ({
@@ -168,7 +172,7 @@ export function createThemeHomeSnapshot(input: {
       })
     }
   }
-  const presentation = mapPresentation(input.presentation, input.searchConfiguration, input.monitorReservedHeight, input.activeSpaceSide, input.layout)
+  const presentation = mapPresentation(input.presentation, input.searchConfiguration, input.monitorReservedHeight, input.activeSpaceSide, input.layout, input.monitorCards)
   const capabilities = [
     ...(input.activeSpaceCanEdit === true && input.canWrite ? ['items.write'] : []),
     ...(input.activeSpaceCanEdit === true && input.canWriteGroups ? ['groups.write'] : []),
@@ -193,10 +197,11 @@ export function createThemeHomeSnapshot(input: {
     // 读得到，但把调试开关挂在另一个文档的 URL 上本身就是脆的，而快照是主题本来就在用的
     // 那条通道。
     ...(input.showClickTrace ? { diagnostics: { showClickTrace: true } } : {}),
+    ...(input.wallpaper ? { wallpaper: input.wallpaper } : {}),
   }
 }
 
-function mapPresentation(source?: PresentationSource, searchConfiguration?: SearchConfigurationSource, monitorReservedHeight?: number, activeSide?: 'yin' | 'yang', layout?: 'standard' | 'directory'): ThemeHomePresentation | undefined {
+function mapPresentation(source?: PresentationSource, searchConfiguration?: SearchConfigurationSource, monitorReservedHeight?: number, activeSide?: 'yin' | 'yang', layout?: 'standard' | 'directory', monitorCards?: readonly ThemeMonitorCard[]): ThemeHomePresentation | undefined {
   if (!source && !searchConfiguration) return undefined
   const defaults = {
     iconStyle: 1,
@@ -271,6 +276,7 @@ function mapPresentation(source?: PresentationSource, searchConfiguration?: Sear
       visible: defaults.systemMonitorShow === true,
       showTitle: defaults.systemMonitorShowTitle !== false,
       ...(monitorReservedHeight !== undefined ? { reservedHeight: boundedFinite(monitorReservedHeight, 0, 0, 100000) } : {}),
+      ...(monitorCards && monitorCards.length ? { cards: monitorCards } : {}),
     },
     // 'lan' is the only value that differs; anything else means WAN.
     network: {

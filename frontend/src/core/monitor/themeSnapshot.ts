@@ -29,5 +29,18 @@ export function normalizeMonitorSnapshot(source: CoreMonitorSnapshot, capturedAt
       bytesSent: counter.bytesSent,
       bytesRecv: counter.bytesRecv,
     })),
+    // Omitted rather than sent as undefined: the theme treats a missing list and
+    // an empty one the same, and the DTO stays exactly as wide as the data.
+    ...(source.DISK_INFO
+      ? {
+          disks: Object.entries(source.DISK_INFO).map(([path, disk]) => ({
+            path,
+            total: disk.total,
+            used: disk.used,
+            free: disk.free,
+            usedPercent: Number.isFinite(disk.usedPercent) ? disk.usedPercent : 0,
+          })),
+        }
+      : {}),
   }
 }

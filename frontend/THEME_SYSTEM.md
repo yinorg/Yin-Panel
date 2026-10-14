@@ -101,6 +101,42 @@ primitive.color.*
 
 The same DTCG document also declares `shape`, `spacing`, `density`, `elevation`, `motion`, `background`, and `effect`. Reference resolution is cycle checked. CSS string values reject rule delimiters and control characters; finite numbers, dimensions, duration, color, font family, shadow, and cubic-Bezier values are checked before application.
 
+## Data Layer and Rendering Layer
+
+The boundary above has one consequence worth stating on its own: **the Core supplies data, the theme renders it.** Two pieces of data exist for that reason, and a theme may use, ignore, or replace what it is given.
+
+### The wallpaper's tone
+
+The Core owns the wallpaper, so it is the only side that can read it. It samples the artwork it paints and hands the result over in the snapshot:
+
+```ts
+snapshot.wallpaper?: {
+  /** How light the artwork is; null when it is painted but cannot be read
+   *  (a sandboxed page, a cross-origin frame, a picture that taints the canvas). */
+  tone: 'light' | 'dark' | null
+  /** What the Core would use. Not a rule — a theme may ignore it. */
+  onWallpaper?: string
+  onWallpaperMuted?: string
+}
+```
+
+The field is absent when nothing is painted. A theme that wants different colours derives them from `tone` itself; a theme that wants none ignores the field entirely. The built-in home packages read `onWallpaper` for every piece of text they paint on the artwork, so one value drives the clock, group titles and affordances together instead of each one hardcoding white.
+
+### Monitor samples arrive as events
+
+The system monitor refreshes on its own cadence, so its samples are announced rather than carried in the snapshot — folding them in would re-announce `state.updated` on every tick and make the theme re-render the whole home:
+
+```js
+const snapshot = await api.monitor.getSnapshot()
+const stop = api.events.subscribe('monitor.updated', event => draw(event.payload.monitor))
+```
+
+`ThemeMonitorSnapshot` carries `capturedAt`, `cpu`, `memory` and `network`.
+
+### Where the monitor band belongs
+
+The band is **presentation**, so it belongs to the theme. The Core registers `<yin-system-monitor>` as a component bridge for themes that would rather not draw it, and keeps its own layer as the minimum viable fallback when no theme renders one — but a home package that ships its own band owns its markup, its styles and its colours. That is what makes the band follow the wallpaper tone like every other surface instead of being pinned to white by a Core stylesheet.
+
 ## Coverage Matrix
 
 | Visual dimension | Token families | Runtime consumers |

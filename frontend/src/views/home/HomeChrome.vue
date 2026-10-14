@@ -136,6 +136,7 @@ const themeSurfaceRoute = computed(() => route.name === 'themeSurface')
       :ref="theme.setThemeHostElement"
       :theme="theme.themeRuntimePackage"
       :snapshot="theme.themeRuntimeSnapshot"
+      :monitor-snapshot="theme.monitorSnapshot"
       :environment="theme.themeRuntimeEnvironment"
       :permissions="theme.themeRuntimePermissions"
       :execution-mode="theme.themeExecutionMode"

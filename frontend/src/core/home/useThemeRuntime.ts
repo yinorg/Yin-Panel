@@ -9,6 +9,8 @@ import { createThemePersistence } from '@/core/home/themePersistence'
 import { createThemeSettingsSchemaValidator } from '@/core/home/themeSettingsSchema'
 import { createIconifyResourceResolver } from '@/core/home/iconifyResource'
 import { createThemeHomeSnapshot } from '@/core/home/themeSnapshot'
+import { suggestedForeground, wallpaperPainted, wallpaperTone } from '@/core/home/wallpaperTone'
+import { useMonitorCards } from '@/core/home/useMonitorCards'
 import { spaceDisplayName, type Space } from '@/api/panel/space'
 import { isThemeSafeMode } from '@/theme/recovery/safeMode'
 import { t } from '@/locales'
@@ -241,6 +243,17 @@ export function useThemeRuntime(input: {
   }, { immediate: true })
   onUnmounted(() => iconifyResourceResolver.cancel())
 
+  // The Core owns the wallpaper, so the tone derived from it here is the only
+  // source for it. A theme is free to ignore the suggestions and pick its own
+  // colours — that is why this carries the tone as well as the Core's choice.
+  const themeWallpaper = computed(() => {    if (!wallpaperPainted.value) return undefined
+    const tone = wallpaperTone.value
+    if (!tone) return { tone: null }
+    return { tone, ...suggestedForeground(tone) }
+  })
+
+  const { monitorCards } = useMonitorCards()
+
   const themeRuntimeSnapshot = computed(() => createThemeHomeSnapshot({
     version: input.themeSnapshotVersion.value,
     status: input.homeCollectionStatus.value,
@@ -270,6 +283,8 @@ export function useThemeRuntime(input: {
     // 沙箱里的主题读不到面板 URL（`about:srcdoc` 无查询串、referrer 为空、
     // `parent.location` 抛 SecurityError），快照是唯一通道。
     showClickTrace: themeClickTraceEnabled,
+    wallpaper: themeWallpaper.value,
+    monitorCards: monitorCards.value,
     permissions: themeRuntimePermissions.value,
     presentation: {
       ...panelState.panelConfig,
