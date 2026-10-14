@@ -670,7 +670,7 @@ func (a *ThemeRouter) InstallV2(c *gin.Context) {
 
 func (a *ThemeRouter) installPackageV2(c *gin.Context, preview bool) {
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, theme.MaxArchive+(1<<20))
-	if err := c.Request.ParseMultipartForm(theme.MaxArchive + (1 << 20)); err != nil {
+	if err := c.Request.ParseMultipartForm(uploadMemoryBudget()); err != nil {
 		response.ErrorParamFomat(c, "invalid multipart theme upload")
 		return
 	}
@@ -705,6 +705,10 @@ func (a *ThemeRouter) PreviewV2(c *gin.Context) {
 
 func (a *ThemeRouter) previewPackageV2(c *gin.Context) {
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, theme.MaxArchive+(1<<20))
+	if err := c.Request.ParseMultipartForm(uploadMemoryBudget()); err != nil {
+		response.ErrorParamFomat(c, "invalid multipart theme upload")
+		return
+	}
 	file, _, err := c.Request.FormFile("package")
 	if err != nil {
 		response.ErrorParamFomat(c, "theme package file is required")

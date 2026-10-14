@@ -119,6 +119,11 @@ type PackageV2 struct {
 
 var digestPatternV2 = regexp.MustCompile(`^[a-fA-F0-9]{64}$`)
 
+// maxPackagePreviewsV2 bounds how many parsed previews stay resident. A preview
+// can hold a fully expanded package in memory, so the count matters more than
+// the ten-minute expiry on its own.
+const maxPackagePreviewsV2 = 3
+
 var packagePreviewsV2 = struct {
 	sync.Mutex
 	items map[string]previewPackageV2
@@ -277,6 +282,16 @@ func SavePackagePreviewV2(pkg *PackageV2) (string, error) {
 		if now.After(preview.expiresAt) {
 			delete(packagePreviewsV2.items, existing)
 		}
+	}
+	for len(packagePreviewsV2.items) >= maxPackagePreviewsV2 {
+		evicted := ""
+		var evictedExpiry time.Time
+		for existing, preview := range packagePreviewsV2.items {
+			if evicted == "" || preview.expiresAt.Before(evictedExpiry) {
+				evicted, evictedExpiry = existing, preview.expiresAt
+			}
+		}
+		delete(packagePreviewsV2.items, evicted)
 	}
 	packagePreviewsV2.items[token] = previewPackageV2{packageData: pkg, expiresAt: now.Add(10 * time.Minute)}
 	return token, nil
