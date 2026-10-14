@@ -11,6 +11,7 @@ import (
 	"github.com/yinorg/Yin-Panel/backend/internal/web/router/system"
 	"github.com/yinorg/Yin-Panel/backend/pkg/extension"
 
+	"github.com/gin-contrib/gzip"
 	"github.com/gin-gonic/gin"
 )
 
@@ -92,6 +93,10 @@ func InitRouters(addr string) error {
 
 	// 注册标准 API 路由
 	routerGroup := rootRouter.Group("api")
+	// API 响应都是 JSON，而首页的条目载荷是整个面板发给浏览器最大的那一份。
+	// 面板常通过长链路访问，压缩它值得这点 CPU；低于阈值的响应不压，小响应
+	// 就不会因为 gzip 分帧反而变慢。
+	routerGroup.Use(gzip.Gzip(gzip.DefaultCompression, gzip.WithMinLength(1024)))
 	for _, router := range RouterArray() {
 		router.InitRouter(routerGroup)
 	}

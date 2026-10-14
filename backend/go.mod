@@ -6,6 +6,7 @@ toolchain go1.27.2
 
 require (
 	github.com/PuerkitoBio/goquery v1.13.0
+	github.com/gin-contrib/gzip v1.2.8
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-playground/locales v0.14.2
 	github.com/go-playground/universal-translator v0.18.2
