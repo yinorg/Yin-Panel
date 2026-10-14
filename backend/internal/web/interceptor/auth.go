@@ -4,8 +4,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
-	"net/http"
-	"net/url"
 	"github.com/yinorg/Yin-Panel/backend/internal/biz/repository"
 	"github.com/yinorg/Yin-Panel/backend/internal/constant"
 	"github.com/yinorg/Yin-Panel/backend/internal/global"
@@ -15,6 +13,8 @@ import (
 	"github.com/yinorg/Yin-Panel/backend/internal/web/model/base"
 	"github.com/yinorg/Yin-Panel/backend/internal/web/model/response"
 	"github.com/yinorg/Yin-Panel/backend/pkg/extension"
+	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -60,7 +60,6 @@ func requestIsHTTPS(c *gin.Context) bool {
 	root, err := url.Parse(config.AppConfig.Base.RootURL)
 	return err == nil && root.Scheme == "https"
 }
-
 
 // Auth 认证中间件
 func Auth(c *gin.Context) {

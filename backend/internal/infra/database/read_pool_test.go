@@ -19,7 +19,7 @@ func (rpWidget) TableName() string { return "rp_widget" }
 func openRW(t *testing.T, path string) *gorm.DB {
 	t.Helper()
 	db, err := gorm.Open(sqlite.Open(path), &gorm.Config{
-		NamingStrategy: schema.NamingStrategy{SingularTable: true},
+		NamingStrategy:                           schema.NamingStrategy{SingularTable: true},
 		DisableForeignKeyConstraintWhenMigrating: true,
 	})
 	if err != nil {

@@ -222,7 +222,7 @@ func (r *memoryUserRepo) GetList(repository.PagedParam) ([]repository.User, uint
 }
 func (r *memoryUserRepo) Update(uint, *repository.User) error       { return nil }
 func (r *memoryUserRepo) UpdateUserInfo(uint, map[string]any) error { return nil }
-func (r *memoryUserRepo) Delete(uint) ([]string, error) { return nil, nil }
+func (r *memoryUserRepo) Delete(uint) ([]string, error)             { return nil, nil }
 func (r *memoryUserRepo) InvalidateTokens(userID uint) error {
 	for index := range r.users {
 		if r.users[index].ID == userID {

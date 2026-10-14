@@ -19,7 +19,7 @@ func setupArrangeLayoutDB(t *testing.T) (spaceID, groupA, groupB, itemA, itemB u
 	t.Helper()
 	previousDB := repository.Db
 	db, err := gorm.Open(sqlite.Open("file:layout-arrange?mode=memory&cache=shared"), &gorm.Config{
-		NamingStrategy:                    schema.NamingStrategy{SingularTable: true},
+		NamingStrategy:                           schema.NamingStrategy{SingularTable: true},
 		DisableForeignKeyConstraintWhenMigrating: true,
 	})
 	if err != nil {
