@@ -101,6 +101,7 @@ const themeSurfaceRoute = computed(() => route.name === 'themeSurface')
     <div v-if="home.showSpaceBar" class="space-status-bar">
       <NDropdown
         trigger="hover"
+        scrollable
         :options="home.spaceSelectorOptions"
         :theme-overrides="{
           color: 'rgba(18, 22, 28, 0.72)',
