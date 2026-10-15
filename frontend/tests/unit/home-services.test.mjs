@@ -738,8 +738,10 @@ test('home collection takes a whole Space in one request and buckets it by group
   assert.deepEqual(result.itemsByGroup.get(3).map(item => item.id), [14])
   assert.equal(result.failedGroups, 0)
   assert.equal(saved.items['2'].map(item => item.id).join(','), '11,13')
-  // One publish for the cached paint, one for the Space-wide page.
-  assert.equal(progress, 2)
+  // The cached paint and the Space-wide page land inside the coalescing window,
+  // so the reader is told once instead of twice. The data assertions above are
+  // what guarantee nothing was dropped by the merge.
+  assert.equal(progress, 1)
 })
 
 test('home collection falls back to the per-group walk when one page cannot hold the Space', async () => {

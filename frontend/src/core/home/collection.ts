@@ -110,8 +110,30 @@ export function createHomeCollectionLoader<Group extends HomeCollectionGroup, It
       stale: false,
       cancelled: false,
     }
-    const publish = () => {
+    // One publish rebuilds the theme's whole snapshot (625 groups and 1000 items
+    // on a loaded Space) and re-renders it, so a Space-wide read that published
+    // per page paid that cost once per page. Coalesce them instead: progress
+    // still reaches the reader, but a few times a second at most, and the final
+    // state is carried by the returned result either way.
+    const PUBLISH_MIN_INTERVAL_MS = 120
+    let lastPublishAt = 0
+    let publishTimer: ReturnType<typeof setTimeout> | null = null
+    const publishNow = () => {
+      if (publishTimer) {
+        clearTimeout(publishTimer)
+        publishTimer = null
+      }
+      lastPublishAt = Date.now()
       if (active()) options.onProgress?.({ ...result, itemsByGroup: new Map(itemsByGroup) })
+    }
+    const publish = () => {
+      if (!active()) return
+      const wait = PUBLISH_MIN_INTERVAL_MS - (Date.now() - lastPublishAt)
+      if (wait <= 0) {
+        publishNow()
+        return
+      }
+      if (!publishTimer) publishTimer = setTimeout(publishNow, wait)
     }
     const empty = () => {
       if (!cached) result.error = { code: 'OFFLINE', message: 'Home data is unavailable offline' }
