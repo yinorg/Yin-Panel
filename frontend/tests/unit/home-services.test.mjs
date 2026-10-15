@@ -5,6 +5,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 // eslint-disable-next-line test/no-import-node-test
 import test from 'node:test'
 import { createHomeCollectionLoader, HOME_ITEM_CONCURRENCY } from '../../src/core/home/collection.ts'
+import { patchLayoutBuckets, patchLayoutGroups } from '../../src/core/home/layoutPatch.ts'
 import { createHomeBootstrap } from '../../src/core/home/bootstrap.ts'
 import { createHomeSpaceController } from '../../src/core/home/spaceController.ts'
 import { createHomeMutationService } from '../../src/core/home/mutations.ts'
@@ -212,6 +213,32 @@ test('home command search only publishes the latest query for the still-active S
   pending[2].resolve([{ id: 3, title: 'Gamma' }])
   assert.equal(await changedSpace, undefined)
   assert.deepEqual(await service.search('/open'), [])
+})
+
+test('a layout save applies the layout instead of re-reading the Space', async () => {
+  const calls = []
+  const layout = { items: [{ id: 11, groupId: 2, sort: 1 }], groups: [{ id: 2, sort: 1 }] }
+  let code = 0
+  const service = createHomeMutationService({
+    api: {
+      arrangeLayout: async (spaceId, payload) => { calls.push(['arrange', spaceId, payload]); return { code, msg: code ? 'nope' : '' } },
+    },
+    getActiveSpaceId: () => 7,
+    canWrite: () => true,
+    invalidateSpace: spaceId => calls.push(['invalidate', spaceId]),
+    refreshSpace: spaceId => calls.push(['refresh', spaceId]),
+    applyLayout: (spaceId, payload) => calls.push(['apply', spaceId, payload]),
+  })
+
+  await service.arrangeLayout(layout)
+  // One request, no re-read: the payload is the new state, so the collection takes it.
+  assert.deepEqual(calls, [['arrange', 7, layout], ['apply', 7, layout]])
+
+  // A rejected save must not touch the collection at all.
+  calls.length = 0
+  code = 1
+  await assert.rejects(service.arrangeLayout(layout), error => error.code === 'RUNTIME_UNAVAILABLE')
+  assert.deepEqual(calls, [['arrange', 7, layout]])
 })
 
 test('home mutations require write access and refresh only the Space that was mutated', async () => {
@@ -746,6 +773,116 @@ test('home collection falls back to the per-group walk when one page cannot hold
   assert.deepEqual(probes, [[1, 2]])
   assert.deepEqual(perGroup, [[1, 1], [2, 1]])
   assert.deepEqual(second.itemsByGroup.get(1).map(item => item.id), [10])
+})
+
+test('home collection pages a large Space by its reported counts instead of walking every group', async () => {
+  const spacePages = []
+  const perGroup = []
+  const loader = createHomeCollectionLoader({
+    // Groups with no items are absent from the counts rather than reported as
+    // zero, so only the two that hold items carry an itemCount.
+    getGroups: async () => ({ data: [{ id: 1, itemCount: 2 }, { id: 2, itemCount: 1 }, { id: 3 }, { id: 4 }, { id: 5 }, { id: 6 }] }),
+    getItems: async (_spaceId, groupId, page) => {
+      perGroup.push([groupId, page])
+      return { data: [] }
+    },
+    getSpaceItems: async (_spaceId, page, pageSize) => {
+      spacePages.push([page, pageSize])
+      const all = [
+        { id: 11, itemIconGroupId: 1 },
+        { id: 12, itemIconGroupId: 2 },
+        { id: 13, itemIconGroupId: 1 },
+      ]
+      return { data: all.slice((page - 1) * pageSize, page * pageSize) }
+    },
+    readCache: () => null,
+    writeCache: () => {},
+    isOnline: () => true,
+    spacePageSize: 2,
+  })
+
+  const result = await loader.load(8)
+  // Three items over six groups: two pages, where the walk would have cost six.
+  assert.deepEqual(spacePages, [[1, 2], [2, 2]])
+  assert.deepEqual(perGroup, [])
+  assert.deepEqual(result.itemsByGroup.get(1).map(item => item.id), [11, 13])
+  assert.deepEqual(result.itemsByGroup.get(2).map(item => item.id), [12])
+  assert.deepEqual(result.itemsByGroup.get(6).map(item => item.id), [])
+})
+
+test('home collection falls back to the walk when the reported counts were short', async () => {
+  const spacePages = []
+  const perGroup = []
+  const loader = createHomeCollectionLoader({
+    getGroups: async () => ({ data: [{ id: 1, itemCount: 1 }, { id: 2 }, { id: 3 }, { id: 4 }] }),
+    getItems: async (_spaceId, groupId, page) => {
+      perGroup.push([groupId, page])
+      return { data: [{ id: groupId * 10, itemIconGroupId: groupId }] }
+    },
+    getSpaceItems: async (_spaceId, page, pageSize) => {
+      spacePages.push([page, pageSize])
+      // The counts said one item, but the Space has grown past every page.
+      return { data: Array.from({ length: pageSize }, (_, index) => ({ id: page * 100 + index, itemIconGroupId: 1 })) }
+    },
+    readCache: () => null,
+    writeCache: () => {},
+    isOnline: () => true,
+    spacePageSize: 2,
+  })
+
+  const result = await loader.load(9)
+  // One page was budgeted and came back full, so the walk finished the job
+  // rather than saving a layout missing the rest of the Space.
+  assert.deepEqual(spacePages, [[1, 2]])
+  assert.deepEqual(perGroup, [[1, 1], [2, 1], [3, 1], [4, 1]])
+  assert.deepEqual(result.itemsByGroup.get(2).map(item => item.id), [20])
+})
+
+test('a saved layout lands in the local buckets without a re-read', () => {
+  const buckets = {
+    1: [{ id: 11, itemIconGroupId: 1, sort: 1 }, { id: 12, itemIconGroupId: 1, sort: 2 }],
+    2: [{ id: 21, itemIconGroupId: 2, sort: 1 }],
+    3: [{ id: 31, itemIconGroupId: 3, sort: 1 }],
+  }
+  patchLayoutBuckets(buckets, {
+    items: [{ id: 11, groupId: 2, sort: 1 }, { id: 21, groupId: 2, sort: 2 }],
+    groups: [],
+  })
+  assert.deepEqual(buckets['1'].map(item => item.id), [12])
+  assert.deepEqual(buckets['2'].map(item => item.id), [11, 21])
+  // A group the layout did not name keeps the order the server gave it.
+  assert.deepEqual(buckets['3'].map(item => item.id), [31])
+})
+
+test('a saved layout keeps the server order when a group carries a duplicate sort', () => {
+  // A save only sends the rows it changed, so an older save can leave two items
+  // sharing a sort. The endpoint reads that back as `sort, created_at, id`, and a
+  // patch that tie-broke differently would move the layout on the next load.
+  const buckets = {
+    1: [
+      { id: 5, itemIconGroupId: 1, sort: 2, createTime: '2026-01-02T10:00:00+08:00' },
+      { id: 3, itemIconGroupId: 1, sort: 2, createTime: '2026-01-01T10:00:00+08:00' },
+      { id: 4, itemIconGroupId: 1, sort: 1, createTime: '2026-01-03T10:00:00+08:00' },
+    ],
+  }
+  patchLayoutBuckets(buckets, { items: [{ id: 3, groupId: 1, sort: 2 }], groups: [] })
+  assert.deepEqual(buckets['1'].map(item => item.id), [4, 3, 5])
+})
+
+test('a saved layout never invents a group that is not loaded', () => {
+  const buckets = { 1: [{ id: 11, itemIconGroupId: 1, sort: 1 }] }
+  patchLayoutBuckets(buckets, { items: [{ id: 11, groupId: 99, sort: 1 }], groups: [] })
+  // The item leaves its old group; the next full load puts it where the server says.
+  assert.deepEqual(buckets['1'], [])
+  assert.equal(buckets['99'], undefined)
+})
+
+test('a saved layout reorders the groups it names and leaves the rest alone', () => {
+  const groups = [{ id: 1, sort: 1 }, { id: 2, sort: 2 }, { id: 3, sort: 3 }]
+  const ordered = patchLayoutGroups(groups, { items: [], groups: [{ id: 3, sort: 1 }, { id: 1, sort: 2 }] })
+  assert.deepEqual(ordered.map(group => group.id), [3, 1, 2])
+  // The array handed in is left untouched.
+  assert.deepEqual(groups.map(group => group.id), [1, 2, 3])
 })
 
 test('home collection retries a failed group once before writing it off', async () => {

@@ -129,6 +129,7 @@ export function useHomeShell() {
     homeCommandSearch,
     loadHomeData,
     getList,
+    applyLayout,
     reloadSpaces,
     selectSpace,
     togglePanelSide,
@@ -174,6 +175,7 @@ export function useHomeShell() {
     reloadSpaces,
     refreshCollection: forceRefresh => getList(forceRefresh),
     invalidateSpaceCache: clearCachedSpace,
+    applyLayout,
   })
 
   /** Handle to the mounted theme host. It is a function ref because the element is

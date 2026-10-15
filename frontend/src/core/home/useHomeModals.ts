@@ -5,7 +5,7 @@ import { uploadImage } from '@/api/panel/file'
 import { usePanelState } from '@/store'
 import { t } from '@/locales'
 import { PanelStateNetworkModeEnum } from '@/enums'
-import { createHomeMutationService } from '@/core/home/mutations'
+import { createHomeMutationService, type HomeLayoutInput } from '@/core/home/mutations'
 import { resolveItemOpenUrl } from '@/core/items/openPolicy'
 
 /**
@@ -22,6 +22,7 @@ export function useHomeModals(input: {
   reloadSpaces: (selectLatest?: boolean) => void
   refreshCollection: (forceRefresh?: boolean) => void
   invalidateSpaceCache: (spaceId: number) => void
+  applyLayout: (spaceId: number, layout: HomeLayoutInput) => void
 }) {
   const panelState = usePanelState()
   const ms = useMessage()
@@ -60,6 +61,7 @@ export function useHomeModals(input: {
     canWrite: () => input.canWrite.value,
     invalidateSpace: input.invalidateSpaceCache,
     refreshSpace: spaceId => input.activeSpace.value?.id === spaceId ? input.refreshCollection(true) : undefined,
+    applyLayout: input.applyLayout,
   })
 
   function openPage(openMethod: number, url: string, title?: string) {

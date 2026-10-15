@@ -2,6 +2,12 @@ import type { SpaceCache } from '../../utils/spaceCache'
 
 export interface HomeCollectionGroup {
   id?: number
+  /**
+   * Items the group holds, as the group list reports it. Groups with no items are
+   * left out of the counts rather than reported as zero, so an absent count is a
+   * zero; only a list that reports no counts at all means the total is unknown.
+   */
+  itemCount?: number
 }
 
 export interface HomeCollectionItem {
@@ -25,14 +31,12 @@ export interface HomeCollectionOptions<Group extends HomeCollectionGroup, Item e
   getGroups: (spaceId: number, signal: AbortSignal) => Promise<{ data?: Group[] }>
   getItems: (spaceId: number, groupId: number, page: number, pageSize: number, signal: AbortSignal) => Promise<{ data?: Item[] }>
   /**
-   * One page of the whole Space, in `sort, created_at` order. When supplied, the
-   * loader asks for this first: a Space of ordinary size then arrives in a single
-   * round trip instead of one request per group, which is the difference between
-   * one network round and `ceil(groups / concurrency)` of them on a slow link.
-   *
-   * A page that comes back full means the Space holds more than we are willing to
-   * pull at once, and the loader falls back to the per-group walk rather than
-   * dragging everything down. Omitting the option keeps the per-group walk only.
+   * One page of the whole Space, in `sort, created_at, id` order. When supplied,
+   * the loader pages the Space rather than asking once per group: a Space of
+   * ordinary size then costs `ceil(items / pageSize)` round trips instead of
+   * `ceil(groups / concurrency)` of them, which is the whole difference on a slow
+   * link. It only takes that shape while it is the cheaper one, and falls back to
+   * the per-group walk otherwise. Omitting the option keeps the walk only.
    */
   getSpaceItems?: (spaceId: number, page: number, pageSize: number, signal: AbortSignal) => Promise<{ data?: Item[] }>
   readCache: (spaceId: number) => SpaceCache | null
@@ -217,7 +221,14 @@ export function createHomeCollectionLoader<Group extends HomeCollectionGroup, It
     }
 
     /**
-     * Replaces the per-group fan-out with a single Space-wide page.
+     * Replaces the per-group fan-out with whole-Space pages.
+     *
+     * The group list carries each group's item count, so how many pages the Space
+     * needs is known before the first request. That matters because one Space-wide
+     * page costs the same round trip as one group page: when the Space would need
+     * at least as many pages as it has groups, the walk is the cheaper shape and
+     * no probe is spent finding that out. Without the counts (an older backend)
+     * the loader keeps its single probe and hands back to the walk on a full page.
      *
      * Returns true when it produced the items, false when the caller should walk
      * the groups instead. Never throws: this is an optimisation, so anything that
@@ -227,26 +238,47 @@ export function createHomeCollectionLoader<Group extends HomeCollectionGroup, It
       if (!options.getSpaceItems || pending.length < 2 || !active()) return false
       if (oversizedSpaces.has(spaceId)) return false
       const pageSize = options.spacePageSize ?? HOME_SPACE_PAGE_SIZE
-      let page: Item[]
-      try {
-        const response = await withTimeout(
-          signal => options.getSpaceItems!(spaceId, 1, pageSize, signal),
-          options.timeoutMs ?? 3000,
-          requestController.signal,
-        )
-        if (!active()) return false
-        page = response.data || []
-      }
-      catch {
-        return false
-      }
-      if (page.length >= pageSize) {
-        oversizedSpaces.add(spaceId)
-        return false
-      }
+      const counted = pending.some(group => Number.isFinite(Number(group.itemCount)))
+      const itemTotal = pending.reduce((total, group) => total + (Number(group.itemCount) || 0), 0)
+      const pages = counted ? Math.max(1, Math.ceil(itemTotal / pageSize)) : 1
+      // Paging the Space only saves anything while it needs fewer round trips than
+      // the per-group walk it replaces.
+      if (pages >= pending.length) return false
 
-      // The Space-wide page is ordered `sort, created_at`, the same order each
-      // per-group page uses, so bucketing preserves every group's own order.
+      const collected: Item[] = []
+      for (let page = 1; page <= pages; page++) {
+        let chunk: Item[]
+        try {
+          const response = await withTimeout(
+            signal => options.getSpaceItems!(spaceId, page, pageSize, signal),
+            options.timeoutMs ?? 3000,
+            requestController.signal,
+          )
+          if (!active()) return false
+          chunk = response.data || []
+        }
+        catch {
+          return false
+        }
+        collected.push(...chunk)
+        // A short page is the end of the Space.
+        if (chunk.length < pageSize) return bucketWholeSpace(collected)
+      }
+      // A full last page means the counts were short — the Space has grown since
+      // the group list was read. Hand the work back rather than save a layout that
+      // is missing whatever the budget cut off.
+      if (counted) return false
+      oversizedSpaces.add(spaceId)
+      return false
+    }
+
+    /**
+     * Buckets whole-Space pages by group and writes the cache.
+     *
+     * The pages arrive in `sort, created_at, id` order, the same order each
+     * per-group page uses, so bucketing preserves every group's own order.
+     */
+    function bucketWholeSpace(page: Item[]): boolean {
       const pendingIds = new Set(pending.map(group => Number(group.id)))
       const buckets = new Map<number, Item[]>()
       const seen = new Map<number, Set<number>>()
@@ -266,7 +298,7 @@ export function createHomeCollectionLoader<Group extends HomeCollectionGroup, It
       }
       for (const group of pending) {
         const groupId = Number(group.id)
-        // A group the page did not mention is empty, and an empty array is what
+        // A group the pages did not mention is empty, and an empty array is what
         // tells the next load not to ask for it again.
         const bucket = buckets.get(groupId) || []
         itemsByGroup.set(groupId, bucket)

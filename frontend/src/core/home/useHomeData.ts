@@ -12,6 +12,8 @@ import { createHomeCommandSearch } from '@/core/home/commandCenter'
 import { buildHomeGroupTree } from '@/core/home/groupTree'
 import { createHomeSearchService } from '@/core/home/search'
 import { createHomeSpaceController } from '@/core/home/spaceController'
+import { patchLayoutBuckets, patchLayoutGroups } from '@/core/home/layoutPatch'
+import type { HomeLayoutInput } from '@/core/home/mutations'
 import type { ThemeCollectionStatus } from '@/theme/api/v1'
 import type { Response as ApiResponse } from '@/utils/request'
 
@@ -138,6 +140,35 @@ export function useHomeData(input: {
   function applyCollectionProgress(result: HomeCollectionResult<HomeGroupNode, Panel.ItemInfo>) {
     if (activeSpace.value?.id !== result.spaceId) return
     applyGroups(result.groups, result.itemsByGroup, result.spaceId)
+  }
+
+  /**
+   * Applies a saved layout to the collection the theme renders from.
+   *
+   * The layout *is* the new state — `parseLayout` has already checked every id
+   * against the loaded groups and the endpoint writes those columns in one
+   * transaction — so this replaces the re-read that a save used to pay for. The
+   * cache is patched in the same shape, otherwise a later visit would paint the
+   * order the user just changed away from.
+   */
+  function applyLayout(spaceId: number, layout: HomeLayoutInput) {
+    if (activeSpace.value?.id !== spaceId || collectionSpaceId.value !== spaceId) return
+    const buckets: Record<string, Panel.ItemInfo[]> = {}
+    for (const group of items.value) {
+      const id = Number(group.id)
+      if (Number.isSafeInteger(id)) buckets[String(id)] = [...(group.items || [])]
+    }
+    patchLayoutBuckets(buckets, layout)
+    const itemsByGroup = new Map<number, Panel.ItemInfo[]>()
+    for (const key of Object.keys(buckets)) itemsByGroup.set(Number(key), buckets[key])
+    applyGroups(patchLayoutGroups(items.value, layout), itemsByGroup, spaceId)
+    cacheUpdatedAt.value = Date.now()
+
+    const cache = getCachedSpace(spaceId)
+    if (!cache) return
+    patchLayoutBuckets(cache.items || {}, layout)
+    if (Array.isArray(cache.groups)) cache.groups = patchLayoutGroups(cache.groups, layout)
+    saveCachedSpace(spaceId, cache)
   }
 
   const homeCollectionLoader = createHomeCollectionLoader<HomeGroupNode, Panel.ItemInfo>({
@@ -383,6 +414,7 @@ export function useHomeData(input: {
     homeSearch,
     homeCommandSearch,
     getList,
+    applyLayout,
     loadHomeData,
     selectSpace,
     togglePanelSide,

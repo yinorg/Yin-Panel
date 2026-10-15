@@ -34,6 +34,12 @@ export function createHomeMutationService(options: {
   canWrite: () => boolean
   invalidateSpace: (spaceId: number) => void
   refreshSpace: (spaceId: number) => Promise<unknown> | unknown
+  /**
+   * Applies a saved layout to the loaded collection. A layout save is the one
+   * write whose payload *is* the resulting state, so the collection takes it
+   * directly instead of being re-read.
+   */
+  applyLayout?: (spaceId: number, layout: HomeLayoutInput) => void
 }) {
   function writableSpaceId(): number {
     const spaceId = options.getActiveSpaceId()
@@ -61,6 +67,23 @@ export function createHomeMutationService(options: {
 
   async function mutate(operation: (spaceId: number) => Promise<HomeMutationResult>, expectedSpaceId?: number) {
     await mutateResult(operation, expectedSpaceId)
+  }
+
+  /**
+   * A layout save does not re-read the Space.
+   *
+   * `parseLayout` has already checked every id against the loaded groups, and the
+   * endpoint writes those columns in a single transaction, so the layout that went
+   * out is exactly what a re-read would come back with — minus the round trips.
+   * For a 75-group Space that is the difference between one request and three.
+   */
+  async function arrangeLayout(layout: HomeLayoutInput) {
+    const spaceId = writableSpaceId()
+    const result = await options.api.arrangeLayout(spaceId, layout)
+    if (result.code !== 0)
+      throw apiError('RUNTIME_UNAVAILABLE', result.msg || 'Core rejected the Theme command')
+    options.applyLayout?.(spaceId, layout)
+    return result
   }
 
   return {
@@ -95,7 +118,7 @@ export function createHomeMutationService(options: {
     updateGroup: (groupId: number, input: { title: string; icon: string; parentId: number | null }) => mutate(spaceId => options.api.updateGroup(spaceId, groupId, input)),
     deleteGroup: (groupId: number, expectedSpaceId?: number) => mutate(spaceId => options.api.deleteGroup(spaceId, groupId), expectedSpaceId),
     reorderGroups: (parentId: number | null, groupIds: number[]) => mutate(spaceId => options.api.reorderGroups(spaceId, parentId, groupIds)),
-    arrangeLayout: (layout: HomeLayoutInput) => mutate(spaceId => options.api.arrangeLayout(spaceId, layout)),
+    arrangeLayout,
   }
 }
 

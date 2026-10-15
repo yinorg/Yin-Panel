@@ -1404,14 +1404,25 @@ func (r *SpaceRouter) Items(c *gin.Context) {
 		return
 	}
 	var items []repository.ItemIcon
-	query := repository.Db.Where("space_id = ?", id).Order("sort, created_at")
+	// `id` breaks ties so paging a whole Space is deterministic: `created_at` is
+	// second-precision on MySQL, and a Space-wide read that pages over a
+	// non-unique sort key can skip or repeat rows at a page boundary. Both this
+	// and the per-group read share the order, so a Space-wide page buckets back
+	// into the same per-group order.
+	query := repository.Db.Where("space_id = ?", id).Order("sort, created_at, id")
 	if groupID := c.Query("groupId"); groupID != "" {
 		query = query.Where("item_icon_group_id = ?", groupID)
 	}
 	if page, _ := strconv.Atoi(c.Query("page")); page > 0 {
 		pageSize, _ := strconv.Atoi(c.Query("pageSize"))
-		if pageSize < 1 || pageSize > 200 {
+		if pageSize < 1 {
 			pageSize = 50
+		}
+		// Clamp instead of falling back to the default: a caller that asks for
+		// more than the cap must not get a page shorter than it asked for, or it
+		// reads a full Space as an exhausted one and drops the remainder.
+		if pageSize > 200 {
+			pageSize = 200
 		}
 		query = query.Offset((page - 1) * pageSize).Limit(pageSize)
 	}
