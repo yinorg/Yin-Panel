@@ -349,7 +349,7 @@
     "wallpaperChoose": "Choose a wallpaper",
     "wallpaperFollowTheme": "Follow the theme",
     "spaceWallpaper": "공간 기본 배경",
-    "wallpaperHint": "방문자가 직접 배경을 고르지 않은 동안에만 적용됩니다",
+    "wallpaperHint": "Everyone visiting this Space sees it",
     "wallpaperSaved": "공간 배경을 저장했습니다",
     "chooseFile": "가져오기",
     "oidcTitle": "OIDC 그룹 권한 부여",

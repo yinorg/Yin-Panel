@@ -349,7 +349,7 @@
     "wallpaperChoose": "Choose a wallpaper",
     "wallpaperFollowTheme": "Follow the theme",
     "spaceWallpaper": "Обои пространства по умолчанию",
-    "wallpaperHint": "Действует, пока посетитель не выбрал свои обои",
+    "wallpaperHint": "Everyone visiting this Space sees it",
     "wallpaperSaved": "Обои пространства сохранены",
     "chooseFile": "Импортировать",
     "oidcTitle": "Авторизация групп OIDC",

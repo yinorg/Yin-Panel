@@ -349,7 +349,7 @@
     "wallpaperChoose": "Choose a wallpaper",
     "wallpaperFollowTheme": "Follow the theme",
     "spaceWallpaper": "Fondo predeterminado del espacio",
-    "wallpaperHint": "Solo se aplica mientras el visitante no haya elegido su propio fondo",
+    "wallpaperHint": "Everyone visiting this Space sees it",
     "wallpaperSaved": "Fondo del espacio guardado",
     "chooseFile": "Importar",
     "oidcTitle": "Autorización de grupos OIDC",

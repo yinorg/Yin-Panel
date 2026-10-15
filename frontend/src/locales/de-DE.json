@@ -349,7 +349,7 @@
     "wallpaperChoose": "Choose a wallpaper",
     "wallpaperFollowTheme": "Follow the theme",
     "spaceWallpaper": "Standard-Hintergrund des Bereichs",
-    "wallpaperHint": "Gilt nur, solange Besucher kein eigenes Hintergrundbild gewählt haben",
+    "wallpaperHint": "Everyone visiting this Space sees it",
     "wallpaperSaved": "Hintergrund des Bereichs gespeichert",
     "chooseFile": "Importieren",
     "oidcTitle": "OIDC-Gruppenautorisierung",
