@@ -157,6 +157,14 @@ const createYinHome = yinLayout => ({
     const collapsedGroups = new Set()
     const groupNodes = new Map()
     const itemNodes = new Map()
+    // A group can hold a thousand items, and building every node before the first
+    // paint made a Space switch feel like a hang (measured: 3.9s for 1000 items,
+    // ~0.55ms per node). Build a chunk now and let the rest arrive over the next
+    // frames, so the switch paints in well under a second and the list fills in
+    // without blocking input. Keyed by group, so a different Space starts fresh.
+    const ITEM_RENDER_CHUNK = 80
+    const itemRenderBudget = new Map()
+    let itemRenderTimer = null
 
     const iconTones = new Map()
     // A transparent logo on the default dark tile is unreadable, so the tile
@@ -1186,7 +1194,19 @@ const createYinHome = yinLayout => ({
         const list = section._yin.list
         const visibleItemIds = new Set()
         if (!collapsed) {
-          for (const itemId of group.itemIds || []) {
+          const allItemIds = group.itemIds || []
+          const drawn = itemRenderBudget.get(group.id) || ITEM_RENDER_CHUNK
+          const limit = Math.min(allItemIds.length, drawn)
+          if (limit < allItemIds.length) {
+            itemRenderBudget.set(group.id, limit + ITEM_RENDER_CHUNK)
+            if (!itemRenderTimer) {
+              itemRenderTimer = setTimeout(() => {
+                itemRenderTimer = null
+                requestRender()
+              }, 0)
+            }
+          }
+          for (const itemId of allItemIds.slice(0, limit)) {
             const item = itemById.get(String(itemId))
             if (!item) continue
             const searchable = `${item.title || ''} ${item.description || ''}`.toLocaleLowerCase()
