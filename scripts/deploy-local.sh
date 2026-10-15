@@ -92,7 +92,14 @@ printf 'Testing backend...\n'
 (cd "$repo_root/backend" && go test ./...)
 
 printf 'Building backend...\n'
-(cd "$repo_root/backend" && go build -o "$build_dir/yin-panel" .)
+# Report the tag the local binary was built from, the same way CI does, so
+# global.VERSION no longer has to be edited by hand for a release.
+global_pkg="github.com/yinorg/Yin-Panel/backend/internal/global"
+version="$(git -C "$repo_root" describe --tags --always --dirty 2>/dev/null || printf 'dev')"
+commit="$(git -C "$repo_root" rev-parse --short HEAD 2>/dev/null || printf 'unknown')"
+build_time="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+(cd "$repo_root/backend" && go build -o "$build_dir/yin-panel" \
+    -ldflags="-X ${global_pkg}.VERSION=${version} -X ${global_pkg}.COMMIT=${commit} -X ${global_pkg}.BUILD_TIME=${build_time}" .)
 
 [[ -x "$build_dir/yin-panel" ]] || die "backend build did not produce an executable"
 
