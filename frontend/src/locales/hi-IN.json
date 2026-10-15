@@ -345,6 +345,8 @@
     "retryWhenOnline": "ऑनलाइन होने पर रीफ़्रेश करें"
   },
   "spaceManage": { "mySpace": "मेरा स्पेस",
+    "wallpaperChoose": "Choose a wallpaper",
+    "wallpaperFollowTheme": "Follow the theme",
     "spaceWallpaper": "स्पेस का डिफ़ॉल्ट वॉलपेपर",
     "wallpaperHint": "केवल तब लागू होता है जब आगंतुक ने अपना वॉलपेपर न चुना हो",
     "wallpaperSaved": "स्पेस वॉलपेपर सहेजा गया", "chooseFile": "आयात करें", "oidcTitle": "OIDC समूह प्राधिकरण", "addRule": "नियम जोड़ें", "shared": "साझा", "personal": "व्यक्तिगत", "emailMissing": "ईमेल उपलब्ध नहीं", "admin": "एडमिनिस्ट्रेटर",

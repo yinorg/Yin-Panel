@@ -346,6 +346,8 @@
   },
   "spaceManage": {
     "mySpace": "내 공간",
+    "wallpaperChoose": "Choose a wallpaper",
+    "wallpaperFollowTheme": "Follow the theme",
     "spaceWallpaper": "공간 기본 배경",
     "wallpaperHint": "방문자가 직접 배경을 고르지 않은 동안에만 적용됩니다",
     "wallpaperSaved": "공간 배경을 저장했습니다",

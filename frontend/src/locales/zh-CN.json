@@ -345,6 +345,8 @@
     "retryWhenOnline": "联网后刷新"
   },
   "spaceManage": { "mySpace": "我的空间",
+    "wallpaperChoose": "选择壁纸",
+    "wallpaperFollowTheme": "跟随主题",
     "spaceWallpaper": "空间默认壁纸",
     "wallpaperHint": "仅在成员未自行选择壁纸时生效",
     "wallpaperSaved": "空间壁纸已保存", "chooseFile": "导入", "oidcTitle": "OIDC 分组授权", "addRule": "添加规则", "shared": "共享", "personal": "个人", "emailMissing": "邮箱未设置", "admin": "管理员",

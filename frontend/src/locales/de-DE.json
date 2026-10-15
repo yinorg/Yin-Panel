@@ -346,6 +346,8 @@
   },
   "spaceManage": {
     "mySpace": "Mein Bereich",
+    "wallpaperChoose": "Choose a wallpaper",
+    "wallpaperFollowTheme": "Follow the theme",
     "spaceWallpaper": "Standard-Hintergrund des Bereichs",
     "wallpaperHint": "Gilt nur, solange Besucher kein eigenes Hintergrundbild gewählt haben",
     "wallpaperSaved": "Hintergrund des Bereichs gespeichert",

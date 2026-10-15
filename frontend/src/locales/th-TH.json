@@ -345,6 +345,8 @@
     "retryWhenOnline": "รีเฟรชเมื่อออนไลน์"
   },
   "spaceManage": { "mySpace": "สเปซของฉัน",
+    "wallpaperChoose": "Choose a wallpaper",
+    "wallpaperFollowTheme": "Follow the theme",
     "spaceWallpaper": "วอลเปเปอร์เริ่มต้นของสเปซ",
     "wallpaperHint": "มีผลเฉพาะเมื่อผู้เยี่ยมชมยังไม่ได้เลือกวอลเปเปอร์เอง",
     "wallpaperSaved": "บันทึกวอลเปเปอร์ของสเปซแล้ว", "chooseFile": "นำเข้า", "oidcTitle": "การอนุญาตกลุ่ม OIDC", "addRule": "เพิ่มกฎ", "shared": "แชร์", "personal": "ส่วนตัว", "emailMissing": "ไม่มีอีเมล", "admin": "ผู้ดูแลระบบ",

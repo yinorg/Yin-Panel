@@ -317,11 +317,16 @@ async function loadSpaceThemeOptions() {
 const spaceWallpaperMode = ref<'theme' | 'library' | 'custom' | 'none'>('theme')
 const spaceWallpaperEntry = ref('')
 const spaceWallpaperSaving = ref(false)
+const spaceWallpaperDialog = ref(false)
+const spaceWallpaperLabel = computed(() => (spaceWallpaperMode.value === 'library' && spaceWallpaperEntry.value)
+  ? spaceWallpaperEntry.value
+  : t('spaceManage.wallpaperFollowTheme'))
 /** The embedded wallpaper centre owns the library, the paging and the tiles, so
  *  this card only records what it reports and writes it to the Space on save. */
 function onSpaceWallpaperPick(value: { mode: 'theme' | 'library'; entry: string }) {
   spaceWallpaperMode.value = value.mode
   spaceWallpaperEntry.value = value.entry
+  spaceWallpaperDialog.value = false
 }
 /** Reads the Space's default wallpaper. The home falls back to it while the
  *  visitor has not picked a wallpaper of their own. */
@@ -452,18 +457,24 @@ onMounted(load)
               {{ $t('common.save') }}
             </NButton>
           </div>
-          <div v-if="editableSpace" class="mt-3">
+          <div v-if="editableSpace" class="mt-3 max-w-[280px]">
             <div class="mb-1">{{ $t('spaceManage.spaceWallpaper') }}</div>
-            <WallpaperCenter
-              embedded
-              :persist="false"
-              :selection="{ mode: spaceWallpaperMode === 'library' ? 'library' : 'theme', entry: spaceWallpaperEntry }"
-              @select="onSpaceWallpaperPick"
-            />
+            <NButton class="w-full" @click="spaceWallpaperDialog = true">
+              {{ $t('spaceManage.wallpaperChoose') }}
+            </NButton>
+            <div class="mt-1 text-xs opacity-70">{{ spaceWallpaperLabel }}</div>
             <div class="mt-1 text-xs opacity-70">{{ $t('spaceManage.wallpaperHint') }}</div>
             <NButton class="mt-2" size="small" type="primary" :loading="spaceWallpaperSaving" @click="saveSpaceWallpaper">
               {{ $t('common.save') }}
             </NButton>
+            <NModal v-model:show="spaceWallpaperDialog" preset="card" style="width: min(92vw, 720px); max-height: 88vh; overflow: auto" :title="$t('spaceManage.spaceWallpaper')">
+              <WallpaperCenter
+                embedded
+                :persist="false"
+                :selection="{ mode: spaceWallpaperMode === 'library' ? 'library' : 'theme', entry: spaceWallpaperEntry }"
+                @select="onSpaceWallpaperPick"
+              />
+            </NModal>
           </div>
           <NModal v-model:show="renameDialogVisible" preset="dialog" :title="$t('spaceManage.rename')" :positive-text="$t('common.confirm')" :negative-text="$t('common.cancel')" @positive-click="renameCurrent">
             <NInput v-model:value="rename" :placeholder="$t('spaceManage.spaceName')" maxlength="100" @keyup.enter="renameCurrent" />

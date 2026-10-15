@@ -345,6 +345,8 @@
     "retryWhenOnline": "Odśwież po połączeniu z siecią"
   },
   "spaceManage": { "mySpace": "Moja przestrzeń",
+    "wallpaperChoose": "Choose a wallpaper",
+    "wallpaperFollowTheme": "Follow the theme",
     "spaceWallpaper": "Domyślna tapeta przestrzeni",
     "wallpaperHint": "Działa, dopóki odwiedzający nie wybierze własnej tapety",
     "wallpaperSaved": "Tapeta przestrzeni zapisana", "chooseFile": "Importuj", "oidcTitle": "Autoryzacja grup OIDC", "addRule": "Dodaj regułę", "shared": "Współdzielona", "personal": "Osobista", "emailMissing": "E-mail niedostępny", "admin": "Administrator",

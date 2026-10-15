@@ -345,6 +345,8 @@
     "retryWhenOnline": "Vernieuwen wanneer online"
   },
   "spaceManage": { "mySpace": "Mijn ruimte",
+    "wallpaperChoose": "Choose a wallpaper",
+    "wallpaperFollowTheme": "Follow the theme",
     "spaceWallpaper": "Standaardachtergrond van de ruimte",
     "wallpaperHint": "Geldt alleen zolang een bezoeker geen eigen achtergrond heeft gekozen",
     "wallpaperSaved": "Achtergrond van de ruimte opgeslagen", "chooseFile": "Importeren", "oidcTitle": "OIDC-groepsautorisatie", "addRule": "Regel toevoegen", "shared": "Gedeeld", "personal": "Persoonlijk", "emailMissing": "E-mailadres niet beschikbaar", "admin": "Beheerder",

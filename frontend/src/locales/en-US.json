@@ -345,6 +345,8 @@
     "retryWhenOnline": "Refresh when online"
   },
   "spaceManage": { "mySpace": "My space",
+    "wallpaperChoose": "Choose a wallpaper",
+    "wallpaperFollowTheme": "Follow the theme",
     "spaceWallpaper": "Space default wallpaper",
     "wallpaperHint": "Applies only while a visitor has not picked their own wallpaper",
     "wallpaperSaved": "Space wallpaper saved", "chooseFile": "Import", "oidcTitle": "OIDC group authorization", "addRule": "Add rule", "shared": "Shared", "personal": "Personal", "emailMissing": "Email unavailable", "admin": "Administrator",

@@ -345,6 +345,8 @@
     "retryWhenOnline": "Muat ulang saat online"
   },
   "spaceManage": { "mySpace": "Ruang saya",
+    "wallpaperChoose": "Choose a wallpaper",
+    "wallpaperFollowTheme": "Follow the theme",
     "spaceWallpaper": "Wallpaper bawaan ruang",
     "wallpaperHint": "Berlaku hanya selama pengunjung belum memilih wallpaper sendiri",
     "wallpaperSaved": "Wallpaper ruang disimpan", "chooseFile": "Impor", "oidcTitle": "Otorisasi grup OIDC", "addRule": "Tambah aturan", "shared": "Bersama", "personal": "Pribadi", "emailMissing": "Email tidak tersedia", "admin": "Administrator",

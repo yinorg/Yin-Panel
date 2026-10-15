@@ -346,6 +346,8 @@
   },
   "spaceManage": {
     "mySpace": "我的空間",
+    "wallpaperChoose": "Choose a wallpaper",
+    "wallpaperFollowTheme": "Follow the theme",
     "spaceWallpaper": "空間預設壁紙",
     "wallpaperHint": "僅在成員未自行選擇壁紙時生效",
     "wallpaperSaved": "空間壁紙已儲存",

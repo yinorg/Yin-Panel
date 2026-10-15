@@ -345,6 +345,8 @@
     "retryWhenOnline": "Aggiorna quando sei online"
   },
   "spaceManage": { "mySpace": "Il mio spazio",
+    "wallpaperChoose": "Choose a wallpaper",
+    "wallpaperFollowTheme": "Follow the theme",
     "spaceWallpaper": "Sfondo predefinito dello spazio",
     "wallpaperHint": "Si applica solo finché il visitatore non scegle il proprio sfondo",
     "wallpaperSaved": "Sfondo dello spazio salvato", "chooseFile": "Importa", "oidcTitle": "Autorizzazione dei gruppi OIDC", "addRule": "Aggiungi regola", "shared": "Condiviso", "personal": "Personale", "emailMissing": "Email non disponibile", "admin": "Amministratore",

@@ -346,6 +346,8 @@
   },
   "spaceManage": {
     "mySpace": "Моё пространство",
+    "wallpaperChoose": "Choose a wallpaper",
+    "wallpaperFollowTheme": "Follow the theme",
     "spaceWallpaper": "Обои пространства по умолчанию",
     "wallpaperHint": "Действует, пока посетитель не выбрал свои обои",
     "wallpaperSaved": "Обои пространства сохранены",

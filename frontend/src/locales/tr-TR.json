@@ -345,6 +345,8 @@
     "retryWhenOnline": "Çevrimiçi olduğunda yenile"
   },
   "spaceManage": { "mySpace": "Alanım",
+    "wallpaperChoose": "Choose a wallpaper",
+    "wallpaperFollowTheme": "Follow the theme",
     "spaceWallpaper": "Alanın varsayılan duvar kağıdı",
     "wallpaperHint": "Yalnızca ziyaretçi kendi duvar kağıdını seçmediyse uygulanır",
     "wallpaperSaved": "Alan duvar kağıdı kaydedildi", "chooseFile": "İçe aktar", "oidcTitle": "OIDC grup yetkilendirmesi", "addRule": "Kural ekle", "shared": "Paylaşılan", "personal": "Kişisel", "emailMissing": "E-posta kullanılamıyor", "admin": "Yönetici",

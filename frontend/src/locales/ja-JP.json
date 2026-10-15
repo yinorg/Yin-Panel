@@ -345,6 +345,8 @@
     "retryWhenOnline": "オンラインで更新"
   },
   "spaceManage": { "mySpace": "マイスペース",
+    "wallpaperChoose": "Choose a wallpaper",
+    "wallpaperFollowTheme": "Follow the theme",
     "spaceWallpaper": "スペースの既定壁紙",
     "wallpaperHint": "訪問者が自分で壁紙を選んでいない場合のみ適用されます",
     "wallpaperSaved": "スペースの壁紙を保存しました", "chooseFile": "インポート", "oidcTitle": "OIDCグループ認証", "addRule": "ルールを追加", "shared": "共有", "personal": "個人", "emailMissing": "メール未設定", "admin": "管理者",

@@ -346,6 +346,8 @@
   },
   "spaceManage": {
     "mySpace": "Mon espace",
+    "wallpaperChoose": "Choose a wallpaper",
+    "wallpaperFollowTheme": "Follow the theme",
     "spaceWallpaper": "Fond d'écran par défaut de l'espace",
     "wallpaperHint": "S'applique uniquement tant qu'un visiteur n'a pas choisi son propre fond",
     "wallpaperSaved": "Fond de l’espace enregistré",
