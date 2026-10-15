@@ -179,7 +179,7 @@ select {
   padding: 2px 10px;
   border: 1px solid var(--yin-border);
   border-radius: 16px;
-  background: color-mix(in srgb, var(--yin-surface) 72%, transparent);
+  background: color-mix(in srgb, var(--yin-surface) calc(var(--yin-component-surface-opacity) * 100%), transparent);
   color: var(--yin-text, #20282c);
   backdrop-filter: blur(2px);
 }
@@ -365,7 +365,7 @@ select {
      override it with their own. */
   color: var(--yin-onWallpaper);
   --yin-border: transparent;
-  --yin-component-app-icon-surface: color-mix(in srgb, var(--yin-surface) 72%, transparent);
+  --yin-component-app-icon-surface: color-mix(in srgb, var(--yin-surface) calc(var(--yin-component-surface-opacity) * 100%), transparent);
   --yin-component-system-monitor-heading-size: 18px;
 }
 .yin-monitor .n-progress-graph-circle-rail { stroke: color-mix(in srgb, var(--yin-text, #20282c) 36%, transparent) !important; }
@@ -585,7 +585,7 @@ select {
   padding: 0;
   border: 0;
   /* The old buttons were Naive's `color="#2a2a2a6b"`: a 42%-opaque dark fill. */
-  background: color-mix(in srgb, var(--yin-surface) 72%, transparent);
+  background: color-mix(in srgb, var(--yin-surface) calc(var(--yin-component-surface-opacity) * 100%), transparent);
   color: var(--yin-text);
   cursor: pointer;
 }
@@ -1309,5 +1309,39 @@ select {
   .yin-collection .yin-item-placeholder {
     animation: none;
     opacity: .6;
+  }
+}
+
+/* A save is a round trip, and on a slow link the disabled state alone reads as
+   nothing having happened. The icon form of the button keeps its box and swaps
+   the glyph for a spinner, so the row never reflows mid-save. */
+@keyframes yin-action-saving-spin {
+  to { transform: rotate(360deg); }
+}
+
+.yin-action-button[data-saving='true'] {
+  position: relative;
+}
+
+.yin-action-button[data-saving='true'] svg {
+  visibility: hidden;
+}
+
+.yin-action-button[data-saving='true']::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: yin-action-saving-spin .7s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .yin-action-button[data-saving='true']::after {
+    animation-duration: 2s;
   }
 }

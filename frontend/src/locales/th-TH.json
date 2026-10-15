@@ -85,6 +85,7 @@
       "hideTitle": "ซ่อนชื่อเรื่อง",
       "leftRightMargin": "ระยะขอบซ้าย-ขวา",
       "mask": "มาสก์",
+      "surfaceOpacity": "ความโปร่งใสของพื้นผิว",
       "maxWidth": "ความกว้างสูงสุด",
       "netModeChangeButtonShow": "แสดงปุ่มสลับโหมดเครือข่าย",
       "resetWarnText": "คุณแน่ใจหรือไม่ว่าต้องการรีเซ็ตรูปแบบเหล่านี้?",

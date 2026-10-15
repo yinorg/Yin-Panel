@@ -954,10 +954,10 @@ func builtinPackagesV2() []*PackageV2 {
 			// Bump whenever a home resource changes; a published version is
 			// immutable, so reusing it would abort startup. The directory package
 			// starts its own version line because it is a new package.
-			version = "2.3.110"
+			version = "2.3.112"
 			homeLayout = &HomeLayoutV2{Kind: "standard", Editable: true}
 			if palette.id == "org.yin.directory" {
-				version = "2.11.30"
+				version = "2.11.35"
 				homeLayout = &HomeLayoutV2{Kind: "directory", Editable: true}
 			}
 			requiredPermissions = append(requiredPermissions,

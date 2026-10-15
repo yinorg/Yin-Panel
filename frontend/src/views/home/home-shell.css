@@ -45,7 +45,7 @@
    global `--yin-controlHeight: 36px`, while the pre-theme build used Naive's
    34px default. That token is app-wide, so pinning it is a global decision
    rather than a replica fix, and `height` cannot lift a `min-height` floor. */
-.sun-main.theme-runtime-yin .space-status-bar { padding: 3px; border-color: color-mix(in srgb, var(--yin-onWallpaper) 22%, transparent) !important; border-radius: 999px; background: color-mix(in srgb, var(--yin-surface) 68%, transparent) !important; backdrop-filter: blur(14px); box-shadow: 0 8px 30px rgb(0 0 0 / 18%); }
+.sun-main.theme-runtime-yin .space-status-bar { padding: 3px; border-color: color-mix(in srgb, var(--yin-onWallpaper) 22%, transparent) !important; border-radius: 999px; background: color-mix(in srgb, var(--yin-surface) calc(var(--yin-component-surface-opacity) * 100%), transparent) !important; backdrop-filter: blur(14px); box-shadow: 0 8px 30px rgb(0 0 0 / 18%); }
 .sun-main.theme-runtime-yin .space-status-button { min-width: 140px !important; color: var(--yin-onWallpaper) !important; }
 .sun-main.theme-runtime-yin .space-status-dot { background: var(--yin-primary); box-shadow: 0 0 10px var(--yin-primary); }
 .space-status-dot { width: 7px; height: 7px; margin-right: 8px; border-radius: 50%; background: var(--yin-success); box-shadow: 0 0 var(--yin-component-surface-glow) var(--yin-success); }
@@ -61,7 +61,7 @@
    for its own layout (marginTopPercent of the viewport + a fixed masthead and
    search height). Anchoring the monitor layer to that keeps it below the search
    box instead of the old viewport-height guess, which sat on top of it. */
-.theme-runtime-monitor-layer--yin { top: var(--yin-theme-monitor-top, calc(var(--yin-theme-content-top, 10vh) + 187px)); right: auto; left: 50%; width: min(calc(var(--yin-contentMaxWidth, 1200px) - 30px), calc(100vw - 30px)); max-width: none; max-height: 286px; padding-top: 26px; box-sizing: border-box; transform: translateX(-50%); --yin-text: var(--yin-onWallpaper); --yin-textMuted: var(--yin-onWallpaperMuted); --yin-component-app-icon-surface: color-mix(in srgb, var(--yin-surface) 72%, transparent); --yin-component-system-monitor-heading-size: 18px; }
+.theme-runtime-monitor-layer--yin { top: var(--yin-theme-monitor-top, calc(var(--yin-theme-content-top, 10vh) + 187px)); right: auto; left: 50%; width: min(calc(var(--yin-contentMaxWidth, 1200px) - 30px), calc(100vw - 30px)); max-width: none; max-height: 286px; padding-top: 26px; box-sizing: border-box; transform: translateX(-50%); --yin-text: var(--yin-onWallpaper); --yin-textMuted: var(--yin-onWallpaperMuted); --yin-component-app-icon-surface: color-mix(in srgb, var(--yin-surface) calc(var(--yin-component-surface-opacity) * 100%), transparent); --yin-component-system-monitor-heading-size: 18px; }
 .theme-runtime-monitor-layer--yin .n-progress-graph-circle-rail { stroke: rgb(255 255 255 / 36%) !important; }
 /* This layer forces --yin-border transparent, and the detail (line) progress
    borrows it for its rail, so the 100% track vanished and the filled length was
@@ -100,6 +100,12 @@ html {
 /* ---- from <style scoped> (scoped) ---- */
 .sun-main {
   user-select: none;
+  /* One surface value for everything the home paints — the theme's card, the
+     monitor band, the icon tiles. The appearance slider writes
+     `--yin-home-surface-opacity`; without it the family keeps the value the
+     monitor band was already using. Dialogs live outside this wrapper, so they
+     keep the Core's own global value. */
+  --yin-component-surface-opacity: var(--yin-home-surface-opacity, .72);
 }
 
 /* The pre-theme build let Naive default the app-icon avatar radius to 3px. */
@@ -347,6 +353,17 @@ html {
   bottom: 50px;
   display: flex;
   flex-direction: column;
+  /* This column is Core chrome and sits *outside* the themed wrapper, so it has
+     to carry the family's surface value itself: without this it reads the
+     document default and the appearance slider leaves the whole column behind,
+     however the buttons themselves are written.
+     The fills are declared as custom properties rather than written into
+     `background` directly: Chromium does not re-resolve a `color-mix()` whose
+     percentage is a `calc()` over a custom property when that property changes
+     further up the tree, and the buttons then kept painting the old value while
+     every other surface followed. Going through a property (the pattern the
+     theme's card already uses) does invalidate. */
+  --yin-component-surface-opacity: var(--yin-home-surface-opacity, .72);
   box-shadow: 0 0 10px 2px rgba(0, 0, 0, 0.2);
 }
 
@@ -360,8 +377,20 @@ html {
   border: 0;
   /* Same surface as every other pill on the home: it is derived from the
      theme's own surface, so it follows the scheme the wallpaper chose instead
-     of staying a dark blob on a light page. */
-  background: color-mix(in srgb, var(--yin-surface) 72%, transparent);
+     of staying a dark blob on a light page — and the family's transparency
+     value, so the appearance slider moves this column too. The blur is what
+     makes that value readable at this size: without it a 46x34 cell over a
+     photo barely shows the difference.
+     The fill is declared on the button rather than on the column because
+     Chromium only re-resolves the mix when the property it reads is computed on
+     the same element — an inherited one left the button painting its first
+     value while every other surface followed. The theme's card already works
+     this way, which is why it was never affected. */
+  --yin-floating-fill: color-mix(in srgb, var(--yin-surface) calc(var(--yin-component-surface-opacity) * 100%), transparent);
+  --yin-floating-fill-hover: color-mix(in srgb, var(--yin-surface) min(calc(var(--yin-component-surface-opacity) * 100% + 16%), 100%), transparent);
+  --yin-floating-fill-cancel: color-mix(in srgb, var(--yin-danger) calc(var(--yin-component-surface-opacity) * 100%), transparent);
+  background: var(--yin-floating-fill);
+  backdrop-filter: blur(14px);
   color: var(--yin-text);
   cursor: pointer;
 }
@@ -371,14 +400,16 @@ html {
   height: 20px;
 }
 
+/* A hover reads as one step more solid than the rest of the family, expressed
+   against the same value so the slider keeps working. */
 .home-floating-button:hover {
-  background: color-mix(in srgb, var(--yin-surface) 88%, transparent);
+  background: var(--yin-floating-fill-hover);
 }
 
 /* The theme reports whether it is editing, so the entry turns into the way out:
    the same button, in red, closing the edit instead of opening it. */
 .home-floating-button--cancel {
-  background: color-mix(in srgb, var(--yin-danger) 80%, transparent);
+  background: var(--yin-floating-fill-cancel);
   color: var(--yin-onPrimary);
 }
 

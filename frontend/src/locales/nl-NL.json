@@ -85,6 +85,7 @@
       "hideTitle": "Titel verbergen",
       "leftRightMargin": "Linker- en rechtermarge",
       "mask": "Masker",
+      "surfaceOpacity": "Transparantie van het oppervlak",
       "maxWidth": "Maximale breedte",
       "netModeChangeButtonShow": "Knop voor netwerkmodus tonen",
       "resetWarnText": "Weet u zeker dat u deze stijlen wilt resetten?",

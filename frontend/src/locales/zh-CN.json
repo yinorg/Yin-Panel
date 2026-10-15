@@ -85,6 +85,7 @@
       "hideTitle": "隐藏标题",
       "leftRightMargin": "左右边距",
       "mask": "遮罩",
+      "surfaceOpacity": "表面透明度",
       "maxWidth": "最大宽度",
       "netModeChangeButtonShow": "显示网络模式切换按钮",
       "resetWarnText": "确定要重置这些样式吗？",

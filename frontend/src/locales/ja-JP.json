@@ -85,6 +85,7 @@
       "hideTitle": "タイトルを隠す",
       "leftRightMargin": "左右の余白",
       "mask": "マスク",
+      "surfaceOpacity": "表面の透明度",
       "maxWidth": "最大幅",
       "netModeChangeButtonShow": "ネットワークモード切替ボタンを表示",
       "resetWarnText": "これらのスタイルをリセットしますか？",

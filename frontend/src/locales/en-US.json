@@ -85,6 +85,7 @@
       "hideTitle": "Hide title",
       "leftRightMargin": "Left-right margin",
       "mask": "Mask",
+      "surfaceOpacity": "Surface transparency",
       "maxWidth": "Max width",
       "netModeChangeButtonShow": "Show network mode switch button",
       "resetWarnText": "Are you sure you want to reset these styles?",

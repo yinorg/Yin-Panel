@@ -85,6 +85,7 @@
       "hideTitle": "Masquer le titre",
       "leftRightMargin": "Marges gauche et droite",
       "mask": "Masque",
+      "surfaceOpacity": "Transparence des surfaces",
       "maxWidth": "Largeur maximale",
       "netModeChangeButtonShow": "Afficher le bouton de changement de mode réseau",
       "resetWarnText": "Voulez-vous vraiment réinitialiser ces styles ?",

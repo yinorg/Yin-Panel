@@ -1349,6 +1349,9 @@ const createYinHome = yinLayout => ({
       const diff = diffLayout(editBaseline, serializeLayout())
       if (!diff.items.length && !diff.groups.length) { exitEditMode(); return }
       button.disabled = true
+      // A save is a round trip, and on a slow link the disabled state alone reads
+      // as nothing having happened. The spinner is what says the click landed.
+      button.dataset.saving = 'true'
       try {
         await api.commands.execute('layout.save', diff)
         editMode = false
@@ -1362,6 +1365,7 @@ const createYinHome = yinLayout => ({
         if (status) status.textContent = `${envLabel('status.layoutSaveFailed', 'Could not save the layout')}${error?.message ? `: ${error.message}` : ''}`
       }
       finally {
+        delete button.dataset.saving
         button.disabled = false
       }
     }

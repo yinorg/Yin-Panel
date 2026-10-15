@@ -14,6 +14,7 @@ export function defaultStatePanelConfig(): Panel.panelConfig {
     backgroundImageSrc: defaultBackground,
     wallpaperMode: 'theme',
     backgroundBlur: 0,
+    surfaceOpacity: 0.72,
     backgroundMaskNumber: 0,
     iconStyle: PanelPanelConfigStyleEnum.icon,
     iconTextColor: '#ffffff',
@@ -69,6 +70,7 @@ export const appearancePanelKeys: (keyof Panel.panelConfig)[] = [
   'wallpaperPoster',
   'wallpaperLibraryEntry',
   'backgroundBlur',
+  'surfaceOpacity',
   'backgroundMaskNumber',
 ]
 

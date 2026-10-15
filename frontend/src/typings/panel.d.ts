@@ -56,6 +56,8 @@ declare namespace Panel {
          *  the library, so a stored choice survives a library rebuild. */
         wallpaperLibraryEntry?:string
         backgroundBlur?:number
+        /** 首页表面的统一透明度（0.4–1）。外观页滑杆写入，缺省 0.72。 */
+        surfaceOpacity?:number
         backgroundMaskNumber?:number
         iconStyle?:PanelPanelConfigStyleEnum
         iconTextColor?:string

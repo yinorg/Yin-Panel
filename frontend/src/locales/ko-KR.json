@@ -85,6 +85,7 @@
       "hideTitle": "제목 숨기기",
       "leftRightMargin": "좌우 여백",
       "mask": "마스크",
+      "surfaceOpacity": "표면 투명도",
       "maxWidth": "최대 너비",
       "netModeChangeButtonShow": "네트워크 모드 전환 버튼 표시",
       "resetWarnText": "이 스타일을 초기화하시겠습니까?",

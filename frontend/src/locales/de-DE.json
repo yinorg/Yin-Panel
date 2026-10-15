@@ -85,6 +85,7 @@
       "hideTitle": "Titel ausblenden",
       "leftRightMargin": "Linker und rechter Rand",
       "mask": "Maske",
+      "surfaceOpacity": "Oberflächentransparenz",
       "maxWidth": "Maximale Breite",
       "netModeChangeButtonShow": "Schaltfläche zum Wechseln des Netzwerkmodus anzeigen",
       "resetWarnText": "Möchten Sie diese Stile wirklich zurücksetzen?",

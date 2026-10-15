@@ -47,6 +47,22 @@ watch(() => panelState.panelConfig.logoImageSrc, (newUrl) => {
   updateFavicon(newUrl)
 })
 
+/**
+ * The home's surface transparency — one value for the whole family.
+ *
+ * Written on the document root so the theme's card, the monitor band and the
+ * icon tiles all read the same number: the home wrapper turns it into
+ * `--yin-component-surface-opacity`. Dialogs render outside that wrapper, so
+ * they keep the Core's own global value instead of following the slider.
+ */
+watch(() => panelState.panelConfig.surfaceOpacity, (value) => {
+  const opacity = Number(value)
+  if (Number.isFinite(opacity) && opacity > 0)
+    document.documentElement.style.setProperty('--yin-home-surface-opacity', String(opacity))
+  else
+    document.documentElement.style.removeProperty('--yin-home-surface-opacity')
+}, { immediate: true })
+
 // 首次加载时更新
 updateFavicon(panelState.panelConfig.logoImageSrc)
 </script>

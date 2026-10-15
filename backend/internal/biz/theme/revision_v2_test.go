@@ -369,9 +369,9 @@ func TestBuiltinPackagesV2AreCompleteDTCGAndRepeatable(t *testing.T) {
 		wantVersion := "2.3.3"
 		switch summary.ID {
 		case "org.yin.default":
-			wantVersion = "2.3.110"
+			wantVersion = "2.3.112"
 		case "org.yin.directory":
-			wantVersion = "2.11.30"
+			wantVersion = "2.11.35"
 		}
 		if pkg.Manifest.Version != wantVersion {
 			t.Errorf("%s builtin version = %q, want %q", summary.ID, pkg.Manifest.Version, wantVersion)
@@ -442,8 +442,9 @@ func TestBuiltinHomeResourceHashesPinTheEmbeddedThemes(t *testing.T) {
 			// 样式表新增了 Save/Cancel 的绿勾红叉规则。
 			// 图标底色与品牌色改为按像素采样：透明图标按自身亮度选浅/深底，
 			// 品牌字跟随壁纸亮度选黑/白并配同向阴影。
-			"views/home.mjs":  "34936f9f36c3264c37102b83b69b92bfff098c68160aaebdf865f894f3c28389",
-			"styles/home.css": "7ffab5ba47a25f482e211402b67f9288ce52d15124484126eccf8f531169df5b",
+			// 保存时按钮进入 data-saving 态：图标让位给转圈动画。
+			"views/home.mjs":  "831e1c4dad38784abf1e1341df7baa701e6c8384afc0bfaf66a3c7f4191ab6f0",
+			"styles/home.css": "4acdcf83a827bc0e24f08b3b0b8e1f48661f5a927d71959988f72b870dd974e6",
 		},
 		"org.yin.directory": {
 			// 目录主题改为「标签页 + 行标签 + 书签网格 + 行内分组菜单」，
@@ -453,8 +454,10 @@ func TestBuiltinHomeResourceHashesPinTheEmbeddedThemes(t *testing.T) {
 			// 多字标签会被裁成中间的一条；现在文字层跟随方块尺寸，并只画一个字。
 			// 图标底色与品牌色改为按像素采样：透明图标按自身亮度选浅/深底，
 			// 品牌字跟随壁纸亮度选黑/白并配同向阴影。
-			"views/home.mjs":  "a30ec89d7b810935e522352ef758afad5f6a75552264b2d14020676e12057517",
-			"styles/home.css": "5b9ceb9f4af4c9fbeb9d63ca95def81492674f34d3cd5b0a828ef083fc5745b1",
+			// 保存时按钮进入 data-saving 态：图标让位给转圈动画。
+			// 首页卡片（标签栏 + 集合）改为磨砂玻璃：76% 面 + blur(18px)，壁纸透出来。
+			"views/home.mjs":  "1c1a3cfb8546674b2e428d949872af690a4f4a98c8ccc07da819798421950a21",
+			"styles/home.css": "b0781b5ebb7cda40213004574131f4287f4ac62399fd8712bb0bd9f7f17d5df3",
 		},
 		"org.yin.glass": {
 			// Glass 复用 shared/home.mjs 与 shared/home.css，两者都改了。
@@ -525,7 +528,7 @@ func TestEnsureBuiltinV2UpgradesOnlyActivationForSelectedBuiltin(t *testing.T) {
 		t.Fatal(err)
 	}
 	latest, err := LatestPackageRevisionV2(db, "org.yin.default")
-	if err != nil || latest.Version != "2.3.110" || activation.ActiveRevisionID != latest.ID {
+	if err != nil || latest.Version != "2.3.112" || activation.ActiveRevisionID != latest.ID {
 		t.Fatalf("selected builtin activation = %+v, latest=%s, err=%v", activation, latest.ID, err)
 	}
 	if latest.ID == old.Revision {

@@ -85,6 +85,7 @@
       "hideTitle": "Başlığı gizle",
       "leftRightMargin": "Sol-sağ kenar boşluğu",
       "mask": "Maske",
+      "surfaceOpacity": "Yüzey saydamlığı",
       "maxWidth": "Maksimum genişlik",
       "netModeChangeButtonShow": "Ağ modu değiştirme düğmesini göster",
       "resetWarnText": "Bu stilleri sıfırlamak istediğinizden emin misiniz?",

@@ -162,6 +162,17 @@ function adoptThemeDefaults() {
   savePanelConfig()
 }
 
+/**
+ * The home's surface transparency, defaulted here rather than only in the store:
+ * a configuration saved before this setting existed has no key for it, and a
+ * slider bound straight to the store would open at zero while the surfaces were
+ * actually at the default.
+ */
+const surfaceOpacity = computed({
+  get: () => Number(panelState.panelConfig.surfaceOpacity ?? 0.72),
+  set: (value: number) => { panelState.panelConfig.surfaceOpacity = value },
+})
+
 function resetAppearanceConfig() {
   panelState.resetAppearanceConfig()
   savePanelConfig()
@@ -360,6 +371,12 @@ function resetAppearanceConfig() {
       <div class="flex items-center mt-[10px]">
         <span class="mr-[10px]">{{ $t('apps.baseSettings.mask') }}</span>
         <NSlider v-model:value="panelState.panelConfig.backgroundMaskNumber" class="max-w-[200px]" :step="0.1" :max="1" />
+      </div>
+
+      <!-- 首页所有表面共用一个值：主题的卡片、监控条、图标方块都读它。 -->
+      <div class="flex items-center mt-[10px]">
+        <span class="mr-[10px]">{{ $t('apps.baseSettings.surfaceOpacity') }}</span>
+        <NSlider v-model:value="surfaceOpacity" class="max-w-[200px]" :min="0.4" :max="1" :step="0.02" />
       </div>
     </NCard>
 
