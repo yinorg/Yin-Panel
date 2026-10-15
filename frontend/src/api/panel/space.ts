@@ -14,6 +14,28 @@ export function spaceDisplayName(space: Space, spaces: Space[], currentUserId?: 
   const sameName = spaces.filter(item => item.name === space.name)
   return sameName.length > 1 ? `${space.name} ${space.id}` : space.name
 }
+/**
+ * Display names for a whole Space list in one pass.
+ *
+ * `spaceDisplayName` rescans the list per Space to find duplicate names, which is
+ * quadratic. The home labels every Space when it builds the theme snapshot — once
+ * per Space switch — so with ~1200 Spaces that rescan alone measured ~0.4s of the
+ * switch. Count the names once, then label every Space from the counts.
+ */
+export function spaceDisplayNames(spaces: Space[], currentUserId?: number): Map<number, string> {
+  const nameCounts = new Map<string, number>()
+  for (const space of spaces)
+    nameCounts.set(space.name, (nameCounts.get(space.name) || 0) + 1)
+  const names = new Map<number, string>()
+  for (const space of spaces) {
+    if (space.type === 'personal' && space.ownerUserId === currentUserId) {
+      names.set(space.id, t('spaceManage.mySpace'))
+      continue
+    }
+    names.set(space.id, (nameCounts.get(space.name) || 0) > 1 ? `${space.name} ${space.id}` : space.name)
+  }
+  return names
+}
 export function resolveSpace(spaces: Space[], spaceId: number) {
   const space = spaces.find(item => item.id === spaceId)
   if (space) return space

@@ -369,9 +369,9 @@ func TestBuiltinPackagesV2AreCompleteDTCGAndRepeatable(t *testing.T) {
 		wantVersion := "2.3.3"
 		switch summary.ID {
 		case "org.yin.default":
-			wantVersion = "2.3.113"
+			wantVersion = "2.3.116"
 		case "org.yin.directory":
-			wantVersion = "2.11.36"
+			wantVersion = "2.11.39"
 		}
 		if pkg.Manifest.Version != wantVersion {
 			t.Errorf("%s builtin version = %q, want %q", summary.ID, pkg.Manifest.Version, wantVersion)
@@ -443,7 +443,7 @@ func TestBuiltinHomeResourceHashesPinTheEmbeddedThemes(t *testing.T) {
 			// 图标底色与品牌色改为按像素采样：透明图标按自身亮度选浅/深底，
 			// 品牌字跟随壁纸亮度选黑/白并配同向阴影。
 			// 保存时按钮进入 data-saving 态：图标让位给转圈动画。
-			"views/home.mjs":  "b9b22f9380062f8f98a00a802fb217998fae9897e60344c7925bab3b693d82bc",
+			"views/home.mjs":  "0a4e030d5910178f262d2c56ebec70c7bc62d5efda53975842157676b11efa8b",
 			"styles/home.css": "4acdcf83a827bc0e24f08b3b0b8e1f48661f5a927d71959988f72b870dd974e6",
 		},
 		"org.yin.directory": {
@@ -456,7 +456,7 @@ func TestBuiltinHomeResourceHashesPinTheEmbeddedThemes(t *testing.T) {
 			// 品牌字跟随壁纸亮度选黑/白并配同向阴影。
 			// 保存时按钮进入 data-saving 态：图标让位给转圈动画。
 			// 首页卡片（标签栏 + 集合）改为磨砂玻璃：76% 面 + blur(18px)，壁纸透出来。
-			"views/home.mjs":  "c46a4ff4b4e79c566ce14863e628a57181410847bcf8d8c65c640e07a10fdf94",
+			"views/home.mjs":  "6d051ca2b88d5f1aa447a62e449242c7fbc33e0b022b1f722710f4eadafbfbbc",
 			"styles/home.css": "b0781b5ebb7cda40213004574131f4287f4ac62399fd8712bb0bd9f7f17d5df3",
 		},
 		"org.yin.glass": {
@@ -528,7 +528,7 @@ func TestEnsureBuiltinV2UpgradesOnlyActivationForSelectedBuiltin(t *testing.T) {
 		t.Fatal(err)
 	}
 	latest, err := LatestPackageRevisionV2(db, "org.yin.default")
-	if err != nil || latest.Version != "2.3.113" || activation.ActiveRevisionID != latest.ID {
+	if err != nil || latest.Version != "2.3.116" || activation.ActiveRevisionID != latest.ID {
 		t.Fatalf("selected builtin activation = %+v, latest=%s, err=%v", activation, latest.ID, err)
 	}
 	if latest.ID == old.Revision {

@@ -11,7 +11,7 @@ import { createIconifyResourceResolver } from '@/core/home/iconifyResource'
 import { createThemeHomeSnapshot } from '@/core/home/themeSnapshot'
 import { suggestedForeground, wallpaperPainted, wallpaperTone } from '@/core/home/wallpaperTone'
 import { useMonitorCards } from '@/core/home/useMonitorCards'
-import { spaceDisplayName, type Space } from '@/api/panel/space'
+import { spaceDisplayNames, type Space } from '@/api/panel/space'
 import { isThemeSafeMode } from '@/theme/recovery/safeMode'
 import { t } from '@/locales'
 import { PanelStateNetworkModeEnum } from '@/enums'
@@ -254,11 +254,16 @@ export function useThemeRuntime(input: {
 
   const { monitorCards } = useMonitorCards()
 
-  const themeRuntimeSnapshot = computed(() => createThemeHomeSnapshot({
+  const themeRuntimeSnapshot = computed(() => {
+    // Label every Space from one pass over the list. Naming them one by one made
+    // this snapshot ~0.4s on a panel with ~1200 Spaces, and it is rebuilt on every
+    // Space switch.
+    const spaceNames = spaceDisplayNames(input.spaces.value, authStore.userInfo?.id)
+    return createThemeHomeSnapshot({
     version: input.themeSnapshotVersion.value,
     status: input.homeCollectionStatus.value,
     error: input.homeCollectionError.value,
-    spaces: input.spaces.value.map(space => ({ ...space, name: spaceDisplayName(space, input.spaces.value, authStore.userInfo?.id) })),
+    spaces: input.spaces.value.map(space => ({ ...space, name: spaceNames.get(space.id) || space.name })),
     activeSpaceId: input.activeSpace.value?.id,
     activeSpaceSide: input.activeSpace.value?.side,
     activeSpacePairedId: input.activeSpace.value?.pairedSpaceId,
@@ -298,7 +303,8 @@ export function useThemeRuntime(input: {
     layout: resolveThemeHomeLayout(activeThemePackage.value?.manifest).kind,
     monitorReservedHeight: input.getMonitorReservedHeight(),
     searchConfiguration: input.getSearchConfiguration(),
-  }))
+    })
+  })
 
   // Resolve the grant whenever the package revision, the session or the route mode
   // changes. A trusted route additionally polls, because losing the policy while it

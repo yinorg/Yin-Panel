@@ -5,7 +5,7 @@ import { useAppStore } from '../store'
 import { useAuthStore } from '../store'
 import { getCurrentTheme, getEffectiveTheme, getMyTheme, getPreviewTheme, getThemePackage } from '../api/theme'
 import { parsePublicCodeFromPath } from '../utils/request/axios'
-import { isYinThemePackage, resolveThemeSlots, resolveWallpaper, selectThemeScheme, type ThemePackage } from '../utils/theme'
+import { isBuiltinThemePackage, isYinThemePackage, resolveThemeSlots, resolveWallpaper, selectThemeScheme, type ThemePackage } from '../utils/theme'
 import { suggestedForeground, wallpaperPainted, wallpaperTone } from '@/core/home/wallpaperTone'
 import { isThemeSafeMode } from '../theme/recovery/safeMode'
 
@@ -28,6 +28,33 @@ const previewMode = new URLSearchParams(window.location.search).get('themePrevie
 let appliedSlots: string[] = []
 let fontStyle: HTMLStyleElement | null = null
 let prefetchedThemeRevision = ''
+
+/**
+ * The installed revision each built-in package resolves to for this panel.
+ *
+ * A Space theme is stored as a *revision*, so two Spaces that both chose the same
+ * built-in theme can still name two different revisions — whichever build was
+ * current when each Space was configured. Mounting the named revision per Space
+ * makes every Space switch tear the whole theme app down and rebuild it (measured
+ * at ~4s on a loaded home) even though both copies are the same theme. A built-in
+ * also ships with the panel, so its frozen older copy can never receive a fix.
+ * Resolve every built-in to the installed revision for its id instead: Space
+ * switches then hand the mounted theme a new snapshot, and only a genuinely
+ * different theme restarts it.
+ */
+const builtinPackageRevision = new Map<string, Promise<ThemePackage | null>>()
+
+function installedBuiltinPackage(pkg: ThemePackage): Promise<ThemePackage | null> {
+  const id = pkg.manifest.id
+  let pending = builtinPackageRevision.get(id)
+  if (!pending) {
+    pending = getThemePackage(id)
+      .then(result => (result.code === 0 && result.data ? result.data : null))
+      .catch(() => null)
+    builtinPackageRevision.set(id, pending)
+  }
+  return pending
+}
 
 /**
  * Where the resolved palette is cached for the next page load.
@@ -105,8 +132,14 @@ export async function reconcileSpaceTheme(spaceId?: number) {
     const effective = await getEffectiveTheme(spaceId)
     if (effective.code !== 0 || !effective.data.package)
       return
-    if (effective.data.package.revision !== activeThemePackage.value?.revision)
-      activeThemePackage.value = effective.data.package
+    let next = effective.data.package
+    if (isBuiltinThemePackage(next.manifest.id)) {
+      const installed = await installedBuiltinPackage(next)
+      if (installed && installed.manifest.id === next.manifest.id)
+        next = installed
+    }
+    if (next.revision !== activeThemePackage.value?.revision)
+      activeThemePackage.value = next
   }
   catch {
     // Keep the mounted package when resolution is temporarily unavailable.

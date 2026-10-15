@@ -1,5 +1,5 @@
 import { computed, onUnmounted, ref, watch, type Ref } from 'vue'
-import { getGroups, getItems, getSpaces, getWallpaperConfig, sortSpaces, spaceDisplayName, type Space } from '@/api/panel/space'
+import { getGroups, getItems, getSpaces, getWallpaperConfig, sortSpaces, spaceDisplayNames, type Space } from '@/api/panel/space'
 import { getEnableStatus } from '@/api/system/systemMonitor'
 import { useAuthStore, usePanelState } from '@/store'
 import { setTitle } from '@/utils/cmn'
@@ -89,9 +89,14 @@ export function useHomeData(input: {
       panelState.spaceWallpaper = null
     }
   }, { immediate: true })
-  const spaceSelectorOptions = computed(() => spaces.value
-    .filter(space => space.id !== activeSpace.value?.id)
-    .map(space => ({ label: spaceDisplayName(space, spaces.value, authStore.userInfo?.id), key: space.id })))
+  const spaceSelectorOptions = computed(() => {
+    const names = spaceDisplayNames(spaces.value, authStore.userInfo?.id)
+    // Every Space, the active one included. Filtering the active Space out made
+    // this array change on every switch, which re-rendered the whole (up to
+    // thousand-entry) menu behind the scenes; keeping the list stable lets the
+    // menu stay mounted and reused. See the `display-directive` note in HomeChrome.
+    return spaces.value.map(space => ({ label: names.get(space.id) || space.name, key: space.id }))
+  })
 
   const cacheUpdatedAt = ref<number | null>(null)
   const hasValidCachedHome = ref(false)
@@ -282,6 +287,9 @@ export function useHomeData(input: {
   }
 
   function selectSpace(key: string | number) {
+    // The list now keeps the active Space in it; picking it back is a no-op rather
+    // than a reload.
+    if (activeSpace.value?.id === Number(key)) return
     homeTransitionGeneration++
     homeCollectionLoader.cancel()
     dropPrefetchedGroups()

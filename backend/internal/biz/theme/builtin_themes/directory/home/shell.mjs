@@ -157,14 +157,6 @@ const createYinHome = yinLayout => ({
     const collapsedGroups = new Set()
     const groupNodes = new Map()
     const itemNodes = new Map()
-    // A group can hold a thousand items, and building every node before the first
-    // paint made a Space switch feel like a hang (measured: 3.9s for 1000 items,
-    // ~0.55ms per node). Build a chunk now and let the rest arrive over the next
-    // frames, so the switch paints in well under a second and the list fills in
-    // without blocking input. Keyed by group, so a different Space starts fresh.
-    const ITEM_RENDER_CHUNK = 80
-    const itemRenderBudget = new Map()
-    let itemRenderTimer = null
 
     const iconTones = new Map()
     // A transparent logo on the default dark tile is unreadable, so the tile
@@ -967,31 +959,39 @@ const createYinHome = yinLayout => ({
       const chrome = yinLayout.itemChrome(presentation)
       title.hidden = chrome.hideTitle
       description.hidden = chrome.hideDescription
-      icon.replaceChildren()
-      icon.removeAttribute('style')
       const itemIcon = item.icon
-      icon.removeAttribute('data-icon-tone')
-      if (itemIcon?.backgroundColor) icon.style.backgroundColor = itemIcon.backgroundColor
-      else if (itemIcon?.src) applyIconTone(icon, itemIcon.src)
-      // The letter sits on its own layer the size of the tile, so it centres on
-      // the whole box rather than on the 1px-inset content area left by the
-      // transparent border. It is always the base layer: the item only shows the
-      // image once that image has actually loaded, so a missing, blocked or
-      // broken image falls back to the letter instead of leaving an empty tile.
-      // One glyph, because this layout's tile is 20px in the collection, where a
-      // longer stored label would be clipped to a strip of its middle.
-      const letters = element('span', 'yin-item-icon-letters')
-      letters.textContent = (itemIcon?.text || item.title || '?').slice(0, 1)
-      icon.append(letters)
-      if (itemIcon?.src) {
-        const image = element('img', 'yin-item-icon-image')
-        image.alt = ''
-        image.loading = 'lazy'
-        image.referrerPolicy = 'no-referrer'
-        image.addEventListener('load', () => letters.remove())
-        image.addEventListener('error', () => image.remove())
-        image.src = itemIcon.src
-        icon.append(image)
+      // Rebuilding the tile is the expensive part of an item update (a new span,
+      // a new image element and a style reset per item, ~1000 of them on a loaded
+      // Space), and re-rendering usually changes nothing about the icon. Only the
+      // tile that actually changed is rebuilt.
+      const iconSignature = [itemIcon?.src || '', itemIcon?.text || '', itemIcon?.backgroundColor || '', item.title || ''].join('\u0000')
+      if (link._yin.iconSignature !== iconSignature) {
+        link._yin.iconSignature = iconSignature
+        icon.replaceChildren()
+        icon.removeAttribute('style')
+        icon.removeAttribute('data-icon-tone')
+        if (itemIcon?.backgroundColor) icon.style.backgroundColor = itemIcon.backgroundColor
+        else if (itemIcon?.src) applyIconTone(icon, itemIcon.src)
+        // The letter sits on its own layer the size of the tile, so it centres on
+        // the whole box rather than on the 1px-inset content area left by the
+        // transparent border. It is always the base layer: the item only shows the
+        // image once that image has actually loaded, so a missing, blocked or
+        // broken image falls back to the letter instead of leaving an empty tile.
+        // One glyph, because this layout's tile is 20px in the collection, where a
+        // longer stored label would be clipped to a strip of its middle.
+        const letters = element('span', 'yin-item-icon-letters')
+        letters.textContent = (itemIcon?.text || item.title || '?').slice(0, 1)
+        icon.append(letters)
+        if (itemIcon?.src) {
+          const image = element('img', 'yin-item-icon-image')
+          image.alt = ''
+          image.loading = 'lazy'
+          image.referrerPolicy = 'no-referrer'
+          image.addEventListener('load', () => letters.remove())
+          image.addEventListener('error', () => image.remove())
+          image.src = itemIcon.src
+          icon.append(image)
+        }
       }
       const infoStyle = chrome.info
       link.classList.toggle('yin-item--info', infoStyle)
@@ -1158,6 +1158,16 @@ const createYinHome = yinLayout => ({
       // rows keep the list clean, but the row is also where the group is managed.
       const tabHasItems = !hideEmptyGroups
         || visibleGroups.some(({ group }) => (group.itemIds || []).some(itemId => itemById.has(String(itemId))))
+      // Reorder controls need a group's position among its siblings. Looking that
+      // up by rescanning the whole group list per group is quadratic — 625 groups
+      // meant ~390k comparisons on every render — so collect the order once.
+      const siblingOrder = new Map()
+      for (const candidate of snapshot.groups || []) {
+        const parentKey = candidate.parentId == null ? '' : String(candidate.parentId)
+        const bucket = siblingOrder.get(parentKey)
+        if (bucket) bucket.push(String(candidate.id))
+        else siblingOrder.set(parentKey, [String(candidate.id)])
+      }
       for (const { group, depth } of visibleGroups) {
         const section = groupNodes.get(String(group.id)) || createGroupNode(group)
         groupNodes.set(String(group.id), section)
@@ -1174,8 +1184,8 @@ const createYinHome = yinLayout => ({
         // own chrome already names the group can hide the redundant title
         // through `decorateGroup`.
         section._yin.heading.hidden = false
-        const siblings = (snapshot.groups || []).filter(candidate => (candidate.parentId ?? null) === (group.parentId ?? null))
-        const siblingIndex = siblings.findIndex(candidate => String(candidate.id) === String(group.id))
+        const siblings = siblingOrder.get(group.parentId == null ? '' : String(group.parentId)) || []
+        const siblingIndex = siblings.indexOf(String(group.id))
         section._yin.addItem.hidden = !canCreateItems()
         section._yin.addItem.disabled = inFlight.has(`editor-new-item-${group.id}`)
         section._yin.editGroup.hidden = !canMutateGroup('update')
@@ -1196,19 +1206,7 @@ const createYinHome = yinLayout => ({
         const list = section._yin.list
         const visibleItemIds = new Set()
         if (!collapsed) {
-          const allItemIds = group.itemIds || []
-          const drawn = itemRenderBudget.get(group.id) || ITEM_RENDER_CHUNK
-          const limit = Math.min(allItemIds.length, drawn)
-          if (limit < allItemIds.length) {
-            itemRenderBudget.set(group.id, limit + ITEM_RENDER_CHUNK)
-            if (!itemRenderTimer) {
-              itemRenderTimer = setTimeout(() => {
-                itemRenderTimer = null
-                requestRender()
-              }, 0)
-            }
-          }
-          for (const itemId of allItemIds.slice(0, limit)) {
+          for (const itemId of group.itemIds || []) {
             const item = itemById.get(String(itemId))
             if (!item) continue
             const searchable = `${item.title || ''} ${item.description || ''}`.toLocaleLowerCase()

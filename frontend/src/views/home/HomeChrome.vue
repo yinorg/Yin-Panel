@@ -102,6 +102,7 @@ const themeSurfaceRoute = computed(() => route.name === 'themeSurface')
       <NDropdown
         trigger="hover"
         scrollable
+        display-directive="show"
         :options="home.spaceSelectorOptions"
         :theme-overrides="{
           color: 'rgba(18, 22, 28, 0.72)',

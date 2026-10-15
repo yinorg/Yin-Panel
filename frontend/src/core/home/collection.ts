@@ -100,6 +100,10 @@ export function createHomeCollectionLoader<Group extends HomeCollectionGroup, It
     const active = () => currentGeneration === generation && !requestController.signal.aborted
     const cached = options.readCache(spaceId)
     const cache: SpaceCache = cached || { groups: [], items: {} }
+    // Writing the cache back is only worth it when this load actually changed it:
+    // persisting an unchanged Space re-encrypts a megabyte-sized payload for
+    // nothing, and a switch between two loaded Spaces changes nothing at all.
+    let cacheDirty = false
     const itemsByGroup = new Map<number, Item[]>()
     const result: HomeCollectionResult<Group, Item> = {
       spaceId,
@@ -149,7 +153,10 @@ export function createHomeCollectionLoader<Group extends HomeCollectionGroup, It
         const response = await withTimeout(signal => options.getGroups(spaceId, signal), options.timeoutMs ?? 3000, requestController.signal)
         if (!active()) return { ...result, cancelled: true }
         groups = response.data
-        if (groups) cache.groups = groups
+        if (groups) {
+          cache.groups = groups
+          cacheDirty = true
+        }
       }
       catch {
         if (!active()) return { ...result, cancelled: true }
@@ -175,7 +182,7 @@ export function createHomeCollectionLoader<Group extends HomeCollectionGroup, It
 
     if (!options.isOnline() && pending.length) {
       result.stale = true
-      options.writeCache(spaceId, cache)
+      if (cacheDirty) options.writeCache(spaceId, cache)
       return result
     }
 
@@ -206,6 +213,7 @@ export function createHomeCollectionLoader<Group extends HomeCollectionGroup, It
             publish()
             if (pageItems.length < pageSize) {
               cache.items[String(groupId)] = loadedItems
+              cacheDirty = true
               break
             }
             page++
@@ -327,6 +335,7 @@ export function createHomeCollectionLoader<Group extends HomeCollectionGroup, It
         cache.items[String(groupId)] = bucket
       }
       publish()
+      cacheDirty = true
       options.writeCache(spaceId, cache)
       result.stale ||= result.failedGroups > 0
       return true
@@ -335,7 +344,7 @@ export function createHomeCollectionLoader<Group extends HomeCollectionGroup, It
     await Promise.all(Array.from({ length: Math.min(options.concurrency ?? HOME_ITEM_CONCURRENCY, pending.length) }, worker))
     if (!active()) return { ...result, cancelled: true }
 
-    options.writeCache(spaceId, cache)
+    if (cacheDirty) options.writeCache(spaceId, cache)
     result.stale ||= result.failedGroups > 0
     if (result.failedGroups)
       result.error = { code: 'PARTIAL_LOAD', message: 'Some bookmark items could not be loaded' }
