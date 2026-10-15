@@ -233,7 +233,7 @@ export -n SUDO_PASSWORD SUDO_PASSWD 2>/dev/null || true
 1. Run `git status --short` and preserve unrelated user changes.
 2. Search the repository before changing branding, API fields, database models, or migrations.
 3. Never delete or reset databases, uploads, backups, or generated files without explicit permission.
-4. Keep user-facing translations synchronized across `frontend/src/locales/`.
+4. Add new user-facing strings to `frontend/src/locales/zh-CN.json` and `frontend/src/locales/en-US.json` only while a change is in progress. Sync the other locales from those two as the last step before a commit, then run `npm run check:i18n`. Do not touch the other locales mid-task.
 
 ## Standard Build Order
 
