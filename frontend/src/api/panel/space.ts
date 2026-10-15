@@ -47,8 +47,10 @@ export function sortSpaces(spaces: Space[], currentUserId?: number) {
 export function getSpaces<T>(signal?: AbortSignal) { return get<T>({ url: '/spaces', signal }) }
 export function getSearchConfig<T>(spaceId: number) { return get<T>({ url: `/spaces/${spaceId}/search-config` }) }
 export function setSearchConfig<T>(spaceId: number, data: SpaceSearchConfig) { return post<T>({ url: `/spaces/${spaceId}/search-config`, data }) }
-export function getPublicConfig<T>(spaceId: number) { return get<T>({ url: `/spaces/${spaceId}/public` }) }
-export function setPublicConfig<T>(spaceId: number, data: PublicConfig) { return post<T>({ url: `/spaces/${spaceId}/public`, data }) }
+export interface SpaceWallpaperConfig { mode: 'theme' | 'library' | 'custom' | 'none'; kind?: string; source?: string; poster?: string; libraryEntry?: string }
+export function getWallpaperConfig<T>(spaceId: number) { return get<T>({ url: `/spaces/${spaceId}/wallpaper` }) }
+export function setWallpaperConfig<T>(spaceId: number, data: SpaceWallpaperConfig) { return post<T>({ url: `/spaces/${spaceId}/wallpaper`, data }) }
+export function getPublicConfig<T>(spaceId: number) { return get<T>({ url: `/spaces/${spaceId}/public` }) }export function setPublicConfig<T>(spaceId: number, data: PublicConfig) { return post<T>({ url: `/spaces/${spaceId}/public`, data }) }
 export function getBookmarkTree<T>(spaceId: number) { return get<T>({ url: `/spaces/${spaceId}/bookmarks/tree` }) }
 export function importBookmarksBatch<T>(spaceId: number, data: FormData) { return post<T>({ url: `/spaces/${spaceId}/bookmarks/import-batch`, data }) }
 export function clearSpace<T>(spaceId: number) { return post<T>({ url: `/spaces/${spaceId}/clear` }) }

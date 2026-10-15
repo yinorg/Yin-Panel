@@ -45,6 +45,8 @@ func (r *SpaceRouter) InitRouter(router *gin.RouterGroup) {
 	g.GET("", r.List)
 	g.GET("/:spaceId/search-config", r.GetSearchConfig)
 	g.POST("/:spaceId/search-config", r.SetSearchConfig)
+	g.GET("/:spaceId/wallpaper", r.GetWallpaperConfig)
+	g.POST("/:spaceId/wallpaper", r.SetWallpaperConfig)
 	g.GET("/:spaceId/groups", r.Groups)
 	g.GET("/:spaceId/items", r.Items)
 	g.POST("/:spaceId/items", r.CreateItem)
@@ -1348,6 +1350,81 @@ func (r *SpaceRouter) SetSearchConfig(c *gin.Context) {
 		return
 	}
 	response.Success(c)
+}
+
+// GetWallpaperConfig returns the Space's default wallpaper, or null when the
+// Space has never set one, in which case the visitor's own choice stands.
+func (r *SpaceRouter) GetWallpaperConfig(c *gin.Context) {
+	user, ok := base.GetCurrentUserInfo(c)
+	if !ok {
+		response.Error(c, "not logged in")
+		return
+	}
+	id, err := spaceID(c)
+	if err != nil || !canAccessSpace(user.ID, id) {
+		response.ErrorNoAccess(c)
+		return
+	}
+
+	var space repository.Space
+	if err := repository.Db.First(&space, id).Error; err != nil {
+		response.ErrorDataNotFound(c)
+		return
+	}
+	if space.WallpaperJSON == "" {
+		response.SuccessData(c, nil)
+		return
+	}
+
+	var config repository.SpaceWallpaperConfig
+	if err := json.Unmarshal([]byte(space.WallpaperJSON), &config); err != nil {
+		response.ErrorDatabase(c, err.Error())
+		return
+	}
+	response.SuccessData(c, config)
+}
+
+// SetWallpaperConfig stores the Space default wallpaper. A `none` mode clears
+// it, so the Space falls back to the theme's own artwork.
+func (r *SpaceRouter) SetWallpaperConfig(c *gin.Context) {
+	user, ok := base.GetCurrentUserInfo(c)
+	if !ok {
+		response.Error(c, "not logged in")
+		return
+	}
+	id, err := spaceID(c)
+	if err != nil || !canEditSpace(user.ID, id) {
+		response.ErrorNoAccess(c)
+		return
+	}
+
+	var config repository.SpaceWallpaperConfig
+	if err := c.ShouldBindJSON(&config); err != nil || !validWallpaperMode(config.Mode) {
+		response.ErrorParamFomat(c, "invalid wallpaper config")
+		return
+	}
+	encoded := ""
+	if config.Mode != "none" {
+		data, err := json.Marshal(config)
+		if err != nil {
+			response.ErrorParamFomat(c, "invalid wallpaper config")
+			return
+		}
+		encoded = string(data)
+	}
+	if err := repository.Db.Model(&repository.Space{}).Where("id = ?", id).Update("wallpaper_json", encoded).Error; err != nil {
+		response.ErrorDatabase(c, err.Error())
+		return
+	}
+	response.Success(c)
+}
+
+func validWallpaperMode(mode string) bool {
+	switch mode {
+	case "theme", "library", "custom", "none":
+		return true
+	}
+	return false
 }
 
 func (r *SpaceRouter) Groups(c *gin.Context) {

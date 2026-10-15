@@ -26,6 +26,18 @@ type Space struct {
 	PublicMode       string  `gorm:"type:varchar(20);not null;default:'direct'" json:"publicMode"`
 	PublicCodeHash   string  `gorm:"type:varchar(128)" json:"-"`
 	SearchConfigJSON string  `gorm:"type:text" json:"-"`
+	WallpaperJSON    string  `gorm:"type:text" json:"-"`
+}
+
+// SpaceWallpaperConfig is a Space's default wallpaper. It mirrors the
+// user-level wallpaper fields so the home can fall back to the Space's choice
+// when the visitor has not picked one of their own.
+type SpaceWallpaperConfig struct {
+	Mode         string `json:"mode"`
+	Kind         string `json:"kind,omitempty"`
+	Source       string `json:"source,omitempty"`
+	Poster       string `json:"poster,omitempty"`
+	LibraryEntry string `json:"libraryEntry,omitempty"`
 }
 
 type SearchEngineConfig struct {

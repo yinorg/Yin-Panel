@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { NButton, NCard, NInput, NList, NListItem, NModal, NProgress, NSelect, NSpace, useMessage } from 'naive-ui'
 import { computed, onMounted, ref } from 'vue'
-import { addMember, addOIDCGroup, clearSpace, copySpace, createGroup, createSpace, deleteGroup, deleteOIDCGroup, deleteSpace, getGroups, getMembers, getOIDCGroups, getPublicConfig, getSearchConfig, getSpaces, removeMember, renameSpace, resolveSpace, setPublicConfig, setSearchConfig, spaceOptions, updateGroup, updateMember, type Space, type SpaceMember, type SpaceSearchConfig } from '../../../api/panel/space'
+import { addMember, addOIDCGroup, clearSpace, copySpace, createGroup, createSpace, deleteGroup, deleteOIDCGroup, deleteSpace, getGroups, getMembers, getOIDCGroups, getPublicConfig, getSearchConfig, getSpaces, getWallpaperConfig, removeMember, renameSpace, resolveSpace, setPublicConfig, setSearchConfig, setWallpaperConfig, spaceOptions, updateGroup, updateMember, type Space, type SpaceMember, type SpaceSearchConfig, type SpaceWallpaperConfig } from '../../../api/panel/space'
 import { useAuthStore } from '../../../store'
 import { t } from '../../../locales'
 import { clearSpaceCache, readSpaceCache, writeSpaceCache } from '@/utils/spaceCache'
@@ -168,7 +168,7 @@ async function clearCurrentSpace() {
 }
 function load() { getSpaces<Space[]>().then(({ data }) => { spaces.value = data || []; if (spaces.value.length && !selectedSpaceId.value) selectedSpaceId.value = spaces.value[0].id; spaces.value.forEach(space => loadGroups(space.id)); if (selectedSpaceId.value) { loadGroups(selectedSpaceId.value); loadDetails(selectedSpaceId.value) } }) }
 function loadGroups(spaceId: number) { getGroups<{ id: number; title: string; parentId?: number | null }[]>(spaceId).then(({ data }) => { groups.value[spaceId] = data || [] }) }
-function loadDetails(spaceId: number) { getMembers<SpaceMember[]>(spaceId).then(({ data }) => { members.value = data || [] }); getOIDCGroups<any[]>(spaceId).then(({ data }) => { oidcRules.value = data || [] }); getPublicConfig<any>(spaceId).then(({ data }) => { publicEnabled.value = !!data?.enabled; publicId.value = data?.publicId || ''; publicMode.value = data?.mode === 'code' ? 'code' : 'direct'; publicAccessCode.value = '' }); loadSpaceTheme(spaceId); loadSearchConfig(spaceId) }
+function loadDetails(spaceId: number) { getMembers<SpaceMember[]>(spaceId).then(({ data }) => { members.value = data || [] }); getOIDCGroups<any[]>(spaceId).then(({ data }) => { oidcRules.value = data || [] }); getPublicConfig<any>(spaceId).then(({ data }) => { publicEnabled.value = !!data?.enabled; publicId.value = data?.publicId || ''; publicMode.value = data?.mode === 'code' ? 'code' : 'direct'; publicAccessCode.value = '' }); loadSpaceTheme(spaceId); loadSearchConfig(spaceId); loadSpaceWallpaper(spaceId) }
 function savePublic() { if (!selectedSpaceId.value || (publicEnabled.value && !/^[a-z][a-z0-9-]{4,28}[a-z0-9]$/.test(publicId.value))) { message.error(t('spaceManage.publicIdInvalid')); return }; if (publicMode.value === 'code' && publicEnabled.value && publicAccessCode.value && (publicAccessCode.value.length < 4 || publicAccessCode.value.length > 12)) { message.error(t('spaceManage.accessCodeInvalid')); return }; publicSaving.value = true; setPublicConfig(selectedSpaceId.value, { enabled: publicEnabled.value, publicId: publicId.value, mode: publicMode.value, accessCode: publicAccessCode.value }).then(({ code }) => { if (code === 0) message.success(t('spaceManage.publicSaved')) }).finally(() => { publicSaving.value = false }) }
 function saveGroup(spaceId: number) {
   const title = groupName.value.trim(); if (!title) return false
@@ -313,6 +313,48 @@ async function loadSpaceThemeOptions() {
     // The space keeps following the system default when the list is unavailable.
   }
 }
+const spaceWallpaperMode = ref<'theme' | 'library' | 'custom' | 'none'>('theme')
+const spaceWallpaperSource = ref('')
+const spaceWallpaperEntry = ref('')
+const spaceWallpaperSaving = ref(false)
+const spaceWallpaperOptions = computed(() => [
+  { label: t('spaceManage.wallpaperFollowTheme'), value: 'theme' },
+  { label: t('spaceManage.wallpaperLibrary'), value: 'library' },
+  { label: t('spaceManage.wallpaperCustom'), value: 'custom' },
+  { label: t('spaceManage.wallpaperNone'), value: 'none' },
+])
+/** Reads the Space's default wallpaper. The home falls back to it while the
+ *  visitor has not picked a wallpaper of their own. */
+function loadSpaceWallpaper(spaceId: number) {
+  getWallpaperConfig<SpaceWallpaperConfig | null>(spaceId)
+    .then(({ data }) => {
+      spaceWallpaperMode.value = data?.mode || 'theme'
+      spaceWallpaperSource.value = data?.source || ''
+      spaceWallpaperEntry.value = data?.libraryEntry || ''
+    })
+    .catch(() => {
+      spaceWallpaperMode.value = 'theme'
+    })
+}
+async function saveSpaceWallpaper() {
+  if (!selectedSpaceId.value) return
+  spaceWallpaperSaving.value = true
+  try {
+    const result = await setWallpaperConfig(selectedSpaceId.value, {
+      mode: spaceWallpaperMode.value,
+      kind: 'image',
+      source: spaceWallpaperSource.value.trim(),
+      libraryEntry: spaceWallpaperEntry.value.trim(),
+    })
+    if (result.code === 0)
+      message.success(t('spaceManage.wallpaperSaved'))
+    else
+      message.error(result.msg)
+  }
+  finally {
+    spaceWallpaperSaving.value = false
+  }
+}
 async function loadSpaceTheme(spaceId: number) {
   if (!spaces.value.find(space => space.id === spaceId)?.canEdit) return
   await loadSpaceThemeOptions()
@@ -409,6 +451,26 @@ onMounted(load)
             <div class="mb-1">{{ $t('themeScope.spaceTitle') }}</div>
             <NSelect v-model:value="spaceThemeSelection" :options="spaceThemeOptions" />
             <NButton class="mt-2" size="small" type="primary" :loading="spaceThemeSaving" @click="saveSpaceTheme">
+              {{ $t('common.save') }}
+            </NButton>
+          </div>
+          <div v-if="editableSpace" class="mt-3 max-w-[280px]">
+            <div class="mb-1">{{ $t('spaceManage.spaceWallpaper') }}</div>
+            <NSelect v-model:value="spaceWallpaperMode" :options="spaceWallpaperOptions" />
+            <NInput
+              v-if="spaceWallpaperMode === 'custom'"
+              v-model:value="spaceWallpaperSource"
+              class="mt-2"
+              :placeholder="$t('spaceManage.wallpaperSourcePlaceholder')"
+            />
+            <NInput
+              v-if="spaceWallpaperMode === 'library'"
+              v-model:value="spaceWallpaperEntry"
+              class="mt-2"
+              :placeholder="$t('spaceManage.wallpaperEntryPlaceholder')"
+            />
+            <div class="mt-1 text-xs opacity-70">{{ $t('spaceManage.wallpaperHint') }}</div>
+            <NButton class="mt-2" size="small" type="primary" :loading="spaceWallpaperSaving" @click="saveSpaceWallpaper">
               {{ $t('common.save') }}
             </NButton>
           </div>

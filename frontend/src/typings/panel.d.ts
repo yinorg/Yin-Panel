@@ -43,6 +43,19 @@ declare namespace Panel {
          *  compare against it to tell the user what is still unsaved; null means
          *  no server answer has arrived yet, so nothing is claimed to be dirty. */
         savedPanelConfig?:panelConfig | null
+        /** The active Space's default wallpaper, resolved by the home whenever
+         *  the Space changes. A runtime cache, not a user preference: the
+         *  wallpaper layer only falls back to it while the visitor has not
+         *  picked a wallpaper of their own. */
+        spaceWallpaper?:SpaceWallpaperConfig | null
+    }
+
+    interface SpaceWallpaperConfig {
+        mode:'theme' | 'library' | 'custom' | 'none'
+        kind?:string
+        source?:string
+        poster?:string
+        libraryEntry?:string
     }
 
     interface panelConfig{

@@ -1,5 +1,5 @@
-import { computed, onUnmounted, ref, type Ref } from 'vue'
-import { getGroups, getItems, getSpaces, sortSpaces, spaceDisplayName, type Space } from '@/api/panel/space'
+import { computed, onUnmounted, ref, watch, type Ref } from 'vue'
+import { getGroups, getItems, getSpaces, getWallpaperConfig, sortSpaces, spaceDisplayName, type Space } from '@/api/panel/space'
 import { getEnableStatus } from '@/api/system/systemMonitor'
 import { useAuthStore, usePanelState } from '@/store'
 import { setTitle } from '@/utils/cmn'
@@ -72,6 +72,23 @@ export function useHomeData(input: {
 
   const spaces = ref<Space[]>([])
   const activeSpace = ref<Space | null>(null)
+  // A Space can name a default wallpaper for its home. It is a Space-level
+  // setting, so it is re-read whenever the active Space changes and cleared when
+  // the read fails, which leaves the visitor's own choice standing.
+  watch(activeSpace, async (space) => {
+    const id = space?.id
+    if (!id) {
+      panelState.spaceWallpaper = null
+      return
+    }
+    try {
+      const res = await getWallpaperConfig<Panel.SpaceWallpaperConfig | null>(id)
+      panelState.spaceWallpaper = res.code === 0 ? (res.data ?? null) : null
+    }
+    catch {
+      panelState.spaceWallpaper = null
+    }
+  }, { immediate: true })
   const spaceSelectorOptions = computed(() => spaces.value
     .filter(space => space.id !== activeSpace.value?.id)
     .map(space => ({ label: spaceDisplayName(space, spaces.value, authStore.userInfo?.id), key: space.id })))

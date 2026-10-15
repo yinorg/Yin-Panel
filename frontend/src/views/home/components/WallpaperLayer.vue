@@ -32,6 +32,19 @@ const wallpaper = computed(() => {
     const source = config.wallpaperSource || config.backgroundImageSrc || '/assets/bg-forest.webp'
     return { kind, source, poster: config.wallpaperPoster || (kind === 'image' && !/\.gif(?:[?#]|$)/i.test(source) ? source : '/assets/bg-forest.webp'), overlayOpacity: undefined }
   }
+  // A Space can name a default wallpaper for its home. It only applies while the
+  // visitor has not picked one of their own, so a personal choice always wins.
+  if (!previewThemeDefaults && (config.wallpaperMode === undefined || config.wallpaperMode === 'theme')) {
+    const space = panelState.spaceWallpaper
+    if (space && space.mode === 'library') {
+      const entry = wallpaperLibrary.find(space.libraryEntry)
+      if (entry) return { kind: entry.kind, source: entry.source, poster: entry.poster || entry.source, overlayOpacity: 0 }
+    }
+    if (space && space.mode === 'custom' && space.source) {
+      const kind = space.kind || 'image'
+      return { kind, source: space.source, poster: space.poster || space.source, overlayOpacity: undefined }
+    }
+  }
   // Default wallpaper. The pre-theme build drew the artwork with no veil at
   // all, so the fallback opacity is 0 rather than the old 0.85 that washed the
   // page out to near-white.
