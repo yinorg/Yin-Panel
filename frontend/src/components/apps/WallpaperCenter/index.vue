@@ -19,7 +19,16 @@ import { t } from '@/locales'
  *  rendered whole: one page of thumbnails costs a few hundred kilobytes. */
 const PAGE_SIZE = 24
 
-withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
+const props = withDefaults(defineProps<{
+  embedded?: boolean
+  /** A host that owns the sink passes its own selection and handles `select`
+   *  instead: the Space settings write a Space, not the user config. */
+  selection?: { mode: 'theme' | 'library'; entry: string } | null
+  /** When false the picker only reports the choice and never writes the user
+   *  config, so the embedding host stays the single writer. */
+  persist?: boolean
+}>(), { embedded: false, selection: null, persist: true })
+const emit = defineEmits<{ (e: 'select', value: { mode: 'theme' | 'library'; entry: string }): void }>()
 
 const panelState = usePanelState()
 const ms = useMessage()
@@ -32,8 +41,12 @@ const current = computed(() => categories.value.find(category => category.id ===
 const items = computed(() => current.value?.items || [])
 const pageCount = computed(() => Math.max(1, Math.ceil(items.value.length / PAGE_SIZE)))
 const tiles = computed(() => items.value.slice(page.value * PAGE_SIZE, (page.value + 1) * PAGE_SIZE))
-const selectedEntry = computed(() => (panelState.panelConfig.wallpaperMode === 'library' ? panelState.panelConfig.wallpaperLibraryEntry : ''))
-const followsTheme = computed(() => !panelState.panelConfig.wallpaperMode || panelState.panelConfig.wallpaperMode === 'theme')
+const selectedEntry = computed(() => props.selection
+  ? (props.selection.mode === 'library' ? props.selection.entry : '')
+  : (panelState.panelConfig.wallpaperMode === 'library' ? panelState.panelConfig.wallpaperLibraryEntry : ''))
+const followsTheme = computed(() => props.selection
+  ? props.selection.mode === 'theme'
+  : (!panelState.panelConfig.wallpaperMode || panelState.panelConfig.wallpaperMode === 'theme'))
 
 function selectCategory(id: string) {
   categoryId.value = id
@@ -55,11 +68,19 @@ function save() {
 
 /** The default tile: hand the wallpaper back to the active theme. */
 function chooseTheme() {
+  if (!props.persist) {
+    emit('select', { mode: 'theme', entry: '' })
+    return
+  }
   panelState.panelConfig.wallpaperMode = 'theme'
   save()
 }
 
 function choose(entry: { id: string }) {
+  if (!props.persist) {
+    emit('select', { mode: 'library', entry: entry.id })
+    return
+  }
   panelState.panelConfig.wallpaperMode = 'library'
   panelState.panelConfig.wallpaperLibraryEntry = entry.id
   save()

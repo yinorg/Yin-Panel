@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { NButton, NCard, NInput, NList, NListItem, NModal, NProgress, NSelect, NSpace, useMessage } from 'naive-ui'
-import { useWallpaperLibrary } from '@/hooks/useWallpaperLibrary'
+import WallpaperCenter from '../WallpaperCenter/index.vue'
 import { computed, onMounted, ref } from 'vue'
 import { addMember, addOIDCGroup, clearSpace, copySpace, createGroup, createSpace, deleteGroup, deleteOIDCGroup, deleteSpace, getGroups, getMembers, getOIDCGroups, getPublicConfig, getSearchConfig, getSpaces, getWallpaperConfig, removeMember, renameSpace, resolveSpace, setPublicConfig, setSearchConfig, setWallpaperConfig, spaceOptions, updateGroup, updateMember, type Space, type SpaceMember, type SpaceSearchConfig, type SpaceWallpaperConfig } from '../../../api/panel/space'
 import { useAuthStore } from '../../../store'
@@ -324,24 +324,15 @@ const spaceWallpaperOptions = computed(() => [
   { label: t('spaceManage.wallpaperCustom'), value: 'custom' },
   { label: t('spaceManage.wallpaperNone'), value: 'none' },
 ])
-const spaceWallpaperPage = ref(0)
-const SPACE_WALLPAPER_PAGE_SIZE = 12
-const { library: wallpaperLibrary, load: loadWallpaperLibrary } = useWallpaperLibrary()
-const spaceWallpaperEntries = computed(() => wallpaperLibrary.value.categories.flatMap(category => category.items))
-const spaceWallpaperPageCount = computed(() => Math.max(1, Math.ceil(spaceWallpaperEntries.value.length / SPACE_WALLPAPER_PAGE_SIZE)))
-const spaceWallpaperTiles = computed(() => spaceWallpaperEntries.value.slice(
-  spaceWallpaperPage.value * SPACE_WALLPAPER_PAGE_SIZE,
-  (spaceWallpaperPage.value + 1) * SPACE_WALLPAPER_PAGE_SIZE,
-))
-/** The library is paged rather than rendered whole: one page of thumbnails is a
- *  few hundred kilobytes, and the catalogue holds several hundred entries. */
-function stepSpaceWallpaperPage(delta: number) {
-  spaceWallpaperPage.value = Math.min(spaceWallpaperPageCount.value - 1, Math.max(0, spaceWallpaperPage.value + delta))
+/** The embedded wallpaper centre owns the library, the paging and the tiles, so
+ *  this card only records what it reports and writes it to the Space on save. */
+function onSpaceWallpaperPick(value: { mode: 'theme' | 'library'; entry: string }) {
+  spaceWallpaperMode.value = value.mode
+  spaceWallpaperEntry.value = value.entry
 }
 /** Reads the Space's default wallpaper. The home falls back to it while the
  *  visitor has not picked a wallpaper of their own. */
 function loadSpaceWallpaper(spaceId: number) {
-  void loadWallpaperLibrary()
   getWallpaperConfig<SpaceWallpaperConfig | null>(spaceId)
     .then(({ data }) => {
       spaceWallpaperMode.value = data?.mode || 'theme'
@@ -480,24 +471,12 @@ onMounted(load)
               :placeholder="$t('spaceManage.wallpaperSourcePlaceholder')"
             />
             <div v-if="spaceWallpaperMode === 'library'" class="mt-2">
-              <div class="flex flex-wrap gap-2">
-                <button
-                  v-for="entry in spaceWallpaperTiles"
-                  :key="entry.id"
-                  type="button"
-                  :data-testid="'space-wallpaper-' + entry.id"
-                  :style="{ width: '72px', padding: '0', border: spaceWallpaperEntry === entry.id ? '2px solid var(--yin-primary)' : '2px solid transparent', borderRadius: '8px', background: 'transparent', cursor: 'pointer' }"
-                  @click="spaceWallpaperEntry = entry.id"
-                >
-                  <img :src="entry.poster || entry.source" :alt="entry.name" loading="lazy" style="width: 100%; height: 44px; object-fit: cover; border-radius: 6px; display: block">
-                  <span style="display: block; font-size: 11px; opacity: 0.7; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{ entry.name }}</span>
-                </button>
-              </div>
-              <div v-if="spaceWallpaperPageCount > 1" class="mt-1 flex items-center justify-center gap-2">
-                <NButton size="tiny" :disabled="spaceWallpaperPage <= 0" @click="stepSpaceWallpaperPage(-1)">‹</NButton>
-                <span class="text-xs opacity-70">{{ spaceWallpaperPage + 1 }} / {{ spaceWallpaperPageCount }}</span>
-                <NButton size="tiny" :disabled="spaceWallpaperPage >= spaceWallpaperPageCount - 1" @click="stepSpaceWallpaperPage(1)">›</NButton>
-              </div>
+              <WallpaperCenter
+                embedded
+                :persist="false"
+                :selection="{ mode: spaceWallpaperMode === 'library' ? 'library' : 'theme', entry: spaceWallpaperEntry }"
+                @select="onSpaceWallpaperPick"
+              />
             </div>
             <div class="mt-1 text-xs opacity-70">{{ $t('spaceManage.wallpaperHint') }}</div>
             <NButton class="mt-2" size="small" type="primary" :loading="spaceWallpaperSaving" @click="saveSpaceWallpaper">
