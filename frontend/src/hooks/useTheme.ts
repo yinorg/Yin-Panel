@@ -91,12 +91,15 @@ async function refreshCurrentTheme() {
 /**
  * Re-resolve the theme for a space through the server-side precedence chain.
  * It is a no-op when the resolved revision matches what is already mounted, so
- * switching spaces never reloads an unchanged theme — and today no space theme
- * is set, so it always matches. This is the reservation that lets a space theme
- * take effect later without touching the call sites again.
+ * switching spaces never reloads an unchanged theme.
+ *
+ * A public link takes this path too: the visitor has no user preference to
+ * resolve, but the space the code exposes does have a theme, and the server
+ * resolves it from the Space alone. Skipping the call left every public link on
+ * the system default no matter what the space had chosen.
  */
 export async function reconcileSpaceTheme(spaceId?: number) {
-  if (previewToken || isThemeSafeMode() || parsePublicCodeFromPath())
+  if (previewToken || isThemeSafeMode())
     return
   try {
     const effective = await getEffectiveTheme(spaceId)

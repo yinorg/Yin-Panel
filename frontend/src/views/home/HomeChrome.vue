@@ -43,7 +43,11 @@ useBootOverlay({
   offlineUnavailable: () => props.home.offlineUnavailable,
   modalPending: () => props.dialogs.themeRuntimeNeedsConsent
     || props.dialogs.themeRuntimeConsentVisible
-    || (!!props.home.publicCode && !props.home.publicAccessReady),
+    // Only a prompt that is actually about to show earns the early dismissal. A
+    // `direct` public link settles its access check without ever showing the code
+    // prompt, and dismissing on that alone uncovered the home a whole data load
+    // before the theme could paint it — the blank moment this layer exists to hide.
+    || (!!props.home.publicCode && !props.home.publicAccessReady && !props.home.publicAccessChecking),
 })
 
 const SystemMonitor = defineAsyncComponent(() => import('@/components/deskModule/SystemMonitor/index.vue'))

@@ -129,6 +129,15 @@ func (a *ThemeRouter) EffectiveV2(c *gin.Context) {
 			userID = user.ID
 		}
 	}
+	// A public link exposes exactly one Space, and the visitor has no user for a
+	// preference to resolve against — the server already knows which Space the
+	// code unlocked, so that is the one whose theme applies. Overriding the query
+	// also keeps a public visitor from asking about any other Space's theme.
+	if publicID, ok := c.Get("publicSpaceID"); ok {
+		if id, valid := publicID.(uint); valid && id != 0 {
+			spaceID = id
+		}
+	}
 	resolution, err := theme.ResolveThemeV2(repository.Db, userID, spaceID)
 	if err != nil {
 		response.ErrorDatabase(c, err.Error())
