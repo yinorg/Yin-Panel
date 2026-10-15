@@ -347,11 +347,6 @@
   "spaceManage": {
     "mySpace": "我的空間",
     "spaceWallpaper": "空間預設壁紙",
-    "wallpaperFollowTheme": "跟隨主題",
-    "wallpaperLibrary": "從壁紙庫選擇",
-    "wallpaperCustom": "自訂網址",
-    "wallpaperNone": "不設預設",
-    "wallpaperSourcePlaceholder": "圖片或影片網址",
     "wallpaperHint": "僅在成員未自行選擇壁紙時生效",
     "wallpaperSaved": "空間壁紙已儲存",
     "chooseFile": "導入",

@@ -347,11 +347,6 @@
   "spaceManage": {
     "mySpace": "Mein Bereich",
     "spaceWallpaper": "Standard-Hintergrund des Bereichs",
-    "wallpaperFollowTheme": "Dem Design folgen",
-    "wallpaperLibrary": "Aus der Bibliothek wählen",
-    "wallpaperCustom": "Eigene URL",
-    "wallpaperNone": "Kein Standard",
-    "wallpaperSourcePlaceholder": "Bild- oder Video-URL",
     "wallpaperHint": "Gilt nur, solange Besucher kein eigenes Hintergrundbild gewählt haben",
     "wallpaperSaved": "Hintergrund des Bereichs gespeichert",
     "chooseFile": "Importieren",

@@ -315,15 +315,8 @@ async function loadSpaceThemeOptions() {
   }
 }
 const spaceWallpaperMode = ref<'theme' | 'library' | 'custom' | 'none'>('theme')
-const spaceWallpaperSource = ref('')
 const spaceWallpaperEntry = ref('')
 const spaceWallpaperSaving = ref(false)
-const spaceWallpaperOptions = computed(() => [
-  { label: t('spaceManage.wallpaperFollowTheme'), value: 'theme' },
-  { label: t('spaceManage.wallpaperLibrary'), value: 'library' },
-  { label: t('spaceManage.wallpaperCustom'), value: 'custom' },
-  { label: t('spaceManage.wallpaperNone'), value: 'none' },
-])
 /** The embedded wallpaper centre owns the library, the paging and the tiles, so
  *  this card only records what it reports and writes it to the Space on save. */
 function onSpaceWallpaperPick(value: { mode: 'theme' | 'library'; entry: string }) {
@@ -335,8 +328,7 @@ function onSpaceWallpaperPick(value: { mode: 'theme' | 'library'; entry: string 
 function loadSpaceWallpaper(spaceId: number) {
   getWallpaperConfig<SpaceWallpaperConfig | null>(spaceId)
     .then(({ data }) => {
-      spaceWallpaperMode.value = data?.mode || 'theme'
-      spaceWallpaperSource.value = data?.source || ''
+      spaceWallpaperMode.value = data?.mode === 'library' ? 'library' : 'theme'
       spaceWallpaperEntry.value = data?.libraryEntry || ''
     })
     .catch(() => {
@@ -348,9 +340,8 @@ async function saveSpaceWallpaper() {
   spaceWallpaperSaving.value = true
   try {
     const result = await setWallpaperConfig(selectedSpaceId.value, {
-      mode: spaceWallpaperMode.value,
+      mode: spaceWallpaperMode.value === 'library' ? 'library' : 'theme',
       kind: 'image',
-      source: spaceWallpaperSource.value.trim(),
       libraryEntry: spaceWallpaperEntry.value.trim(),
     })
     if (result.code === 0)
@@ -461,23 +452,14 @@ onMounted(load)
               {{ $t('common.save') }}
             </NButton>
           </div>
-          <div v-if="editableSpace" class="mt-3 max-w-[280px]">
+          <div v-if="editableSpace" class="mt-3">
             <div class="mb-1">{{ $t('spaceManage.spaceWallpaper') }}</div>
-            <NSelect v-model:value="spaceWallpaperMode" :options="spaceWallpaperOptions" />
-            <NInput
-              v-if="spaceWallpaperMode === 'custom'"
-              v-model:value="spaceWallpaperSource"
-              class="mt-2"
-              :placeholder="$t('spaceManage.wallpaperSourcePlaceholder')"
+            <WallpaperCenter
+              embedded
+              :persist="false"
+              :selection="{ mode: spaceWallpaperMode === 'library' ? 'library' : 'theme', entry: spaceWallpaperEntry }"
+              @select="onSpaceWallpaperPick"
             />
-            <div v-if="spaceWallpaperMode === 'library'" class="mt-2">
-              <WallpaperCenter
-                embedded
-                :persist="false"
-                :selection="{ mode: spaceWallpaperMode === 'library' ? 'library' : 'theme', entry: spaceWallpaperEntry }"
-                @select="onSpaceWallpaperPick"
-              />
-            </div>
             <div class="mt-1 text-xs opacity-70">{{ $t('spaceManage.wallpaperHint') }}</div>
             <NButton class="mt-2" size="small" type="primary" :loading="spaceWallpaperSaving" @click="saveSpaceWallpaper">
               {{ $t('common.save') }}

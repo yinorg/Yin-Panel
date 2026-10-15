@@ -347,11 +347,6 @@
   "spaceManage": {
     "mySpace": "Моё пространство",
     "spaceWallpaper": "Обои пространства по умолчанию",
-    "wallpaperFollowTheme": "Как в теме",
-    "wallpaperLibrary": "Выбрать из библиотеки",
-    "wallpaperCustom": "Свой URL",
-    "wallpaperNone": "Без обоев",
-    "wallpaperSourcePlaceholder": "URL изображения или видео",
     "wallpaperHint": "Действует, пока посетитель не выбрал свои обои",
     "wallpaperSaved": "Обои пространства сохранены",
     "chooseFile": "Импортировать",

@@ -347,11 +347,6 @@
   "spaceManage": {
     "mySpace": "내 공간",
     "spaceWallpaper": "공간 기본 배경",
-    "wallpaperFollowTheme": "테마 따르기",
-    "wallpaperLibrary": "라이브러리에서 선택",
-    "wallpaperCustom": "사용자 지정 URL",
-    "wallpaperNone": "기본 없음",
-    "wallpaperSourcePlaceholder": "이미지 또는 동영상 URL",
     "wallpaperHint": "방문자가 직접 배경을 고르지 않은 동안에만 적용됩니다",
     "wallpaperSaved": "공간 배경을 저장했습니다",
     "chooseFile": "가져오기",

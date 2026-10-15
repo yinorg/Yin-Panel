@@ -347,11 +347,6 @@
   "spaceManage": {
     "mySpace": "Mi espacio",
     "spaceWallpaper": "Fondo predeterminado del espacio",
-    "wallpaperFollowTheme": "Seguir el tema",
-    "wallpaperLibrary": "Elegir de la biblioteca",
-    "wallpaperCustom": "URL personalizada",
-    "wallpaperNone": "Sin predeterminado",
-    "wallpaperSourcePlaceholder": "URL de imagen o vídeo",
     "wallpaperHint": "Solo se aplica mientras el visitante no haya elegido su propio fondo",
     "wallpaperSaved": "Fondo del espacio guardado",
     "chooseFile": "Importar",
