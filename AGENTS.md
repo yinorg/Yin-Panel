@@ -259,13 +259,18 @@ The script requires `backend/conf.yaml` before it stops any running process. Aft
 
 ## Versioning and Tags
 
+The release version is the git tag, never a source edit. CI injects it with
+`-ldflags "-X .../global.VERSION=${VERSION}"` from `github.ref_name`, and
+`scripts/deploy-local.sh` injects the same value locally from
+`git describe --tags`. `backend/internal/global/global.go` keeps its source
+default as a fallback and is not edited for a release.
+
 Before creating a release tag:
 
-1. Update `backend/internal/global/global.go`, especially `global.VERSION`.
-2. Build the frontend so generated frontend metadata is current.
-3. Build and test the backend after the frontend build.
-4. Run `git diff --check`, inspect `git diff`, and confirm old branding and old version strings are gone.
-5. Create the tag only after all checks pass.
+1. Build the frontend so generated frontend metadata is current.
+2. Build and test the backend after the frontend build.
+3. Run `git diff --check`, inspect `git diff`, and confirm old branding and old version strings are gone.
+4. Create the tag only after all checks pass.
 
 The Docker workflow publishes standard version tags such as `0.3.1`. It expects frontend output in `backend/web` and a backend binary in `build-output/yin-panel`. Do not tag before both artifacts are rebuilt.
 
