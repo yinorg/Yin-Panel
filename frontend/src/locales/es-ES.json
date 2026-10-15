@@ -352,7 +352,6 @@
     "wallpaperCustom": "URL personalizada",
     "wallpaperNone": "Sin predeterminado",
     "wallpaperSourcePlaceholder": "URL de imagen o vídeo",
-    "wallpaperEntryPlaceholder": "ID de la entrada de la biblioteca",
     "wallpaperHint": "Solo se aplica mientras el visitante no haya elegido su propio fondo",
     "wallpaperSaved": "Fondo del espacio guardado",
     "chooseFile": "Importar",
