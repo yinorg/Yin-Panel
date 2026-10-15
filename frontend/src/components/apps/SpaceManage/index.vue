@@ -420,7 +420,7 @@ onMounted(load)
         <NCard v-if="selectedSpaceId" size="small" :title="$t('spaceManage.sectionContent')">
           <div class="w-full">
             <div class="flex items-center gap-2"><span>{{ $t('spaceManage.groups') }}</span><NButton size="tiny" type="primary" @click="openAddGroup(selectedSpaceId!)">{{ $t('spaceManage.addGroup') }}</NButton><span v-if="!groups[selectedSpaceId]?.length" class="yin-text-muted">{{ $t('common.noData') }}</span></div>
-            <NList class="mt-1"><NListItem v-for="group in groups[selectedSpaceId]" :key="group.id"><NSpace justify="space-between" align="center" class="w-full"><span>{{ group.title }}{{ group.parentId ? ` ${$t('spaceManage.childGroupLabel')}` : '' }}</span><NSpace :size="6"><NButton data-testid="group-rename" size="tiny" @click="editGroup(selectedSpaceId!, group)">{{ $t('common.edit') }}</NButton><NButton data-testid="group-delete" size="tiny" tertiary type="error" @click="removeGroup(selectedSpaceId!, group)">{{ $t('common.delete') }}</NButton></NSpace></NSpace></NListItem></NList>
+            <NList class="mt-1" style="max-height: 320px; overflow-y: auto"><NListItem v-for="group in groups[selectedSpaceId]" :key="group.id"><NSpace justify="space-between" align="center" class="w-full"><span>{{ group.title }}{{ group.parentId ? ` ${$t('spaceManage.childGroupLabel')}` : '' }}</span><NSpace :size="6"><NButton data-testid="group-rename" size="tiny" @click="editGroup(selectedSpaceId!, group)">{{ $t('common.edit') }}</NButton><NButton data-testid="group-delete" size="tiny" tertiary type="error" @click="removeGroup(selectedSpaceId!, group)">{{ $t('common.delete') }}</NButton></NSpace></NSpace></NListItem></NList>
           </div>
           <NModal v-model:show="groupDialogVisible" preset="dialog" :title="editing ? $t('common.edit') : $t('spaceManage.addGroup')" :positive-text="$t('common.confirm')" :negative-text="$t('common.cancel')" @positive-click="saveGroup(selectedSpaceId!)">
             <NSpace vertical>
@@ -442,7 +442,7 @@ onMounted(load)
           <div class="mt-3">
             <div class="mb-1">{{ $t('spaceManage.bookmarkTransfer') }}</div>
             <NSpace><NButton data-testid="bookmark-export" @click="exportBookmarks">{{ $t('spaceManage.exportBookmarks') }}</NButton><NButton data-testid="bookmark-choose-file" @click="bookmarkFileInput?.click()">{{ $t('spaceManage.chooseFile') }}</NButton><input ref="bookmarkFileInput" data-testid="bookmark-file-input" class="hidden" type="file" accept=".html,text/html" @change="previewBookmarks"></NSpace>
-            <NList v-if="bookmarkPreview" class="mt-2"><NListItem v-for="(row, index) in bookmarkPreviewRows" :key="index" data-testid="bookmark-preview-row"><span :style="{ paddingLeft: `${row.depth * 16}px` }">{{ row.title }} {{ $t('spaceManage.bookmarkGroupCount', { n: row.count }) }}</span></NListItem><NProgress v-if="importing" type="line" :percentage="importProgress" processing /><NButton data-testid="bookmark-import-confirm" type="primary" :loading="importing" @click="confirmImport">{{ $t('spaceManage.confirmImport') }}</NButton></NList>
+            <NList v-if="bookmarkPreview" class="mt-2" style="max-height: 320px; overflow-y: auto"><NListItem v-for="(row, index) in bookmarkPreviewRows" :key="index" data-testid="bookmark-preview-row"><span :style="{ paddingLeft: `${row.depth * 16}px` }">{{ row.title }} {{ $t('spaceManage.bookmarkGroupCount', { n: row.count }) }}</span></NListItem><NProgress v-if="importing" type="line" :percentage="importProgress" processing /><NButton data-testid="bookmark-import-confirm" type="primary" :loading="importing" @click="confirmImport">{{ $t('spaceManage.confirmImport') }}</NButton></NList>
           </div>
         </NCard>
 
@@ -461,7 +461,7 @@ onMounted(load)
 
           <div class="mt-4">
             <div class="flex items-center gap-2"><span class="yin-text-muted font-bold">{{ $t('spaceManage.members') }}</span><NButton size="tiny" type="primary" @click="openAddMember">{{ $t('spaceManage.addMember') }}</NButton></div>
-            <NList><NListItem v-for="member in members" :key="member.id"><NSpace justify="space-between" class="w-full" align="center"><span>{{ memberLabel(member) }} ({{ member.source || 'manual' }})</span><NSpace align="center"><NSelect class="w-32" :value="member.role" :disabled="isSpaceOwner(member)" :options="[{ label: $t('spaceManage.admin'), value: 'admin' }, { label: $t('spaceManage.editor'), value: 'editor' }, { label: $t('spaceManage.viewer'), value: 'viewer' }]" @update:value="role => changeMember(member, role)" /><NButton v-if="!isSpaceOwner(member)" size="tiny" @click="removeCurrentMember(member)">{{ $t('spaceManage.removeMember') }}</NButton></NSpace></NSpace></NListItem></NList>
+            <NList style="max-height: 320px; overflow-y: auto"><NListItem v-for="member in members" :key="member.id"><NSpace justify="space-between" class="w-full" align="center"><span>{{ memberLabel(member) }} ({{ member.source || 'manual' }})</span><NSpace align="center"><NSelect class="w-32" :value="member.role" :disabled="isSpaceOwner(member)" :options="[{ label: $t('spaceManage.admin'), value: 'admin' }, { label: $t('spaceManage.editor'), value: 'editor' }, { label: $t('spaceManage.viewer'), value: 'viewer' }]" @update:value="role => changeMember(member, role)" /><NButton v-if="!isSpaceOwner(member)" size="tiny" @click="removeCurrentMember(member)">{{ $t('spaceManage.removeMember') }}</NButton></NSpace></NSpace></NListItem></NList>
           </div>
           <NModal v-model:show="memberDialogVisible" preset="dialog" :title="$t('spaceManage.addMember')" :positive-text="$t('common.confirm')" :negative-text="$t('common.cancel')" @positive-click="addCurrentMember">
             <NSpace vertical>
@@ -472,7 +472,7 @@ onMounted(load)
 
           <div class="mt-4">
             <div class="flex items-center gap-2"><span class="yin-text-muted font-bold">{{ $t('spaceManage.oidcTitle') }}</span><NButton size="tiny" type="primary" @click="openAddRule">{{ $t('spaceManage.addRule') }}</NButton></div>
-            <NList><NListItem v-for="rule in oidcRules" :key="rule.id"><NSpace justify="space-between" class="w-full"><span>{{ rule.provider }} / {{ rule.groupName }} ({{ rule.role }})</span><NButton size="small" @click="removeRule(rule.id)">{{ $t('common.delete') }}</NButton></NSpace></NListItem></NList>
+            <NList style="max-height: 320px; overflow-y: auto"><NListItem v-for="rule in oidcRules" :key="rule.id"><NSpace justify="space-between" class="w-full"><span>{{ rule.provider }} / {{ rule.groupName }} ({{ rule.role }})</span><NButton size="small" @click="removeRule(rule.id)">{{ $t('common.delete') }}</NButton></NSpace></NListItem></NList>
           </div>
           <NModal v-model:show="oidcDialogVisible" preset="dialog" :title="$t('spaceManage.addRule')" :positive-text="$t('common.confirm')" :negative-text="$t('common.cancel')" @positive-click="addRule">
             <NSpace vertical>
