@@ -1,4 +1,4 @@
-import { computed, onUnmounted, ref, watch, type Ref } from 'vue'
+import { computed, onUnmounted, ref, toRaw, watch, type Ref } from 'vue'
 import { useDialog } from 'naive-ui'
 import { useAuthStore, usePanelState } from '@/store'
 import { useRoute } from 'vue-router'
@@ -264,7 +264,11 @@ export function useThemeRuntime(input: {
     activeSpacePairedId: input.activeSpace.value?.pairedSpaceId,
     activeSpaceCanEdit: input.activeSpace.value?.canEdit === true && !input.publicCode,
     activeSpaceCapabilities: input.activeSpace.value?.pairedSpaceId ? ['space.toggleSide'] : [],
-    groups: input.items.value.filter(group => Number.isSafeInteger(Number(group.id))).map(group => ({
+    // `toRaw` here is the difference between 5s and a fraction of it on a Space
+    // with a thousand items: reading the array is what the computed tracks, and
+    // every per-item read below would otherwise go through Vue's proxy traps
+    // (profiled at ~2.4s of the load). Replacing the array still re-runs this.
+    groups: toRaw(input.items.value).filter(group => Number.isSafeInteger(Number(group.id))).map(group => ({
       ...group,
       id: Number(group.id),
       items: (group.items || []).filter(item => Number.isSafeInteger(Number(item.id))).map(item => ({
