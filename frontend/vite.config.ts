@@ -49,6 +49,24 @@ function setupPlugins(env: ImportMetaEnv): PluginOption[] {
             expiration: { maxEntries: 200, maxAgeSeconds: 7 * 24 * 60 * 60 },
           },
         }, {
+          // Item icons come from the public Iconify API, and a panel resolves the
+          // same handful of identifiers on every load. The CDN already sends a
+          // seven-day `immutable` header, so the browser's own cache serves
+          // repeat requests — but that cache is not ours: it expires weekly and
+          // it cannot answer offline. Holding the bytes in the worker keeps icons
+          // instant across reloads and lets an offline home keep them.
+          // `/search` is excluded because it is a live query, not a resource, and
+          // an icon identifier is immutable, so `CacheFirst` cannot serve a stale
+          // icon. The matcher is serialized into sw.js like the one below, so it
+          // stays self-contained.
+          urlPattern: ({ url }) => url.hostname === 'api.iconify.design' && !url.pathname.startsWith('/search'),
+          handler: 'CacheFirst',
+          options: {
+            cacheName: 'yin-panel-iconify-assets',
+            cacheableResponse: { statuses: [0, 200] },
+            expiration: { maxEntries: 300, maxAgeSeconds: 30 * 24 * 60 * 60 },
+          },
+        }, {
           // A theme-rendered home needs three runtime requests, and offline it
           // needs all three: the package manifest, the sandbox grant, and the
           // resource bytes. Any one of them missing means the sandbox cannot boot
