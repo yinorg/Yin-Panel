@@ -24,6 +24,22 @@ Yin-Panel adalah panel navigasi ringan yang dapat dihosting sendiri untuk ruang 
 | --- | --- |
 | ![Menambahkan bookmark dengan editor ikon](../images/readme-editor-light.jpg) | ![Manajemen ruang dengan akses publik dan impor/ekspor bookmark](../images/readme-spaces-light.jpg) |
 
+### Pratinjau antarmuka
+
+| Login | Akses publik |
+| --- | --- |
+| ![Login](../images/readme-login-light.jpg) | ![Akses publik](../images/readme-public-light.jpg) |
+
+| Pusat wallpaper | Wallpaper bawaan ruang |
+| --- | --- |
+| ![Pusat wallpaper](../images/readme-wallpaper-light.jpg) | ![Wallpaper bawaan ruang](../images/readme-space-wallpaper-light.jpg) |
+
+**Tema Directory**: setiap ruang dapat memakai paket temanya sendiri, jadi ruang di satu instans bisa tampil berbeda.
+
+![Beranda tema Directory](../images/readme-home-space-light.jpg)
+
+![Tampilan](../images/readme-appearance-light.jpg)
+
 ## Fitur
 
 - Ruang pribadi dan bersama dengan konten yang terisolasi

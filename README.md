@@ -24,6 +24,22 @@ Yin-Panel is a lightweight, self-hostable navigation panel for personal and shar
 | --- | --- |
 | ![Adding a bookmark with the icon editor](docs/images/readme-editor-light.jpg) | ![Space management with public access and bookmark import/export](docs/images/readme-spaces-light.jpg) |
 
+### Interface preview
+
+| Login | Public access |
+| --- | --- |
+| ![Login](docs/images/readme-login-light.jpg) | ![Public access](docs/images/readme-public-light.jpg) |
+
+| Wallpaper centre | Space default wallpaper |
+| --- | --- |
+| ![Wallpaper centre](docs/images/readme-wallpaper-light.jpg) | ![Space default wallpaper](docs/images/readme-space-wallpaper-light.jpg) |
+
+**Directory theme**: each Space can use its own theme package, so Spaces in one instance can look different.
+
+![Directory theme home page](docs/images/readme-home-space-light.jpg)
+
+![Appearance](docs/images/readme-appearance-light.jpg)
+
 ## Features
 
 - Personal and shared spaces with isolated content

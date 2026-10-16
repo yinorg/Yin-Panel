@@ -24,6 +24,22 @@ Yin-Panel은 개인 및 공유 공간을 위한 가볍고 셀프 호스팅 가�
 | --- | --- |
 | ![아이콘 편집기로 북마크 추가](../images/readme-editor-light.jpg) | ![공개 액세스와 북마크 가져오기/내보내기가 있는 공간 관리](../images/readme-spaces-light.jpg) |
 
+### 화면 미리보기
+
+| 로그인 | 공개 접근 |
+| --- | --- |
+| ![로그인](../images/readme-login-light.jpg) | ![공개 접근](../images/readme-public-light.jpg) |
+
+| 배경화면 센터 | 공간 기본 배경 |
+| --- | --- |
+| ![배경화면 센터](../images/readme-wallpaper-light.jpg) | ![공간 기본 배경](../images/readme-space-wallpaper-light.jpg) |
+
+**디렉터리 테마**: 공간마다 테마 패키지를 지정할 수 있어 같은 인스턴스에서도 공간별로 레이아웃이 달라집니다.
+
+![디렉터리 테마 홈](../images/readme-home-space-light.jpg)
+
+![모양](../images/readme-appearance-light.jpg)
+
 ## 기능
 
 - 개인 공간과 공유 공간, 콘텐츠는 서로 격리

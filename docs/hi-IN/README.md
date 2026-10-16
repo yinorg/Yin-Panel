@@ -24,6 +24,22 @@ Yin-Panel व्यक्तिगत और साझा स्पेस के
 | --- | --- |
 | ![आइकन एडिटर से बुकमार्क जोड़ना](../images/readme-editor-light.jpg) | ![सार्वजनिक पहुँच और बुकमार्क आयात/निर्यात सहित स्पेस प्रबंधन](../images/readme-spaces-light.jpg) |
 
+### इंटरफ़ेस पूर्वावलोकन
+
+| लॉगिन | सार्वजनिक पहुँच |
+| --- | --- |
+| ![लॉगिन](../images/readme-login-light.jpg) | ![सार्वजनिक पहुँच](../images/readme-public-light.jpg) |
+
+| वॉलपेपर केंद्र | स्पेस का डिफ़ॉल्ट वॉलपेपर |
+| --- | --- |
+| ![वॉलपेपर केंद्र](../images/readme-wallpaper-light.jpg) | ![स्पेस का डिफ़ॉल्ट वॉलपेपर](../images/readme-space-wallpaper-light.jpg) |
+
+**Directory थीम**: हर स्पेस अपना थीम पैकेज चुन सकता है, इसलिए एक ही इंस्टेंस के स्पेस अलग दिख सकते हैं।
+
+![Directory थीम का होम पेज](../images/readme-home-space-light.jpg)
+
+![रूप-रंग](../images/readme-appearance-light.jpg)
+
 ## विशेषताएँ
 
 - पृथक सामग्री वाले व्यक्तिगत और साझा स्पेस

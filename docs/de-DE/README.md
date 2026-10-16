@@ -24,6 +24,22 @@ Yin-Panel ist ein leichtgewichtiges, selbst hostbares Navigationspanel für pers
 | --- | --- |
 | ![Lesezeichen mit dem Symbol-Editor hinzufügen](../images/readme-editor-light.jpg) | ![Bereichsverwaltung mit öffentlichem Zugriff und Lesezeichen-Import/-Export](../images/readme-spaces-light.jpg) |
 
+### Oberflächen-Vorschau
+
+| Anmelden | Öffentlicher Zugriff |
+| --- | --- |
+| ![Anmelden](../images/readme-login-light.jpg) | ![Öffentlicher Zugriff](../images/readme-public-light.jpg) |
+
+| Tapeten-Zentrum | Standard-Hintergrund des Bereichs |
+| --- | --- |
+| ![Tapeten-Zentrum](../images/readme-wallpaper-light.jpg) | ![Standard-Hintergrund des Bereichs](../images/readme-space-wallpaper-light.jpg) |
+
+**Directory-Theme**: Jeder Space kann ein eigenes Theme-Paket verwenden, sodass Spaces derselben Instanz unterschiedlich aussehen.
+
+![Startseite des Directory-Themes](../images/readme-home-space-light.jpg)
+
+![Erscheinungsbild](../images/readme-appearance-light.jpg)
+
 ## Funktionen
 
 - Persönliche und gemeinsame Bereiche mit voneinander getrennten Inhalten

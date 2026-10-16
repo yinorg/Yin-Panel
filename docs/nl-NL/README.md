@@ -24,6 +24,22 @@ Yin-Panel is een lichtgewicht, zelf te hosten navigatiepaneel voor persoonlijke 
 | --- | --- |
 | ![Een bladwijzer toevoegen met de pictogram-editor](../images/readme-editor-light.jpg) | ![Ruimtebeheer met openbare toegang en importeren/exporteren van bladwijzers](../images/readme-spaces-light.jpg) |
 
+### Interfacevoorbeeld
+
+| Aanmelden | Openbare toegang |
+| --- | --- |
+| ![Aanmelden](../images/readme-login-light.jpg) | ![Openbare toegang](../images/readme-public-light.jpg) |
+
+| Achtergrondencentrum | Standaardachtergrond van de ruimte |
+| --- | --- |
+| ![Achtergrondencentrum](../images/readme-wallpaper-light.jpg) | ![Standaardachtergrond van de ruimte](../images/readme-space-wallpaper-light.jpg) |
+
+**Directory-thema**: elke space kan een eigen themapakket gebruiken, waardoor spaces in dezelfde instantie er anders uit kunnen zien.
+
+![Startpagina van het Directory-thema](../images/readme-home-space-light.jpg)
+
+![Uiterlijk](../images/readme-appearance-light.jpg)
+
 ## Functies
 
 - Persoonlijke en gedeelde ruimten met gescheiden inhoud

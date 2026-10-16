@@ -24,6 +24,22 @@ Yin-Panel 是一個輕量、可自架的個人與共享空間導覽面板，適�
 | --- | --- |
 | ![使用圖示編輯器新增書籤](../images/readme-editor-light.jpg) | ![空間管理：公開存取與書籤匯入匯出](../images/readme-spaces-light.jpg) |
 
+### 介面預覽
+
+| 登錄 | 公開訪問 |
+| --- | --- |
+| ![登錄](../images/readme-login-light.jpg) | ![公開訪問](../images/readme-public-light.jpg) |
+
+| 壁紙中心 | 空間預設壁紙 |
+| --- | --- |
+| ![壁紙中心](../images/readme-wallpaper-light.jpg) | ![空間預設壁紙](../images/readme-space-wallpaper-light.jpg) |
+
+**目錄主題**：每個空間可以指定自己的主題包，同一個實例裡不同空間呈現不同佈局。
+
+![目錄主題首頁](../images/readme-home-space-light.jpg)
+
+![外觀](../images/readme-appearance-light.jpg)
+
 ## 功能
 
 - 個人空間與共享空間，內容彼此隔離

@@ -24,6 +24,22 @@ Yin-Panel, kişisel ve paylaşılan alanlar için hafif, kendi sunucunuzda barı
 | --- | --- |
 | ![Simge düzenleyiciyle yer işareti ekleme](../images/readme-editor-light.jpg) | ![Herkese açık erişim ile yer işareti içe/dışa aktarma içeren alan yönetimi](../images/readme-spaces-light.jpg) |
 
+### Arayüz önizlemesi
+
+| Giriş yap | Herkese açık erişim |
+| --- | --- |
+| ![Giriş yap](../images/readme-login-light.jpg) | ![Herkese açık erişim](../images/readme-public-light.jpg) |
+
+| Duvar kağıdı merkezi | Alanın varsayılan duvar kağıdı |
+| --- | --- |
+| ![Duvar kağıdı merkezi](../images/readme-wallpaper-light.jpg) | ![Alanın varsayılan duvar kağıdı](../images/readme-space-wallpaper-light.jpg) |
+
+**Directory teması**: her alan kendi tema paketini kullanabilir; aynı kurulumdaki alanlar farklı görünebilir.
+
+![Directory teması ana sayfası](../images/readme-home-space-light.jpg)
+
+![Görünüm](../images/readme-appearance-light.jpg)
+
 ## Özellikler
 
 - İzole içerikli kişisel ve paylaşılan alanlar

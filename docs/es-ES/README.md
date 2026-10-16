@@ -24,6 +24,22 @@ Yin-Panel es un panel de navegación ligero y autoalojable para espacios persona
 | --- | --- |
 | ![Añadir un marcador con el editor de iconos](../images/readme-editor-light.jpg) | ![Gestión de espacios con acceso público e importación/exportación de marcadores](../images/readme-spaces-light.jpg) |
 
+### Vista previa de la interfaz
+
+| Iniciar sesión | Acceso público |
+| --- | --- |
+| ![Iniciar sesión](../images/readme-login-light.jpg) | ![Acceso público](../images/readme-public-light.jpg) |
+
+| Centro de fondos | Fondo predeterminado del espacio |
+| --- | --- |
+| ![Centro de fondos](../images/readme-wallpaper-light.jpg) | ![Fondo predeterminado del espacio](../images/readme-space-wallpaper-light.jpg) |
+
+**Tema Directory**: cada espacio puede usar su propio paquete de tema, así que los espacios de una misma instancia pueden verse distintos.
+
+![Inicio del tema Directory](../images/readme-home-space-light.jpg)
+
+![Apariencia](../images/readme-appearance-light.jpg)
+
 ## Funciones
 
 - Espacios personales y compartidos con contenido aislado entre sí

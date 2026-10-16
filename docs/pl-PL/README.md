@@ -24,6 +24,22 @@ Yin-Panel to lekki panel nawigacyjny do samodzielnego hostowania, przeznaczony d
 | --- | --- |
 | ![Dodawanie zakładki za pomocą edytora ikon](../images/readme-editor-light.jpg) | ![Zarządzanie przestrzeniami z dostępem publicznym oraz importem/eksportem zakładek](../images/readme-spaces-light.jpg) |
 
+### Podgląd interfejsu
+
+| Zaloguj się | Dostęp publiczny |
+| --- | --- |
+| ![Zaloguj się](../images/readme-login-light.jpg) | ![Dostęp publiczny](../images/readme-public-light.jpg) |
+
+| Centrum tapet | Domyślna tapeta przestrzeni |
+| --- | --- |
+| ![Centrum tapet](../images/readme-wallpaper-light.jpg) | ![Domyślna tapeta przestrzeni](../images/readme-space-wallpaper-light.jpg) |
+
+**Motyw Directory**: każda przestrzeń może używać własnego pakietu motywu, więc przestrzenie w tej samej instalacji mogą wyglądać inaczej.
+
+![Strona główna motywu Directory](../images/readme-home-space-light.jpg)
+
+![Wygląd](../images/readme-appearance-light.jpg)
+
 ## Funkcje
 
 - Przestrzenie osobiste i współdzielone z odizolowaną zawartością

@@ -24,6 +24,22 @@ Yin-Panel 是一个轻量、可自托管的个人与共享空间导航面板，�
 | --- | --- |
 | ![用图标编辑器添加书签](../images/readme-editor-light.jpg) | ![空间管理：公开访问与书签导入导出](../images/readme-spaces-light.jpg) |
 
+### 界面预览
+
+| 登录 | 公开访问 |
+| --- | --- |
+| ![登录页：账号密码登录与第三方登录](../images/readme-login-light.jpg) | ![公开访问链接：访客无需登录即可浏览该空间，没有编辑入口](../images/readme-public-light.jpg) |
+
+| 壁纸中心 | 空间默认壁纸 |
+| --- | --- |
+| ![壁纸中心：按分类浏览，选择即预览，右上角保存才写入](../images/readme-wallpaper-light.jpg) | ![空间默认壁纸：选择即预览，右上角保存后对未自行选择壁纸的成员生效](../images/readme-space-wallpaper-light.jpg) |
+
+**目录主题**：每个空间可以指定自己的主题包，同一个实例里不同空间呈现不同布局。
+
+![目录主题首页：标签分组、系统状态、搜索与页脚](../images/readme-home-space-light.jpg)
+
+![外观设置：首页标识、Favicon、明暗模式与主题包](../images/readme-appearance-light.jpg)
+
 ## 功能
 
 - 个人空间与共享空间，内容彼此隔离

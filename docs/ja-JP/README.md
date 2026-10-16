@@ -24,6 +24,22 @@ Yin-Panel は、個人用と共有のスペースのための軽量でセルフ�
 | --- | --- |
 | ![アイコンエディターでブックマークを追加](../images/readme-editor-light.jpg) | ![公開アクセスとブックマークのインポート/エクスポートを備えたスペース管理](../images/readme-spaces-light.jpg) |
 
+### 画面プレビュー
+
+| ログイン | 公開アクセス |
+| --- | --- |
+| ![ログイン](../images/readme-login-light.jpg) | ![公開アクセス](../images/readme-public-light.jpg) |
+
+| 壁紙センター | スペースの既定壁紙 |
+| --- | --- |
+| ![壁紙センター](../images/readme-wallpaper-light.jpg) | ![スペースの既定壁紙](../images/readme-space-wallpaper-light.jpg) |
+
+**ディレクトリテーマ**：スペースごとにテーマパッケージを指定でき、同じインスタンスでもスペースによってレイアウトが変わります。
+
+![ディレクトリテーマのホーム](../images/readme-home-space-light.jpg)
+
+![外観](../images/readme-appearance-light.jpg)
+
 ## 機能
 
 - 個人スペースと共有スペース（コンテンツは互いに分離）
