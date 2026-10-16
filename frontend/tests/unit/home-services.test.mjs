@@ -527,13 +527,15 @@ test('Core Home snapshot preserves text, image, and Iconify item icon representa
       { id: 2, title: 'Image', icon: { itemType: 2, src: '/icons/image.png', fileName: 'image.png' } },
       { id: 3, title: 'Iconify unresolved', icon: { itemType: 3, text: 'mdi:home' } },
       { id: 4, title: 'Iconify resolved', icon: { itemType: 3, text: 'mdi:home', resolvedSrc: safeIconUri, backgroundColor: '#654321' } },
+      { id: 5, title: 'Legacy text tile', icon: { itemType: 1, text: 'DEF', backgroundColor: '#2a2a2a6b' } },
     ] }],
   })
   assert.deepEqual(snapshot.items.map(item => item.icon), [
-    { itemType: 1, text: 'TX', backgroundColor: '#123456' },
-    { itemType: 2, src: '/icons/image.png', fileName: 'image.png', backgroundColor: undefined },
+    { itemType: 1, text: 'TX', backgroundColor: '#123456', textColor: '#ffffff' },
+    { itemType: 2, src: '/icons/image.png', fileName: 'image.png', backgroundColor: undefined, textColor: undefined },
     { itemType: 4, backgroundColor: undefined },
-    { itemType: 3, src: safeIconUri, backgroundColor: '#654321' },
+    { itemType: 3, src: safeIconUri, backgroundColor: '#654321', textColor: '#ffffff' },
+    { itemType: 1, text: 'DEF', backgroundColor: undefined, textColor: undefined },
   ])
   assert.equal(JSON.stringify(snapshot).includes('mdi:home'), false)
 })

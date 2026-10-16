@@ -33,7 +33,9 @@ const NaiveProviderContent = defineComponent({
   <NLoadingBarProvider>
     <NDialogProvider>
       <NNotificationProvider>
-        <NMessageProvider>
+        <!-- The home's own toasts hide the top-centre space selector, so every
+             message lands in the top-right corner instead. -->
+        <NMessageProvider placement="top-right">
           <slot />
           <NaiveProviderContent />
         </NMessageProvider>

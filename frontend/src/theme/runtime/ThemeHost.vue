@@ -263,6 +263,11 @@ function scopedSnapshot(snapshot: ThemeHomeSnapshot): ThemeHomeSnapshot {
   const canReadSpaces = permissions.has('spaces.read')
   const canReadGroups = permissions.has('groups.read')
   const canReadItems = permissions.has('items.read')
+  // An item tile may be translucent, so its glyph colour is resolved against the
+  // surface it is painted on rather than its own channels.
+  const iconTextBase = typeof document === 'undefined'
+    ? undefined
+    : getComputedStyle(document.documentElement).getPropertyValue('--yin-canvas').trim() || undefined
   const capabilities = (snapshot.capabilities || []).filter(capability =>
     capability === 'items.write' ? permissions.has('items.write')
       : capability === 'groups.write' && permissions.has('groups.write'))
@@ -294,7 +299,7 @@ function scopedSnapshot(snapshot: ThemeHomeSnapshot): ThemeHomeSnapshot {
       groupId: canReadGroups ? String(item.groupId) : '',
       title: String(item.title),
       description: item.description === undefined ? undefined : String(item.description),
-      icon: toThemeItemIcon(item.icon),
+      icon: toThemeItemIcon(item.icon, iconTextBase),
       sort: Number(item.sort) || 0,
       // 这个映射是主题真正收到内容的唯一关卡：它逐字段重建 item，没列出的字段到不了
       // 主题。所以 `openMethod` 和 `url` 都必须写在这里——只在上游

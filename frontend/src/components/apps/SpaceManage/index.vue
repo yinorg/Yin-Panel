@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { NButton, NCard, NInput, NList, NListItem, NModal, NProgress, NSelect, NSpace, useMessage } from 'naive-ui'
 import WallpaperCenter from '../WallpaperCenter/index.vue'
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { addMember, addOIDCGroup, clearSpace, copySpace, createGroup, createSpace, deleteGroup, deleteOIDCGroup, deleteSpace, getGroups, getMembers, getOIDCGroups, getPublicConfig, getSearchConfig, getSpaces, getWallpaperConfig, removeMember, renameSpace, resolveSpace, setPublicConfig, setSearchConfig, setWallpaperConfig, spaceOptions, updateGroup, updateMember, type Space, type SpaceMember, type SpaceSearchConfig, type SpaceWallpaperConfig } from '../../../api/panel/space'
 import { useAuthStore } from '../../../store'
 import { t } from '../../../locales'
 import { clearSpaceCache, readSpaceCache, writeSpaceCache } from '@/utils/spaceCache'
 import { announceSpaceWallpaperWrite } from '@/core/home/spaceWallpaper'
+import { setWallpaperPreview } from '@/core/home/wallpaperPreview'
 import { fetchIconsFromExtension, getIconByUrl, iconFileFromBytes, isIconExtensionAvailable } from '@/utils/itemIcon'
 import { importBookmarksBatch } from '@/api/panel/space'
 import { getBookmarkTree } from '@/api/panel/space'
@@ -324,6 +325,11 @@ const spaceWallpaperMode = ref<'theme' | 'library' | 'custom' | 'none'>('theme')
 const spaceWallpaperEntry = ref('')
 const spaceWallpaperSaving = ref(false)
 const spaceWallpaperDialog = ref(false)
+/** A pick the user has previewed but not written yet: the save button stays
+ *  disabled until there is something to save. */
+const spaceWallpaperDirty = ref(false)
+/** The stored choice, so closing without saving puts the card back. */
+const spaceWallpaperSnapshot = ref<{ mode: 'theme' | 'library' | 'custom' | 'none'; entry: string } | null>(null)
 // Which Space the card's current mode/entry describe. Saving is only allowed
 // once that is the Space the user has selected, so switching Spaces can never
 // write the previous Space's choice over a Space nobody has read yet.
@@ -338,13 +344,35 @@ const spaceWallpaperLabel = computed(() => (spaceWallpaperMode.value === 'librar
   ? spaceWallpaperEntry.value
   : t('spaceManage.wallpaperFollowTheme'))
 /** The embedded wallpaper centre owns the library, the paging and the tiles, so
- *  this card only records what it reports and writes it to the Space on save. */
+ *  this card only records what it reports and writes it to the Space on save.
+ *  A pick previews on the home behind the dialog — the same thing the Core's own
+ *  picker does — and the save button in the dialog header commits it. */
 function onSpaceWallpaperPick(value: { mode: 'theme' | 'library'; entry: string }) {
   spaceWallpaperPicked += 1
   spaceWallpaperMode.value = value.mode
   spaceWallpaperEntry.value = value.entry
   spaceWallpaperLoadedFor.value = selectedSpaceId.value
-  spaceWallpaperDialog.value = false
+  spaceWallpaperDirty.value = true
+  setWallpaperPreview({ mode: value.mode, entry: value.entry })
+}
+
+/** Opening the dialog remembers the stored choice so a discard can restore it. */
+function openSpaceWallpaperDialog() {
+  spaceWallpaperSnapshot.value = { mode: spaceWallpaperMode.value, entry: spaceWallpaperEntry.value }
+  spaceWallpaperDirty.value = false
+  spaceWallpaperDialog.value = true
+}
+
+/** Closing without saving drops the preview and puts the stored value back. */
+function onSpaceWallpaperDialogClosed() {
+  setWallpaperPreview(null)
+  if (!spaceWallpaperDirty.value) return
+  const stored = spaceWallpaperSnapshot.value
+  if (stored) {
+    spaceWallpaperMode.value = stored.mode
+    spaceWallpaperEntry.value = stored.entry
+  }
+  spaceWallpaperDirty.value = false
 }
 /** Reads the Space's default wallpaper. The home falls back to it while the
  *  visitor has not picked a wallpaper of their own. A read that was already in
@@ -393,6 +421,11 @@ async function saveSpaceWallpaper() {
       // server just stored: without that, the new artwork only appeared after a
       // reload.
       announceSpaceWallpaperWrite(spaceId, wallpaper)
+      // The preview becomes the stored value: clearing it lets the home resolve
+      // again, which now sees this Space's default.
+      spaceWallpaperDirty.value = false
+      spaceWallpaperSnapshot.value = { mode: spaceWallpaperMode.value, entry: spaceWallpaperEntry.value }
+      setWallpaperPreview(null)
     }
     else
       message.error(result.msg)
@@ -473,6 +506,10 @@ const searchEngineOptions = searchEngineList.map(engine => ({
   value: engine.url,
 }))
 onMounted(load)
+onUnmounted(() => {
+  // A preview must not outlive the dialog that owns it.
+  if (spaceWallpaperDirty.value) setWallpaperPreview(null)
+})
 </script>
 
 <template>
@@ -502,15 +539,32 @@ onMounted(load)
           </div>
           <div v-if="editableSpace" class="mt-3 max-w-[280px]">
             <div class="mb-1">{{ $t('spaceManage.spaceWallpaper') }}</div>
-            <NButton class="w-full" @click="spaceWallpaperDialog = true">
+            <NButton class="w-full" @click="openSpaceWallpaperDialog">
               {{ $t('spaceManage.wallpaperChoose') }}
             </NButton>
             <div class="mt-1 text-xs opacity-70">{{ spaceWallpaperLabel }}</div>
             <div class="mt-1 text-xs opacity-70">{{ $t('spaceManage.wallpaperHint') }}</div>
-            <NButton class="mt-2" size="small" type="primary" :disabled="spaceWallpaperLoadedFor !== selectedSpaceId" :loading="spaceWallpaperSaving" @click="saveSpaceWallpaper">
-              {{ $t('common.save') }}
-            </NButton>
-            <NModal v-model:show="spaceWallpaperDialog" preset="card" style="width: min(92vw, 720px); max-height: 88vh; overflow: auto" :title="$t('spaceManage.spaceWallpaper')">
+            <NModal
+              v-model:show="spaceWallpaperDialog"
+              preset="card"
+              style="width: min(92vw, 720px); max-height: 88vh; overflow: auto"
+              :title="$t('spaceManage.spaceWallpaper')"
+              @after-leave="onSpaceWallpaperDialogClosed"
+            >
+              <!-- The save lives in the dialog header so the picker below stays a
+                   pure preview surface, exactly like the Core wallpaper centre. -->
+              <template #header-extra>
+                <NButton
+                  size="small"
+                  type="primary"
+                  data-testid="space-wallpaper-save"
+                  :loading="spaceWallpaperSaving"
+                  :disabled="!spaceWallpaperDirty || spaceWallpaperLoadedFor !== selectedSpaceId"
+                  @click="saveSpaceWallpaper"
+                >
+                  {{ $t('common.save') }}
+                </NButton>
+              </template>
               <WallpaperCenter
                 embedded
                 :persist="false"

@@ -300,6 +300,9 @@ export function useThemeRuntime(input: {
       networkMode: panelState.networkMode === PanelStateNetworkModeEnum.lan ? 'lan' : 'wan',
       signedIn: !!authStore.loggedIn,
     },
+    // Item tiles may be translucent, so the glyph contrast needs the surface they
+    // are actually painted on rather than their own channels.
+    iconTextBase: themeRuntimeSlots.value.canvas,
     layout: resolveThemeHomeLayout(activeThemePackage.value?.manifest).kind,
     monitorReservedHeight: input.getMonitorReservedHeight(),
     searchConfiguration: input.getSearchConfiguration(),

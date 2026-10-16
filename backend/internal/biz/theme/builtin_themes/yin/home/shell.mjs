@@ -1005,6 +1005,23 @@ const createYinHome = yinLayout => ({
         link.style.removeProperty('background-color')
         if (itemIcon?.backgroundColor) icon.style.backgroundColor = itemIcon.backgroundColor
       }
+      // A tile the user coloured decides its own text contrast: the Core hands
+      // over the readable colour for that background, so a pale avatar keeps a
+      // dark glyph instead of taking the scheme's light one. The tinted card
+      // carries the same colour, so its title and description follow it too.
+      const iconTextColor = itemIcon?.textColor || ''
+      const letters = icon.querySelector('.yin-item-icon-letters')
+      if (letters) {
+        if (iconTextColor) letters.style.color = iconTextColor
+        else letters.style.removeProperty('color')
+      }
+      if (infoStyle && tinted && iconTextColor) {
+        title.style.color = iconTextColor
+        description.style.color = iconTextColor
+      } else {
+        title.style.removeProperty('color')
+        description.style.removeProperty('color')
+      }
     }
 
     const updateFooter = html => {

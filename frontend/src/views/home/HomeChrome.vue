@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { NButton, NCard, NCheckbox, NDropdown, NInput, NModal, NRadio, NRadioGroup, NSkeleton, NSpin, NSpace } from 'naive-ui'
-import { computed, defineAsyncComponent } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import CommandCenter from './components/CommandCenter/index.vue'
 import WallpaperLayer from './components/WallpaperLayer.vue'
@@ -59,6 +59,49 @@ const EditItem = defineAsyncComponent(() => import('./components/EditItem/index.
 // mounts into that same runtime.
 const route = useRoute()
 const themeSurfaceRoute = computed(() => route.name === 'themeSurface')
+
+/**
+ * The toast stack has to clear the space selector, and the selector is part of the
+ * responsive layout: it moves and resizes with the viewport, the language and the
+ * theme's spacing. Measure it and publish the offset as a CSS variable the message
+ * containers read, instead of baking a pixel value. Without a bar (login, public
+ * links) the variable is dropped and Naive's own offset applies.
+ */
+const spaceBar = ref<HTMLElement | null>(null)
+let spaceBarObserver: ResizeObserver | null = null
+
+function syncToastTop() {
+  const root = document.documentElement
+  const bar = spaceBar.value
+  if (!bar) {
+    root.style.removeProperty('--yin-toast-top')
+    return
+  }
+  root.style.setProperty('--yin-toast-top', `${Math.round(bar.getBoundingClientRect().bottom + 8)}px`)
+}
+
+function observeSpaceBar() {
+  spaceBarObserver?.disconnect()
+  spaceBarObserver = null
+  const bar = spaceBar.value
+  if (bar && typeof ResizeObserver !== 'undefined') {
+    spaceBarObserver = new ResizeObserver(syncToastTop)
+    spaceBarObserver.observe(bar)
+  }
+  syncToastTop()
+}
+
+watch(spaceBar, () => { void nextTick(observeSpaceBar) }, { immediate: true })
+watch(() => props.home.showSpaceBar, () => { void nextTick(observeSpaceBar) })
+onMounted(() => {
+  window.addEventListener('resize', syncToastTop)
+  void nextTick(observeSpaceBar)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', syncToastTop)
+  spaceBarObserver?.disconnect()
+  document.documentElement.style.removeProperty('--yin-toast-top')
+})
 </script>
 
 <template>
@@ -98,7 +141,7 @@ const themeSurfaceRoute = computed(() => route.name === 'themeSurface')
         </NSpace>
       </NCard>
     </NModal>
-    <div v-if="home.showSpaceBar" class="space-status-bar">
+    <div v-if="home.showSpaceBar" ref="spaceBar" class="space-status-bar">
       <NDropdown
         trigger="hover"
         scrollable

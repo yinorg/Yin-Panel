@@ -104,6 +104,8 @@ export function createThemeHomeSnapshot(input: {
   presentation?: PresentationSource
   /** The home layout the mounted theme package renders. */
   layout?: 'standard' | 'directory'
+  /** The surface an item icon's translucent tile is painted on, for contrast. */
+  iconTextBase?: string
   searchConfiguration?: SearchConfigurationSource
   /**
    * Resolves an item's open address with the Core's LAN/WAN and mobile policy.
@@ -155,7 +157,7 @@ export function createThemeHomeSnapshot(input: {
         groupId,
         title: item.title,
         description: item.description,
-        icon: toThemeItemIcon(item.icon),
+        icon: toThemeItemIcon(item.icon, input.iconTextBase),
         sort: item.sort ?? 0,
         // 主题在自己的点击同步栈里开窗——只有收到手势的那个框能开，Core 代开在手机上会被拒。
         //

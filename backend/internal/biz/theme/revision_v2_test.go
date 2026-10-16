@@ -369,9 +369,9 @@ func TestBuiltinPackagesV2AreCompleteDTCGAndRepeatable(t *testing.T) {
 		wantVersion := "2.3.3"
 		switch summary.ID {
 		case "org.yin.default":
-			wantVersion = "2.3.116"
+			wantVersion = "2.3.117"
 		case "org.yin.directory":
-			wantVersion = "2.11.39"
+			wantVersion = "2.11.40"
 		}
 		if pkg.Manifest.Version != wantVersion {
 			t.Errorf("%s builtin version = %q, want %q", summary.ID, pkg.Manifest.Version, wantVersion)
@@ -443,7 +443,8 @@ func TestBuiltinHomeResourceHashesPinTheEmbeddedThemes(t *testing.T) {
 			// 图标底色与品牌色改为按像素采样：透明图标按自身亮度选浅/深底，
 			// 品牌字跟随壁纸亮度选黑/白并配同向阴影。
 			// 保存时按钮进入 data-saving 态：图标让位给转圈动画。
-			"views/home.mjs":  "0a4e030d5910178f262d2c56ebec70c7bc62d5efda53975842157676b11efa8b",
+			// 文字图标的前景色改由 Core 快照按底色对比度给出，浅色底不再配浅色字。
+			"views/home.mjs":  "711c36552fffd8ca161cc47e5ac0dcd4bdbd352b8d4f311b57168b022a04680a",
 			"styles/home.css": "4acdcf83a827bc0e24f08b3b0b8e1f48661f5a927d71959988f72b870dd974e6",
 		},
 		"org.yin.directory": {
@@ -456,7 +457,8 @@ func TestBuiltinHomeResourceHashesPinTheEmbeddedThemes(t *testing.T) {
 			// 品牌字跟随壁纸亮度选黑/白并配同向阴影。
 			// 保存时按钮进入 data-saving 态：图标让位给转圈动画。
 			// 首页卡片（标签栏 + 集合）改为磨砂玻璃：76% 面 + blur(18px)，壁纸透出来。
-			"views/home.mjs":  "6d051ca2b88d5f1aa447a62e449242c7fbc33e0b022b1f722710f4eadafbfbbc",
+			// 文字图标的前景色改由 Core 快照按底色对比度给出，浅色底不再配浅色字。
+			"views/home.mjs":  "50f36163b5e16f7bf1cf91a1ef464a9f6a794109b5f88c772b437503fc906746",
 			"styles/home.css": "b0781b5ebb7cda40213004574131f4287f4ac62399fd8712bb0bd9f7f17d5df3",
 		},
 		"org.yin.glass": {
@@ -528,7 +530,7 @@ func TestEnsureBuiltinV2UpgradesOnlyActivationForSelectedBuiltin(t *testing.T) {
 		t.Fatal(err)
 	}
 	latest, err := LatestPackageRevisionV2(db, "org.yin.default")
-	if err != nil || latest.Version != "2.3.116" || activation.ActiveRevisionID != latest.ID {
+	if err != nil || latest.Version != "2.3.117" || activation.ActiveRevisionID != latest.ID {
 		t.Fatalf("selected builtin activation = %+v, latest=%s, err=%v", activation, latest.ID, err)
 	}
 	if latest.ID == old.Revision {

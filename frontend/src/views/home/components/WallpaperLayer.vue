@@ -5,12 +5,14 @@ import { activeThemeWallpaper } from '@/hooks/useTheme'
 import { useWallpaperLibrary } from '@/hooks/useWallpaperLibrary'
 import { publishWallpaperTone } from '@/core/home/wallpaperTone'
 import { resolveWallpaper } from '@/core/home/wallpaperResolve'
+import { useWallpaperPreview } from '@/core/home/wallpaperPreview'
 
 const panelState = usePanelState()
 // The Core wallpaper library: a stored selection is an id, so the layer resolves
 // it here. The picker shares this request, but the layer must be able to paint a
 // choice on its own, before the picker has ever been opened.
 const wallpaperLibrary = useWallpaperLibrary()
+const wallpaperPreview = useWallpaperPreview()
 const previewThemeDefaults = new URLSearchParams(window.location.search).has('themePreview')
 const visible = ref(true)
 const online = ref(navigator.onLine)
@@ -19,8 +21,18 @@ const failed = ref(false)
 const posterFailed = ref(false)
 const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
 
+// A choice the picker is previewing outranks the stored config for as long as the
+// picker is open; the stored config is only written when the user saves.
+const effectiveConfig = computed(() => wallpaperPreview.value
+  ? {
+      ...panelState.panelConfig,
+      wallpaperMode: wallpaperPreview.value.mode,
+      wallpaperLibraryEntry: wallpaperPreview.value.entry,
+    }
+  : panelState.panelConfig)
+
 const wallpaper = computed(() => resolveWallpaper({
-  panelConfig: panelState.panelConfig,
+  panelConfig: effectiveConfig.value,
   spaceWallpaper: panelState.spaceWallpaper,
   findLibraryEntry: id => wallpaperLibrary.find(id),
   themeWallpaper: activeThemeWallpaper.value,
@@ -48,7 +60,7 @@ const mediaFilter = computed(() => {
 // a fully transparent mask, so the default stays transparent and only a
 // user-configured mask dims the artwork.
 const maskColor = computed(() => {
-  if (previewThemeDefaults || panelState.panelConfig.wallpaperMode === 'theme' || panelState.panelConfig.useThemeDefaults)
+  if (previewThemeDefaults || effectiveConfig.value.wallpaperMode === 'theme' || effectiveConfig.value.useThemeDefaults)
     return `rgba(0,0,0,${wallpaper.value?.overlayOpacity ?? 0})`
   return `rgba(0,0,0,${panelState.panelConfig.backgroundMaskNumber ?? 0})`
 })
@@ -63,8 +75,8 @@ watch(() => wallpaper.value?.poster || wallpaper.value?.source || null, source =
 // default wallpaper is a library id too (the picker may never have been opened
 // for it).
 watch(() => [
-  panelState.panelConfig.wallpaperMode,
-  panelState.panelConfig.wallpaperLibraryEntry,
+  effectiveConfig.value.wallpaperMode,
+  effectiveConfig.value.wallpaperLibraryEntry,
   panelState.spaceWallpaper?.mode,
   panelState.spaceWallpaper?.libraryEntry,
 ] as const, ([mode, , spaceMode]) => {

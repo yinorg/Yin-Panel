@@ -8,11 +8,12 @@
  * or by embedding `<yin-wallpaper-center>`. A theme contributes look and feel,
  * never a second picker.
  */
-import { computed, onMounted, ref } from 'vue'
-import { NButton, NEmpty, NSpin, useMessage } from 'naive-ui'
-import { set as setUserConfig } from '@/api/panel/userConfig'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { NButton, NEmpty, NSpin } from 'naive-ui'
 import { usePanelState } from '@/store'
 import { useWallpaperLibrary } from '@/hooks/useWallpaperLibrary'
+import { usePanelConfigSave } from '@/hooks/usePanelConfigSave'
+import { setWallpaperPreview, type WallpaperPreview } from '@/core/home/wallpaperPreview'
 import { t } from '@/locales'
 
 /** The catalogue holds several hundred entries, so the grid is paged instead of
@@ -31,22 +32,36 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{ (e: 'select', value: { mode: 'theme' | 'library'; entry: string }): void }>()
 
 const panelState = usePanelState()
-const ms = useMessage()
+const { savePanelConfig } = usePanelConfigSave()
 const { library, loading, load } = useWallpaperLibrary()
 const categoryId = ref('')
 const page = ref(0)
+/** The previewed-but-unsaved choice. Only the standalone picker keeps one: an
+ *  embedding host owns the sink and receives the choice through `select`. */
+const draft = ref<WallpaperPreview | null>(null)
+const saving = ref(false)
 
 const categories = computed(() => library.value.categories)
 const current = computed(() => categories.value.find(category => category.id === categoryId.value) || categories.value[0] || null)
 const items = computed(() => current.value?.items || [])
 const pageCount = computed(() => Math.max(1, Math.ceil(items.value.length / PAGE_SIZE)))
 const tiles = computed(() => items.value.slice(page.value * PAGE_SIZE, (page.value + 1) * PAGE_SIZE))
-const selectedEntry = computed(() => props.selection
-  ? (props.selection.mode === 'library' ? props.selection.entry : '')
-  : (panelState.panelConfig.wallpaperMode === 'library' ? panelState.panelConfig.wallpaperLibraryEntry : ''))
-const followsTheme = computed(() => props.selection
-  ? props.selection.mode === 'theme'
-  : (!panelState.panelConfig.wallpaperMode || panelState.panelConfig.wallpaperMode === 'theme'))
+
+/** The saved choice. `custom` and `none` are not tiles here, so neither marks one
+ *  and the grid simply shows a stored config this picker cannot express. */
+const storedChoice = computed<WallpaperPreview | null>(() => {
+  const mode = panelState.panelConfig.wallpaperMode
+  if (mode === 'library')
+    return { mode: 'library', entry: panelState.panelConfig.wallpaperLibraryEntry || '' }
+  if (!mode || mode === 'theme')
+    return { mode: 'theme', entry: '' }
+  return null
+})
+const activeChoice = computed<WallpaperPreview | null>(() => props.selection
+  ? { mode: props.selection.mode, entry: props.selection.entry }
+  : (draft.value || storedChoice.value))
+const selectedEntry = computed(() => activeChoice.value?.mode === 'library' ? activeChoice.value.entry : '')
+const followsTheme = computed(() => activeChoice.value?.mode === 'theme')
 
 function selectCategory(id: string) {
   categoryId.value = id
@@ -57,37 +72,61 @@ function stepPage(delta: number) {
   page.value = Math.min(pageCount.value - 1, Math.max(0, page.value + delta))
 }
 
-function save() {
-  setUserConfig({ panel: panelState.panelConfig }).then((res) => {
-    if (res.code === 0)
-      ms.success(t('apps.baseSettings.configSaved'))
-    else
-      ms.error(t('apps.baseSettings.configFailed', { message: res.msg }))
-  })
+/**
+ * Paint the choice on the live home without touching the stored config. The
+ * standalone picker previews through the layer's preview ref and commits on save;
+ * an embedding host owns the sink, so it receives the choice instead.
+ */
+function preview(value: WallpaperPreview) {
+  if (!props.persist) {
+    emit('select', value)
+    return
+  }
+  draft.value = value
+  setWallpaperPreview(value)
 }
 
 /** The default tile: hand the wallpaper back to the active theme. */
 function chooseTheme() {
-  if (!props.persist) {
-    emit('select', { mode: 'theme', entry: '' })
-    return
-  }
-  panelState.panelConfig.wallpaperMode = 'theme'
-  save()
+  preview({ mode: 'theme', entry: '' })
 }
 
 function choose(entry: { id: string }) {
-  if (!props.persist) {
-    emit('select', { mode: 'library', entry: entry.id })
+  preview({ mode: 'library', entry: entry.id })
+}
+
+async function save() {
+  const choice = draft.value
+  if (!choice || saving.value)
     return
+  const previousMode = panelState.panelConfig.wallpaperMode
+  const previousEntry = panelState.panelConfig.wallpaperLibraryEntry
+  saving.value = true
+  panelState.panelConfig.wallpaperMode = choice.mode
+  panelState.panelConfig.wallpaperLibraryEntry = choice.mode === 'library' ? choice.entry : ''
+  const saved = await savePanelConfig()
+  saving.value = false
+  if (saved) {
+    draft.value = null
+    setWallpaperPreview(null)
   }
-  panelState.panelConfig.wallpaperMode = 'library'
-  panelState.panelConfig.wallpaperLibraryEntry = entry.id
-  save()
+  else {
+    // A failed save must not leave the uncommitted choice in the stored config.
+    // Put the previous values back and keep previewing.
+    panelState.panelConfig.wallpaperMode = previousMode
+    panelState.panelConfig.wallpaperLibraryEntry = previousEntry
+  }
 }
 
 onMounted(() => {
   load()
+})
+
+onUnmounted(() => {
+  // Closing the picker without saving drops the preview, so the home falls back to
+  // the stored wallpaper.
+  if (props.persist)
+    setWallpaperPreview(null)
 })
 </script>
 
@@ -97,6 +136,17 @@ onMounted(() => {
       <h2 class="wallpaper-center-title">
         {{ t('themeWallpaper.center') }}
       </h2>
+      <NButton
+        v-if="persist"
+        type="primary"
+        size="small"
+        :loading="saving"
+        :disabled="!draft"
+        data-testid="wallpaper-center-save"
+        @click="save"
+      >
+        {{ t('common.save') }}
+      </NButton>
     </header>
 
     <div v-if="categories.length" class="wallpaper-center-tabs">

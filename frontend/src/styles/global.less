@@ -263,3 +263,16 @@ button, input, select, textarea, [role='button'] {
 @media (prefers-reduced-motion: reduce) {
 	*, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
 }
+
+/* Toasts wrap before they reach the page centre. Naive caps a message at 720px and
+   writes the value inline, so the cap only takes effect with `!important`. */
+.n-message {
+	--n-max-width: min(360px, calc(100vw - 32px)) !important;
+}
+
+/* The home measures its space selector and publishes the offset, because the bar
+   moves with the responsive layout. Naive's own 12px is the fallback for routes
+   that have no selector. */
+html .n-message-container--top-right {
+	top: var(--yin-toast-top, 12px);
+}

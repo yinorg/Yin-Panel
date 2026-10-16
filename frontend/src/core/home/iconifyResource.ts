@@ -1,4 +1,6 @@
 import type { ThemeItemIcon } from '../../theme/api/v1'
+// @ts-expect-error Node's strip-types runner requires an explicit source extension.
+import { normalizeIconBackground, readableTextColor } from '../../utils/color.ts'
 
 const ICONIFY_API_ORIGIN = 'https://api.iconify.design'
 const MAX_ICONIFY_IDENTIFIER_LENGTH = 160
@@ -115,19 +117,27 @@ export function isSafeIconifyDataUri(value: unknown): value is string {
     && value.startsWith('data:image/svg+xml;charset=utf-8,')
 }
 
-export function toThemeItemIcon(icon: CoreItemIconSource | null | undefined): ThemeItemIcon | undefined {
+export function toThemeItemIcon(icon: CoreItemIconSource | null | undefined, textBase?: string): ThemeItemIcon | undefined {
   if (!icon) return undefined
+  // The editor's legacy default tile is not a choice; dropping it puts a text icon
+  // on the same panel surface an auto icon uses.
+  const backgroundColor = normalizeIconBackground(icon.backgroundColor)
+  // The tile background decides the glyph colour: a pale avatar needs dark type
+  // whatever the page scheme is, and the theme only has the colours the Core
+  // hands it. A translucent tile is flattened over the surface it is painted on
+  // (`textBase`), because its own channels say nothing about how light it ends up.
+  const textColor = readableTextColor(backgroundColor, textBase)
   if (icon.itemType === 1)
-    return { itemType: 1, text: icon.text, backgroundColor: icon.backgroundColor }
+    return { itemType: 1, text: icon.text, backgroundColor, textColor }
   if (icon.itemType === 2)
-    return { itemType: 2, src: icon.src, fileName: icon.fileName, backgroundColor: icon.backgroundColor }
+    return { itemType: 2, src: icon.src, fileName: icon.fileName, backgroundColor, textColor }
   if (icon.itemType === 3) {
     const resource = isSafeIconifyDataUri(icon.resolvedSrc) ? icon.resolvedSrc : icon.src
     return isSafeIconifyDataUri(resource)
-      ? { itemType: 3, src: resource, backgroundColor: icon.backgroundColor }
-      : { itemType: 4, backgroundColor: icon.backgroundColor }
+      ? { itemType: 3, src: resource, backgroundColor, textColor }
+      : { itemType: 4, backgroundColor }
   }
-  return { itemType: 4, backgroundColor: icon.backgroundColor }
+  return { itemType: 4, backgroundColor }
 }
 
 function buildIconifyEndpoint(identifier: string): string {

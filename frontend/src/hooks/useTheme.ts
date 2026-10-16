@@ -239,18 +239,12 @@ export function useTheme() {
   const selectedScheme = computed(() => {
     const schemes = activeThemePackage.value?.manifest.schemes || []
     const mode = previewToken && (previewMode === 'light' || previewMode === 'dark') ? previewMode : appStore.theme
-    // `auto` follows the artwork, not the operating system.
-    //
-    // The home is painted on the wallpaper, so the theme's whole token set has to
-    // agree with what is behind it: a light wallpaper with a dark OS theme used to
-    // put the dark tokens on a light background, and every text, accent, card fill
-    // and border fought the surface under it. Only the few rules that happened to
-    // read the derived tone looked right, which is exactly the mixed page that
-    // exposed this. With no artwork behind the page there is nothing to follow, so
-    // the OS theme still decides.
-    const ambient = wallpaperPainted.value && wallpaperTone.value
-      ? wallpaperTone.value
-      : OsTheme.value === 'dark' ? 'dark' : 'light'
+    // `auto` is the "follow the system" choice: the operating system decides the
+    // scheme and nothing here may override it. The wallpaper's tone still drives
+    // the on-wallpaper text pair below, so a wallpaper that is brighter or darker
+    // than the OS scheme keeps its own readable text instead of forcing the whole
+    // page back to the artwork's brightness.
+    const ambient = OsTheme.value === 'dark' ? 'dark' : 'light'
     return selectThemeScheme(schemes, mode, ambient)
   })
 

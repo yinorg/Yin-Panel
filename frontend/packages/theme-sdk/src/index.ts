@@ -149,9 +149,9 @@ export interface ThemeItem {
 }
 
 export type ThemeItemIcon =
-  | { itemType: 1; text?: string; backgroundColor?: string }
-  | { itemType: 2; src?: string; fileName?: string; backgroundColor?: string }
-  | { itemType: 3; src: string; backgroundColor?: string }
+  | { itemType: 1; text?: string; backgroundColor?: string; textColor?: string }
+  | { itemType: 2; src?: string; fileName?: string; backgroundColor?: string; textColor?: string }
+  | { itemType: 3; src: string; backgroundColor?: string; textColor?: string }
   | { itemType: 4; backgroundColor?: string }
 
 export interface ThemeSearchEngine {

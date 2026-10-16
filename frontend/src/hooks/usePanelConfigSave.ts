@@ -15,16 +15,15 @@ export function usePanelConfigSave() {
   const panelState = usePanelState()
   const ms = useMessage()
 
-  function savePanelConfig() {
-    setUserConfig({ panel: panelState.panelConfig }).then((res) => {
-      if (res.code === 0) {
-        panelState.markPanelConfigSaved()
-        ms.success(t('apps.baseSettings.configSaved'))
-      }
-      else {
-        ms.error(t('apps.baseSettings.configFailed', { message: res.msg }))
-      }
-    })
+  async function savePanelConfig(): Promise<boolean> {
+    const res = await setUserConfig({ panel: panelState.panelConfig })
+    if (res.code === 0) {
+      panelState.markPanelConfigSaved()
+      ms.success(t('apps.baseSettings.configSaved'))
+      return true
+    }
+    ms.error(t('apps.baseSettings.configFailed', { message: res.msg }))
+    return false
   }
 
   return { savePanelConfig }
