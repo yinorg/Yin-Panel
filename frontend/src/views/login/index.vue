@@ -54,11 +54,15 @@ const loginPost = async () => {
       authStore.setUserInfo(res.data)
       authStore.saveStorage()
 
+      // Clear the button and route in the same tick the response lands: the
+      // request round trip is the whole wait, and an extra fixed delay here was
+      // a pure addition to "login → first paint". A single frame is enough for
+      // the button's loading state to unset before the route swaps.
       setTimeout(() => {
         ms.success(`Hi ${res.data.name},${t('login.welcomeMessage')}`)
         loading.value = false
         router.push({ path: '/' })
-      }, 500)
+      }, 60)
     }
     else {
       loading.value = false

@@ -1,4 +1,4 @@
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import type { NLocale } from 'naive-ui'
 import {
   deDE,
@@ -20,7 +20,7 @@ import {
   zhTW,
 } from 'naive-ui'
 import { useAppStore } from '../store'
-import { resolveBrowserLocale, setLocale } from '../locales'
+import { resolveBrowserLocale, setLocaleAsync } from '../locales'
 
 const naiveLocales: Record<string, NLocale> = {
   'en-US': enUS,
@@ -45,9 +45,17 @@ const naiveLocales: Record<string, NLocale> = {
 export function useLanguage() {
   const appStore = useAppStore()
 
+  // Fetch the locale chunk before switching, so a language change never renders
+  // raw keys. The boot path already loaded the stored language, so this is a
+  // no-op on first render and only does work when the user actually changes it.
+  watch(
+    () => appStore.language,
+    language => { void setLocaleAsync(language) },
+    { immediate: true },
+  )
+
   const language = computed(() => {
     const resolvedLanguage = appStore.language === 'auto' ? resolveBrowserLocale() : appStore.language
-    setLocale(appStore.language)
     return naiveLocales[resolvedLanguage] ?? enUS
   })
 
