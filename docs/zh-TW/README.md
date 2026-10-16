@@ -52,6 +52,19 @@ Yin-Panel 是一個輕量、可自架的個人與共享空間導覽面板，適�
 - 自訂圖示、可安裝的主題套件、17 種介面語言、背景、WAN/LAN 與手機網址模式、頁面內彈窗開啟
 - 支援 SQLite、MySQL、MariaDB 與 PostgreSQL，提供 amd64 與 arm64 Docker 映像與 Kubernetes Helm Chart
 
+## 官方託管環境
+
+我們維護三套線上環境，可以直接註冊試用，三套都支援 GitHub / GitLab / Google 登入；另有一套監控面板，用於查看運行指標與告警。
+
+| 環境 | 位址 | 用途 | 穩定性 |
+| --- | --- | --- | --- |
+| 正式（PRD） | <https://panel.yiniot.com> | 正式使用 | 以 99.9% 可用性為目標盡力保障 |
+| STG | <https://panel-stg.yiniot.com> | 發佈前驗證 | 可能隨時重啟或回滾 |
+| DEV | <https://panel-dev.yiniot.com> | 嘗鮮、回報問題 | 最不穩定，資料可能隨時清空 |
+| 監控 | <https://owl.yiniot.com> | 查看三套環境的運行指標與告警 | — |
+
+這三套環境跑在同一台免費伺服器上，**沒有做高可用**：PRD 以 99.9% 的可達目標盡力保障，但不提供賠付；STG 與 DEV 隨時可能中斷。請不要把重要資料放在這些環境裡，長期使用請選擇下面的自建部署。
+
 ## 快速開始
 
 ### Docker Compose
@@ -66,10 +79,12 @@ mkdir -p database uploads
 jwt_secret="$(openssl rand -hex 32)"
 sed -i "s#^  secret: your_secret_key$#  secret: ${jwt_secret}#" conf.yaml
 unset jwt_secret
-YIN_PANEL_IMAGE=ghcr.io/yinorg/yin-panel-ce:0.6.0 docker compose up -d
+YIN_PANEL_IMAGE=ghcr.io/yinorg/yin-panel-ce:latest docker compose up -d
 ```
 
 開啟 <http://localhost:3002>。
+
+`latest` 指向目前正式版，適合先跑起來試用；**正式環境請將它固定成具體 tag 或映像 digest**（見「CI/CD 架構」），避免部署漂移。
 
 預設管理員：`admin@yiniot.com`，密碼 `admin@yiniot.com`。首次登入後請立即修改密碼，並在 `conf.yaml` 中設定 `base.root_url` 與唯一的 `jwt.secret`。
 
@@ -78,11 +93,11 @@ YIN_PANEL_IMAGE=ghcr.io/yinorg/yin-panel-ce:0.6.0 docker compose up -d
 ### GHCR 映像
 
 ```bash
-docker pull ghcr.io/yinorg/yin-panel-ce:0.6.0
 docker pull ghcr.io/yinorg/yin-panel-ce:latest
+docker pull ghcr.io/yinorg/yin-panel-ce:<x.y.z>
 ```
 
-`0.6.0` 與 `latest` 都是面向 amd64 與 arm64 主機的 multi-arch 資訊清單。發佈 tag 不帶架構後綴；`-amd64`、`-arm64` 之類的 tag 不屬於正式發佈。
+`latest` 指向目前正式版；它與每個發佈 tag 都是面向 amd64 與 arm64 主機的 multi-arch manifest。發佈 tag 不帶架構後綴；`-amd64`、`-arm64` 之類的 tag 不屬於正式發佈。
 
 ## 效能與建議組態
 
@@ -124,7 +139,7 @@ docker pull ghcr.io/yinorg/yin-panel-ce:latest
 1. **資料量**：清單介面在單次回應中傳回整個空間的全部項目，項目越多，單請求成本越高；這是最需要用自身資料實測的部分。
 2. **寫入頻率**：SQLite 同一時刻只有一個寫入者，寫入輸送量受磁碟 fsync 限制（數百次寫入/秒量級）。寫入密集或多執行個體情境建議改用 MySQL。
 3. **峰值而非平均**：按峰值選型，通常預留均值 2–5 倍的餘量。
-4. **靜態資源**：建議由反向代理或 CDN 承載 `/assets/*` 與帶 hash 的資源，見「Cloudflare 快取」。
+4. **靜態資源**：建議由反向代理或 CDN 承載 `/assets/*` 與帶 hash 的資源，並對這些帶 hash 的檔案長期快取；入口檔案與 `/api/*` 應保持即時。
 
 ## 資料庫
 
@@ -175,8 +190,10 @@ OIDC 回呼位址：
 
 ```bash
 helm upgrade --install yin-panel ./distribution/helm-chart/yin-panel \
-  --set image.tag=0.6.0
+  --set image.tag=latest
 ```
+
+正式環境請把 `image.tag` 換成具體版本號。
 
 部署前可用 `helm template yin-panel ./distribution/helm-chart/yin-panel` 檢查渲染結果。
 
@@ -218,15 +235,53 @@ go build ./...
 
 升級前請備份資料庫、`uploads/`、`conf.yaml` 與 Helm values。遷移會保留使用者、空間、群組、書籤與檔案參照。升級異常時使用升級前備份還原，不要直接刪除資料庫重建。
 
-## Cloudflare 快取
+Compose 部署的升級步驟：
 
-如果網域啟用了 Cloudflare 橘色小雲，建議使用 Cache Rules 保持入口檔案即時更新、只長期快取帶 hash 的靜態資源。
+```bash
+docker compose pull
+docker compose up -d
+```
 
-繞過快取：`/`、`/index.html`、`/login`、`/sw.js`、`/registerSW.js`、`/manifest.webmanifest` 與 `/api/*`。
+`docker/docker-compose.yml` 預設使用 `latest`，`pull_policy: missing` 只在本地沒有映像時拉取，所以升級必須明確執行 `docker compose pull`。正式環境建議把 `YIN_PANEL_IMAGE` 固定成具體版本號，升級時再改成目標版本。
 
-長期快取：`/assets/*` 與 `/workbox-*.js`。這些檔案帶內容 hash 檔名，原始伺服器會以 30 天 `immutable` 回應。
+## CI/CD 架構
 
-不要對整個網站啟用 `Cache Everything`。發佈後只清理入口檔案與 Service Worker 的 Cloudflare 快取，帶 hash 的資源可以繼續重用邊緣快取。
+官方環境在一台 1C1G 的 VPS 上同時運行 DEV、STG、PRD。目標不是堆疊元件，而是**少常駐程序、低資源開銷、發佈可審計、失敗可回滾**。
+
+```mermaid
+flowchart LR
+    GH["GitHub Actions<br/>CI / 建置 / 發佈"] -->|發佈通知| WH["adnanh/webhook<br/>驗證觸發"]
+    WH --> SH["受控 Shell 腳本<br/>版本校驗 / 互斥 / 健康檢查 / 回滾"]
+    SH --> DEV["DEV<br/>Podman Compose"]
+    SH --> STG["STG<br/>Podman Compose"]
+    SH --> PRD["PRD<br/>Podman Compose"]
+    DEV -. 應用指標 .-> OWL["Owl<br/>主機與應用指標"]
+    STG -. 應用指標 .-> OWL
+    PRD -. 應用指標 .-> OWL
+```
+
+| 層次 | 元件 | 職責 |
+| --- | --- | --- |
+| CI | GitHub Actions | 測試、建置映像、產生版本、觸發發佈 |
+| 發佈入口 | adnanh/webhook | 驗證來源與請求，只觸發固定的發佈任務 |
+| 發佈執行 | Shell 腳本 | 版本校驗、環境選擇、互斥、部署、健康檢查與回滾 |
+| 執行環境 | Podman Compose | 執行三套互相隔離的應用實例（Podman 比 Docker 約省 150 MB 常駐記憶體） |
+| 監控 | Owl | 主機與應用指標 |
+
+**為什麼這樣分**：CI 全部在 GitHub Actions 上跑，VPS 只拉取已建置的映像並部署——本機不承擔編譯時的記憶體峰值，也不常駐 CI/CD 控制面。三個環境共用一條發佈鏈路，但各自擁有獨立的 Compose 專案、設定、資料卷、網路與連接埠，共用發佈機制不等於共享運行資料。
+
+### 發佈流程
+
+1. **建置**：Actions 執行測試並建置映像；版本以 Git tag、commit SHA 或映像 digest 固定，正式環境不部署 `latest`。
+2. **觸發與校驗**：Actions 向 webhook 發送經過驗證的發佈請求；腳本檢查版本、目標環境與允許的操作，不把任意輸入拼接成 Shell 命令。
+3. **互斥與部署**：同一環境不允許併發部署，只更新指定環境，不同時無差別重啟全部環境。
+4. **健康檢查與失敗處理**：確認服務啟動並正常回應；失敗時保留上一個可用版本並回滾，同時記錄環境、版本、觸發來源、結果與回滾原因。
+
+環境晉升：DEV 自動部署 → 驗證通過後 STG 部署同一版本 → 冒煙測試通過後 **PRD 人工批准**。緊急修復也走可審計的例外流程，不讓一般開發事件自動繞過正式批准。
+
+### 邊界
+
+這是**單機、低資源、可審計**的部署架構，不是高可用架構：三個環境雖然在程序、設定與資料上相互隔離，但共享同一台 VPS 的核心、磁碟、網路與記憶體，主機故障或資源耗盡會同時影響三個環境。它的價值在於用很少的常駐元件保留了可靠發佈所需的關鍵機制——版本固定、環境隔離、健康檢查、回滾、監控與可審計記錄。
 
 ## Open Core
 
@@ -243,6 +298,18 @@ Yin-Panel 基於開源專案 [hslr-s/sun-panel](https://github.com/hslr-s/sun-pa
 同時感謝 [PhantomMaa/sun-panel](https://github.com/PhantomMaa/sun-panel) 對專案進行的最佳化與維護工作。Yin-Panel 在此基礎上接任後續維護，並持續加入新功能、互動體驗與適合自架情境的改進。
 
 感謝所有原作者、貢獻者與使用者。
+
+## 參與貢獻
+
+專案能一直走下去，靠的是使用者願意把問題與新想法說出來。歡迎各種形式的參與：
+
+- **提建議、回報 Bug**：到 [Issues](https://github.com/yinorg/Yin-Panel/issues) 說清楚版本、環境、重現步驟與現象，最好附上截圖或日誌，處理起來會快很多。
+- **直接動手改**：歡迎提 [Pull Requests](https://github.com/yinorg/Yin-Panel/pulls)。修一個 Bug、改一句文案、補一種語言的翻譯、換一張更清楚的截圖，都算有價值的貢獻。
+- **還沒想清楚**：先開一個 Issue 把方案聊明白再寫程式，避免做完才發現方向不一致。
+
+動手之前可以看一眼 [CONTRIBUTING.md](../../CONTRIBUTING.md)：較大的改動建議先討論，安全問題請私下回報而不是開公開 Issue；沒想清楚的地方也可以直接在 Issue 裡問，我會盡量給出方向。
+
+Issue 與 PR 都會看，我會盡量在 7 天內回應；能穩定重現的問題與帶脈絡的建議會處理得更快。你的每一次回饋，都是這個專案繼續更新的理由。
 
 ## 授權條款
 

@@ -52,6 +52,19 @@ Yin-Panel is a lightweight, self-hostable navigation panel for personal and shar
 - Custom icons, installable theme packages, 17 UI languages, wallpapers, WAN/LAN and mobile URL modes, and in-page popup windows
 - SQLite, MySQL, MariaDB, or PostgreSQL storage, Docker images for amd64 and arm64, and a Helm chart for Kubernetes
 
+## Hosted environments
+
+We run three online environments you can register on and try right away; all three support GitHub / GitLab / Google sign-in, and a monitoring panel shows their metrics and alerts.
+
+| Environment | Address | Purpose | Availability |
+| --- | --- | --- | --- |
+| Production (PRD) | <https://panel.yiniot.com> | Everyday use | Best effort towards 99.9% availability |
+| STG | <https://panel-stg.yiniot.com> | Verify before release | May restart or roll back at any time |
+| DEV | <https://panel-dev.yiniot.com> | Try things and report issues | Least stable; data may be wiped at any time |
+| Monitoring | <https://owl.yiniot.com> | Metrics and alerts for the three environments | — |
+
+All three run on the same free server and **there is no high availability**: PRD aims for 99.9% but carries no compensation, while STG and DEV can go down at any time. Please do not keep important data there; for long-term use, deploy it yourself as described below.
+
 ## Quick start
 
 ### Docker Compose
@@ -66,10 +79,12 @@ mkdir -p database uploads
 jwt_secret="$(openssl rand -hex 32)"
 sed -i "s#^  secret: your_secret_key$#  secret: ${jwt_secret}#" conf.yaml
 unset jwt_secret
-YIN_PANEL_IMAGE=ghcr.io/yinorg/yin-panel-ce:0.6.0 docker compose up -d
+YIN_PANEL_IMAGE=ghcr.io/yinorg/yin-panel-ce:latest docker compose up -d
 ```
 
 Open <http://localhost:3002>.
+
+`latest` points at the current release and is the quickest way to try the panel; **pin a specific tag or image digest in production** (see [CI/CD architecture](#cicd-architecture)) so a deployment cannot drift.
 
 Default administrator: `admin@yiniot.com`, password `admin@yiniot.com`. Change the password immediately after the first login, and set `base.root_url` and a unique `jwt.secret` in `conf.yaml`.
 
@@ -78,11 +93,11 @@ Every deployment should generate its own random `jwt.secret`. The repository shi
 ### GHCR images
 
 ```bash
-docker pull ghcr.io/yinorg/yin-panel-ce:0.6.0
 docker pull ghcr.io/yinorg/yin-panel-ce:latest
+docker pull ghcr.io/yinorg/yin-panel-ce:<x.y.z>
 ```
 
-`0.6.0` and `latest` are multi-architecture manifests for amd64 and arm64 hosts. Release tags never carry an architecture suffix; tags like `-amd64` or `-arm64` are not part of a release.
+`latest` points at the current release; it and every release tag are multi-architecture manifests for amd64 and arm64 hosts. Release tags never carry an architecture suffix; tags like `-amd64` or `-arm64` are not part of a release.
 
 ## Performance and recommended configuration
 
@@ -124,7 +139,7 @@ The more active the users (editing, importing, refreshing frequently), the highe
 1. **Data volume** — list endpoints return every entry of a space in one response; more entries mean a costlier request. This is the part most worth measuring on your own data.
 2. **Write rate** — SQLite allows only one writer at a time; write throughput is bound by disk fsync (on the order of hundreds of writes per second). For write-heavy or multi-instance setups, use MySQL.
 3. **Peak, not average** — size for peaks, usually reserving 2–5× the average.
-4. **Static assets** — let a reverse proxy or CDN serve `/assets/*` and other hashed assets; see "Cloudflare caching".
+4. **Static assets** — let a reverse proxy or CDN serve `/assets/*` and other hashed assets, and cache those hashed files for a long time; entry documents and `/api/*` should stay fresh.
 
 ## Database
 
@@ -175,10 +190,10 @@ Creating a space, renaming it, adding groups, adding members, and adding OIDC ru
 
 ```bash
 helm upgrade --install yin-panel ./distribution/helm-chart/yin-panel \
-  --set image.tag=0.6.0
+  --set image.tag=latest
 ```
 
-Before deploying, preview the rendered manifests with `helm template yin-panel ./distribution/helm-chart/yin-panel`.
+For production, replace `image.tag` with a specific version. Before deploying, preview the rendered manifests with `helm template yin-panel ./distribution/helm-chart/yin-panel`.
 
 ## Source development
 
@@ -218,15 +233,53 @@ The home-page theme system is documented in [`frontend/THEME_SYSTEM.md`](fronten
 
 Before upgrading, back up the database, `uploads/`, `conf.yaml`, and Helm values. Migrations preserve users, spaces, groups, bookmarks, and file references. If an upgrade goes wrong, restore the pre-upgrade backup; do not delete the database and start over.
 
-## Cloudflare caching
+To upgrade a Compose deployment:
 
-If the domain uses Cloudflare's orange cloud, add Cache Rules that keep the entry document fresh and cache only hashed static assets for a long time.
+```bash
+docker compose pull
+docker compose up -d
+```
 
-Bypass cache: `/`, `/index.html`, `/login`, `/sw.js`, `/registerSW.js`, `/manifest.webmanifest`, and `/api/*`.
+`docker/docker-compose.yml` defaults to `latest`, and `pull_policy: missing` only pulls when the image is absent locally, so an upgrade has to run `docker compose pull` explicitly. In production, pin `YIN_PANEL_IMAGE` to a specific version and change it when you upgrade.
 
-Long cache: `/assets/*` and `/workbox-*.js`. These files carry content-hashed names, and the origin serves them with 30-day `immutable` caching.
+## CI/CD architecture
 
-Do not enable `Cache Everything` for the whole site. After a release, purge only the entry document and service-worker files from the Cloudflare cache; hashed assets can stay on the edge.
+The official environments run DEV, STG and PRD on a single 1C1G VPS. The goal is not a pile of components but **few resident processes, low overhead, auditable releases and recoverable failures**.
+
+```mermaid
+flowchart LR
+    GH["GitHub Actions<br/>CI / build / release"] -->|release notice| WH["adnanh/webhook<br/>verified trigger"]
+    WH --> SH["Guarded shell script<br/>version / lock / health / rollback"]
+    SH --> DEV["DEV<br/>Podman Compose"]
+    SH --> STG["STG<br/>Podman Compose"]
+    SH --> PRD["PRD<br/>Podman Compose"]
+    DEV -. metrics .-> OWL["Owl<br/>host and application metrics"]
+    STG -. metrics .-> OWL
+    PRD -. metrics .-> OWL
+```
+
+| Layer | Component | Responsibility |
+| --- | --- | --- |
+| CI | GitHub Actions | Test, build the image, stamp the version, trigger the release |
+| Release entry | adnanh/webhook | Verify the origin and the request; only run fixed release tasks |
+| Release execution | Shell script | Version check, environment selection, locking, deploy, health check and rollback |
+| Runtime | Podman Compose | Run the three isolated application instances (Podman saves ~150 MB RSS over Docker) |
+| Monitoring | Owl | Host and application metrics |
+
+**Why it is split this way**: all CI runs on GitHub Actions and the VPS only pulls the built image and deploys it — the small machine never carries the compile peak and runs no CI/CD control plane. The three environments share one release chain but keep separate Compose projects, configuration, volumes, networks and ports; sharing the release mechanism is not sharing data.
+
+### Release flow
+
+1. **Build**: Actions tests and builds the image; the version is pinned by a Git tag, commit SHA or image digest, and production never deploys `latest`.
+2. **Trigger and validation**: Actions sends a verified release request to the webhook; the script checks the version, the target environment and the allowed action, and never splices arbitrary input into a shell command.
+3. **Locking and deploy**: one deployment per environment at a time, and only the target environment is updated — nothing is restarted blindly.
+4. **Health check and failure handling**: confirm the service starts and answers; on failure keep the previous good version and roll back, recording the environment, version, trigger source, result and rollback reason.
+
+Promotion: DEV deploys automatically → STG deploys the same version after verification → **PRD requires human approval** after smoke tests. Emergency fixes still go through an auditable exception path, so an ordinary development event never bypasses production approval.
+
+### Boundaries
+
+This is a **single-machine, low-resource, auditable** deployment architecture, not a high-availability one: the three environments are isolated in process, configuration and data, but they share one VPS kernel, disk, network and memory, so a host failure or resource exhaustion hits all three at once. Its value is keeping the mechanisms a reliable release needs — pinned versions, environment isolation, health checks, rollback, monitoring and an audit trail — with very few resident components.
 
 ## Open Core
 
@@ -243,6 +296,18 @@ Yin-Panel grew out of the open-source project [hslr-s/sun-panel](https://github.
 Thanks as well to [PhantomMaa/sun-panel](https://github.com/PhantomMaa/sun-panel) for its optimizations and maintenance work. Yin-Panel took over continued maintenance from that base and keeps adding features, interaction improvements, and self-hosting-oriented changes.
 
 Thanks to all original authors, contributors, and users.
+
+## Contributing
+
+The project keeps going because people take the time to report problems and share ideas. Every kind of contribution is welcome:
+
+- **Suggestions and bug reports**: open an [issue](https://github.com/yinorg/Yin-Panel/issues) with the version, environment, reproduction steps and what you saw — a screenshot or log makes it much faster to handle.
+- **Code and docs**: pull requests are welcome. Fixing a bug, rewording a sentence, adding a language, or replacing a screenshot all count.
+- **Not sure yet**: open an issue first and settle the approach before writing code, so the work does not go in a direction nobody wants.
+
+Take a look at [CONTRIBUTING.md](./CONTRIBUTING.md) before you start: larger changes are worth discussing first, and security problems should be reported privately rather than in a public issue. If something is unclear, just ask in an issue and I will try to point you in the right direction.
+
+Issues and pull requests are both read, and I aim to respond within 7 days; reproducible problems and well-described suggestions move fastest. Every piece of feedback is a reason for this project to keep going.
 
 ## License
 

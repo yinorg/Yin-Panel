@@ -52,6 +52,19 @@ Yin-Panel は、個人用と共有のスペースのための軽量でセルフ�
 - カスタムアイコン、インストール可能なテーマパッケージ、17 種類の UI 言語、壁紙、WAN/LAN・モバイル URL モード、ページ内ポップアップ表示
 - SQLite、MySQL、MariaDB、PostgreSQL に対応し、amd64 / arm64 の Docker イメージと Kubernetes 用 Helm チャートを提供
 
+## 公式ホスティング環境
+
+3 つのオンライン環境を用意しており、すぐに登録して試せます。いずれも GitHub / GitLab / Google でログインでき、稼働状況とアラートを見る監視パネルもあります。
+
+| 環境 | アドレス | 用途 | 可用性 |
+| --- | --- | --- | --- |
+| 本番（PRD） | <https://panel.yiniot.com> | 通常利用 | 可用性 99.9% を目標にベストエフォートで運用 |
+| STG | <https://panel-stg.yiniot.com> | リリース前の確認 | いつでも再起動・ロールバックされる可能性あり |
+| DEV | <https://panel-dev.yiniot.com> | 試用・不具合報告 | 最も不安定で、データが随時消去される可能性あり |
+| 監視 | <https://owl.yiniot.com> | 3 環境の稼働指標とアラート | — |
+
+3 つの環境は同じ無償サーバー上で動いており、**高可用構成ではありません**。PRD は 99.9% を目標にベストエフォートで運用しますが補償はなく、STG と DEV はいつでも停止する可能性があります。重要なデータは置かず、長期利用は以下のセルフホストを選んでください。
+
 ## クイックスタート
 
 ### Docker Compose
@@ -66,10 +79,12 @@ mkdir -p database uploads
 jwt_secret="$(openssl rand -hex 32)"
 sed -i "s#^  secret: your_secret_key$#  secret: ${jwt_secret}#" conf.yaml
 unset jwt_secret
-YIN_PANEL_IMAGE=ghcr.io/yinorg/yin-panel-ce:0.6.0 docker compose up -d
+YIN_PANEL_IMAGE=ghcr.io/yinorg/yin-panel-ce:latest docker compose up -d
 ```
 
 <http://localhost:3002> を開きます。
+
+`latest` は現在の正式版を指し、まず試すのに向いています。**本番では具体的なタグかイメージ digest に固定してください**（「CI/CD アーキテクチャ」を参照）。
 
 既定の管理者：`admin@yiniot.com`、パスワード `admin@yiniot.com`。初回ログイン後にすぐパスワードを変更し、`conf.yaml` で `base.root_url` と一意の `jwt.secret` を設定してください。
 
@@ -78,11 +93,11 @@ YIN_PANEL_IMAGE=ghcr.io/yinorg/yin-panel-ce:0.6.0 docker compose up -d
 ### GHCR イメージ
 
 ```bash
-docker pull ghcr.io/yinorg/yin-panel-ce:0.6.0
 docker pull ghcr.io/yinorg/yin-panel-ce:latest
+docker pull ghcr.io/yinorg/yin-panel-ce:<x.y.z>
 ```
 
-`0.6.0` と `latest` はどちらも amd64 / arm64 ホスト向けのマルチアーキテクチャマニフェストです。リリースタグにアーキテクチャの接尾辞は付きません。`-amd64` や `-arm64` のようなタグは正式リリースには含まれません。
+`latest` は現在の正式版を指します。これも各リリースタグも amd64 / arm64 ホスト向けのマルチアーキテクチャマニフェストです。リリースタグにアーキテクチャの接尾辞は付きません。`-amd64` や `-arm64` のようなタグは正式リリースには含まれません。
 
 ## パフォーマンスと推奨構成
 
@@ -124,7 +139,7 @@ docker pull ghcr.io/yinorg/yin-panel-ce:latest
 1. **データ量**：一覧 API は 1 回の応答でスペース内の全項目を返すため、項目が多いほど 1 リクエストのコストが増えます。自分のデータで実測する価値が最も高い部分です。
 2. **書き込み頻度**：SQLite は同時に 1 つの書き込み者しか持てず、書き込みスループットはディスク fsync に制約されます（毎秒数百回程度）。書き込みが多い場合やマルチインスタンス構成では MySQL を推奨します。
 3. **平均ではなくピーク**：ピークを基準に選定し、通常は平均の 2–5 倍の余裕を見込みます。
-4. **静的ファイル**：`/assets/*` とハッシュ付きアセットはリバースプロキシまたは CDN からの配信を推奨します。「Cloudflare キャッシュ」を参照してください。
+4. **静的ファイル**：`/assets/*` とハッシュ付きアセットはリバースプロキシまたは CDN からの配信を推奨します。ハッシュ付きファイルは長期キャッシュし、入口ファイルと `/api/*` は常に最新に保ってください。
 
 ## データベース
 
@@ -175,8 +190,10 @@ OIDC コールバック URL：
 
 ```bash
 helm upgrade --install yin-panel ./distribution/helm-chart/yin-panel \
-  --set image.tag=0.6.0
+  --set image.tag=latest
 ```
+
+本番では `image.tag` を具体的なバージョンに変更してください。
 
 デプロイ前に `helm template yin-panel ./distribution/helm-chart/yin-panel` でレンダリング結果を確認できます。
 
@@ -218,15 +235,53 @@ go build ./...
 
 アップグレード前にデータベース、`uploads/`、`conf.yaml`、Helm values をバックアップしてください。マイグレーションはユーザー、スペース、グループ、ブックマーク、ファイル参照を保持します。問題が発生した場合はアップグレード前のバックアップから復元し、データベースを削除して作り直さないでください。
 
-## Cloudflare キャッシュ
+Compose 構成のアップグレード手順：
 
-ドメインで Cloudflare のオレンジ色の雲を有効にしている場合は、Cache Rules で入口ファイルを常に最新に保ち、ハッシュ付き静的アセットのみを長期キャッシュすることを推奨します。
+```bash
+docker compose pull
+docker compose up -d
+```
 
-キャッシュをバイパス：`/`、`/index.html`、`/login`、`/sw.js`、`/registerSW.js`、`/manifest.webmanifest`、`/api/*`。
+`docker/docker-compose.yml` は既定で `latest` を使い、`pull_policy: missing` はローカルにイメージが無いときだけ取得するため、アップグレード時は `docker compose pull` を明示的に実行します。本番では `YIN_PANEL_IMAGE` を具体的なバージョンに固定し、更新時に書き換えてください。
 
-長期キャッシュ：`/assets/*` と `/workbox-*.js`。これらのファイルは内容ハッシュ付きの名前を持ち、オリジンは 30 日間の `immutable` として返します。
+## CI/CD アーキテクチャ
 
-サイト全体に `Cache Everything` を有効にしないでください。リリース後は入口ファイルと Service Worker の Cloudflare キャッシュのみをパージし、ハッシュ付きアセットはエッジキャッシュに残して構いません。
+公式環境は 1C1G の VPS 1 台で DEV / STG / PRD を同時に動かしています。狙いはコンポーネントを積み上げることではなく、**常駐プロセスの削減、低リソース、監査可能なリリース、復旧可能な失敗**です。
+
+```mermaid
+flowchart LR
+    GH["GitHub Actions<br/>CI / ビルド / リリース"] -->|リリース通知| WH["adnanh/webhook<br/>検証済みトリガー"]
+    WH --> SH["統制された Shell スクリプト<br/>バージョン検証 / 排他 / ヘルスチェック / ロールバック"]
+    SH --> DEV["DEV<br/>Podman Compose"]
+    SH --> STG["STG<br/>Podman Compose"]
+    SH --> PRD["PRD<br/>Podman Compose"]
+    DEV -. メトリクス .-> OWL["Owl<br/>ホストとアプリのメトリクス"]
+    STG -. メトリクス .-> OWL
+    PRD -. メトリクス .-> OWL
+```
+
+| 層 | コンポーネント | 役割 |
+| --- | --- | --- |
+| CI | GitHub Actions | テスト、イメージのビルド、バージョン付与、リリースの起動 |
+| リリース入口 | adnanh/webhook | 送信元とリクエストを検証し、固定されたリリース処理だけを起動 |
+| リリース実行 | Shell スクリプト | バージョン検証、環境選択、排他、デプロイ、ヘルスチェック、ロールバック |
+| 実行環境 | Podman Compose | 3 つの分離されたアプリインスタンスを実行（Podman は Docker より常駐メモリが約 150 MB 少ない） |
+| 監視 | Owl | ホストとアプリのメトリクス |
+
+**なぜこの分担か**：CI はすべて GitHub Actions 側で実行し、VPS はビルド済みイメージを取得して配置するだけです。小さなマシンがコンパイル時のメモリピークを抱えることも、CI/CD の常駐コントロールプレーンを持つこともありません。3 環境は 1 本のリリース経路を共有しますが、Compose プロジェクト、設定、ボリューム、ネットワーク、ポートはそれぞれ独立しており、経路の共有はデータの共有ではありません。
+
+### リリースの流れ
+
+1. **ビルド**：Actions がテストとイメージのビルドを行います。バージョンは Git タグ、コミット SHA、イメージ digest で固定し、本番では `latest` を使いません。
+2. **起動と検証**：Actions が検証済みのリリース要求を webhook に送ります。スクリプトはバージョン、対象環境、許可された操作を確認し、任意の入力を Shell コマンドに連結しません。
+3. **排他とデプロイ**：同じ環境で同時にデプロイせず、対象の環境だけを更新します（全環境をまとめて再起動しません）。
+4. **ヘルスチェックと失敗時の扱い**：サービスの起動と応答を確認し、失敗時は直前の正常バージョンを残してロールバックし、環境、バージョン、トリガー元、結果、ロールバック理由を記録します。
+
+昇格の流れ：DEV は自動デプロイ → 確認後に STG へ同じバージョンをデプロイ → スモークテスト後に **PRD は人手による承認**。緊急修正も監査可能な例外手順を通し、通常の開発イベントが本番承認を迂回することはありません。
+
+### 前提と限界
+
+これは**単一マシン、低リソース、監査可能**なデプロイ構成であり、高可用構成ではありません。3 環境はプロセス・設定・データの面で分離されていますが、VPS のカーネル、ディスク、ネットワーク、メモリは共有しているため、ホスト障害やリソース枯渇は 3 環境に同時に影響します。価値は、常駐コンポーネントを最小限にしつつ、確実なリリースに必要な仕組み（バージョン固定、環境分離、ヘルスチェック、ロールバック、監視、監査記録）を保てる点にあります。
 
 ## Open Core
 
@@ -243,6 +298,18 @@ Yin-Panel はオープンソースプロジェクト [hslr-s/sun-panel](https://
 [PhantomMaa/sun-panel](https://github.com/PhantomMaa/sun-panel) の最適化と保守作業にも感謝します。Yin-Panel はその基盤を引き継いで継続的な保守を行い、新機能、操作性の向上、セルフホストに適した改善を続けています。
 
 すべての原作者、コントリビューター、ユーザーに感謝します。
+
+## コントリビュート
+
+プロジェクトが続いていくのは、利用者が問題やアイデアを共有してくれるからです。どんな形の参加も歓迎します：
+
+- **提案・不具合報告**：[Issues](https://github.com/yinorg/Yin-Panel/issues) に、バージョン、環境、再現手順、起きたことを書いてください。スクリーンショットやログがあると対応が速くなります。
+- **手を動かす**：[Pull Requests](https://github.com/yinorg/Yin-Panel/pulls) を歓迎します。バグ修正、文言の修正、言語の追加、スクリーンショットの差し替えも価値ある貢献です。
+- **まだ決めていない**：先に Issue で方針を相談してからコードを書くと、方向性のズレを避けられます。
+
+始める前に [CONTRIBUTING.md](../../CONTRIBUTING.md) に目を通してください：大きな変更は先に相談を、セキュリティの問題は公開 Issue ではなく非公開で報告してください。分からない点は Issue で聞いてもらえれば、できる範囲で方向を示します。
+
+Issue と PR はどちらも確認し、7 日以内の返信を心がけます。安定して再現できる問題や文脈のある提案はより早く進みます。フィードバックの一つひとつが、このプロジェクトを続ける理由になります。
 
 ## ライセンス
 

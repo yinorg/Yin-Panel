@@ -52,6 +52,19 @@ Yin-Panel, kişisel ve paylaşılan alanlar için hafif, kendi sunucunuzda barı
 - Özel simgeler, yüklenebilir tema paketleri, 17 arayüz dili, duvar kağıtları, WAN/LAN ve mobil URL modları ve sayfa içi açılır pencereler
 - SQLite, MySQL, MariaDB veya PostgreSQL depolama, amd64 ve arm64 için Docker imajları ve Kubernetes için Helm chart
 
+## Resmî barındırılan ortamlar
+
+Hemen kayıt olup deneyebileceğiniz üç çevrimiçi ortam işletiyoruz; üçü de GitHub / GitLab / Google ile girişi destekliyor ve bir izleme paneli metriklerle uyarıları gösteriyor.
+
+| Ortam | Adres | Amaç | Kararlılık |
+| --- | --- | --- | --- |
+| Üretim (PRD) | <https://panel.yiniot.com> | Günlük kullanım | %99,9 kullanılabilirlik hedefiyle best effort |
+| STG | <https://panel-stg.yiniot.com> | Sürüm öncesi doğrulama | Her an yeniden başlatılabilir veya geri alınabilir |
+| DEV | <https://panel-dev.yiniot.com> | Deneme ve sorun bildirme | En kararsız olan; veriler her an silinebilir |
+| İzleme | <https://owl.yiniot.com> | Üç ortamın metrikleri ve uyarıları | — |
+
+Üç ortam aynı ücretsiz sunucuda çalışır ve **yüksek kullanılabilirlik yoktur**: PRD %99,9'u hedefler ama herhangi bir tazminat sunmaz; STG ve DEV ise her an durabilir. Oralarda önemli veri tutmayın; uzun süreli kullanım için aşağıda anlatıldığı gibi kendiniz kurun.
+
 ## Hızlı başlangıç
 
 ### Docker Compose
@@ -66,10 +79,12 @@ mkdir -p database uploads
 jwt_secret="$(openssl rand -hex 32)"
 sed -i "s#^  secret: your_secret_key$#  secret: ${jwt_secret}#" conf.yaml
 unset jwt_secret
-YIN_PANEL_IMAGE=ghcr.io/yinorg/yin-panel-ce:0.6.0 docker compose up -d
+YIN_PANEL_IMAGE=ghcr.io/yinorg/yin-panel-ce:latest docker compose up -d
 ```
 
 <http://localhost:3002> adresini açın.
+
+`latest` geçerli sürümü gösterir ve denemenin en hızlı yoludur; **üretimde belirli bir etikete veya imaj digest'ine sabitleyin** (bkz. «CI/CD mimarisi») ki dağıtım kaymasın.
 
 Varsayılan yönetici: `admin@yiniot.com`, parola `admin@yiniot.com`. İlk girişten hemen sonra parolayı değiştirin ve `conf.yaml` içinde `base.root_url` ile benzersiz bir `jwt.secret` ayarlayın.
 
@@ -78,11 +93,11 @@ Her dağıtım kendi rastgele `jwt.secret` değerini üretmelidir. Depoda yalnı
 ### GHCR imajları
 
 ```bash
-docker pull ghcr.io/yinorg/yin-panel-ce:0.6.0
 docker pull ghcr.io/yinorg/yin-panel-ce:latest
+docker pull ghcr.io/yinorg/yin-panel-ce:<x.y.z>
 ```
 
-`0.6.0` ve `latest`, amd64 ve arm64 ana makineler için çok mimarili manifestlerdir. Sürüm etiketleri hiçbir zaman mimari eki taşımaz; `-amd64` veya `-arm64` gibi etiketler bir sürümün parçası değildir.
+`latest` geçerli sürümü gösterir; hem o hem de her sürüm etiketi amd64 ve arm64 ana makineler için çok mimarili manifestlerdir. Sürüm etiketleri hiçbir zaman mimari eki taşımaz; `-amd64` veya `-arm64` gibi etiketler bir sürümün parçası değildir.
 
 ## Performans ve önerilen yapılandırma
 
@@ -124,7 +139,7 @@ Kullanıcılar ne kadar etkinse (düzenleme, içe aktarma, sık yenileme), her k
 1. **Veri hacmi** — liste uç noktaları bir alanın tüm girdilerini tek yanıtta döndürür; daha fazla girdi daha maliyetli istek anlamına gelir. Kendi verinizle ölçmeye en çok değer veren kısım budur.
 2. **Yazma oranı** — SQLite aynı anda yalnızca bir yazıcıya izin verir; yazma iş hacmi disk fsync ile sınırlıdır (saniyede yüzlerce yazma düzeyinde). Yazma yoğun veya çok örnekli kurulumlar için MySQL kullanın.
 3. **Ortalama değil tepe** — tepe noktalarına göre boyutlandırın; genellikle ortalamanın 2–5 katını ayırın.
-4. **Statik varlıklar** — `/assets/*` ve diğer hash'li varlıkları bir ters proxy veya CDN sunsun; "Cloudflare önbelleği" bölümüne bakın.
+4. **Statik varlıklar** — `/assets/*` ve diğer hash'li varlıkları bir ters proxy veya CDN sunsun ve hash'li dosyaları uzun süreli önbelleğe alın; giriş dosyaları ve `/api/*` her zaman güncel kalmalıdır.
 
 ## Veritabanı
 
@@ -175,8 +190,10 @@ Alan oluşturma, yeniden adlandırma, grup ekleme, üye ekleme ve OIDC kuralı e
 
 ```bash
 helm upgrade --install yin-panel ./distribution/helm-chart/yin-panel \
-  --set image.tag=0.6.0
+  --set image.tag=latest
 ```
+
+Üretimde `image.tag` değerini somut bir sürüme çevirin.
 
 Dağıtımdan önce oluşturulan manifestleri `helm template yin-panel ./distribution/helm-chart/yin-panel` ile önizleyin.
 
@@ -218,15 +235,53 @@ Ana sayfa tema sistemi [`frontend/THEME_SYSTEM.md`](../../frontend/THEME_SYSTEM.
 
 Yükseltmeden önce veritabanını, `uploads/`, `conf.yaml` ve Helm değerlerini yedekleyin. Geçişler kullanıcıları, alanları, grupları, yer işaretlerini ve dosya başvurularını korur. Yükseltme ters giderse yükseltme öncesi yedeği geri yükleyin; veritabanını silip baştan başlamayın.
 
-## Cloudflare önbelleği
+Compose kurulumunda yükseltme adımları:
 
-Alan adı Cloudflare'in turuncu bulutunu kullanıyorsa, giriş belgesini güncel tutan ve yalnızca hash'li statik varlıkları uzun süre önbelleğe alan Cache Rules ekleyin.
+```bash
+docker compose pull
+docker compose up -d
+```
 
-Önbelleği atla: `/`, `/index.html`, `/login`, `/sw.js`, `/registerSW.js`, `/manifest.webmanifest` ve `/api/*`.
+`docker/docker-compose.yml` varsayılan olarak `latest` kullanır ve `pull_policy: missing` yalnızca imaj yerelde yoksa indirir; bu yüzden yükseltme sırasında `docker compose pull` açıkça çalıştırılmalıdır. Üretimde `YIN_PANEL_IMAGE` değerini somut bir sürüme sabitleyin ve güncelleme sırasında değiştirin.
 
-Uzun önbellek: `/assets/*` ve `/workbox-*.js`. Bu dosyalar içerik hash'li adlar taşır ve kaynak sunucu bunları 30 günlük `immutable` önbellekleme ile sunar.
+## CI/CD mimarisi
 
-Tüm site için `Cache Everything` özelliğini etkinleştirmeyin. Bir sürümden sonra Cloudflare önbelleğinden yalnızca giriş belgesini ve service worker dosyalarını temizleyin; hash'li varlıklar uçta kalabilir.
+Resmî ortamlar DEV, STG ve PRD'yi tek bir 1C1G VPS üzerinde çalıştırır. Amaç bileşen yığmak değil, **az sayıda kalıcı süreç, düşük ek yük, denetlenebilir sürümler ve hata durumunda geri dönebilme**dir.
+
+```mermaid
+flowchart LR
+    GH["GitHub Actions<br/>CI / derleme / sürüm"] -->|sürüm bildirimi| WH["adnanh/webhook<br/>doğrulanmış tetikleyici"]
+    WH --> SH["Denetimli shell betiği<br/>sürüm / kilit / sağlık / geri alma"]
+    SH --> DEV["DEV<br/>Podman Compose"]
+    SH --> STG["STG<br/>Podman Compose"]
+    SH --> PRD["PRD<br/>Podman Compose"]
+    DEV -. metrikler .-> OWL["Owl<br/>ana makine ve uygulama metrikleri"]
+    STG -. metrikler .-> OWL
+    PRD -. metrikler .-> OWL
+```
+
+| Katman | Bileşen | Sorumluluk |
+| --- | --- | --- |
+| CI | GitHub Actions | Test etme, imajı derleme, sürümü damgalama, sürümü başlatma |
+| Sürüm girişi | adnanh/webhook | Kaynağı ve isteği doğrulama; yalnızca sabit sürüm görevlerini çalıştırma |
+| Sürüm yürütme | Shell betiği | Sürüm kontrolü, ortam seçimi, kilit, dağıtım, sağlık kontrolü ve geri alma |
+| Çalışma ortamı | Podman Compose | Üç yalıtılmış uygulama örneğini çalıştırma (Podman, Docker'a göre yaklaşık 150 MB RSS tasarrufu sağlar) |
+| İzleme | Owl | Ana makine ve uygulama metrikleri |
+
+**Neden böyle bölünmüş**: CI tamamen GitHub Actions üzerinde çalışır ve VPS yalnızca derlenmiş imajı çekip dağıtır — küçük makine derleme zirvesini hiç taşımaz ve kalıcı bir CI/CD kontrol düzlemi işletmez. Üç ortam tek bir sürüm zincirini paylaşır ama Compose projeleri, yapılandırma, birimler, ağlar ve portlar ayrıdır; sürüm mekanizmasını paylaşmak veriyi paylaşmak değildir.
+
+### Sürüm akışı
+
+1. **Derleme**: Actions testleri çalıştırır ve imajı derler; sürüm bir Git etiketi, commit SHA'sı veya imaj digest'i ile sabitlenir ve üretimde `latest` asla dağıtılmaz.
+2. **Tetikleme ve doğrulama**: Actions webhook'a doğrulanmış bir sürüm isteği gönderir; betik sürümü, hedef ortamı ve izin verilen eylemi kontrol eder ve rastgele girdiyi hiçbir zaman bir shell komutuna eklemez.
+3. **Kilit ve dağıtım**: bir ortamda aynı anda tek dağıtım çalışır ve yalnızca hedef ortam güncellenir — hiçbir şey körlemesine yeniden başlatılmaz.
+4. **Sağlık kontrolü ve hata**: servisin başlayıp yanıt verdiği doğrulanır; başarısız olursa son sağlam sürüm korunur ve geri alınır, ortam, sürüm, tetikleyici kaynağı, sonuç ve geri alma nedeni kaydedilir.
+
+Yükseltme: DEV otomatik dağıtır → doğrulamadan sonra STG aynı sürümü dağıtır → smoke testlerinden sonra **PRD insan onayı gerektirir**. Acil düzeltmeler de denetlenebilir bir istisna yolundan geçer; sıradan bir geliştirme olayı üretim onayını asla atlamaz.
+
+### Sınırlar
+
+Bu **tek makineye dayalı, kaynak açısından tutumlu ve denetlenebilir** bir dağıtım mimarisidir, yüksek kullanılabilirlik mimarisi değildir: üç ortam süreç, yapılandırma ve veri olarak yalıtılmıştır ama aynı VPS'in çekirdeğini, diskini, ağını ve belleğini paylaşır; bir ana makine arızası veya kaynak tükenmesi üçünü birden etkiler. Değeri, güvenilir bir sürüm için gereken mekanizmaları — sabitlenmiş sürümler, ayrı ortamlar, sağlık kontrolleri, geri alma, izleme ve denetim izi — çok az kalıcı bileşenle korumasıdır.
 
 ## Open Core
 
@@ -243,6 +298,18 @@ Yin-Panel, açık kaynaklı [hslr-s/sun-panel](https://github.com/hslr-s/sun-pan
 Optimizasyonları ve bakım çalışmaları için [PhantomMaa/sun-panel](https://github.com/PhantomMaa/sun-panel) projesine de teşekkürler. Yin-Panel bu temelden kesintisiz bakımı devraldı ve özellikler, etkileşim iyileştirmeleri ve kendi sunucunuzda barındırma odaklı değişiklikler eklemeye devam ediyor.
 
 Tüm özgün yazarlara, katkıda bulunanlara ve kullanıcılara teşekkürler.
+
+## Katkıda bulunma
+
+Bu proje, insanlar sorunları ve fikirleri paylaşmaya zaman ayırdığı için devam ediyor. Her türlü katkı memnuniyetle karşılanır:
+
+- **Öneriler ve hata bildirimleri**: sürüm, ortam, yeniden üretme adımları ve gördüğünüz durumu içeren bir [issue](https://github.com/yinorg/Yin-Panel/issues) açın; ekran görüntüsü veya günlük işleri çok hızlandırır.
+- **Kod ve dokümantasyon**: pull request'ler memnuniyetle karşılanır. Bir hatayı düzeltmek, bir cümleyi yeniden yazmak, bir dil eklemek veya ekran görüntüsünü değiştirmek de değerli katkıdır.
+- **Henüz emin değilseniz**: kod yazmadan önce bir issue açıp yaklaşımı netleştirin; böylece emek kimsenin istemediği bir yöne gitmez.
+
+Başlamadan önce [CONTRIBUTING.md](../../CONTRIBUTING.md) dosyasına göz atın: büyük değişiklikleri önce konuşmak daha iyi olur ve güvenlik sorunları herkese açık bir issue yerine özel olarak bildirilmelidir. Net olmayan bir şey varsa issue'da sorun, yön göstermeye çalışırım.
+
+Hem issue'lar hem de pull request'ler okunuyor ve 7 gün içinde yanıt vermeye çalışıyorum; yeniden üretilebilen sorunlar ve iyi anlatılmış öneriler en hızlı ilerleyenlerdir. Her geri bildirim bu projenin sürmesi için bir neden.
 
 ## Lisans
 

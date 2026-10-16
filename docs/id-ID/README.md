@@ -52,6 +52,19 @@ Yin-Panel adalah panel navigasi ringan yang dapat dihosting sendiri untuk ruang 
 - Ikon kustom, paket tema yang dapat dipasang, 17 bahasa UI, wallpaper, mode URL WAN/LAN dan seluler, serta jendela popup dalam halaman
 - Penyimpanan SQLite, MySQL, MariaDB, atau PostgreSQL, image Docker untuk amd64 dan arm64, dan chart Helm untuk Kubernetes
 
+## Lingkungan resmi yang dihosting
+
+Kami menjalankan tiga lingkungan online yang bisa langsung Anda daftari dan coba; ketiganya mendukung masuk dengan GitHub / GitLab / Google, dan ada panel pemantauan yang menampilkan metrik serta peringatannya.
+
+| Lingkungan | Alamat | Tujuan | Ketersediaan |
+| --- | --- | --- | --- |
+| Produksi (PRD) | <https://panel.yiniot.com> | Penggunaan sehari-hari | Best effort dengan target ketersediaan 99,9% |
+| STG | <https://panel-stg.yiniot.com> | Verifikasi sebelum rilis | Bisa direstart atau di-rollback kapan saja |
+| DEV | <https://panel-dev.yiniot.com> | Mencoba dan melaporkan masalah | Paling tidak stabil; data bisa dihapus kapan saja |
+| Pemantauan | <https://owl.yiniot.com> | Metrik dan peringatan untuk ketiga lingkungan | — |
+
+Ketiganya berjalan di server gratis yang sama dan **tidak ada ketersediaan tinggi**: PRD menargetkan 99,9% tanpa kompensasi apa pun, sedangkan STG dan DEV bisa mati kapan saja. Jangan menyimpan data penting di sana; untuk pemakaian jangka panjang, hosting sendiri seperti dijelaskan di bawah.
+
 ## Mulai cepat
 
 ### Docker Compose
@@ -66,10 +79,12 @@ mkdir -p database uploads
 jwt_secret="$(openssl rand -hex 32)"
 sed -i "s#^  secret: your_secret_key$#  secret: ${jwt_secret}#" conf.yaml
 unset jwt_secret
-YIN_PANEL_IMAGE=ghcr.io/yinorg/yin-panel-ce:0.6.0 docker compose up -d
+YIN_PANEL_IMAGE=ghcr.io/yinorg/yin-panel-ce:latest docker compose up -d
 ```
 
 Buka <http://localhost:3002>.
+
+`latest` menunjuk ke rilis saat ini dan merupakan cara tercepat untuk mencoba; **di produksi patok ke tag atau digest image tertentu** (lihat "Arsitektur CI/CD") supaya deployment tidak bergeser.
 
 Administrator bawaan: `admin@yiniot.com`, kata sandi `admin@yiniot.com`. Ganti kata sandi segera setelah login pertama, lalu tetapkan `base.root_url` dan `jwt.secret` yang unik di `conf.yaml`.
 
@@ -78,11 +93,11 @@ Setiap penerapan harus menghasilkan `jwt.secret` acak miliknya sendiri. Reposito
 ### Image GHCR
 
 ```bash
-docker pull ghcr.io/yinorg/yin-panel-ce:0.6.0
 docker pull ghcr.io/yinorg/yin-panel-ce:latest
+docker pull ghcr.io/yinorg/yin-panel-ce:<x.y.z>
 ```
 
-`0.6.0` dan `latest` adalah manifes multi-arsitektur untuk host amd64 dan arm64. Tag rilis tidak pernah membawa akhiran arsitektur; tag seperti `-amd64` atau `-arm64` bukan bagian dari sebuah rilis.
+`latest` menunjuk ke rilis saat ini; tag ini dan setiap tag rilis adalah manifes multi-arsitektur untuk host amd64 dan arm64. Tag rilis tidak pernah membawa akhiran arsitektur; tag seperti `-amd64` atau `-arm64` bukan bagian dari sebuah rilis.
 
 ## Performa dan konfigurasi yang direkomendasikan
 
@@ -124,7 +139,7 @@ Semakin aktif pengguna (mengedit, mengimpor, sering memuat ulang), semakin tingg
 1. **Volume data** — endpoint daftar mengembalikan setiap entri suatu ruang dalam satu respons; semakin banyak entri, semakin mahal sebuah permintaan. Ini bagian yang paling layak diukur pada data Anda sendiri.
 2. **Laju penulisan** — SQLite hanya mengizinkan satu penulis pada satu waktu; throughput penulisan dibatasi oleh fsync disk (pada kisaran ratusan penulisan per detik). Untuk beban tulis berat atau penyiapan multi-instans, gunakan MySQL.
 3. **Puncak, bukan rata-rata** — ukur untuk puncak, biasanya menyisihkan 2–5× rata-rata.
-4. **Aset statis** — biarkan reverse proxy atau CDN melayani `/assets/*` dan aset ber-hash lainnya; lihat "Caching Cloudflare".
+4. **Aset statis** — biarkan reverse proxy atau CDN melayani `/assets/*` dan aset ber-hash lainnya, dan cache berkas ber-hash itu untuk jangka panjang; berkas pintu masuk dan `/api/*` harus selalu terbaru.
 
 ## Basis data
 
@@ -175,8 +190,10 @@ Membuat ruang, mengganti namanya, menambahkan grup, menambahkan anggota, dan men
 
 ```bash
 helm upgrade --install yin-panel ./distribution/helm-chart/yin-panel \
-  --set image.tag=0.6.0
+  --set image.tag=latest
 ```
+
+Di produksi, ganti `image.tag` dengan versi tertentu.
 
 Sebelum menerapkan, pratinjau manifes yang dirender dengan `helm template yin-panel ./distribution/helm-chart/yin-panel`.
 
@@ -218,15 +235,53 @@ Sistem tema halaman beranda didokumentasikan di [`frontend/THEME_SYSTEM.md`](../
 
 Sebelum meningkatkan versi, cadangkan basis data, `uploads/`, `conf.yaml`, dan nilai Helm. Migrasi mempertahankan pengguna, ruang, grup, bookmark, dan referensi berkas. Jika peningkatan gagal, pulihkan cadangan sebelum peningkatan; jangan menghapus basis data lalu memulai dari awal.
 
-## Caching Cloudflare
+Langkah upgrade untuk instalasi Compose:
 
-Jika domain menggunakan orange cloud Cloudflare, tambahkan Cache Rules yang menjaga dokumen entri tetap segar dan hanya meng-cache aset statis ber-hash untuk waktu lama.
+```bash
+docker compose pull
+docker compose up -d
+```
 
-Lewati cache: `/`, `/index.html`, `/login`, `/sw.js`, `/registerSW.js`, `/manifest.webmanifest`, dan `/api/*`.
+`docker/docker-compose.yml` memakai `latest` secara default, dan `pull_policy: missing` hanya menarik image kalau belum ada di lokal, jadi saat upgrade `docker compose pull` harus dijalankan secara eksplisit. Di produksi patok `YIN_PANEL_IMAGE` ke versi tertentu dan ubah saat memperbarui.
 
-Cache lama: `/assets/*` dan `/workbox-*.js`. Berkas-berkas ini membawa nama ber-hash konten, dan origin menyajikannya dengan caching `immutable` selama 30 hari.
+## Arsitektur CI/CD
 
-Jangan aktifkan `Cache Everything` untuk seluruh situs. Setelah rilis, bersihkan hanya dokumen entri dan berkas service-worker dari cache Cloudflare; aset ber-hash dapat tetap berada di edge.
+Lingkungan resmi menjalankan DEV, STG, dan PRD di satu VPS 1C1G. Tujuannya bukan menumpuk komponen, melainkan **sedikit proses yang menetap, overhead rendah, rilis yang bisa diaudit, dan kegagalan yang bisa dipulihkan**.
+
+```mermaid
+flowchart LR
+    GH["GitHub Actions<br/>CI / build / rilis"] -->|notifikasi rilis| WH["adnanh/webhook<br/>pemicu terverifikasi"]
+    WH --> SH["Skrip shell yang dijaga<br/>versi / lock / health check / rollback"]
+    SH --> DEV["DEV<br/>Podman Compose"]
+    SH --> STG["STG<br/>Podman Compose"]
+    SH --> PRD["PRD<br/>Podman Compose"]
+    DEV -. metrik .-> OWL["Owl<br/>metrik host dan aplikasi"]
+    STG -. metrik .-> OWL
+    PRD -. metrik .-> OWL
+```
+
+| Lapisan | Komponen | Tanggung jawab |
+| --- | --- | --- |
+| CI | GitHub Actions | Menguji, membangun image, menandai versi, memicu rilis |
+| Pintu masuk rilis | adnanh/webhook | Memverifikasi asal dan permintaan; hanya menjalankan tugas rilis yang tetap |
+| Eksekusi rilis | Skrip shell | Pemeriksaan versi, pemilihan lingkungan, lock, deployment, health check, dan rollback |
+| Runtime | Podman Compose | Menjalankan tiga instans aplikasi yang terisolasi (Podman menghemat sekitar 150 MB RSS dibanding Docker) |
+| Pemantauan | Owl | Metrik host dan aplikasi |
+
+**Mengapa dibagi begitu**: seluruh CI berjalan di GitHub Actions dan VPS hanya menarik image yang sudah dibangun lalu menerapkannya — mesin kecil ini tidak pernah menanggung puncak kompilasi dan tidak menjalankan control plane CI/CD. Ketiga lingkungan berbagi satu rantai rilis tetapi tetap punya proyek Compose, konfigurasi, volume, jaringan, dan port yang terpisah; berbagi mekanisme rilis bukan berarti berbagi data.
+
+### Alur rilis
+
+1. **Build**: Actions menjalankan pengujian dan membangun image; versi dipatok lewat tag Git, SHA commit, atau digest image, dan produksi tidak pernah menerapkan `latest`.
+2. **Pemicu dan validasi**: Actions mengirim permintaan rilis yang terverifikasi ke webhook; skrip memeriksa versi, lingkungan tujuan, dan tindakan yang diizinkan, serta tidak pernah menyisipkan input sembarangan ke perintah shell.
+3. **Lock dan deployment**: satu deployment per lingkungan pada satu waktu, dan hanya lingkungan tujuan yang diperbarui — tidak ada yang direstart sembarangan.
+4. **Health check dan penanganan gagal**: layanan dipastikan menyala dan menjawab; jika gagal, versi baik terakhir dipertahankan lalu di-rollback, sambil mencatat lingkungan, versi, sumber pemicu, hasil, dan alasan rollback.
+
+Promosi: DEV menerapkan otomatis → setelah verifikasi STG menerapkan versi yang sama → setelah smoke test **PRD memerlukan persetujuan manusia**. Perbaikan darurat juga melewati jalur pengecualian yang bisa diaudit, jadi aktivitas pengembangan biasa tidak pernah melewati persetujuan produksi.
+
+### Batasan
+
+Ini arsitektur deployment **satu mesin, hemat sumber daya, dan bisa diaudit**, bukan arsitektur ketersediaan tinggi: ketiga lingkungan terpisah secara proses, konfigurasi, dan data, tetapi berbagi kernel, disk, jaringan, dan memori VPS yang sama, sehingga kegagalan host atau kehabisan sumber daya memengaruhi ketiganya sekaligus. Nilainya terletak pada tetap tersedianya mekanisme yang dibutuhkan rilis yang andal — versi terpatok, lingkungan terpisah, health check, rollback, pemantauan, dan jejak audit — dengan sangat sedikit komponen yang menetap.
 
 ## Open Core
 
@@ -243,6 +298,18 @@ Yin-Panel tumbuh dari proyek sumber terbuka [hslr-s/sun-panel](https://github.co
 Terima kasih juga kepada [PhantomMaa/sun-panel](https://github.com/PhantomMaa/sun-panel) atas optimasi dan pekerjaan pemeliharaannya. Yin-Panel mengambil alih pemeliharaan lanjutan dari basis tersebut dan terus menambahkan fitur, peningkatan interaksi, serta perubahan yang berorientasi pada hosting mandiri.
 
 Terima kasih kepada semua penulis asli, kontributor, dan pengguna.
+
+## Ikut berkontribusi
+
+Proyek ini berjalan karena ada orang yang meluangkan waktu melaporkan masalah dan berbagi ide. Segala bentuk partisipasi diterima:
+
+- **Saran dan laporan bug**: buka [issue](https://github.com/yinorg/Yin-Panel/issues) dengan versi, lingkungan, langkah reproduksi, dan apa yang Anda lihat; tangkapan layar atau log membuat penanganannya jauh lebih cepat.
+- **Kode dan dokumentasi**: pull request diterima. Memperbaiki bug, memperbaiki kalimat, menambah bahasa, atau mengganti tangkapan layar sama berharganya.
+- **Belum yakin**: buka issue dulu dan sepakati pendekatannya sebelum menulis kode, agar pekerjaannya tidak menuju arah yang tidak dibutuhkan.
+
+Lihat dulu [CONTRIBUTING.md](../../CONTRIBUTING.md) sebelum mulai: perubahan besar sebaiknya dibicarakan lebih dahulu, dan masalah keamanan dilaporkan secara privat, bukan di issue publik. Kalau ada yang belum jelas, tanyakan di issue dan saya akan berusaha menunjukkan arahnya.
+
+Issue dan pull request sama-sama dibaca, dan saya berusaha menjawab dalam 7 hari; masalah yang bisa direproduksi dan saran yang jelas biasanya paling cepat. Setiap masukan adalah alasan proyek ini terus berjalan.
 
 ## Lisensi
 

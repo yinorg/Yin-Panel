@@ -52,6 +52,19 @@ O Yin-Panel é um painel de navegação leve e auto-hospedável para espaços pe
 - Ícones personalizados, temas instaláveis, 17 idiomas de interface, papéis de parede, modos de URL WAN/LAN e móvel, janelas pop-up dentro da página
 - Armazenamento SQLite, MySQL, MariaDB ou PostgreSQL, imagens Docker para amd64 e arm64 e chart Helm para Kubernetes
 
+## Ambientes hospedados oficiais
+
+Mantemos três ambientes online nos quais você pode se registrar e testar tudo na hora; os três aceitam login com GitHub / GitLab / Google, e um painel de monitoramento mostra as métricas e os alertas deles.
+
+| Ambiente | Endereço | Uso | Disponibilidade |
+| --- | --- | --- | --- |
+| Produção (PRD) | <https://panel.yiniot.com> | Uso diário | Best effort com meta de 99,9% de disponibilidade |
+| STG | <https://panel-stg.yiniot.com> | Verificação antes da publicação | Pode reiniciar ou ser revertido a qualquer momento |
+| DEV | <https://panel-dev.yiniot.com> | Testar e reportar problemas | O menos estável; os dados podem ser apagados a qualquer momento |
+| Monitoramento | <https://owl.yiniot.com> | Métricas e alertas dos três ambientes | — |
+
+Os três ambientes rodam no mesmo servidor gratuito e **não há alta disponibilidade**: o PRD mira 99,9% mas sem qualquer compensação, enquanto STG e DEV podem cair a qualquer momento. Não guarde dados importantes neles; para uso prolongado, hospede você mesmo como descrito abaixo.
+
 ## Início rápido
 
 ### Docker Compose
@@ -66,10 +79,12 @@ mkdir -p database uploads
 jwt_secret="$(openssl rand -hex 32)"
 sed -i "s#^  secret: your_secret_key$#  secret: ${jwt_secret}#" conf.yaml
 unset jwt_secret
-YIN_PANEL_IMAGE=ghcr.io/yinorg/yin-panel-ce:0.6.0 docker compose up -d
+YIN_PANEL_IMAGE=ghcr.io/yinorg/yin-panel-ce:latest docker compose up -d
 ```
 
 Abra <http://localhost:3002>.
+
+`latest` aponta para a versão atual e é o jeito mais rápido de experimentar; **em produção fixe uma tag ou um digest de imagem** (veja «Arquitetura de CI/CD») para que o deploy não derive.
 
 Administrador padrão: `admin@yiniot.com`, senha `admin@yiniot.com`. Altere a senha imediatamente após o primeiro login e defina `base.root_url` e um `jwt.secret` exclusivo no `conf.yaml`.
 
@@ -78,11 +93,11 @@ Cada implantação deve gerar seu próprio `jwt.secret` aleatório. O repositór
 ### Imagens GHCR
 
 ```bash
-docker pull ghcr.io/yinorg/yin-panel-ce:0.6.0
 docker pull ghcr.io/yinorg/yin-panel-ce:latest
+docker pull ghcr.io/yinorg/yin-panel-ce:<x.y.z>
 ```
 
-`0.6.0` e `latest` são manifestos multiarquitetura para hosts amd64 e arm64. As tags de versão nunca têm sufixo de arquitetura; tags como `-amd64` ou `-arm64` não fazem parte de uma versão publicada.
+`latest` aponta para a versão atual; ela e cada tag de versão são manifestos multiarquitetura para hosts amd64 e arm64. As tags de versão nunca têm sufixo de arquitetura; tags como `-amd64` ou `-arm64` não fazem parte de uma versão publicada.
 
 ## Desempenho e configuração recomendada
 
@@ -124,7 +139,7 @@ Quanto mais ativos os usuários (edição, importação, atualizações frequent
 1. **Volume de dados**: os endpoints de listagem retornam todas as entradas de um espaço em uma única resposta; mais entradas significam requisições mais caras. É a parte que mais vale a pena medir com os seus próprios dados.
 2. **Taxa de escrita**: o SQLite permite apenas um escritor por vez; o throughput de escrita é limitado pelo fsync do disco (na ordem de centenas de gravações por segundo). Para cargas intensas de escrita ou várias instâncias, use MySQL.
 3. **Pico, não média**: dimensione para os picos, reservando normalmente 2–5× a média.
-4. **Arquivos estáticos**: sirva `/assets/*` e outros recursos com hash por um proxy reverso ou CDN; consulte "Cache do Cloudflare".
+4. **Arquivos estáticos**: sirva `/assets/*` e outros recursos com hash por um proxy reverso ou CDN e mantenha esses arquivos com hash em cache de longo prazo; os arquivos de entrada e `/api/*` devem ficar sempre atualizados.
 
 ## Banco de dados
 
@@ -175,8 +190,10 @@ Criar um espaço, renomear, adicionar grupos, membros e regras OIDC acontecem em
 
 ```bash
 helm upgrade --install yin-panel ./distribution/helm-chart/yin-panel \
-  --set image.tag=0.6.0
+  --set image.tag=latest
 ```
+
+Em produção, troque `image.tag` por uma versão concreta.
 
 Antes de implantar, visualize os manifestos renderizados com `helm template yin-panel ./distribution/helm-chart/yin-panel`.
 
@@ -218,15 +235,53 @@ O sistema de temas da página inicial está documentado em [`frontend/THEME_SYST
 
 Antes de atualizar, faça backup do banco de dados, de `uploads/`, do `conf.yaml` e dos values do Helm. As migrações preservam usuários, espaços, grupos, favoritos e referências de arquivos. Se algo der errado, restaure o backup anterior à atualização; não exclua o banco de dados para recriá-lo.
 
-## Cache do Cloudflare
+Passos de atualização em uma instalação Compose:
 
-Se o domínio usa a nuvem laranja do Cloudflare, adicione Cache Rules para manter o documento de entrada atualizado e armazenar em cache de longo prazo apenas os recursos estáticos com hash.
+```bash
+docker compose pull
+docker compose up -d
+```
 
-Ignorar cache: `/`, `/index.html`, `/login`, `/sw.js`, `/registerSW.js`, `/manifest.webmanifest` e `/api/*`.
+O `docker/docker-compose.yml` usa `latest` por padrão, e `pull_policy: missing` só baixa quando a imagem não existe localmente, então na atualização é preciso rodar `docker compose pull` explicitamente. Em produção, fixe `YIN_PANEL_IMAGE` em uma versão concreta e troque ao atualizar.
 
-Cache de longo prazo: `/assets/*` e `/workbox-*.js`. Esses arquivos têm nomes com hash de conteúdo, e a origem os serve com cache `immutable` de 30 dias.
+## Arquitetura de CI/CD
 
-Não ative `Cache Everything` para o site inteiro. Após uma publicação, limpe apenas o documento de entrada e os arquivos do service worker do cache do Cloudflare; os recursos com hash podem permanecer no edge.
+Os ambientes oficiais rodam DEV, STG e PRD em um único VPS 1C1G. O objetivo não é empilhar componentes, mas **poucos processos residentes, pouco overhead, publicações auditáveis e falhas das quais dá para voltar**.
+
+```mermaid
+flowchart LR
+    GH["GitHub Actions<br/>CI / build / publicação"] -->|aviso de publicação| WH["adnanh/webhook<br/>gatilho verificado"]
+    WH --> SH["Script shell controlado<br/>versão / lock / saúde / rollback"]
+    SH --> DEV["DEV<br/>Podman Compose"]
+    SH --> STG["STG<br/>Podman Compose"]
+    SH --> PRD["PRD<br/>Podman Compose"]
+    DEV -. métricas .-> OWL["Owl<br/>métricas de host e aplicação"]
+    STG -. métricas .-> OWL
+    PRD -. métricas .-> OWL
+```
+
+| Camada | Componente | Responsabilidade |
+| --- | --- | --- |
+| CI | GitHub Actions | Testar, construir a imagem, marcar a versão e disparar a publicação |
+| Entrada da publicação | adnanh/webhook | Verificar a origem e a requisição; executar apenas tarefas de publicação fixas |
+| Execução da publicação | Script shell | Checagem de versão, escolha do ambiente, lock, deploy, health check e rollback |
+| Execução | Podman Compose | Rodar as três instâncias isoladas (o Podman economiza cerca de 150 MB de RSS em relação ao Docker) |
+| Monitoramento | Owl | Métricas de host e aplicação |
+
+**Por que dividir assim**: toda a CI roda no GitHub Actions e o VPS apenas baixa a imagem já construída e a coloca no ar; a máquina pequena nunca carrega o pico de compilação nem mantém um control plane de CI/CD. Os três ambientes compartilham uma única cadeia de publicação, mas mantêm projetos Compose, configuração, volumes, redes e portas separados; compartilhar o mecanismo de publicação não é compartilhar dados.
+
+### Fluxo de publicação
+
+1. **Build**: o Actions roda os testes e constrói a imagem; a versão fica fixada por tag Git, SHA do commit ou digest da imagem, e a produção nunca implanta `latest`.
+2. **Disparo e validação**: o Actions envia uma requisição de publicação verificada ao webhook; o script confere versão, ambiente de destino e ação permitida, e nunca concatena entrada arbitrária em um comando shell.
+3. **Lock e deploy**: um deploy por ambiente de cada vez, e só o ambiente de destino é atualizado — nada é reiniciado às cegas.
+4. **Health check e falhas**: confirma-se que o serviço sobe e responde; se falhar, a última versão boa é mantida e há rollback, registrando ambiente, versão, origem do disparo, resultado e motivo do rollback.
+
+Promoção: o DEV implanta automaticamente → após a verificação o STG implanta a mesma versão → depois dos smoke tests **o PRD exige aprovação humana**. Correções emergenciais também passam por um caminho de exceção auditável, então um evento comum de desenvolvimento nunca pula a aprovação de produção.
+
+### Limites
+
+É uma arquitetura de deploy **de máquina única, econômica e auditável**, não de alta disponibilidade: os três ambientes são isolados em processo, configuração e dados, mas compartilham kernel, disco, rede e memória do mesmo VPS, então uma falha do host ou o esgotamento de recursos atinge os três ao mesmo tempo. O valor está em manter os mecanismos de uma publicação confiável — versões fixadas, ambientes isolados, health checks, rollback, monitoramento e trilha de auditoria — com pouquíssimos processos residentes.
 
 ## Open Core
 
@@ -243,6 +298,18 @@ O Yin-Panel nasceu do projeto de código aberto [hslr-s/sun-panel](https://githu
 Agradecemos também a [PhantomMaa/sun-panel](https://github.com/PhantomMaa/sun-panel) pelas otimizações e pelo trabalho de manutenção. O Yin-Panel assumiu a manutenção continuada a partir dessa base e segue adicionando recursos, melhorias de interação e mudanças voltadas à auto-hospedagem.
 
 Agradecemos a todos os autores originais, contribuidores e usuários.
+
+## Contribuir
+
+O projeto continua porque as pessoas dedicam tempo a relatar problemas e compartilhar ideias. Toda forma de participação é bem-vinda:
+
+- **Sugestões e bugs**: abra uma [issue](https://github.com/yinorg/Yin-Panel/issues) com a versão, o ambiente, os passos para reproduzir e o que você viu — uma captura de tela ou um log acelera bastante o atendimento.
+- **Código e documentação**: pull requests são bem-vindos. Corrigir um bug, reescrever uma frase, adicionar um idioma ou trocar uma captura de tela também conta.
+- **Ainda em dúvida**: abra uma issue primeiro e combine a abordagem antes de escrever código, para o trabalho não seguir uma direção que ninguém quer.
+
+Dê uma olhada no [CONTRIBUTING.md](../../CONTRIBUTING.md) antes de começar: mudanças maiores vale a pena discutir antes, e problemas de segurança devem ser reportados em privado, não em uma issue pública. Se algo não estiver claro, pergunte em uma issue e vou tentar apontar o caminho.
+
+Issues e pull requests são lidos, e procuro responder em até 7 dias; problemas reproduzíveis e sugestões bem descritas andam mais rápido. Cada retorno é um motivo para o projeto continuar.
 
 ## Licença
 

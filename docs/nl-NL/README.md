@@ -52,6 +52,19 @@ Yin-Panel is een lichtgewicht, zelf te hosten navigatiepaneel voor persoonlijke 
 - Aangepaste pictogrammen, installeerbare themapakketten, 17 UI-talen, achtergronden, WAN-/LAN- en mobiele URL-modus en pop-upvensters in de pagina
 - Opslag met SQLite, MySQL, MariaDB of PostgreSQL, Docker-images voor amd64 en arm64 en een Helm-chart voor Kubernetes
 
+## Officieel gehoste omgevingen
+
+We draaien drie online omgevingen waarop je je direct kunt registreren en alles kunt uitproberen; alle drie ondersteunen inloggen met GitHub / GitLab / Google, en een monitoringspaneel toont hun statistieken en waarschuwingen.
+
+| Omgeving | Adres | Doel | Beschikbaarheid |
+| --- | --- | --- | --- |
+| Productie (PRD) | <https://panel.yiniot.com> | Dagelijks gebruik | Best effort met als doel 99,9% beschikbaarheid |
+| STG | <https://panel-stg.yiniot.com> | Controle voor de release | Kan op elk moment opnieuw starten of terugrollen |
+| DEV | <https://panel-dev.yiniot.com> | Uitproberen en problemen melden | Het minst stabiel; gegevens kunnen op elk moment verdwijnen |
+| Monitoring | <https://owl.yiniot.com> | Statistieken en waarschuwingen van de drie omgevingen | — |
+
+De drie omgevingen draaien op dezelfde gratis server en **er is geen hoge beschikbaarheid**: PRD mikt op 99,9% maar biedt geen compensatie, terwijl STG en DEV op elk moment kunnen uitvallen. Bewaar er geen belangrijke gegevens; voor langdurig gebruik host je het zelf, zoals hieronder beschreven.
+
 ## Snel starten
 
 ### Docker Compose
@@ -66,10 +79,12 @@ mkdir -p database uploads
 jwt_secret="$(openssl rand -hex 32)"
 sed -i "s#^  secret: your_secret_key$#  secret: ${jwt_secret}#" conf.yaml
 unset jwt_secret
-YIN_PANEL_IMAGE=ghcr.io/yinorg/yin-panel-ce:0.6.0 docker compose up -d
+YIN_PANEL_IMAGE=ghcr.io/yinorg/yin-panel-ce:latest docker compose up -d
 ```
 
 Open <http://localhost:3002>.
+
+`latest` wijst naar de huidige release en is de snelste manier om het te proberen; **zet in productie een specifieke tag of image-digest vast** (zie "CI/CD-architectuur") zodat een deployment niet verschuift.
 
 Standaardbeheerder: `admin@yiniot.com`, wachtwoord `admin@yiniot.com`. Wijzig het wachtwoord direct na de eerste aanmelding en stel `base.root_url` en een unieke `jwt.secret` in `conf.yaml` in.
 
@@ -78,11 +93,11 @@ Elke implementatie moet een eigen willekeurige `jwt.secret` genereren. De reposi
 ### GHCR-images
 
 ```bash
-docker pull ghcr.io/yinorg/yin-panel-ce:0.6.0
 docker pull ghcr.io/yinorg/yin-panel-ce:latest
+docker pull ghcr.io/yinorg/yin-panel-ce:<x.y.z>
 ```
 
-`0.6.0` en `latest` zijn multi-architectuurmanifests voor amd64- en arm64-hosts. Release-tags krijgen nooit een architectuurachtervoegsel; tags zoals `-amd64` of `-arm64` maken geen deel uit van een release.
+`latest` wijst naar de huidige release; die en elke release-tag zijn multi-architectuurmanifests voor amd64- en arm64-hosts. Release-tags krijgen nooit een architectuurachtervoegsel; tags zoals `-amd64` of `-arm64` maken geen deel uit van een release.
 
 ## Prestaties en aanbevolen configuratie
 
@@ -124,7 +139,7 @@ Hoe actiever de gebruikers (bewerken, importeren, vaak vernieuwen), hoe hoger he
 1. **Gegevensvolume** — lijsteindpunten retourneren alle items van een ruimte in één antwoord; meer items betekenen een duurder verzoek. Dit is het onderdeel dat het meest de moeite waard is om op uw eigen gegevens te meten.
 2. **Schrijfsnelheid** — SQLite staat slechts één schrijver tegelijk toe; de schrijfdoorvoer wordt begrensd door disk-fsync (in de orde van honderden schrijfacties per seconde). Gebruik MySQL voor schrijfintensieve opstellingen of opstellingen met meerdere instanties.
 3. **Piek, niet gemiddelde** — dimensioneer op pieken en reserveer daarbij meestal 2–5× het gemiddelde.
-4. **Statische assets** — laat een reverse proxy of CDN `/assets/*` en andere gehashte assets leveren; zie "Cloudflare-caching".
+4. **Statische assets** — laat een reverse proxy of CDN `/assets/*` en andere gehashte assets leveren, en cache de gehashte bestanden langdurig; ingangsbestanden en `/api/*` moeten altijd actueel blijven.
 
 ## Database
 
@@ -175,8 +190,10 @@ Het aanmaken van een ruimte, het hernoemen ervan, het toevoegen van groepen, het
 
 ```bash
 helm upgrade --install yin-panel ./distribution/helm-chart/yin-panel \
-  --set image.tag=0.6.0
+  --set image.tag=latest
 ```
+
+Zet in productie `image.tag` op een concrete versie.
 
 Bekijk vóór de implementatie de gerenderde manifests met `helm template yin-panel ./distribution/helm-chart/yin-panel`.
 
@@ -218,15 +235,53 @@ Het themasysteem van de startpagina is gedocumenteerd in [`frontend/THEME_SYSTEM
 
 Maak vóór een upgrade een back-up van de database, `uploads/`, `conf.yaml` en de Helm-waarden. Migraties behouden gebruikers, ruimten, groepen, bladwijzers en bestandsverwijzingen. Als een upgrade misgaat, herstelt u de back-up van vóór de upgrade; verwijder de database niet en begin niet opnieuw.
 
-## Cloudflare-caching
+Upgradestappen voor een Compose-installatie:
 
-Als het domein de oranje wolk van Cloudflare gebruikt, voegt u Cache-regels toe die het toegangsdocument actueel houden en alleen gehashte statische assets langdurig cachen.
+```bash
+docker compose pull
+docker compose up -d
+```
 
-Cache omzeilen: `/`, `/index.html`, `/login`, `/sw.js`, `/registerSW.js`, `/manifest.webmanifest` en `/api/*`.
+`docker/docker-compose.yml` gebruikt standaard `latest`, en `pull_policy: missing` haalt alleen op als de image lokaal ontbreekt; bij een upgrade moet je dus expliciet `docker compose pull` uitvoeren. Zet in productie `YIN_PANEL_IMAGE` vast op een concrete versie en wijzig die bij een update.
 
-Lange cache: `/assets/*` en `/workbox-*.js`. Deze bestanden hebben namen met een inhoudshash en de oorsprong serveert ze met 30 dagen `immutable`-caching.
+## CI/CD-architectuur
 
-Schakel `Cache Everything` niet in voor de hele site. Na een release wist u alleen het toegangsdocument en de service-workerbestanden uit de Cloudflare-cache; gehashte assets kunnen op de edge blijven.
+De officiële omgevingen draaien DEV, STG en PRD op één 1C1G-VPS. Het doel is niet een stapel componenten, maar **weinig blijvende processen, lage overhead, controleerbare releases en fouten waarop je kunt terugrollen**.
+
+```mermaid
+flowchart LR
+    GH["GitHub Actions<br/>CI / build / release"] -->|releasemelding| WH["adnanh/webhook<br/>geverifieerde trigger"]
+    WH --> SH["Beheerd shellscript<br/>versie / lock / health check / rollback"]
+    SH --> DEV["DEV<br/>Podman Compose"]
+    SH --> STG["STG<br/>Podman Compose"]
+    SH --> PRD["PRD<br/>Podman Compose"]
+    DEV -. statistieken .-> OWL["Owl<br/>host- en applicatiestatistieken"]
+    STG -. statistieken .-> OWL
+    PRD -. statistieken .-> OWL
+```
+
+| Laag | Component | Verantwoordelijkheid |
+| --- | --- | --- |
+| CI | GitHub Actions | Testen, image bouwen, versie vastleggen, release starten |
+| Release-ingang | adnanh/webhook | Herkomst en verzoek verifiëren; alleen vaste releasetaken uitvoeren |
+| Release-uitvoering | Shellscript | Versiecontrole, omgevingskeuze, lock, deployment, health check en rollback |
+| Runtime | Podman Compose | Drie geïsoleerde applicatie-instanties draaien (Podman bespaart ongeveer 150 MB RSS ten opzichte van Docker) |
+| Monitoring | Owl | Host- en applicatiestatistieken |
+
+**Waarom zo verdeeld**: alle CI draait op GitHub Actions en de VPS haalt alleen de gebouwde image op en zet die neer; de kleine machine draagt nooit de compileerpiek en houdt geen CI/CD-control plane draaiend. De drie omgevingen delen één releaseketen maar houden aparte Compose-projecten, configuratie, volumes, netwerken en poorten; het releaseproces delen is geen data delen.
+
+### Releaseverloop
+
+1. **Build**: Actions test en bouwt de image; de versie staat vast via een Git-tag, commit-SHA of image-digest, en in productie wordt nooit `latest` uitgerold.
+2. **Trigger en validatie**: Actions stuurt een geverifieerd releaseverzoek naar de webhook; het script controleert versie, doelomgeving en toegestane actie en zet nooit willekeurige invoer in een shellcommando.
+3. **Lock en deployment**: één deployment per omgeving tegelijk, en alleen de doelomgeving wordt bijgewerkt — niets wordt blind herstart.
+4. **Health check en fouten**: er wordt gecontroleerd of de dienst start en antwoordt; bij een fout blijft de laatste goede versie staan en wordt teruggerold, met vastlegging van omgeving, versie, triggerbron, resultaat en reden van de rollback.
+
+Promotie: DEV rolt automatisch uit → na controle rolt STG dezelfde versie uit → na smoke tests **vraagt PRD om menselijke goedkeuring**. Ook noodfixes lopen via een controleerbare uitzonderingsroute, zodat een gewone ontwikkelgebeurtenis de productiegoedkeuring nooit omzeilt.
+
+### Grenzen
+
+Dit is een **single-machine, zuinige en controleerbare** deploymentarchitectuur, geen architectuur voor hoge beschikbaarheid: de drie omgevingen zijn gescheiden in proces, configuratie en data, maar delen de kernel, schijf, het netwerk en het geheugen van één VPS, dus een hoststoring of resourcetekort treft alle drie tegelijk. De waarde zit erin dat de mechanismen voor een betrouwbare release — vaste versies, gescheiden omgevingen, health checks, rollback, monitoring en een auditspoor — behouden blijven met heel weinig blijvende componenten.
 
 ## Open Core
 
@@ -243,6 +298,18 @@ Yin-Panel is voortgekomen uit het opensourceproject [hslr-s/sun-panel](https://g
 Ook dank aan [PhantomMaa/sun-panel](https://github.com/PhantomMaa/sun-panel) voor de optimalisaties en het onderhoudswerk. Yin-Panel nam het onderhoud van die basis over en blijft functies, interactieverbeteringen en wijzigingen gericht op self-hosting toevoegen.
 
 Dank aan alle oorspronkelijke auteurs, bijdragers en gebruikers.
+
+## Bijdragen
+
+Het project blijft bestaan doordat mensen de tijd nemen om problemen en ideeën te delen. Elke vorm van deelname is welkom:
+
+- **Suggesties en bugmeldingen**: open een [issue](https://github.com/yinorg/Yin-Panel/issues) met de versie, omgeving, stappen om het te reproduceren en wat je zag — een schermafbeelding of log maakt het veel sneller.
+- **Code en documentatie**: pull requests zijn welkom. Een bug oplossen, een zin herschrijven, een taal toevoegen of een schermafbeelding vervangen telt allemaal mee.
+- **Nog niet zeker**: open eerst een issue en bepaal de aanpak voordat je code schrijft, zodat het werk niet een richting op gaat die niemand wil.
+
+Kijk voor je begint even naar [CONTRIBUTING.md](../../CONTRIBUTING.md): grotere wijzigingen kun je beter eerst bespreken, en beveiligingsproblemen meld je privé in plaats van in een openbaar issue. Is iets onduidelijk, vraag het in een issue en ik probeer de richting aan te geven.
+
+Issues en pull requests worden allebei gelezen, en ik probeer binnen 7 dagen te reageren; reproduceerbare problemen en goed beschreven suggesties gaan het snelst. Elke reactie is een reden om met dit project door te gaan.
 
 ## Licentie
 
