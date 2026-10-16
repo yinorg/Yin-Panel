@@ -322,6 +322,7 @@
   },
   "panelHome": {
     "systemSettings": "Pengaturan sistem",
+    "updateReady": "Versi baru: klik untuk menyegarkan",
     "floatingActions": "Utilitas halaman",
     "fallbackReasonSafeMode": "Mode aman diaktifkan",
     "fallbackReasonNoHomeView": "Tema aktif tidak menyediakan tampilan beranda",

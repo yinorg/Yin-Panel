@@ -322,6 +322,7 @@
   },
   "panelHome": {
     "systemSettings": "Sistem ayarları",
+    "updateReady": "Yeni sürüm: yenilemek için tıklayın",
     "floatingActions": "Sayfa araçları",
     "fallbackReasonSafeMode": "Güvenli mod etkin",
     "fallbackReasonNoHomeView": "Etkin tema bir ana sayfa görünümü sunmuyor",

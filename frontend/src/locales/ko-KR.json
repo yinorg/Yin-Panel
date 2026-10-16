@@ -322,6 +322,7 @@
   },
   "panelHome": {
     "systemSettings": "시스템 설정",
+    "updateReady": "새 버전이 있습니다. 클릭하여 새로 고침",
     "floatingActions": "페이지 도구",
     "fallbackReasonSafeMode": "안전 모드가 켜져 있습니다",
     "fallbackReasonNoHomeView": "활성 테마가 홈 뷰를 제공하지 않습니다",

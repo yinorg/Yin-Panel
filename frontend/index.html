@@ -285,6 +285,22 @@
 	<script>
 		(function () {
 			try {
+				// A worker handover reloads the document on purpose — that is what puts a
+				// deployment in front of an open tab — but the boot layer would only be a
+				// flash in that case: the previous page's paint already covers the swap.
+				// Drop it before the first paint instead.
+				var bootReload = false
+				try {
+					bootReload = window.sessionStorage.getItem('yin-sw-reload') === '1'
+					if (bootReload) window.sessionStorage.removeItem('yin-sw-reload')
+				}
+				catch (error) { /* storage can be refused; the layer simply stays */ }
+				if (bootReload) {
+					var bootLayer = document.getElementById('yin-boot')
+					if (bootLayer) bootLayer.remove()
+					return
+				}
+
 				var read = function (key) {
 					try { return JSON.parse(window.localStorage.getItem(key) || 'null') } catch (error) { return null }
 				}

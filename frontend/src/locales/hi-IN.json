@@ -322,6 +322,7 @@
   },
   "panelHome": {
     "systemSettings": "सिस्टम सेटिंग्स",
+    "updateReady": "नया संस्करण: अपडेट करने के लिए क्लिक करें",
     "floatingActions": "पेज उपयोगिताएँ",
     "fallbackReasonSafeMode": "सेफ़ मोड सक्षम है",
     "fallbackReasonNoHomeView": "सक्रिय थीम कोई होम व्यू प्रदान नहीं करती",

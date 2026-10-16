@@ -322,6 +322,7 @@
   },
   "panelHome": {
     "systemSettings": "Paramètres système",
+    "updateReady": "Nouvelle version : cliquez pour actualiser",
     "floatingActions": "Outils de la page",
     "fallbackReasonSafeMode": "Le mode sans échec est activé",
     "fallbackReasonNoHomeView": "Le thème actif ne fournit pas de vue d'accueil",

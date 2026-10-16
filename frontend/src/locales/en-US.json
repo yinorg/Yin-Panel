@@ -322,6 +322,7 @@
   },
   "panelHome": {
     "systemSettings": "System settings",
+    "updateReady": "New version: click to refresh",
     "floatingActions": "Page utilities",
     "fallbackReasonSafeMode": "Safe mode is enabled",
     "fallbackReasonNoHomeView": "The active theme provides no home view",

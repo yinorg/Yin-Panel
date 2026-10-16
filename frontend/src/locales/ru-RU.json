@@ -322,6 +322,7 @@
   },
   "panelHome": {
     "systemSettings": "Системные настройки",
+    "updateReady": "Новая версия: нажмите, чтобы обновить",
     "floatingActions": "Инструменты страницы",
     "fallbackReasonSafeMode": "Включён безопасный режим",
     "fallbackReasonNoHomeView": "Активная тема не предоставляет главную страницу",

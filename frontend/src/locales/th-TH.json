@@ -322,6 +322,7 @@
   },
   "panelHome": {
     "systemSettings": "การตั้งค่าระบบ",
+    "updateReady": "มีเวอร์ชันใหม่: คลิกเพื่อรีเฟรช",
     "floatingActions": "เครื่องมือหน้าเว็บ",
     "fallbackReasonSafeMode": "โหมดปลอดภัยเปิดใช้งานอยู่",
     "fallbackReasonNoHomeView": "ธีมที่ใช้งานอยู่ไม่มีมุมมองหน้าแรก",

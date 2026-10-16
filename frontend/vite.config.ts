@@ -6,6 +6,18 @@ import { VitePWA } from 'vite-plugin-pwa'
 import { createSvgIconsPlugin } from 'vite-plugin-svg-icons'
 
 /**
+ * The generation of the runtime-cache *policy* below.
+ *
+ * A cache name is part of the cache key, so bumping this starts the new policy from
+ * an empty cache the moment the new worker activates. The old entries are simply no
+ * longer read — they expire on their own or go away with `/clear.html`. Deleting
+ * them on `activate` was rejected: it would race the first fetch after the worker
+ * takes over and could leave the next offline visit without the theme it had cached.
+ * Bump it whenever a rule's matcher, handler or limits change.
+ */
+const CACHE_POLICY = 'v2'
+
+/**
  * Cloudflare Web Analytics, built into the app document instead of left to the
  * zone's automatic setup.
  *
@@ -75,11 +87,14 @@ function setupPlugins(env: ImportMetaEnv): PluginOption[] {
         clientsClaim: true,
         runtimeCaching: [{
           // Hashed build assets: safe to serve from cache first, and the hash
-          // makes a cache hit correct by construction.
-          urlPattern: /\/assets\//,
+          // makes a cache hit correct by construction. HTML documents are excluded:
+          // their *headers* are part of the response (the sandbox CSP, for one) and a
+          // hash cannot cover those, so the worker must not pin one for a week. The
+          // server serves them revalidatable and a 304 refreshes the stored headers.
+          urlPattern: ({ url }) => /\/assets\//.test(url.pathname) && !url.pathname.endsWith('.html'),
           handler: 'CacheFirst',
           options: {
-            cacheName: 'yin-panel-runtime-assets',
+            cacheName: `yin-panel-runtime-assets-${CACHE_POLICY}`,
             cacheableResponse: { statuses: [0, 200] },
             expiration: { maxEntries: 200, maxAgeSeconds: 7 * 24 * 60 * 60 },
           },
@@ -97,7 +112,7 @@ function setupPlugins(env: ImportMetaEnv): PluginOption[] {
           urlPattern: ({ url }) => url.hostname === 'api.iconify.design' && !url.pathname.startsWith('/search'),
           handler: 'CacheFirst',
           options: {
-            cacheName: 'yin-panel-iconify-assets',
+            cacheName: `yin-panel-iconify-assets-${CACHE_POLICY}`,
             cacheableResponse: { statuses: [0, 200] },
             expiration: { maxEntries: 300, maxAgeSeconds: 30 * 24 * 60 * 60 },
           },
@@ -132,7 +147,7 @@ function setupPlugins(env: ImportMetaEnv): PluginOption[] {
           urlPattern: ({ url }) => ['/api/theme/v2/current', '/api/theme/v2/grants/'].some(pattern => url.pathname.startsWith(pattern)),
           handler: 'NetworkFirst',
           options: {
-            cacheName: 'yin-panel-theme-metadata',
+            cacheName: `yin-panel-theme-metadata-${CACHE_POLICY}`,
             cacheableResponse: { statuses: [0, 200] },
             // Without a timeout `NetworkFirst` waits on the network indefinitely, so a
             // panel opened offline would hang before it ever reached the cached copy.
@@ -149,10 +164,12 @@ function setupPlugins(env: ImportMetaEnv): PluginOption[] {
           // construction — the same property the build assets rely on. The Core
           // additionally verifies every resource's sha256 after loading it, so
           // this does not weaken the integrity guarantee.
-          urlPattern: /\/api\/theme\/v2\/assets\//,
+          // `.html` is excluded for the same reason as the build assets above: its
+          // headers can change without the revision moving.
+          urlPattern: ({ url }) => url.pathname.startsWith('/api/theme/v2/assets/') && !url.pathname.endsWith('.html'),
           handler: 'CacheFirst',
           options: {
-            cacheName: 'yin-panel-theme-assets',
+            cacheName: `yin-panel-theme-assets-${CACHE_POLICY}`,
             cacheableResponse: { statuses: [0, 200] },
             // Revisions are immutable, so entries never need evicting; the limit
             // only stops an unbounded pile-up across many upgrades.

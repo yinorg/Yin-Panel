@@ -322,6 +322,7 @@
   },
   "panelHome": {
     "systemSettings": "Systeeminstellingen",
+    "updateReady": "Nieuwe versie: klik om te vernieuwen",
     "floatingActions": "Pagina-hulpmiddelen",
     "fallbackReasonSafeMode": "Veilige modus is ingeschakeld",
     "fallbackReasonNoHomeView": "Het actieve thema biedt geen startpaginaweergave",

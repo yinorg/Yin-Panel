@@ -368,6 +368,7 @@ html {
 }
 
 .home-floating-button {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -393,6 +394,22 @@ html {
   backdrop-filter: blur(14px);
   color: var(--yin-text);
   cursor: pointer;
+}
+
+/* A worker handover means this tab runs the previous build. The dot is the whole
+   signal: reloading on its own is the one thing users notice about a deploy, so the
+   decision moves to them (or to the next time the tab is hidden). */
+.home-floating-button--update { color: var(--yin-primary); }
+
+.home-floating-update-dot {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--yin-primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--yin-surface) 80%, transparent);
 }
 
 .home-floating-button svg {

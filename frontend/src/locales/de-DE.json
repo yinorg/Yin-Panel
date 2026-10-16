@@ -322,6 +322,7 @@
   },
   "panelHome": {
     "systemSettings": "Systemeinstellungen",
+    "updateReady": "Neue Version: zum Aktualisieren klicken",
     "floatingActions": "Seitenwerkzeuge",
     "fallbackReasonSafeMode": "Sicherheitsmodus ist aktiviert",
     "fallbackReasonNoHomeView": "Das aktive Theme stellt keine Startseitenansicht bereit",

@@ -322,6 +322,7 @@
   },
   "panelHome": {
     "systemSettings": "システム設定",
+    "updateReady": "新しいバージョンがあります。クリックして更新",
     "floatingActions": "ページツール",
     "fallbackReasonSafeMode": "セーフモードが有効です",
     "fallbackReasonNoHomeView": "現在のテーマはホームビューを提供していません",

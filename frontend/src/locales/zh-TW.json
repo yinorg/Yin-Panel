@@ -322,6 +322,7 @@
   },
   "panelHome": {
     "systemSettings": "系統設定",
+    "updateReady": "有新版本，點擊重新整理",
     "floatingActions": "頁面工具",
     "fallbackReasonSafeMode": "已啟用安全模式",
     "fallbackReasonNoHomeView": "目前主題未提供首頁檢視",

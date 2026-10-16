@@ -371,6 +371,23 @@
         await step('local', 'localFail', function () {
           localStorage.clear()
           if (localStorage.length !== 0) throw new Error(String(localStorage.length))
+          // The panel keeps nothing in IndexedDB today, but a future feature must not
+          // be the one thing this page forgets. `databases()` is not in every engine,
+          // and an engine without it simply has nothing to enumerate.
+          if (!window.indexedDB || typeof indexedDB.databases !== 'function') return null
+          return indexedDB.databases().then(function (databases) {
+            return Promise.all(databases.map(function (info) {
+              if (!info || !info.name) return null
+              return new Promise(function (resolve) {
+                var request = indexedDB.deleteDatabase(info.name)
+                request.onsuccess = request.onerror = request.onblocked = function () { resolve() }
+              })
+            })).then(function () {
+              return indexedDB.databases().then(function (remaining) {
+                if (remaining.length !== 0) throw new Error(String(remaining.length))
+              })
+            })
+          })
         })
 
         await step('session', 'sessionFail', function () {
@@ -392,6 +409,12 @@
           await Promise.all(names.map(function (name) { return caches.delete(name) }))
           var remaining = await caches.keys()
           if (remaining.length !== 0) throw new Error(String(remaining.length))
+          // The browser's HTTP cache cannot be cleared from script, but the three
+          // shell documents can be fetched around it: `cache: 'reload'` bypasses the
+          // cache for that request, so the stored copy becomes the current one.
+          await Promise.all(['/index.html', '/sw.js', '/manifest.webmanifest'].map(function (target) {
+            return fetch(target, { cache: 'reload', credentials: 'same-origin' }).catch(function () { return null })
+          }))
         })
 
         // A worker that is already controlling this client keeps serving from its

@@ -274,6 +274,22 @@ Before creating a release tag:
 
 The Docker workflow publishes standard version tags such as `0.3.1`. It expects frontend output in `backend/web` and a backend binary in `build-output/yin-panel`. Do not tag before both artifacts are rebuilt.
 
+The tag name is the contract with CI, so it must have exactly one of these shapes:
+
+| Tag | Meaning |
+| --- | --- |
+| `X.Y.Z` | release; only this shape may move the `latest` image alias |
+| `X.Y.Z-dev`, `X.Y.Z-dev.N` | development build |
+| `X.Y.Z-stg`, `X.Y.Z-stg.N` | staging build |
+
+The ordinal uses a **dot**, never a hyphen: `0.9.1-dev.1` is published, `0.9.1-dev-1` is rejected before anything builds. `.github/workflows/ci-docker.yml` holds the authoritative check for both tag pushes and manual dispatches, so verify a new shape against it before pushing:
+
+```bash
+[[ "$tag" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ || "$tag" =~ ^[0-9]+\.[0-9]+\.[0-9]+-(dev|stg)(\.[0-9]+)?$ ]]
+```
+
+Keep a commit to a single tag. Two tags on one commit make `git describe --tags` pick arbitrarily, and that value is what `scripts/deploy-local.sh` embeds as the local version.
+
 ## Database and Identity Rules
 
 - Space permissions are keyed by `SpaceMember.UserID`, never by email text.

@@ -100,6 +100,11 @@ router.onError((error) => {
   try {
     if (sessionStorage.getItem(CHUNK_RECOVERY_KEY) === '1') return
     sessionStorage.setItem(CHUNK_RECOVERY_KEY, '1')
+    // The document is already broken at this point (a lazy chunk of the previous
+    // build is gone), so the reload is a recovery rather than an update. Mark it the
+    // same way an update reload used to be marked, and the boot layer stays out of
+    // the way while the new document paints.
+    sessionStorage.setItem('yin-sw-reload', '1')
   }
   catch {
     // Private mode can refuse storage; a reload is still better than a dead page.

@@ -86,6 +86,18 @@ func securityHeaders() gin.HandlerFunc {
 	}
 }
 
+// noStoreAPI marks every API response as uncacheable. The JSON the API returns
+// describes the signed-in user's own data, and a cache has no way to tell one
+// visitor from the next once the URL matches. Handlers that serve immutable,
+// content-addressed bytes (theme and wallpaper assets) overwrite this header with
+// their own longer-lived policy.
+func noStoreAPI() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Header("Cache-Control", "no-store")
+		c.Next()
+	}
+}
+
 func InitRouters(addr string) error {
 	router := gin.Default()
 	rootRouter := router.Group("/")
@@ -96,7 +108,10 @@ func InitRouters(addr string) error {
 	// API 响应都是 JSON，而首页的条目载荷是整个面板发给浏览器最大的那一份。
 	// 面板常通过长链路访问，压缩它值得这点 CPU；低于阈值的响应不压，小响应
 	// 就不会因为 gzip 分帧反而变慢。
-	routerGroup.Use(gzip.Gzip(gzip.DefaultCompression, gzip.WithMinLength(1024)))
+	// 用户数据不进任何缓存：浏览器对没有校验符的响应本就不该缓存，但这条要写明，
+	// 否则中间层（CDN、代理）有的是办法替你缓存。需要长期缓存的路由（主题/壁纸
+	// 素材）在处理器里覆盖这条头。
+	routerGroup.Use(noStoreAPI(), gzip.Gzip(gzip.DefaultCompression, gzip.WithMinLength(1024)))
 	for _, router := range RouterArray() {
 		router.InitRouter(routerGroup)
 	}

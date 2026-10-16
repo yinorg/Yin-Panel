@@ -110,3 +110,48 @@ func TestThemeRoutesRequireJWTAndAdminRole(t *testing.T) {
 		}
 	})
 }
+
+// HTML assets carry a policy in their headers, and those headers can change without
+// the body (or the revision-addressed URL) moving. They therefore revalidate instead
+// of being cached as immutable, and a 304 has to repeat the policy so a browser that
+// already stored the document picks the new one up.
+func TestThemeHTMLAssetsRevalidateAndRepeatTheirPolicy(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	body := []byte("<!doctype html><html><body>scene</body></html>")
+	// Routed through an engine: gin flushes the status only when the handler chain
+	// finishes, and a 304 carries no body to flush it implicitly.
+	engine := gin.New()
+	engine.GET("/asset", func(c *gin.Context) { serveThemeAsset(c, "text/html", body, "page.html", true) })
+
+	first := httptest.NewRecorder()
+	engine.ServeHTTP(first, httptest.NewRequest(http.MethodGet, "/asset", nil))
+
+	cacheControl := first.Header().Get("Cache-Control")
+	for _, want := range []string{"max-age=0", "must-revalidate", "no-transform"} {
+		if !strings.Contains(cacheControl, want) {
+			t.Errorf("HTML asset Cache-Control %q is missing %q", cacheControl, want)
+		}
+	}
+	if strings.Contains(cacheControl, "immutable") {
+		t.Errorf("HTML asset must not be immutable: %q", cacheControl)
+	}
+	etag := first.Header().Get("ETag")
+	if etag == "" {
+		t.Fatal("HTML asset has no ETag, so a revalidation would refetch the body")
+	}
+	policy := first.Header().Get("Content-Security-Policy")
+	if !strings.Contains(policy, "sandbox allow-scripts") || !strings.Contains(policy, "connect-src https://cloudflareinsights.com") {
+		t.Errorf("HTML asset sandbox policy = %q", policy)
+	}
+
+	second := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/asset", nil)
+	request.Header.Set("If-None-Match", etag)
+	engine.ServeHTTP(second, request)
+	if second.Code != http.StatusNotModified {
+		t.Fatalf("revalidation status = %d, want %d", second.Code, http.StatusNotModified)
+	}
+	if got := second.Header().Get("Content-Security-Policy"); got != policy {
+		t.Errorf("304 did not repeat the policy:\n got %q\nwant %q", got, policy)
+	}
+}

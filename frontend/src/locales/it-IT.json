@@ -322,6 +322,7 @@
   },
   "panelHome": {
     "systemSettings": "Impostazioni di sistema",
+    "updateReady": "Nuova versione: fai clic per aggiornare",
     "floatingActions": "Utilità della pagina",
     "fallbackReasonSafeMode": "La modalità sicura è abilitata",
     "fallbackReasonNoHomeView": "Il tema attivo non fornisce una vista home",

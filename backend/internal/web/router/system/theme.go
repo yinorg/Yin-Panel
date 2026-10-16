@@ -2,6 +2,8 @@ package system
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"io"
@@ -1042,14 +1044,25 @@ func (a *ThemeRouter) WallpaperLibraryAsset(c *gin.Context) {
 
 func serveThemeAsset(c *gin.Context, mediaType string, content []byte, name string, immutable bool) {
 	c.Header("X-Content-Type-Options", "nosniff")
-	if immutable {
+	switch {
+	case mediaType == "text/html":
+		// A document's headers are part of the response, and the sandbox policy can
+		// still change (a new script host, for example). `immutable` pinned the old
+		// headers in the browser for a year, and the HTTP cache cannot be cleared from
+		// script — so `/clear.html` could not repair it either, only a new profile
+		// could. Revalidate instead: the ETag makes the check a 304, and a 304
+		// refreshes the stored headers.
+		sum := sha256.Sum256(content)
+		c.Header("ETag", `"`+hex.EncodeToString(sum[:])+`"`)
+		c.Header("Cache-Control", "public, max-age=0, must-revalidate, no-transform")
+	case immutable:
 		// `no-transform` tells intermediaries not to rewrite these bytes. A CDN that
 		// injects its own script into an HTML asset would break two guarantees: the
 		// Core verifies theme resources against a sha256, and the wallpaper documents
 		// run under a sandbox CSP that blocks third-party scripts — so an injected
 		// beacon either fails the check or is blocked and logged in the console.
 		c.Header("Cache-Control", "public, max-age=31536000, immutable, no-transform")
-	} else {
+	default:
 		c.Header("Cache-Control", "no-store")
 	}
 	if mediaType == "text/html" {

@@ -322,6 +322,7 @@
   },
   "panelHome": {
     "systemSettings": "Ustawienia systemowe",
+    "updateReady": "Nowa wersja: kliknij, aby odświeżyć",
     "floatingActions": "Narzędzia strony",
     "fallbackReasonSafeMode": "Tryb awaryjny jest włączony",
     "fallbackReasonNoHomeView": "Aktywny motyw nie udostępnia widoku strony głównej",

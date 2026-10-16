@@ -1,29 +1,86 @@
 // Service worker registration.
 //
-// The generated worker caches the theme manifest and grant. A change to those
-// changes which theme boots, so an outdated worker is not a cosmetic problem: it
-// silently keeps serving the previous revision and the previous theme code.
+// The generated worker caches the theme manifest and grant, so an outdated worker is
+// not a cosmetic problem: it silently keeps serving the previous revision and the
+// previous theme code. The build sets `skipWaiting` + `clientsClaim`, so a newly
+// deployed worker takes over as soon as it installs; this script only has to ask for
+// the update and tell the page about it.
 //
-// Browsers check `/sw.js` for a new worker on navigation, but only activate the
-// result on the *next* load, so a deployment is otherwise invisible until every
-// tab is closed. This asks for the update explicitly and reloads once, which is
-// what makes a deploy take effect for someone who simply keeps the panel open.
+// A handover leaves the open document running the previous build. Reloading it right
+// away is the one thing users notice, so instead:
 //
-// The reload is guarded so it can only happen once per worker version, and only
-// when there is no user input at risk: `controllerchange` fires when the new
-// worker takes over.
+// - the page is told (`yin:update-ready`) and puts a dot on the refresh button, which
+//   the user may click or ignore;
+// - the reload happens by itself only once the tab is hidden — the user is somewhere
+//   else, so nothing is seen — and only when it cannot destroy work: no text field
+//   has focus, no dialog is open and the browser is online. Switching tabs mid-edit is
+//   ordinary, so those gates matter more, not less, on this path;
+// - clicking the dot asks for the reload directly (`yin:update-apply`).
+//
+// A tab that is never hidden keeps running the build it loaded and picks the new one
+// up on the next navigation. Every reload this script performs is marked, so
+// `index.html` drops the boot layer before its first paint.
+const RELOAD_FLAG = 'yin-sw-reload'
+
+function isTextFieldFocused() {
+  const active = document.activeElement
+  return !!active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable === true)
+}
+
+// Naive unmounts a closed modal (its `display-directive` defaults to `if`), so any
+// wrapper left in the DOM belongs to a dialog the user may still be working in.
+function hasOpenDialog() {
+  return !!document.querySelector('.n-modal-body-wrapper')
+}
+
+function canReloadUnseen() {
+  return document.hidden
+    && !isTextFieldFocused()
+    && !hasOpenDialog()
+    && navigator.onLine !== false
+}
+
+function reloadUnseen() {
+  try { window.sessionStorage.setItem(RELOAD_FLAG, '1') }
+  catch (error) {
+    // Storage can be refused; the reload still happens, the boot layer simply stays.
+  }
+  window.location.reload()
+}
+
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js', { scope: '/' }).then((registration) => {
-      // No controller yet means this is the very first install; nothing to update.
-      if (!navigator.serviceWorker.controller) return
-      // Fires when a newly installed worker takes over from the old one.
+      // The first worker to claim this page is not an update — it is the install the
+      // page just asked for. Only a later handover means the loaded build is stale,
+      // and the listener has to be armed from the start: returning early on a first
+      // visit left the whole session without one.
+      let sawController = !!navigator.serviceWorker.controller
+      let handoverSeen = false
+
+      function applyWhenUnseen() {
+        if (!handoverSeen || !canReloadUnseen()) return
+        reloadUnseen()
+      }
+
+      // `skipWaiting` + `clientsClaim` make the new worker take over immediately, so
+      // this fires while the page is still running the previous build.
       navigator.serviceWorker.addEventListener('controllerchange', () => {
-        // The session was transferred to the new worker. Reloading is what actually
-        // puts the new caching rules in front of the page; without it the document
-        // keeps running under the worker's old behaviour.
-        window.location.reload()
+        if (!sawController) {
+          sawController = true
+          return
+        }
+        handoverSeen = true
+        window.dispatchEvent(new CustomEvent('yin:update-ready'))
+        applyWhenUnseen()
       })
+
+      // The two moments worth re-checking: the tab was hidden, or the browser came
+      // back online (an offline reload would only fail).
+      document.addEventListener('visibilitychange', applyWhenUnseen)
+      window.addEventListener('online', applyWhenUnseen)
+      window.addEventListener('yin:update-apply', reloadUnseen)
+
       // Poll rather than relying solely on the browser's own update check: that check
       // does not run while the tab stays open, which is the common case here.
       const poll = window.setInterval(async () => {

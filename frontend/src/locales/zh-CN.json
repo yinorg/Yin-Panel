@@ -322,6 +322,7 @@
   },
   "panelHome": {
     "systemSettings": "系统设置",
+    "updateReady": "有新版本，点击刷新",
     "floatingActions": "页面工具",
     "fallbackReasonSafeMode": "已启用安全模式",
     "fallbackReasonNoHomeView": "当前主题未提供首页视图",
