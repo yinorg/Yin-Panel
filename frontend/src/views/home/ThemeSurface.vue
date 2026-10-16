@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import type { useHomeShell } from '@/core/home/useHomeShell'
+import { homeShell } from '@/core/home/homeShellContext'
 
 /**
  * A theme-contributed surface rendered on its own route (`/theme/:view`).
@@ -21,7 +21,6 @@ import type { useHomeShell } from '@/core/home/useHomeShell'
  */
 const route = useRoute()
 const router = useRouter()
-const shell = inject<ReturnType<typeof useHomeShell>>('yin-home-shell')
 
 const host = ref<HTMLElement>()
 let mounted: { unmount: () => void | Promise<void> } | undefined
@@ -31,11 +30,11 @@ let rerun = false
 
 const view = computed(() => String(route.params.view || ''))
 const contributes = computed(() => {
-  const views = shell?.theme.themeRuntimePackage?.manifest.contributes?.views as readonly string[] | undefined
+  const views = homeShell.value?.theme.themeRuntimePackage?.manifest.contributes?.views as readonly string[] | undefined
   return views?.includes(view.value) === true
 })
 /** The theme decision has settled: it is either rendering or has fallen back. */
-const settled = computed(() => shell?.theme.themeRuntimeActive === true || shell?.theme.homeFallbackVisible === true)
+const settled = computed(() => homeShell.value?.theme.themeRuntimeActive === true || homeShell.value?.theme.homeFallbackVisible === true)
 
 async function teardown() {
   const current = mounted
@@ -59,6 +58,9 @@ function clearScopeClass() {
 
 async function sync() {
   const name = view.value
+  // No shell yet: its chunk is still on its way in, and `homeShell` is watched,
+  // so `sync` runs again the moment it registers.
+  const shell = homeShell.value
   if (!name || !shell)
     return
   // The theme is settled and does not contribute this view: the Core has no page to
@@ -114,7 +116,7 @@ async function schedule() {
 }
 
 watch(
-  [view, contributes, settled, () => shell?.theme.themeRuntimeReady, () => shell?.theme.themeRuntimeActive, () => shell?.theme.hasThemeSurface(view.value)],
+  [view, contributes, settled, () => homeShell.value?.theme.themeRuntimeReady, () => homeShell.value?.theme.themeRuntimeActive, () => homeShell.value?.theme.hasThemeSurface(view.value)],
   () => { void schedule() },
   { immediate: true },
 )

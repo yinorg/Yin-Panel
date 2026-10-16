@@ -25,6 +25,9 @@
 	<link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
 	<link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
 
+	<!-- Item icons resolve on demand from Iconify, the one cross-origin API the policy above allows. Opening the connection during boot takes the TLS handshake off the first icon's path; nothing is requested here. -->
+	<link rel="preconnect" href="https://api.iconify.design" crossorigin>
+
 	<meta content="yes" name="apple-mobile-web-app-capable"/>
 	<meta content="yes" name="mobile-web-app-capable"/>
 	<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />

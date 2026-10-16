@@ -10,6 +10,7 @@ import { t } from '../../locales'
 import { languageOptions } from '../../utils/defaultData'
 import type { Language } from '../../store/modules/app/helper'
 import service from '../../utils/request/axios'
+import { loadHomeShell } from '../home/shell'
 
 const authStore = useAuthStore()
 const appStore = useAppStore()
@@ -31,7 +32,19 @@ const form = ref<Login.LoginReqest>({
   password: '',
 })
 
-onMounted(async () => {
+onMounted(() => {
+  // Neither the OAuth probe nor the home runtime is needed to paint the form,
+  // and both used to run on the path that did. Fetch them once the browser is
+  // idle: the form is interactive first, the OAuth buttons join it a moment
+  // later, and the themed shell's chunk is already cached by the time the
+  // visitor has typed their credentials and the login response comes back.
+  whenIdle(() => {
+    void loadHomeShell().catch(() => {})
+    void loadOAuthConfig()
+  })
+})
+
+async function loadOAuthConfig() {
   try {
     // 获取OAuth配置
     const res = await service.get('oauth/config')
@@ -42,8 +55,15 @@ onMounted(async () => {
   } catch (error) {
     console.error('Failed to fetch OAuth config:', error)
   }
+}
 
-})
+/** Run after the first interaction is possible; Safari falls back to a timer. */
+function whenIdle(task: () => void) {
+  if (typeof window.requestIdleCallback === 'function')
+    window.requestIdleCallback(() => task(), { timeout: 2000 })
+  else
+    window.setTimeout(task, 300)
+}
 
 const loginPost = async () => {
   loading.value = true

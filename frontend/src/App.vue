@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import { NConfigProvider } from 'naive-ui'
 import NaiveProvider from './components/common/NaiveProvider/index.vue'
-import HomeShell from './views/home/HomeShell.vue'
-import { useTheme } from './hooks/useTheme'
+import { HomeShell } from './views/home/shell'
+import { useColorScheme } from './hooks/useColorScheme'
 import { useLanguage } from './hooks/useLanguage'
 import { usePanelState } from './store'
 import { useRoute } from 'vue-router'
 import { computed, watch } from 'vue'
 import { dismissBootOverlay, setBootProgress } from './core/home/useBootOverlay'
 
-const { theme, themeOverrides } = useTheme()
+const { theme, themeOverrides } = useColorScheme()
 const { language } = useLanguage()
 const panelState = usePanelState()
 const route = useRoute()

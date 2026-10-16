@@ -1,13 +1,15 @@
 import type { GlobalThemeOverrides } from 'naive-ui'
 import { computed, ref, watch, watchEffect } from 'vue'
-import { darkTheme, useOsTheme } from 'naive-ui'
+import { useOsTheme } from 'naive-ui'
 import { useAppStore } from '../store'
 import { useAuthStore } from '../store'
 import { getCurrentTheme, getEffectiveTheme, getMyTheme, getPreviewTheme, getThemePackage } from '../api/theme'
 import { parsePublicCodeFromPath } from '../utils/request/axios'
 import { isBuiltinThemePackage, isYinThemePackage, resolveThemeSlots, resolveWallpaper, selectThemeScheme, type ThemePackage } from '../utils/theme'
 import { suggestedForeground, wallpaperPainted, wallpaperTone } from '@/core/home/wallpaperTone'
+import { prefetchThemeResource } from '@/theme/runtime/resourceCache'
 import { isThemeSafeMode } from '../theme/recovery/safeMode'
+import { publishHomeScheme } from './useColorScheme'
 
 export const activeThemePackage = ref<ThemePackage | null>(null)
 /**
@@ -213,7 +215,7 @@ function prefetchThemeEntrypoints(pkg: ThemePackage | null) {
   for (const style of pkg.manifest.entrypoints?.styles || [])
     collect(style)
   for (const url of urls)
-    void fetch(url, { credentials: 'omit', redirect: 'error' }).catch(() => {})
+    prefetchThemeResource(url)
 }
 
 export function useTheme() {
@@ -279,10 +281,6 @@ export function useTheme() {
     return selectedScheme.value === 'dark'
   })
 
-  const theme = computed(() => {
-    return isDark.value ? darkTheme : undefined
-  })
-
   const themeOverrides = computed<GlobalThemeOverrides>(() => {
     const slots = activeThemeSlots.value
     // The pre-theme build rendered Naive components with their own defaults.
@@ -343,6 +341,15 @@ export function useTheme() {
       },
       Menu: { borderRadius: 'var(--yin-component-menu-radius)' },
     }
+  })
+
+  // The application-level Naive provider lives above the router and cannot read
+  // the package state this composable owns, so the resolved pair is published to
+  // the lightweight colour module that provider does read. This is what keeps the
+  // login page's provider free of the theme runtime while still giving the home
+  // the package's own colours, control metrics and wallpaper-following scheme.
+  watchEffect(() => {
+    publishHomeScheme(selectedScheme.value === 'dark' ? 'dark' : 'light', themeOverrides.value)
   })
 
   watchEffect(() => {
@@ -413,16 +420,5 @@ export function useTheme() {
     prefetchThemeEntrypoints(pkg)
   }, { immediate: true })
 
-  watch(
-    () => isDark.value,
-    (dark) => {
-      if (dark)
-        document.documentElement.classList.add('dark')
-      else
-        document.documentElement.classList.remove('dark')
-    },
-    { immediate: true },
-  )
-
-  return { theme, themeOverrides }
+  return { isDark, themeOverrides }
 }

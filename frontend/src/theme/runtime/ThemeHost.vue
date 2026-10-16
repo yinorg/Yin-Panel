@@ -5,6 +5,7 @@ import type { ThemePackage } from '@/utils/theme'
 import { mountThemeSandbox, type ThemeSandboxHandle, type ThemeSandboxStylesheet } from './sandbox'
 import { mountThemeDirect, type ThemeDirectHandle } from './direct'
 import { rewriteThemeStylesheet } from './resources'
+import { readThemeResource } from './resourceCache'
 import { isBuiltinThemePackage } from '@/utils/theme'
 import { sha256Hex } from '@/utils/sha256.js'
 import { toThemeItemIcon } from '@/core/home/iconifyResource'
@@ -323,22 +324,17 @@ function findResource(theme: ThemePackage, path: string, mediaType: string) {
 
 async function loadTextResource(theme: ThemePackage, path: string, mediaType: string) {
   const resource = findResource(theme, path, mediaType)
-  const bytes = await loadResource(theme, resource, 900_000)
+  const bytes = await loadResource(resource, 900_000)
   return new TextDecoder('utf-8', { fatal: true }).decode(bytes)
 }
 
-async function loadResource(theme: ThemePackage, resource: NonNullable<ThemePackage['manifest']['resources']>[number], maxBytes: number) {
+async function loadResource(resource: NonNullable<ThemePackage['manifest']['resources']>[number], maxBytes: number) {
   validateResourceURL(resource.url!)
-  // The response is served `immutable` (see AssetV2) and its URL carries the
-  // package revision, so it is cacheable by construction. This deliberately does
-  // NOT set `cache: 'no-store'`: that overrode the server's own caching decision
-  // and made the theme impossible to load offline, which silently dropped the
-  // page back to the C3 fallback list. Freshness still does not depend on the
-  // cache — the sha256 check below rejects any byte that is not the exact
-  // resource the manifest names.
-  const response = await fetch(new URL(resource.url!, window.location.origin), { credentials: 'omit', redirect: 'error' })
-  if (!response.ok) throw new Error(`Theme resource request failed: ${resource.path}`)
-  const bytes = await response.arrayBuffer()
+  // Shared with the shell's warm-up, which already asked for the theme's entry
+  // resources while the grant round trip was in flight. Freshness does not
+  // depend on where the bytes came from: the sha256 check below rejects any byte
+  // that is not the exact resource the manifest names.
+  const bytes = await readThemeResource(resource.url!)
   if (bytes.byteLength > maxBytes) throw new Error(`Theme resource exceeds the runtime size limit: ${resource.path}`)
   const actual = await sha256Hex(bytes)
   if (actual.toLowerCase() !== resource.sha256.toLowerCase()) throw new Error(`Theme resource integrity check failed: ${resource.path}`)
