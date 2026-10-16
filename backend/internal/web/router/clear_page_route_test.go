@@ -12,6 +12,7 @@ import (
 	"github.com/yinorg/Yin-Panel/backend/internal/global"
 	"github.com/yinorg/Yin-Panel/backend/internal/infra/config"
 	"github.com/yinorg/Yin-Panel/backend/internal/infra/zaplog"
+	"github.com/yinorg/Yin-Panel/backend/internal/web/interceptor"
 	"go.uber.org/zap"
 )
 
@@ -85,5 +86,19 @@ func TestClearPageIsServedAsAStandaloneDocument(t *testing.T) {
 	// It must not depend on the bundle this page exists to escape.
 	if strings.Contains(body, "/src/main.ts") || strings.Contains(body, `<script type="module" src="/assets/`) {
 		t.Fatal("the clear page must not load the application bundle")
+	}
+
+	// The session cookie is httpOnly, so the page's own script cannot clear it.
+	// Serving the page has to expire it: otherwise local storage says signed out
+	// while the cookie keeps every API call authenticated, and the next `/` paints
+	// a wallpapered, itemless home instead of the login page.
+	var session *http.Cookie
+	for _, cookie := range recorder.Result().Cookies() {
+		if cookie.Name == interceptor.AuthCookieName {
+			session = cookie
+		}
+	}
+	if session == nil || session.Value != "" || session.MaxAge != -1 {
+		t.Fatalf("GET /clear.html did not expire the session cookie (got %#v); the clear page would leave the browser half signed in", session)
 	}
 }

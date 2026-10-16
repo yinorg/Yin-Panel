@@ -134,7 +134,19 @@ func registerStaticRoutes(rootRouter *gin.RouterGroup) {
 		// not, so it carries its own script and loads no bundle. Without this route
 		// it would fall through to `/:publicId` below and be answered with the SPA
 		// entry document, silently losing the page exactly when it is needed.
-		noCacheGroup.StaticFile("/clear.html", webPath+"/clear.html")
+		//
+		// Serving the page is also the session reset. The document clears everything
+		// script can reach, but the httpOnly session cookie is deliberately outside
+		// that reach. Left standing, it kept authenticating every API call after the
+		// client's own storage said "signed out", so the shell rendered a wallpapered
+		// home with no items instead of the login page. Expiring it here makes the
+		// next request to `/` anonymous, which is what routes the visitor to login.
+		clearLocalData := func(c *gin.Context) {
+			interceptor.ClearAuthCookie(c)
+			c.File(webPath + "/clear.html")
+		}
+		noCacheGroup.GET("/clear.html", clearLocalData)
+		noCacheGroup.HEAD("/clear.html", clearLocalData)
 
 		// 处理根目录下的特定文件
 		noCacheGroup.StaticFile("/", webPath+"/index.html")
