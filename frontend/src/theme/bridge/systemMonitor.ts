@@ -23,6 +23,9 @@ registerCoreElement('yin-system-monitor', () => import('@/components/deskModule/
     allowEdit: element.hasAttribute('allow-edit')
       ? element.getAttribute('allow-edit') !== 'false'
       : bridge.allowEdit,
+    // The theme keeps its element connected even when the band is hidden, so the
+    // component itself has to know when it may not run.
+    enabled: bridge.enabled,
     showTitle,
     iconTextColor: element.getAttribute('icon-text-color') || bridge.iconTextColor,
     snapshotController: bridge.controller,

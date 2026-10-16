@@ -460,9 +460,10 @@ export function useHomeShell() {
         void router.push('/')
       },
     })
-    watch([monitorShowTitle, panelIconTextColor], () => {
+    watch([monitorEnabled, monitorShowTitle, panelIconTextColor], () => {
       setThemeMonitorBridge({
         controller: monitorSnapshotController,
+        enabled: monitorEnabled.value,
         showTitle: monitorShowTitle.value !== false,
         iconTextColor: panelIconTextColor.value,
         allowEdit: authStore.loggedIn,

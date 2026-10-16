@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, provide, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, provide, ref, watch } from 'vue'
 import { VueDraggable } from 'vue-draggable-plus'
 import { NButton, NDropdown, useDialog, useMessage } from 'naive-ui'
 import AppIconSystemMonitor from './AppIconSystemMonitor/index.vue'
@@ -24,6 +24,13 @@ const props = defineProps<{
   allowEdit?: boolean
   showTitle?: boolean
   iconTextColor?: string
+  /**
+   * Whether the monitor may run at all. A public link sets this false: the enable
+   * flag and the snapshot endpoint are JWT-only, so the element stays mounted (its
+   * presence is what tells the Core the theme renders the band) but must not read
+   * its cloud config or poll the host's metrics.
+   */
+  enabled?: boolean
   snapshotController: MonitorSnapshotController<MonitorSnapshot>
 }>()
 const panelState = usePanelState()
@@ -177,14 +184,36 @@ async function getData() {
     .map(item => (item.extendParam as { path?: string } | undefined)?.path || ''))
 }
 
+let monitorRunning = false
+
+watch(() => props.enabled !== false, (allowed) => {
+  if (allowed) {
+    if (monitorRunning)
+      return
+    monitorRunning = true
+    void getData().finally(() => {
+      // A disable that landed while the config was in flight must not start the poller.
+      if (monitorRunning)
+        props.snapshotController.start()
+    })
+    return
+  }
+  if (monitorRunning) {
+    monitorRunning = false
+    props.snapshotController.stop()
+  }
+}, { immediate: true })
+
 onMounted(() => {
   unsubscribeSnapshot = props.snapshotController.subscribe((snapshot) => { monitorSnapshot.value = snapshot })
-  void getData().finally(() => props.snapshotController.start())
 })
 
 onUnmounted(() => {
   unsubscribeSnapshot()
-  props.snapshotController.stop()
+  if (monitorRunning) {
+    monitorRunning = false
+    props.snapshotController.stop()
+  }
 })
 
 function handleSaveDone() {

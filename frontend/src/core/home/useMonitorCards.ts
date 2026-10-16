@@ -15,10 +15,14 @@ const CARD_TYPES = new Set(['cpu', 'memory', 'disk', 'network'])
  * scope, and that module is normally loaded only with the monitor component, so
  * importing it eagerly here would run it before the app is ready.
  */
-export function useMonitorCards() {
+export function useMonitorCards(enabled: () => boolean = () => true) {
   const cards = ref<ThemeMonitorCard[] | undefined>(undefined)
 
   onMounted(() => {
+    // A public link may not read the module config: the endpoint is JWT-only and the
+    // theme's band is hidden there anyway, so the read only earns a refusal.
+    if (!enabled())
+      return
     void import('@/components/deskModule/SystemMonitor/common').then(({ getAll }) => getAll()).then((list) => {
       cards.value = list.flatMap((card) => {
         if (!CARD_TYPES.has(card.monitorType))

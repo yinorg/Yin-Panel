@@ -14,13 +14,14 @@
 		boundary, not script execution. `frame-src` allows the in-panel window to
 		open external bookmarks. A meta policy is used instead of a response header
 		so the PWA service worker cannot cache a stale policy with the shell.
-		`https://static.cloudflareinsights.com` is allowed because Cloudflare
-		injects its Web Analytics beacon into the served document; that beacon
-		reports to the same-origin `/cdn-cgi/rum`, so `connect-src` stays `'self'`
-		and the egress guard is unchanged. Requiring the script host only (not a
-		`connect-src` host) keeps theme data from being able to reach any new host.
+		`https://static.cloudflareinsights.com` and its collector
+		`https://cloudflareinsights.com` are allowed because Cloudflare's Web
+		Analytics beacon runs on this document — injected by the zone, or carried by
+		the build itself (`VITE_GLOB_CF_BEACON_TOKEN`) — and it posts to that
+		collector. Both hosts are named one by one, so the egress guard still stops
+		theme data from reaching anything else.
 	-->
-	<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' blob: https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://api.iconify.design; frame-src 'self' https: http: about: data: blob:; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'self'; manifest-src 'self'">
+	<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' blob: https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://api.iconify.design https://cloudflareinsights.com; frame-src 'self' https: http: about: data: blob:; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'self'; manifest-src 'self'">
 
 	<link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
 	<link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">

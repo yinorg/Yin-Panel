@@ -5,9 +5,44 @@ import vue from '@vitejs/plugin-vue'
 import { VitePWA } from 'vite-plugin-pwa'
 import { createSvgIconsPlugin } from 'vite-plugin-svg-icons'
 
+/**
+ * Cloudflare Web Analytics, built into the app document instead of left to the
+ * zone's automatic setup.
+ *
+ * Automatic mode injects the beacon into *every* HTML response, including the
+ * wallpaper documents, whose sandbox CSP blocks it — so each load logs a violation
+ * and the beacon never runs. Emitting the tag here keeps the analytics on the real
+ * page and leaves the sandbox documents untouched.
+ *
+ * The token comes from `VITE_GLOB_CF_BEACON_TOKEN` at build time. Without it the tag
+ * is omitted entirely, so forks and self-hosted builds carry no third-party script.
+ */
+function cloudflareAnalytics(token?: string): PluginOption {
+  return {
+    name: 'yin-cloudflare-analytics',
+    transformIndexHtml(html) {
+      if (!token)
+        return html
+      return {
+        html,
+        tags: [{
+          tag: 'script',
+          attrs: {
+            defer: true,
+            src: 'https://static.cloudflareinsights.com/beacon.min.js',
+            'data-cf-beacon': JSON.stringify({ token }),
+          },
+          injectTo: 'head',
+        }],
+      }
+    },
+  }
+}
+
 function setupPlugins(env: ImportMetaEnv): PluginOption[] {
   return [
     vue(),
+    cloudflareAnalytics(env.VITE_GLOB_CF_BEACON_TOKEN),
     env.VITE_GLOB_APP_PWA === 'true' && VitePWA({
       injectRegister: 'auto',
       registerType: 'autoUpdate',

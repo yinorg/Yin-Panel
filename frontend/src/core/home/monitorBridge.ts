@@ -14,6 +14,12 @@ import type { MonitorSnapshot } from '@/components/deskModule/SystemMonitor/snap
  */
 export interface ThemeMonitorBridge {
   controller: MonitorSnapshotController<MonitorSnapshot>
+  /**
+   * Whether the monitor may run at all. A public link never may: the enable flag
+   * and the snapshot endpoint are both JWT-only, so the embedded element must stay
+   * idle instead of reading its config and polling the host's metrics.
+   */
+  enabled: boolean
   showTitle: boolean
   iconTextColor: string
   /** Whether the visitor may edit the monitor cards (add/sort/delete). The Core

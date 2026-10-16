@@ -252,7 +252,7 @@ export function useThemeRuntime(input: {
     return { tone, ...suggestedForeground(tone) }
   })
 
-  const { monitorCards } = useMonitorCards()
+  const { monitorCards } = useMonitorCards(() => !input.publicCode)
 
   const themeRuntimeSnapshot = computed(() => {
     // Label every Space from one pass over the list. Naming them one by one made

@@ -1043,12 +1043,22 @@ func (a *ThemeRouter) WallpaperLibraryAsset(c *gin.Context) {
 func serveThemeAsset(c *gin.Context, mediaType string, content []byte, name string, immutable bool) {
 	c.Header("X-Content-Type-Options", "nosniff")
 	if immutable {
-		c.Header("Cache-Control", "public, max-age=31536000, immutable")
+		// `no-transform` tells intermediaries not to rewrite these bytes. A CDN that
+		// injects its own script into an HTML asset would break two guarantees: the
+		// Core verifies theme resources against a sha256, and the wallpaper documents
+		// run under a sandbox CSP that blocks third-party scripts — so an injected
+		// beacon either fails the check or is blocked and logged in the console.
+		c.Header("Cache-Control", "public, max-age=31536000, immutable, no-transform")
 	} else {
 		c.Header("Cache-Control", "no-store")
 	}
 	if mediaType == "text/html" {
-		c.Header("Content-Security-Policy", "sandbox allow-scripts; default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; font-src 'none'; media-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'none'")
+		// A proxied zone injects the Web Analytics beacon into every HTML response, so
+		// blocking it only produced a violation on each wallpaper load. The sandbox
+		// stays intact apart from that one explicitly named pair: the beacon script and
+		// the collector it posts to. Everything else — frames, fonts, media, any other
+		// origin — stays closed, and a wallpaper document is still an opaque origin.
+		c.Header("Content-Security-Policy", "sandbox allow-scripts; default-src 'none'; script-src 'unsafe-inline' https://static.cloudflareinsights.com; style-src 'unsafe-inline'; img-src data:; connect-src https://cloudflareinsights.com; font-src 'none'; media-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'none'")
 		c.Header("Referrer-Policy", "no-referrer")
 	} else if mediaType == "image/svg+xml" {
 		c.Header("Content-Security-Policy", "sandbox; default-src 'none'; script-src 'none'; style-src 'unsafe-inline'; img-src data: blob:; object-src 'none'; form-action 'none'; base-uri 'none'")
