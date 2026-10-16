@@ -6,6 +6,7 @@ import { addMember, addOIDCGroup, clearSpace, copySpace, createGroup, createSpac
 import { useAuthStore } from '../../../store'
 import { t } from '../../../locales'
 import { clearSpaceCache, readSpaceCache, writeSpaceCache } from '@/utils/spaceCache'
+import { announceSpaceWallpaperWrite } from '@/core/home/spaceWallpaper'
 import { fetchIconsFromExtension, getIconByUrl, iconFileFromBytes, isIconExtensionAvailable } from '@/utils/itemIcon'
 import { importBookmarksBatch } from '@/api/panel/space'
 import { getBookmarkTree } from '@/api/panel/space'
@@ -167,7 +168,12 @@ async function clearCurrentSpace() {
   message.success(t('spaceManage.clearSuccess'))
   loadGroups(selectedSpaceId.value)
 }
-function load() { getSpaces<Space[]>().then(({ data }) => { spaces.value = data || []; if (spaces.value.length && !selectedSpaceId.value) selectedSpaceId.value = spaces.value[0].id; spaces.value.forEach(space => loadGroups(space.id)); if (selectedSpaceId.value) { loadGroups(selectedSpaceId.value); loadDetails(selectedSpaceId.value) } }) }
+// Only the selected Space's groups are read: the group list, the parent picker
+// and the rename dialog all key off `groups[selectedSpaceId]`, and a Space the
+// user has not opened needs none. Reading every Space's groups instead queued
+// one request per Space ahead of this screen's own reads, which is what made the
+// Space's wallpaper answer arrive seconds after the card was already usable.
+function load() { getSpaces<Space[]>().then(({ data }) => { spaces.value = data || []; if (spaces.value.length && !selectedSpaceId.value) selectedSpaceId.value = spaces.value[0].id; if (selectedSpaceId.value) { loadGroups(selectedSpaceId.value); loadDetails(selectedSpaceId.value) } }) }
 function loadGroups(spaceId: number) { getGroups<{ id: number; title: string; parentId?: number | null }[]>(spaceId).then(({ data }) => { groups.value[spaceId] = data || [] }) }
 function loadDetails(spaceId: number) { getMembers<SpaceMember[]>(spaceId).then(({ data }) => { members.value = data || [] }); getOIDCGroups<any[]>(spaceId).then(({ data }) => { oidcRules.value = data || [] }); getPublicConfig<any>(spaceId).then(({ data }) => { publicEnabled.value = !!data?.enabled; publicId.value = data?.publicId || ''; publicMode.value = data?.mode === 'code' ? 'code' : 'direct'; publicAccessCode.value = '' }); loadSpaceTheme(spaceId); loadSearchConfig(spaceId); loadSpaceWallpaper(spaceId) }
 function savePublic() { if (!selectedSpaceId.value || (publicEnabled.value && !/^[a-z][a-z0-9-]{4,28}[a-z0-9]$/.test(publicId.value))) { message.error(t('spaceManage.publicIdInvalid')); return }; if (publicMode.value === 'code' && publicEnabled.value && publicAccessCode.value && (publicAccessCode.value.length < 4 || publicAccessCode.value.length > 12)) { message.error(t('spaceManage.accessCodeInvalid')); return }; publicSaving.value = true; setPublicConfig(selectedSpaceId.value, { enabled: publicEnabled.value, publicId: publicId.value, mode: publicMode.value, accessCode: publicAccessCode.value }).then(({ code }) => { if (code === 0) message.success(t('spaceManage.publicSaved')) }).finally(() => { publicSaving.value = false }) }
@@ -318,39 +324,76 @@ const spaceWallpaperMode = ref<'theme' | 'library' | 'custom' | 'none'>('theme')
 const spaceWallpaperEntry = ref('')
 const spaceWallpaperSaving = ref(false)
 const spaceWallpaperDialog = ref(false)
+// Which Space the card's current mode/entry describe. Saving is only allowed
+// once that is the Space the user has selected, so switching Spaces can never
+// write the previous Space's choice over a Space nobody has read yet.
+const spaceWallpaperLoadedFor = ref<number | null>(null)
+// Every pick the user makes bumps this. The Space's own read can land seconds
+// after the card is on screen (the wallpaper card sits in the same screen as the
+// Space list), and without the guard a response already in flight when the user
+// chose put the *previous* value back: the save then wrote the old wallpaper, so
+// choosing one appeared to do nothing at all.
+let spaceWallpaperPicked = 0
 const spaceWallpaperLabel = computed(() => (spaceWallpaperMode.value === 'library' && spaceWallpaperEntry.value)
   ? spaceWallpaperEntry.value
   : t('spaceManage.wallpaperFollowTheme'))
 /** The embedded wallpaper centre owns the library, the paging and the tiles, so
  *  this card only records what it reports and writes it to the Space on save. */
 function onSpaceWallpaperPick(value: { mode: 'theme' | 'library'; entry: string }) {
+  spaceWallpaperPicked += 1
   spaceWallpaperMode.value = value.mode
   spaceWallpaperEntry.value = value.entry
+  spaceWallpaperLoadedFor.value = selectedSpaceId.value
   spaceWallpaperDialog.value = false
 }
 /** Reads the Space's default wallpaper. The home falls back to it while the
- *  visitor has not picked a wallpaper of their own. */
+ *  visitor has not picked a wallpaper of their own. A read that was already in
+ *  flight when the user chose — or when the Space changed — is dropped instead
+ *  of putting the value the card had before back. */
 function loadSpaceWallpaper(spaceId: number) {
+  const picked = spaceWallpaperPicked
+  // The card still shows another Space's choice: drop it rather than let it be
+  // saved here. It reads as "follow the theme" until this Space's own answer
+  // arrives, and saving stays unavailable until then.
+  if (spaceWallpaperLoadedFor.value !== spaceId) {
+    spaceWallpaperMode.value = 'theme'
+    spaceWallpaperEntry.value = ''
+    spaceWallpaperLoadedFor.value = null
+  }
   getWallpaperConfig<SpaceWallpaperConfig | null>(spaceId)
     .then(({ data }) => {
+      if (selectedSpaceId.value !== spaceId || spaceWallpaperPicked !== picked) return
       spaceWallpaperMode.value = data?.mode === 'library' ? 'library' : 'theme'
       spaceWallpaperEntry.value = data?.libraryEntry || ''
+      spaceWallpaperLoadedFor.value = spaceId
     })
     .catch(() => {
+      if (selectedSpaceId.value !== spaceId || spaceWallpaperPicked !== picked) return
+      // An unreadable answer must not lock the card: the Space follows the theme
+      // until the user says otherwise, and that can be saved as it stands.
       spaceWallpaperMode.value = 'theme'
+      spaceWallpaperEntry.value = ''
+      spaceWallpaperLoadedFor.value = spaceId
     })
 }
 async function saveSpaceWallpaper() {
   if (!selectedSpaceId.value) return
   spaceWallpaperSaving.value = true
   try {
-    const result = await setWallpaperConfig(selectedSpaceId.value, {
+    const spaceId = selectedSpaceId.value
+    const wallpaper: SpaceWallpaperConfig = {
       mode: spaceWallpaperMode.value === 'library' ? 'library' : 'theme',
       kind: 'image',
       libraryEntry: spaceWallpaperEntry.value.trim(),
-    })
-    if (result.code === 0)
+    }
+    const result = await setWallpaperConfig(spaceId, wallpaper)
+    if (result.code === 0) {
       message.success(t('spaceManage.wallpaperSaved'))
+      // The home is still running behind this dialog, so hand it the value the
+      // server just stored: without that, the new artwork only appeared after a
+      // reload.
+      announceSpaceWallpaperWrite(spaceId, wallpaper)
+    }
     else
       message.error(result.msg)
   }
@@ -464,7 +507,7 @@ onMounted(load)
             </NButton>
             <div class="mt-1 text-xs opacity-70">{{ spaceWallpaperLabel }}</div>
             <div class="mt-1 text-xs opacity-70">{{ $t('spaceManage.wallpaperHint') }}</div>
-            <NButton class="mt-2" size="small" type="primary" :loading="spaceWallpaperSaving" @click="saveSpaceWallpaper">
+            <NButton class="mt-2" size="small" type="primary" :disabled="spaceWallpaperLoadedFor !== selectedSpaceId" :loading="spaceWallpaperSaving" @click="saveSpaceWallpaper">
               {{ $t('common.save') }}
             </NButton>
             <NModal v-model:show="spaceWallpaperDialog" preset="card" style="width: min(92vw, 720px); max-height: 88vh; overflow: auto" :title="$t('spaceManage.spaceWallpaper')">

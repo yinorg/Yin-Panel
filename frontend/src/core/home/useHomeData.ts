@@ -13,6 +13,7 @@ import { buildHomeGroupTree } from '@/core/home/groupTree'
 import { createHomeSearchService } from '@/core/home/search'
 import { createHomeSpaceController } from '@/core/home/spaceController'
 import { patchLayoutBuckets, patchLayoutGroups } from '@/core/home/layoutPatch'
+import { spaceWallpaperWrite } from '@/core/home/spaceWallpaper'
 import type { HomeLayoutInput } from '@/core/home/mutations'
 import type { ThemeCollectionStatus } from '@/theme/api/v1'
 import type { Response as ApiResponse } from '@/utils/request'
@@ -72,23 +73,51 @@ export function useHomeData(input: {
 
   const spaces = ref<Space[]>([])
   const activeSpace = ref<Space | null>(null)
+  // Counts the writes the settings dialog announces, so a read already in flight
+  // cannot land afterwards with the value the server held before the save.
+  let spaceWallpaperWrites = 0
   // A Space can name a default wallpaper for its home. It is a Space-level
   // setting, so it is re-read whenever the active Space changes and cleared when
-  // the read fails, which leaves the visitor's own choice standing.
-  watch(activeSpace, async (space) => {
-    const id = space?.id
-    if (!id) {
+  // the read fails, which leaves the visitor's own choice standing. The read is
+  // also re-run when the space settings announce a write: that dialog sits on
+  // top of the running home, so without it the artwork only changed on reload.
+  async function loadSpaceWallpaper(spaceId: number, attempt = 0) {
+    const writes = spaceWallpaperWrites
+    // A Space switch, or a fresher write, owns the cache now: a read that was
+    // already in flight when the Space changed or when the settings dialog
+    // saved must not put the server's older answer back.
+    const owns = () => activeSpace.value?.id === spaceId && spaceWallpaperWrites === writes
+    try {
+      const res = await getWallpaperConfig<Panel.SpaceWallpaperConfig | null>(spaceId)
+      if (!owns()) return
+      if (res.code !== 0) throw new Error(`space wallpaper read failed: ${res.code}`)
+      panelState.spaceWallpaper = res.data ?? null
+    }
+    catch {
+      if (!owns()) return
+      // One retry before giving up. A single failed read used to drop the Space's
+      // artwork for the whole visit, which read as "the wallpaper needs a few
+      // refreshes before it appears". The previous value stands until the retry
+      // also fails, so a hiccup does not repaint the home either.
+      if (attempt === 0) {
+        setTimeout(() => void loadSpaceWallpaper(spaceId, attempt + 1), 800)
+        return
+      }
+      panelState.spaceWallpaper = null
+    }
+  }
+  watch(activeSpace, (space) => {
+    if (!space?.id) {
       panelState.spaceWallpaper = null
       return
     }
-    try {
-      const res = await getWallpaperConfig<Panel.SpaceWallpaperConfig | null>(id)
-      panelState.spaceWallpaper = res.code === 0 ? (res.data ?? null) : null
-    }
-    catch {
-      panelState.spaceWallpaper = null
-    }
+    void loadSpaceWallpaper(space.id)
   }, { immediate: true })
+  watch(spaceWallpaperWrite, (write) => {
+    if (!write || write.spaceId !== activeSpace.value?.id) return
+    spaceWallpaperWrites += 1
+    panelState.spaceWallpaper = write.wallpaper
+  })
   const spaceSelectorOptions = computed(() => {
     const names = spaceDisplayNames(spaces.value, authStore.userInfo?.id)
     // Every Space, the active one included. Filtering the active Space out made

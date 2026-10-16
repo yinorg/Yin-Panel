@@ -57,11 +57,18 @@ watch(() => wallpaper.value?.source, () => { failed.value = false; posterFailed.
 // tone travels to the theme through the snapshot; a framed or cross-origin
 // artwork resolves to no tone rather than a guessed one.
 watch(() => wallpaper.value?.poster || wallpaper.value?.source || null, source => { void publishWallpaperTone(source) }, { immediate: true })
-// The library must be loaded whenever a selection exists — not only at mount:
-// the panel config arrives after the layer mounts on a cold load, and the picker
-// can switch the mode while the page is open.
-watch(() => [panelState.panelConfig.wallpaperMode, panelState.panelConfig.wallpaperLibraryEntry] as const, ([mode]) => {
-  if (mode === 'library') void wallpaperLibrary.load()
+// The library must be loaded whenever a stored selection needs it — not only at
+// mount: the panel config arrives after the layer mounts on a cold load, the
+// picker can switch the mode while the page is open, and the active Space's own
+// default wallpaper is a library id too (the picker may never have been opened
+// for it).
+watch(() => [
+  panelState.panelConfig.wallpaperMode,
+  panelState.panelConfig.wallpaperLibraryEntry,
+  panelState.spaceWallpaper?.mode,
+  panelState.spaceWallpaper?.libraryEntry,
+] as const, ([mode, , spaceMode]) => {
+  if (mode === 'library' || spaceMode === 'library') void wallpaperLibrary.load()
 }, { immediate: true })
 
 function updateVisibility() { visible.value = !document.hidden }
