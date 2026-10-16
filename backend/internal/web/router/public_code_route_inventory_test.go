@@ -62,7 +62,8 @@ func publicCodeRouteExpectedForCoreAPI(method, path string) bool {
 		return true
 	case "/api/spaces/:spaceId/groups",
 		"/api/spaces/:spaceId/items",
-		"/api/spaces/:spaceId/search-config":
+		"/api/spaces/:spaceId/search-config",
+		"/api/spaces/:spaceId/wallpaper":
 		return true
 	default:
 		return false

@@ -23,7 +23,10 @@ func PublicCodeRequestAllowed(method, route, spaceParam string, publicSpaceID ui
 		return true
 	case "/api/theme/v2/package/:id", "/api/theme/v2/revisions/:revision", "/api/theme/v2/preview/:token", "/api/theme/v2/preview/:token/assets/*name", "/api/theme/v2/assets/:revision/*name":
 		return true
-	case "/api/spaces/:spaceId/groups", "/api/spaces/:spaceId/items", "/api/spaces/:spaceId/search-config":
+	// The wallpaper is part of the Space's public appearance: a visitor who has
+	// not chosen their own artwork sees the Space's default, and reading it is
+	// what makes that true on a public link. The write route stays JWT-only.
+	case "/api/spaces/:spaceId/groups", "/api/spaces/:spaceId/items", "/api/spaces/:spaceId/search-config", "/api/spaces/:spaceId/wallpaper":
 		targetID, err := strconv.ParseUint(spaceParam, 10, 32)
 		if err != nil || targetID == 0 {
 			return false
