@@ -56,6 +56,10 @@ Yin-Panel ist ein leichtgewichtiges, selbst hostbares Navigationspanel für pers
 
 Wir betreiben drei Online-Umgebungen, auf denen Sie sich direkt registrieren und alles ausprobieren können. Alle drei unterstützen die Anmeldung per GitHub / GitLab / Google, und ein Monitoring-Panel zeigt Betriebskennzahlen und Alarme.
 
+Ohne Konto können Sie über den öffentlichen Link <https://panel.yiniot.com/my-demo> hineinschauen (er eignet sich auch als Browser-Startseite).
+
+Außerdem lässt sich die passende Browser-Erweiterung [Yin-Panel Helper](https://github.com/yinorg/yin-panel-extension) installieren (jetzt im [Chrome Web Store](https://chromewebstore.google.com/detail/yin-panel-helper/hlfhnjccidngjjkidlgejefcchoegofo)). Sie kann genau zwei Dinge: neue Tabs auf Ihr Panel umleiten und beim Abrufen der Website-Icons helfen.
+
 | Umgebung | Adresse | Zweck | Verfügbarkeit |
 | --- | --- | --- | --- |
 | Produktion (PRD) | <https://panel.yiniot.com> | Reguläre Nutzung | Best effort mit dem Ziel 99,9 % Verfügbarkeit |
@@ -230,6 +234,8 @@ Vollständiges lokales Update (Frontend-Build, Backend-Tests und -Build, Deploym
 Das Skript verwendet standardmäßig `backend/` aus dem Repository als Laufzeitverzeichnis und erfordert dort eine lokale `conf.yaml`; `YIN_PANEL_RUNTIME_DIR` in `.env.local` kann dies überschreiben. Nach erfolgreichen Builds und Tests stoppt es nur den Yin-Panel-Listener, ersetzt altes Binary und statische Dateien per `sudo` und berührt Datenbank, Uploads und Konfigurationsdateien nicht.
 
 Das Theme-System der Startseite ist in [`frontend/THEME_SYSTEM.md`](../../frontend/THEME_SYSTEM.md) dokumentiert; ein neues Theme lässt sich mit `npm run create:theme -- init "<Name>"` anlegen. Die vollständigen AI-Entwicklungs-, Release- und Neustart-Konventionen stehen in [AGENTS.md](../../AGENTS.md).
+
+Die Abnahmetests im Browser liegen im separaten Repository [yinorg/yin-panel-e2e](https://github.com/yinorg/yin-panel-e2e): Playwright steuert echte Browser durch vollständige Abläufe (Anmeldung und Konten, Bereiche und Rechte, Lesezeichen-Import und -Export, das Theme-System, das Offline-Verhalten der PWA sowie die Übernahme neuer Tabs durch die Erweiterung), dazu kommt ein k6-Suite für Last- und Kapazitätsmessungen. Nötig sind eine laufende Yin-Panel-Instanz, die `.env.local` des Core-Repositorys und der ungepackte Erweiterungsquelltext; der Ort des Checkouts wird über `YIN_PANEL_E2E_DIR` festgelegt.
 
 ## Backup und Upgrade
 

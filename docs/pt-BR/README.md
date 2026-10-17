@@ -56,6 +56,10 @@ O Yin-Panel é um painel de navegação leve e auto-hospedável para espaços pe
 
 Mantemos três ambientes online nos quais você pode se registrar e testar tudo na hora; os três aceitam login com GitHub / GitLab / Google, e um painel de monitoramento mostra as métricas e os alertas deles.
 
+Sem entrar, você pode dar uma olhada pelo link público <https://panel.yiniot.com/my-demo> (também dá para definir como página inicial do navegador).
+
+Você também pode instalar a extensão complementar [Yin-Panel Helper](https://github.com/yinorg/yin-panel-extension) (agora na [Chrome Web Store](https://chromewebstore.google.com/detail/yin-panel-helper/hlfhnjccidngjjkidlgejefcchoegofo)). Ela faz exatamente duas coisas: levar a nova aba ao seu painel e ajudar a obter os ícones dos sites.
+
 | Ambiente | Endereço | Uso | Disponibilidade |
 | --- | --- | --- | --- |
 | Produção (PRD) | <https://panel.yiniot.com> | Uso diário | Best effort com meta de 99,9% de disponibilidade |
@@ -230,6 +234,8 @@ Atualização local completa (build do frontend, testes e build do backend, impl
 O script usa `backend/` do repositório como diretório de execução por padrão e exige um `conf.yaml` local nele; `YIN_PANEL_RUNTIME_DIR` em `.env.local` pode substituí-lo. Depois que todos os builds e testes passam, ele para apenas o listener do Yin-Panel, substitui o binário antigo e os arquivos estáticos com `sudo`, e nunca toca no banco de dados, nos uploads ou nos arquivos de configuração.
 
 O sistema de temas da página inicial está documentado em [`frontend/THEME_SYSTEM.md`](../../frontend/THEME_SYSTEM.md); crie um tema novo com `npm run create:theme -- init "<nome>"`. As convenções completas de desenvolvimento com IA, publicação e reinício estão em [AGENTS.md](../../AGENTS.md).
+
+Os testes de aceitação no navegador ficam em um repositório separado, [yinorg/yin-panel-e2e](https://github.com/yinorg/yin-panel-e2e): o Playwright conduz navegadores reais por jornadas completas (login e contas, espaços e permissões, importação e exportação de favoritos, o sistema de temas, o comportamento offline do PWA e a substituição da nova aba pela extensão), com um conjunto k6 para medir carga e capacidade. É preciso ter uma instância do Yin-Panel em execução, o `.env.local` do repositório Core e o código não empacotado da extensão; o local do checkout é definido por `YIN_PANEL_E2E_DIR`.
 
 ## Backup e atualização
 

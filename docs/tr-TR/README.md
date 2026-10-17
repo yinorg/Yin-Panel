@@ -56,6 +56,10 @@ Yin-Panel, kişisel ve paylaşılan alanlar için hafif, kendi sunucunuzda barı
 
 Hemen kayıt olup deneyebileceğiniz üç çevrimiçi ortam işletiyoruz; üçü de GitHub / GitLab / Google ile girişi destekliyor ve bir izleme paneli metriklerle uyarıları gösteriyor.
 
+Giriş yapmadan da herkese açık bağlantıya <https://panel.yiniot.com/my-demo> göz atabilirsiniz (tarayıcı ana sayfası olarak da ayarlanabilir).
+
+Yardımcı tarayıcı uzantısını [Yin-Panel Helper](https://github.com/yinorg/yin-panel-extension) da kurabilirsiniz (artık [Chrome Web Store](https://chromewebstore.google.com/detail/yin-panel-helper/hlfhnjccidngjjkidlgejefcchoegofo) üzerinde). Yalnızca iki iş yapar: yeni sekmeyi panelinize yönlendirir ve site simgelerini almanıza yardım eder.
+
 | Ortam | Adres | Amaç | Kararlılık |
 | --- | --- | --- | --- |
 | Üretim (PRD) | <https://panel.yiniot.com> | Günlük kullanım | %99,9 kullanılabilirlik hedefiyle best effort |
@@ -230,6 +234,8 @@ Tam yerel güncelleme (ön yüz derlemesi, arka uç testleri ve derlemesi, dağ�
 Betik varsayılan olarak depodaki `backend/` dizinini çalışma dizini olarak kullanır ve orada yerel bir `conf.yaml` gerektirir; `.env.local` içindeki `YIN_PANEL_RUNTIME_DIR` bunu geçersiz kılabilir. Tüm derlemeler ve testler geçtikten sonra yalnızca Yin-Panel dinleyicisini durdurur, eski ikili dosyayı ve statik dosyaları `sudo` ile değiştirir ve veritabanına, yüklemelere veya yapılandırma dosyalarına hiç dokunmaz.
 
 Ana sayfa tema sistemi [`frontend/THEME_SYSTEM.md`](../../frontend/THEME_SYSTEM.md) içinde belgelenmiştir; `npm run create:theme -- init "<name>"` ile yeni bir tema oluşturabilirsiniz. Tüm yapay zeka geliştirme, sürüm ve yeniden başlatma kuralları [AGENTS.md](../../AGENTS.md) içinde yer alır.
+
+Tarayıcı tarafındaki kabul testleri ayrı bir depoda, [yinorg/yin-panel-e2e](https://github.com/yinorg/yin-panel-e2e) içinde: Playwright gerçek tarayıcıları baştan sona akışlarda gezdirir (giriş ve hesaplar, alanlar ve izinler, yer işareti içe ve dışa aktarma, tema sistemi, PWA'nın çevrimdışı davranışı ve uzantının yeni sekmeyi devralması), ayrıca k6 betikleri yük ve kapasiteyi ölçer. Çalışan bir Yin-Panel örneği, Core deposunun `.env.local` dosyası ve paketlenmemiş uzantı kaynakları gerekir; checkout konumu `YIN_PANEL_E2E_DIR` ile belirtilir.
 
 ## Yedekleme ve yükseltme
 

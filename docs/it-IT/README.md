@@ -56,6 +56,10 @@ Yin-Panel è un pannello di navigazione leggero e self-hostable per spazi person
 
 Gestiamo tre ambienti online su cui puoi registrarti e provare subito tutto; tutti e tre supportano l'accesso con GitHub / GitLab / Google e un pannello di monitoraggio mostra metriche e avvisi.
 
+Senza account puoi dare un'occhiata dal link pubblico <https://panel.yiniot.com/my-demo> (si può impostare anche come home page del browser).
+
+Puoi anche installare l'estensione complementare [Yin-Panel Helper](https://github.com/yinorg/yin-panel-extension) (ora sul [Chrome Web Store](https://chromewebstore.google.com/detail/yin-panel-helper/hlfhnjccidngjjkidlgejefcchoegofo)). Fa esattamente due cose: portare la nuova scheda sul tuo pannello e aiutare a recuperare le icone dei siti.
+
 | Ambiente | Indirizzo | Uso | Disponibilità |
 | --- | --- | --- | --- |
 | Produzione (PRD) | <https://panel.yiniot.com> | Uso quotidiano | Best effort con l'obiettivo del 99,9% di disponibilità |
@@ -230,6 +234,8 @@ Aggiornamento locale completo (build del frontend, test e build del backend, dis
 Per impostazione predefinita lo script usa `backend/` del repository come directory di esecuzione e richiede lì un `conf.yaml` locale; `YIN_PANEL_RUNTIME_DIR` in `.env.local` può sovrascriverla. Dopo che tutte le build e i test sono andati a buon fine, arresta solo il listener di Yin-Panel, usa `sudo` per sostituire il vecchio binario e i file statici e non tocca mai il database, gli upload o i file di configurazione.
 
 Il sistema di temi della home è documentato in [`frontend/THEME_SYSTEM.md`](../../frontend/THEME_SYSTEM.md); crea la struttura di un nuovo tema con `npm run create:theme -- init "<name>"`. Le convenzioni complete per lo sviluppo con l'AI, le release e il riavvio si trovano in [AGENTS.md](../../AGENTS.md).
+
+I test di accettazione lato browser stanno in un repository separato, [yinorg/yin-panel-e2e](https://github.com/yinorg/yin-panel-e2e): Playwright guida browser reali lungo percorsi completi (accesso e account, spazi e permessi, import ed export dei segnalibri, sistema di temi, comportamento offline della PWA e sostituzione della nuova scheda da parte dell'estensione), con in più una suite k6 per misurare carico e capacità. Servono un'istanza Yin-Panel in esecuzione, il `.env.local` del repository Core e i sorgenti non pacchettizzati dell'estensione; la posizione del checkout si indica con `YIN_PANEL_E2E_DIR`.
 
 ## Backup e aggiornamento
 

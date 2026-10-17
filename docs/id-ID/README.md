@@ -56,6 +56,10 @@ Yin-Panel adalah panel navigasi ringan yang dapat dihosting sendiri untuk ruang 
 
 Kami menjalankan tiga lingkungan online yang bisa langsung Anda daftari dan coba; ketiganya mendukung masuk dengan GitHub / GitLab / Google, dan ada panel pemantauan yang menampilkan metrik serta peringatannya.
 
+Tanpa masuk pun Anda bisa melihat-lihat lewat tautan publik <https://panel.yiniot.com/my-demo> (bisa juga dijadikan halaman beranda peramban).
+
+Anda juga bisa memasang ekstensi peramban pendamping [Yin-Panel Helper](https://github.com/yinorg/yin-panel-extension) (kini ada di [Chrome Web Store](https://chromewebstore.google.com/detail/yin-panel-helper/hlfhnjccidngjjkidlgejefcchoegofo)). Ekstensi ini hanya melakukan dua hal: mengarahkan tab baru ke panel Anda dan membantu mengambil ikon situs.
+
 | Lingkungan | Alamat | Tujuan | Ketersediaan |
 | --- | --- | --- | --- |
 | Produksi (PRD) | <https://panel.yiniot.com> | Penggunaan sehari-hari | Best effort dengan target ketersediaan 99,9% |
@@ -230,6 +234,8 @@ Pembaruan lokal lengkap (build frontend, pengujian dan build backend, penerapan,
 Skrip ini menggunakan `backend/` repositori sebagai direktori runtime secara bawaan dan memerlukan `conf.yaml` lokal di sana; `YIN_PANEL_RUNTIME_DIR` di `.env.local` dapat menimpanya. Setelah semua build dan pengujian lulus, skrip ini hanya menghentikan listener Yin-Panel, menggunakan `sudo` untuk mengganti biner lama dan berkas statis, serta tidak pernah menyentuh basis data, unggahan, atau berkas konfigurasi.
 
 Sistem tema halaman beranda didokumentasikan di [`frontend/THEME_SYSTEM.md`](../../frontend/THEME_SYSTEM.md); buat kerangka tema baru dengan `npm run create:theme -- init "<name>"`. Konvensi lengkap pengembangan AI, rilis, dan restart ada di [AGENTS.md](../../AGENTS.md).
+
+Uji penerimaan di sisi peramban berada di repositori terpisah [yinorg/yin-panel-e2e](https://github.com/yinorg/yin-panel-e2e): Playwright menjalankan peramban sungguhan melalui alur lengkap (masuk dan akun, ruang dan izin, impor dan ekspor bookmark, sistem tema, perilaku offline PWA, serta pengambilalihan tab baru oleh ekstensi), ditambah skrip k6 untuk mengukur beban dan kapasitas. Dibutuhkan instans Yin-Panel yang berjalan, `.env.local` dari repositori Core, dan sumber ekstensi yang belum dikemas; lokasi checkout diatur lewat `YIN_PANEL_E2E_DIR`.
 
 ## Pencadangan dan peningkatan
 

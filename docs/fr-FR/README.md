@@ -56,6 +56,10 @@ Yin-Panel est un panneau de navigation léger et auto-hébergeable pour les espa
 
 Nous maintenons trois environnements en ligne sur lesquels vous pouvez vous inscrire et tout essayer immédiatement ; tous les trois acceptent la connexion GitHub / GitLab / Google, et un panneau de supervision affiche leurs métriques et leurs alertes.
 
+Sans compte, vous pouvez jeter un œil via le lien public <https://panel.yiniot.com/my-demo> (il peut aussi servir de page d'accueil au navigateur).
+
+Vous pouvez aussi installer l'extension complémentaire [Yin-Panel Helper](https://github.com/yinorg/yin-panel-extension) (désormais sur le [Chrome Web Store](https://chromewebstore.google.com/detail/yin-panel-helper/hlfhnjccidngjjkidlgejefcchoegofo)). Elle fait exactement deux choses : rediriger le nouvel onglet vers votre panneau et aider à récupérer les icônes des sites.
+
 | Environnement | Adresse | Usage | Disponibilité |
 | --- | --- | --- | --- |
 | Production (PRD) | <https://panel.yiniot.com> | Usage courant | Best effort avec un objectif de 99,9 % de disponibilité |
@@ -230,6 +234,8 @@ Mise à jour locale complète (build frontend, tests et build backend, déploiem
 Le script utilise `backend/` du dépôt comme répertoire d'exécution par défaut et exige un `conf.yaml` local à cet endroit ; `YIN_PANEL_RUNTIME_DIR` dans `.env.local` peut le remplacer. Une fois les builds et les tests réussis, il arrête uniquement l'écouteur Yin-Panel, remplace l'ancien binaire et les fichiers statiques avec `sudo`, et ne touche jamais à la base de données, aux fichiers téléversés ni aux fichiers de configuration.
 
 Le système de thèmes de la page d'accueil est documenté dans [`frontend/THEME_SYSTEM.md`](../../frontend/THEME_SYSTEM.md) ; créez un nouveau thème avec `npm run create:theme -- init "<nom>"`. Les conventions complètes de développement AI, de publication et de redémarrage se trouvent dans [AGENTS.md](../../AGENTS.md).
+
+Les tests d'acceptation dans le navigateur vivent dans un dépôt séparé, [yinorg/yin-panel-e2e](https://github.com/yinorg/yin-panel-e2e) : Playwright pilote de vrais navigateurs sur des parcours complets (connexion et comptes, espaces et permissions, import et export de signets, système de thèmes, comportement hors ligne de la PWA et reprise du nouvel onglet par l'extension), avec en plus une suite k6 pour mesurer la charge et la capacité. Il faut une instance Yin-Panel en marche, le `.env.local` du dépôt Core et les sources non empaquetées de l'extension ; l'emplacement du checkout est indiqué par `YIN_PANEL_E2E_DIR`.
 
 ## Sauvegarde et mise à niveau
 

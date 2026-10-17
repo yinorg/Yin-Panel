@@ -56,6 +56,10 @@ Yin-Panel is a lightweight, self-hostable navigation panel for personal and shar
 
 We run three online environments you can register on and try right away; all three support GitHub / GitLab / Google sign-in, and a monitoring panel shows their metrics and alerts.
 
+You can look around without an account through the public link <https://panel.yiniot.com/my-demo> (it works as a browser homepage too).
+
+You can also install the companion browser extension [Yin-Panel Helper](https://github.com/yinorg/yin-panel-extension) (now on the [Chrome Web Store](https://chromewebstore.google.com/detail/yin-panel-helper/hlfhnjccidngjjkidlgejefcchoegofo)). It does exactly two things: point the new tab at your panel, and help fetch site icons.
+
 | Environment | Address | Purpose | Availability |
 | --- | --- | --- | --- |
 | Production (PRD) | <https://panel.yiniot.com> | Everyday use | Best effort towards 99.9% availability |
@@ -228,6 +232,8 @@ Full local update (frontend build, backend tests and build, deployment, restart)
 The script uses the repository's `backend/` as the runtime directory by default and requires a local `conf.yaml` there; `YIN_PANEL_RUNTIME_DIR` in `.env.local` can override it. After all builds and tests pass, it stops only the Yin-Panel listener, uses `sudo` to replace the old binary and static files, and never touches the database, uploads, or configuration files.
 
 The home-page theme system is documented in [`frontend/THEME_SYSTEM.md`](frontend/THEME_SYSTEM.md); scaffold a new theme with `npm run create:theme -- init "<name>"`. Full AI development, release, and restart conventions live in [AGENTS.md](./AGENTS.md).
+
+Browser-level acceptance tests live in the separate [yinorg/yin-panel-e2e](https://github.com/yinorg/yin-panel-e2e) repository: Playwright drives real browsers through complete journeys (login and accounts, spaces and permissions, bookmark import and export, the theme system, PWA offline behaviour, and the extension's new-tab override), with a k6 suite for load and capacity measurements. It needs a running Yin-Panel instance, the Core repository's `.env.local` and the unpacked extension source, and the checkout location is set by `YIN_PANEL_E2E_DIR`.
 
 ## Backup and upgrade
 

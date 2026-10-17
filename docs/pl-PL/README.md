@@ -56,6 +56,10 @@ Yin-Panel to lekki panel nawigacyjny do samodzielnego hostowania, przeznaczony d
 
 Utrzymujemy trzy środowiska online, na których można od razu się zarejestrować i wszystkiego wypróbować; wszystkie trzy obsługują logowanie przez GitHub / GitLab / Google, a panel monitoringu pokazuje ich metryki i alerty.
 
+Bez logowania możesz zajrzeć przez publiczny link <https://panel.yiniot.com/my-demo> (można go też ustawić jako stronę startową przeglądarki).
+
+Możesz też zainstalować towarzyszące rozszerzenie [Yin-Panel Helper](https://github.com/yinorg/yin-panel-extension) (dostępne w [Chrome Web Store](https://chromewebstore.google.com/detail/yin-panel-helper/hlfhnjccidngjjkidlgejefcchoegofo)). Robi dokładnie dwie rzeczy: kieruje nową kartę na twój panel i pomaga pobierać ikony stron.
+
 | Środowisko | Adres | Przeznaczenie | Dostępność |
 | --- | --- | --- | --- |
 | Produkcja (PRD) | <https://panel.yiniot.com> | Codzienne użytkowanie | Best effort z celem 99,9% dostępności |
@@ -230,6 +234,8 @@ Pełna lokalna aktualizacja (budowa frontendu, testy i budowa backendu, wdrożen
 Skrypt domyślnie używa katalogu `backend/` z repozytorium jako katalogu środowiska uruchomieniowego i wymaga tam lokalnego pliku `conf.yaml`; `YIN_PANEL_RUNTIME_DIR` w `.env.local` może go nadpisać. Po pomyślnym zakończeniu wszystkich budów i testów zatrzymuje tylko proces nasłuchujący Yin-Panel, używa `sudo` do zastąpienia starego pliku binarnego i plików statycznych i nigdy nie dotyka bazy danych, przesłanych plików ani plików konfiguracji.
 
 System motywów strony głównej opisano w [`frontend/THEME_SYSTEM.md`](../../frontend/THEME_SYSTEM.md); utwórz szkielet nowego motywu za pomocą `npm run create:theme -- init "<name>"`. Pełne konwencje rozwoju z udziałem AI, wydań i restartu znajdują się w [AGENTS.md](../../AGENTS.md).
+
+Testy akceptacyjne w przeglądarce leżą w osobnym repozytorium [yinorg/yin-panel-e2e](https://github.com/yinorg/yin-panel-e2e): Playwright prowadzi prawdziwe przeglądarki przez pełne ścieżki (logowanie i konta, przestrzenie i uprawnienia, import i eksport zakładek, system motywów, działanie PWA offline oraz przejęcie nowej karty przez rozszerzenie), a skrypty k6 mierzą obciążenie i pojemność. Potrzebna jest działająca instancja Yin-Panel, `.env.local` z repozytorium Core oraz niepakowane źródła rozszerzenia; miejsce checkoutu wskazuje `YIN_PANEL_E2E_DIR`.
 
 ## Kopia zapasowa i aktualizacja
 

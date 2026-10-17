@@ -56,6 +56,10 @@ Yin-Panel は、個人用と共有のスペースのための軽量でセルフ�
 
 3 つのオンライン環境を用意しており、すぐに登録して試せます。いずれも GitHub / GitLab / Google でログインでき、稼働状況とアラートを見る監視パネルもあります。
 
+登録せずに中身を見たい場合は、公開リンク <https://panel.yiniot.com/my-demo> をどうぞ（ブラウザーのホームページに設定しても構いません）。
+
+同梱のブラウザー拡張 [Yin-Panel Helper](https://github.com/yinorg/yin-panel-extension)（[Chrome ウェブストア](https://chromewebstore.google.com/detail/yin-panel-helper/hlfhnjccidngjjkidlgejefcchoegofo) で公開中）もインストールできます。できることは 2 つだけです：新しいタブをパネルに開くこと、そしてサイトのアイコン取得を補助すること。
+
 | 環境 | アドレス | 用途 | 可用性 |
 | --- | --- | --- | --- |
 | 本番（PRD） | <https://panel.yiniot.com> | 通常利用 | 可用性 99.9% を目標にベストエフォートで運用 |
@@ -230,6 +234,8 @@ go build ./...
 スクリプトは既定でリポジトリ内の `backend/` を実行ディレクトリとし、そこにローカルの `conf.yaml` が必要です。`.env.local` の `YIN_PANEL_RUNTIME_DIR` で上書きできます。ビルドとテストがすべて成功した後、Yin-Panel のリスナーのみを停止し、`sudo` で旧バイナリと静的ファイルを置き換えます。データベース、アップロードファイル、設定ファイルには触れません。
 
 ホームページのテーマシステムは [`frontend/THEME_SYSTEM.md`](../../frontend/THEME_SYSTEM.md) を参照してください。`npm run create:theme -- init "<名前>"` で新しいテーマの雛形を作成できます。AI 開発・リリース・再起動の規約は [AGENTS.md](../../AGENTS.md) にあります。
+
+ブラウザー側の受け入れテストは独立したリポジトリ [yinorg/yin-panel-e2e](https://github.com/yinorg/yin-panel-e2e) にあります。Playwright が実ブラウザーで一連の流れ（ログインとアカウント、スペースと権限、ブックマークの入出力、テーマシステム、PWA のオフライン動作、拡張による新規タブの置き換え）を通し、k6 のスクリプトが負荷と容量を測定します。実行には起動済みの Yin-Panel、Core リポジトリの `.env.local`、未パッケージの拡張ソースが必要で、チェックアウト位置は `YIN_PANEL_E2E_DIR` で指定します。
 
 ## バックアップとアップグレード
 

@@ -56,6 +56,10 @@ Yin-Panel은 개인 및 공유 공간을 위한 가볍고 셀프 호스팅 가�
 
 바로 가입해서 사용해 볼 수 있는 온라인 환경 세 개를 운영하고 있습니다. 세 환경 모두 GitHub / GitLab / Google 로그인을 지원하며, 모니터링 패널에서 지표와 알림을 볼 수 있습니다.
 
+로그인 없이도 공개 링크 <https://panel.yiniot.com/my-demo> 로 둘러볼 수 있습니다(브라우저 시작 페이지로 지정해도 됩니다).
+
+함께 쓰는 브라우저 확장 [Yin-Panel Helper](https://github.com/yinorg/yin-panel-extension)([Chrome 웹 스토어](https://chromewebstore.google.com/detail/yin-panel-helper/hlfhnjccidngjjkidlgejefcchoegofo)에 등록됨)도 설치할 수 있습니다. 하는 일은 딱 두 가지입니다: 새 탭을 내 패널로 연결하고, 사이트 아이콘을 가져오도록 돕습니다.
+
 | 환경 | 주소 | 용도 | 안정성 |
 | --- | --- | --- | --- |
 | 프로덕션(PRD) | <https://panel.yiniot.com> | 일상 사용 | 99.9% 가용성을 목표로 하는 베스트 에포트 |
@@ -230,6 +234,8 @@ go build ./...
 스크립트는 기본적으로 저장소의 `backend/`를 실행 디렉터리로 사용하며 로컬 `conf.yaml`이 필요합니다. `.env.local`의 `YIN_PANEL_RUNTIME_DIR`로 재정의할 수 있습니다. 빌드와 테스트가 모두 통과하면 Yin-Panel 리스너만 중지하고 `sudo`로 이전 바이너리와 정적 파일을 교체하며 데이터베이스, 업로드 파일, 구성 파일은 건드리지 않습니다.
 
 홈 페이지 테마 시스템은 [`frontend/THEME_SYSTEM.md`](../../frontend/THEME_SYSTEM.md)에 문서화되어 있습니다. `npm run create:theme -- init "<이름>"`으로 새 테마 뼈대를 만들 수 있습니다. AI 개발·릴리스·재시작 규칙은 [AGENTS.md](../../AGENTS.md)에 있습니다.
+
+브라우저 수준 인수 테스트는 별도 저장소 [yinorg/yin-panel-e2e](https://github.com/yinorg/yin-panel-e2e)에 있습니다. Playwright가 실제 브라우저로 전체 흐름(로그인과 계정, 공간과 권한, 북마크 가져오기와 내보내기, 테마 시스템, PWA 오프라인 동작, 확장의 새 탭 대체)을 돌리고, k6 스크립트가 부하와 용량을 측정합니다. 실행하려면 돌아가는 Yin-Panel 인스턴스, Core 저장소의 `.env.local`, 패키징하지 않은 확장 소스가 필요하며 체크아웃 위치는 `YIN_PANEL_E2E_DIR`로 지정합니다.
 
 ## 백업과 업그레이드
 

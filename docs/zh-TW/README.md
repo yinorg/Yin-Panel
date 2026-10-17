@@ -56,6 +56,10 @@ Yin-Panel 是一個輕量、可自架的個人與共享空間導覽面板，適�
 
 我們維護三套線上環境，可以直接註冊試用，三套都支援 GitHub / GitLab / Google 登入；另有一套監控面板，用於查看運行指標與告警。
 
+不想登入也可以直接看公開連結 <https://panel.yiniot.com/my-demo>（也可以設為瀏覽器首頁）。
+
+也可以安裝配套的瀏覽器擴充功能 [Yin-Panel Helper](https://github.com/yinorg/yin-panel-extension)（已上架 [Chrome 線上應用程式商店](https://chromewebstore.google.com/detail/yin-panel-helper/hlfhnjccidngjjkidlgejefcchoegofo)），它只做兩件事：把新分頁指向你的面板網址，以及輔助取得網站圖示。
+
 | 環境 | 位址 | 用途 | 穩定性 |
 | --- | --- | --- | --- |
 | 正式（PRD） | <https://panel.yiniot.com> | 正式使用 | 以 99.9% 可用性為目標盡力保障 |
@@ -230,6 +234,8 @@ go build ./...
 腳本預設將儲存庫內的 `backend/` 作為執行目錄，要求其中存在本機 `conf.yaml`；可透過 `.env.local` 中的 `YIN_PANEL_RUNTIME_DIR` 覆寫。腳本會在建置與測試全部通過後，僅停止 Yin-Panel 監聽程序，使用 `sudo` 替換舊二進位檔與靜態檔案，不會修改資料庫、上傳檔案或設定檔。
 
 首頁主題系統見 [`frontend/THEME_SYSTEM.md`](../../frontend/THEME_SYSTEM.md)；使用 `npm run create:theme -- init "<名稱>"` 可建立新主題骨架。完整的 AI 開發、發佈與重新啟動慣例見 [AGENTS.md](../../AGENTS.md)。
+
+瀏覽器端的驗收測試放在獨立儲存庫 [yinorg/yin-panel-e2e](https://github.com/yinorg/yin-panel-e2e)：用 Playwright 驅動真實瀏覽器跑完整流程（登入與帳號、空間與權限、書籤匯入匯出、主題系統、PWA 離線行為，以及擴充功能接管新分頁），另有一套 k6 腳本做負載與容量量測。執行前需要一個已啟動的 Yin-Panel 實例、Core 儲存庫的 `.env.local` 與未封裝的擴充功能原始碼，檢出位置由 `YIN_PANEL_E2E_DIR` 指定。
 
 ## 備份與升級
 
