@@ -98,6 +98,22 @@ func noStoreAPI() gin.HandlerFunc {
 	}
 }
 
+// apiGzip compresses every API response.
+//
+// It deliberately sets no minimum length. gin-contrib/gzip decides "too small
+// to compress" by reading a Content-Length the handler already set, and on that
+// path it returns before the response is committed, leaving the
+// `Content-Encoding: gzip` header it added on entry while the body stays plain.
+// Static handlers that set Content-Length (`c.Data`, `http.ServeContent`) hit
+// exactly that path for payloads under the threshold, so every client that sent
+// `Accept-Encoding: gzip` — every browser — failed to decode small CSS, JSON or
+// uploaded files. Compressing everything keeps the header and the body in
+// agreement; the extra bytes on a tiny JSON response are cheaper than a response
+// no client can read. See TestAPICompressionNeverLabelsAPlainBody.
+func apiGzip() gin.HandlerFunc {
+	return gzip.Gzip(gzip.DefaultCompression)
+}
+
 func InitRouters(addr string) error {
 	router := gin.Default()
 	rootRouter := router.Group("/")
@@ -105,13 +121,10 @@ func InitRouters(addr string) error {
 
 	// 注册标准 API 路由
 	routerGroup := rootRouter.Group("api")
-	// API 响应都是 JSON，而首页的条目载荷是整个面板发给浏览器最大的那一份。
-	// 面板常通过长链路访问，压缩它值得这点 CPU；低于阈值的响应不压，小响应
-	// 就不会因为 gzip 分帧反而变慢。
 	// 用户数据不进任何缓存：浏览器对没有校验符的响应本就不该缓存，但这条要写明，
 	// 否则中间层（CDN、代理）有的是办法替你缓存。需要长期缓存的路由（主题/壁纸
 	// 素材）在处理器里覆盖这条头。
-	routerGroup.Use(noStoreAPI(), gzip.Gzip(gzip.DefaultCompression, gzip.WithMinLength(1024)))
+	routerGroup.Use(noStoreAPI(), apiGzip())
 	for _, router := range RouterArray() {
 		router.InitRouter(routerGroup)
 	}
