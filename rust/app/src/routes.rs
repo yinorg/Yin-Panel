@@ -428,24 +428,52 @@ async fn list_spaces(headers: HeaderMap) -> Response {
         Err(error) => return envelope::error(&error.to_string()),
     };
 
+    // `List` resolves the paired space and the caller's role in two batched
+    // queries rather than two per space, which matters once an account owns or
+    // joins many Spaces.
+    let mut paired_by_id: std::collections::HashMap<i64, i64> = std::collections::HashMap::new();
+    let mut role_by_id: std::collections::HashMap<i64, String> = std::collections::HashMap::new();
+    if !rows.is_empty() {
+        let placeholders = vec!["?"; rows.len()].join(",");
+        let paired_sql = format!(
+            r#"SELECT id, pair_id FROM "space" WHERE pair_id IN ({placeholders}) AND side = 'yang'"#
+        );
+        let mut query = sqlx::query_as::<_, (i64, i64)>(&paired_sql);
+        for row in &rows {
+            query = query.bind(row.id);
+        }
+        if let Ok(paired) = query.fetch_all(pool).await {
+            for (id, pair_id) in paired {
+                paired_by_id.insert(pair_id, id);
+            }
+        }
+        let member_sql = format!(
+            "SELECT space_id, role FROM space_member WHERE user_id = ? AND space_id IN ({placeholders})"
+        );
+        let mut query = sqlx::query_as::<_, (i64, String)>(&member_sql).bind(user.id);
+        for row in &rows {
+            query = query.bind(row.id);
+        }
+        if let Ok(members) = query.fetch_all(pool).await {
+            for (space_id, role) in members {
+                role_by_id.insert(space_id, role);
+            }
+        }
+    }
+
     let mut items = Vec::with_capacity(rows.len());
     for row in rows {
-        let paired: Option<(i64,)> =
-            sqlx::query_as(r#"SELECT id FROM "space" WHERE pair_id = ? AND side = 'yang' LIMIT 1"#)
-                .bind(row.id)
-                .fetch_optional(pool)
-                .await
-                .unwrap_or(None);
-        let role: Option<(String,)> =
-            sqlx::query_as(r#"SELECT role FROM space_member WHERE space_id = ? AND user_id = ? LIMIT 1"#)
-                .bind(row.id)
-                .bind(user.id)
-                .fetch_optional(pool)
-                .await
-                .unwrap_or(None);
-        let role = role.map(|value| value.0).unwrap_or_default();
-        let can_edit = row.owner_user_id == user.id || role == "admin" || role == "editor";
+        let role = match role_by_id.get(&row.id) {
+            Some(role) => role.clone(),
+            None => String::new(),
+        };
+        // The owner is always an administrator, whatever the member row says.
+        let can_edit = row.owner_user_id == user.id
+            || role == "admin"
+            || role == "editor";
         items.push(SpaceItem {
+            paired_space_id: paired_by_id.get(&row.id).copied(),
+            can_edit,
             id: row.id,
             create_time: rfc3339(&row.created_at),
             update_time: rfc3339(&row.updated_at),
@@ -454,11 +482,9 @@ async fn list_spaces(headers: HeaderMap) -> Response {
             owner_user_id: row.owner_user_id,
             pair_id: row.pair_id,
             side: row.side,
-            paired_space_id: paired.map(|value| value.0),
             public_enabled: row.public_enabled != 0,
             public_id: row.public_id,
             public_mode: row.public_mode,
-            can_edit,
         });
     }
     envelope::success_struct(items)
