@@ -124,6 +124,13 @@ that hold a package-level `*gorm.DB`; the bridge sees only constructors and
 behaviour under test is SQL against a live database, and the Go functions cannot
 run without their global handle.
 
+**Update (2026-11-20):** `repository` now has a unit crate after all, through a
+Go adapter in `backend/internal/tools/repositoryport` (a non-product package the
+server does not import). It points the package-level handle at one database file
+for a single call, so `bridge` can record the real methods. See ADR-013.
+
+The paragraph below records the original finding.
+
 Those units are therefore not ported as crates. Their behaviour is proven at the
 HTTP contract level (384 recorded cases, fallback 0.0%) and, for the schema, by
 `rust/db-tool`'s upgrade and copy tests. The consequence is real: `app lift`
@@ -188,3 +195,36 @@ space-separated comparators (`>=0.4.0`), never a bare version, `^` or `*`; and
 the permission check uses a fixed allow-list of eleven names, rejects
 duplicates, and requires a script entrypoint when a theme contributes views,
 regions or components.
+
+## ADR-013: the repository unit goes through a non-product Go adapter
+
+**Status:** accepted
+
+`bridge` cannot see `UserRepo.GetByMail` and its neighbours: the receiver holds
+the package-level `*gorm.DB`, so only the constructors are visible. Instead of
+accepting route-level evidence forever, `backend/internal/tools/repositoryport`
+exposes the real methods as free functions that take a database path, open the
+handle for one call and delegate. Nothing in the server imports that package.
+
+`rust/repository-rs` ports the seven functions it exports with `sqlx` and passes
+the gate: 344/344 recorded cases, including `record not found`, a missing
+database, an empty path and the `sort, created_at` ordering. The fixture is a
+database built from `rust/db-tool`'s schema with two accounts and three groups.
+
+Only read paths are recorded: a recorded write would mutate the fixture between
+the original run and the port run, so `UpdateUserName` is ported and exported
+but has no case.
+
+## ADR-014: wallpaperpack's `error cases` check is a recorded exception
+
+**Status:** accepted, with a consequence for `app lift`
+
+`wallpaperpack-rs` passes every gate check except `error cases`, which asks for
+a recorded case where `Catalogue` fails. Its only error path is a failed read of
+the compile-time `embed.FS`, which cannot happen at run time and cannot be
+produced by any input. The check is a false positive: it infers "this function
+can fail" from the `(Pack, error)` signature and a `return ..., loadErr` line.
+
+The port matches all 212 recorded cases. Fabricating a case would be worse than
+recording the exception, so the exception stands and `app lift` will keep
+refusing until the gate check or the accepted definition changes.

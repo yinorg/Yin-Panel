@@ -58,6 +58,7 @@ rust-anything analyze backend --lang go --whole-app
   | `response-rs` (`GetErrorMsgByCode`) | **pass** | 25/25 |
   | `storage-rs` (`ContentAddressedKey`) | **pass** | 100/100 |
   | `theme-rs` (manifest/grant/scope/web-wallpaper) | **pass** | 111/111 |
+  | `repository-rs` (7 repository methods, via a non-product Go adapter) | **pass** | 344/344 |
   | `wallpaperpack-rs` | fails **only** `error cases` | 212/212 |
   | `internal/biz/service` | cannot be bridged: every export depends on a repository interface | — |
   | `internal/web/model/base` | cannot be bridged: `interface{}` and `*gin.Context` | — |
@@ -68,9 +69,11 @@ rust-anything analyze backend --lang go --whole-app
   `MigrateDB`; the rest of that package takes the package-level `*gorm.DB` and
   stays in Go, with the reason recorded per export in its manifest. The binary's
   `migrate-db` command calls the same function.
-- `repository` still has no unit crate: `bridge` on `internal/biz/repository`
-  yields only the constructors and `CalcOffset`, because every repository method
-  hangs off a receiver that holds the package-level `*gorm.DB` (ADR-009).
+- `repository` is ported through `backend/internal/tools/repositoryport`, a
+  non-product adapter: `bridge` on `internal/biz/repository` itself yields only
+  the constructors (ADR-009), so the adapter opens the handle for one call and
+  delegates to the real methods. `rust/repository-rs` passes the gate with 344
+  cases (ADR-013).
 - `app lift` builds a copy of `rust/app` (without `rust/record/`) and replays it
   from the repository root, so the configuration must exist in the recording
   directory it falls back to. Prepare it first:

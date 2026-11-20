@@ -1,0 +1,228 @@
+{
+  "schema": "rust-anything/bridge@1",
+  "root": "/home/hsy/project/Yin-Panel/backend",
+  "unit": "internal/tools/repositoryport/",
+  "language": "go",
+  "kind": "ffi",
+  "crate_name": "repositoryport-rs",
+  "exports": [
+    {
+      "name": "CountUsers",
+      "file": "internal/tools/repositoryport/repositoryport.go",
+      "line": 45,
+      "params": [
+        {
+          "name": "dbPath",
+          "ts_type": "string",
+          "optional": false,
+          "rest": false,
+          "native_type": "string"
+        }
+      ],
+      "returns": "int",
+      "is_async": false,
+      "is_generator": false,
+      "type_params": [],
+      "uses_instanceof": false,
+      "native_return": "(uint, error)",
+      "prototype": "func CountUsers(dbPath string) (uint, error)"
+    },
+    {
+      "name": "UserMailAndName",
+      "file": "internal/tools/repositoryport/repositoryport.go",
+      "line": 61,
+      "params": [
+        {
+          "name": "dbPath",
+          "ts_type": "string",
+          "optional": false,
+          "rest": false,
+          "native_type": "string"
+        },
+        {
+          "name": "mail",
+          "ts_type": "string",
+          "optional": false,
+          "rest": false,
+          "native_type": "string"
+        }
+      ],
+      "returns": "[string, string]",
+      "is_async": false,
+      "is_generator": false,
+      "type_params": [],
+      "uses_instanceof": false,
+      "native_return": "(string, string, error)",
+      "prototype": "func UserMailAndName(dbPath, mail string) (string, string, error)"
+    },
+    {
+      "name": "UpdateUserName",
+      "file": "internal/tools/repositoryport/repositoryport.go",
+      "line": 70,
+      "params": [
+        {
+          "name": "dbPath",
+          "ts_type": "string",
+          "optional": false,
+          "rest": false,
+          "native_type": "string"
+        },
+        {
+          "name": "userID",
+          "ts_type": "int",
+          "optional": false,
+          "rest": false,
+          "native_type": "uint"
+        },
+        {
+          "name": "name",
+          "ts_type": "string",
+          "optional": false,
+          "rest": false,
+          "native_type": "string"
+        }
+      ],
+      "returns": "void",
+      "is_async": false,
+      "is_generator": false,
+      "type_params": [],
+      "uses_instanceof": false,
+      "native_return": "(error)",
+      "prototype": "func UpdateUserName(dbPath string, userID uint, name string) error"
+    },
+    {
+      "name": "CountGroups",
+      "file": "internal/tools/repositoryport/repositoryport.go",
+      "line": 86,
+      "params": [
+        {
+          "name": "dbPath",
+          "ts_type": "string",
+          "optional": false,
+          "rest": false,
+          "native_type": "string"
+        },
+        {
+          "name": "userID",
+          "ts_type": "int",
+          "optional": false,
+          "rest": false,
+          "native_type": "uint"
+        }
+      ],
+      "returns": "int",
+      "is_async": false,
+      "is_generator": false,
+      "type_params": [],
+      "uses_instanceof": false,
+      "native_return": "(int, error)",
+      "prototype": "func CountGroups(dbPath string, userID uint) (int, error)"
+    },
+    {
+      "name": "GetUserPassword",
+      "file": "internal/tools/repositoryport/repositoryport.go",
+      "line": 94,
+      "params": [
+        {
+          "name": "dbPath",
+          "ts_type": "string",
+          "optional": false,
+          "rest": false,
+          "native_type": "string"
+        },
+        {
+          "name": "mail",
+          "ts_type": "string",
+          "optional": false,
+          "rest": false,
+          "native_type": "string"
+        }
+      ],
+      "returns": "string",
+      "is_async": false,
+      "is_generator": false,
+      "type_params": [],
+      "uses_instanceof": false,
+      "native_return": "(string, error)",
+      "prototype": "func GetUserPassword(dbPath, mail string) (string, error)"
+    },
+    {
+      "name": "PasswordMatches",
+      "file": "internal/tools/repositoryport/repositoryport.go",
+      "line": 104,
+      "params": [
+        {
+          "name": "dbPath",
+          "ts_type": "string",
+          "optional": false,
+          "rest": false,
+          "native_type": "string"
+        },
+        {
+          "name": "mail",
+          "ts_type": "string",
+          "optional": false,
+          "rest": false,
+          "native_type": "string"
+        },
+        {
+          "name": "password",
+          "ts_type": "string",
+          "optional": false,
+          "rest": false,
+          "native_type": "string"
+        }
+      ],
+      "returns": "boolean",
+      "is_async": false,
+      "is_generator": false,
+      "type_params": [],
+      "uses_instanceof": false,
+      "native_return": "(bool, error)",
+      "prototype": "func PasswordMatches(dbPath, mail, password string) (bool, error)"
+    },
+    {
+      "name": "GroupTitles",
+      "file": "internal/tools/repositoryport/repositoryport.go",
+      "line": 119,
+      "params": [
+        {
+          "name": "dbPath",
+          "ts_type": "string",
+          "optional": false,
+          "rest": false,
+          "native_type": "string"
+        },
+        {
+          "name": "userID",
+          "ts_type": "int",
+          "optional": false,
+          "rest": false,
+          "native_type": "uint"
+        }
+      ],
+      "returns": "string[]",
+      "is_async": false,
+      "is_generator": false,
+      "type_params": [],
+      "uses_instanceof": false,
+      "native_return": "([]string, error)",
+      "prototype": "func GroupTitles(dbPath string, userID uint) ([]string, error)"
+    }
+  ],
+  "classes": [],
+  "js_only": [
+    {
+      "name": "GetUserByMail",
+      "file": "internal/tools/repositoryport/repositoryport.go",
+      "line": 53,
+      "reason": "uses `repository.User` from another package"
+    },
+    {
+      "name": "ListGroups",
+      "file": "internal/tools/repositoryport/repositoryport.go",
+      "line": 78,
+      "reason": "uses `repository.ItemIconGroup` from another package"
+    }
+  ]
+}

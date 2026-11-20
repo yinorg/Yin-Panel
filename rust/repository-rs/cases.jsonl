@@ -1,0 +1,344 @@
+{"args":["abc"],"error":"database not found: abc","fn":"CountUsers"}
+{"args":["src/a/b.ts"],"error":"database not found: src/a/b.ts","fn":"CountUsers"}
+{"args":["a:b:c"],"error":"database not found: a:b:c","fn":"CountUsers"}
+{"args":["é"],"error":"database not found: é","fn":"CountUsers"}
+{"args":["ab"],"error":"database not found: ab","fn":"CountUsers"}
+{"args":["ns:key.path"],"error":"database not found: ns:key.path","fn":"CountUsers"}
+{"args":["a😀b😀c"],"error":"database not found: a😀b😀c","fn":"CountUsers"}
+{"args":["ΣΊΣΥΦΟΣ"],"error":"database not found: ΣΊΣΥΦΟΣ","fn":"CountUsers"}
+{"args":["hello world"],"error":"database not found: hello world","fn":"CountUsers"}
+{"args":["{name} has {count} items"],"error":"database not found: {name} has {count} items","fn":"CountUsers"}
+{"args":["a:b:c﻿bom"],"error":"database not found: a:b:c﻿bom","fn":"CountUsers"}
+{"args":["﻿bom"],"error":"database not found: ﻿bom","fn":"CountUsers"}
+{"args":["日本語のテキスト"],"error":"database not found: 日本語のテキスト","fn":"CountUsers"}
+{"args":["ünïcödé"],"error":"database not found: ünïcödé","fn":"CountUsers"}
+{"args":["line1\nline2"],"error":"database not found: line1\nline2","fn":"CountUsers"}
+{"args":["İstanbul"],"error":"database not found: İstanbul","fn":"CountUsers"}
+{"args":["Hello Worldemoji 👍🏽 mix"],"error":"database not found: Hello Worldemoji 👍🏽 mix","fn":"CountUsers"}
+{"args":["line1\nline2Hello World"],"error":"database not found: line1\nline2Hello World","fn":"CountUsers"}
+{"args":["tab\tseparated"],"error":"database not found: tab\tseparated","fn":"CountUsers"}
+{"args":["a..b"],"error":"database not found: a..b","fn":"CountUsers"}
+{"args":["héllo wörld"],"error":"database not found: héllo wörld","fn":"CountUsers"}
+{"args":["👍🏽 thumbs"],"error":"database not found: 👍🏽 thumbs","fn":"CountUsers"}
+{"args":["日本語"],"error":"database not found: 日本語","fn":"CountUsers"}
+{"args":[""],"error":"database path is required","fn":"CountUsers"}
+{"args":["straße"],"error":"database not found: straße","fn":"CountUsers"}
+{"args":["ılık ırmak"],"error":"database not found: ılık ırmak","fn":"CountUsers"}
+{"args":["👨‍👩‍👧 family"],"error":"database not found: 👨‍👩‍👧 family","fn":"CountUsers"}
+{"args":["a b"],"error":"database not found: a b","fn":"CountUsers"}
+{"args":["a😀b"],"error":"database not found: a😀b","fn":"CountUsers"}
+{"args":["a²b x½ y①"],"error":"database not found: a²b x½ y①","fn":"CountUsers"}
+{"args":["aⅠb Ⅻ"],"error":"database not found: aⅠb Ⅻ","fn":"CountUsers"}
+{"args":["a𐐀b 𝐀bc"],"error":"database not found: a𐐀b 𝐀bc","fn":"CountUsers"}
+{"args":["कि ٣٤"],"error":"database not found: कि ٣٤","fn":"CountUsers"}
+{"args":["a..b  padded  ",":"],"error":"database not found: a..b  padded  ","fn":"UserMailAndName"}
+{"args":["straßeΣΊΣΥΦΟΣ","key_name-1"],"error":"database not found: straßeΣΊΣΥΦΟΣ","fn":"UserMailAndName"}
+{"args":["a.b.c","{name} has {count} items"],"error":"database not found: a.b.c","fn":"UserMailAndName"}
+{"args":[".leading","İstanbula:b:c"],"error":"database not found: .leading","fn":"UserMailAndName"}
+{"args":["line1\nline2","İstanbulab"],"error":"database not found: line1\nline2","fn":"UserMailAndName"}
+{"args":["﻿bom","{name} has {count} items"],"error":"database not found: ﻿bom","fn":"UserMailAndName"}
+{"args":["hello😀","line1\nline2"],"error":"database not found: hello😀","fn":"UserMailAndName"}
+{"args":["İstanbul","a..b"],"error":"database not found: İstanbul","fn":"UserMailAndName"}
+{"args":[".leading","tab\tseparated"],"error":"database not found: .leading","fn":"UserMailAndName"}
+{"args":["abc﻿bom","HELLOemoji 👍🏽 mix"],"error":"database not found: abc﻿bom","fn":"UserMailAndName"}
+{"args":[":a😀b😀c","a:b:cHello World"],"error":"database not found: :a😀b😀c","fn":"UserMailAndName"}
+{"args":["a..b","ΣΊΣΥΦΟΣ"],"error":"database not found: a..b","fn":"UserMailAndName"}
+{"args":["abünïcödé","日本語のテキスト"],"error":"database not found: abünïcödé","fn":"UserMailAndName"}
+{"args":["Hello World","llo Wor"],"error":"database not found: Hello World","fn":"UserMailAndName"}
+{"args":["a😀b😀c","src/a/b.ts"],"error":"database not found: a😀b😀c","fn":"UserMailAndName"}
+{"args":["ns:key.path","HELLO"],"error":"database not found: ns:key.path","fn":"UserMailAndName"}
+{"args":["abc","ΣΊΣΥΦΟΣ﻿bom"],"error":"database not found: abc","fn":"UserMailAndName"}
+{"args":["a","hello"],"error":"database not found: a","fn":"UserMailAndName"}
+{"args":["Hello World","a😀b😀c"],"error":"database not found: Hello World","fn":"UserMailAndName"}
+{"args":["trailing.",":.leading"],"error":"database not found: trailing.","fn":"UserMailAndName"}
+{"args":["héllo wörld",":"],"error":"database not found: héllo wörld","fn":"UserMailAndName"}
+{"args":["👍🏽 thumbs",":"],"error":"database not found: 👍🏽 thumbs","fn":"UserMailAndName"}
+{"args":["日本語",":"],"error":"database not found: 日本語","fn":"UserMailAndName"}
+{"args":["",":"],"error":"database path is required","fn":"UserMailAndName"}
+{"args":["é",":"],"error":"database not found: é","fn":"UserMailAndName"}
+{"args":["İstanbul",":"],"error":"database not found: İstanbul","fn":"UserMailAndName"}
+{"args":["straße",":"],"error":"database not found: straße","fn":"UserMailAndName"}
+{"args":["ılık ırmak",":"],"error":"database not found: ılık ırmak","fn":"UserMailAndName"}
+{"args":["👨‍👩‍👧 family",":"],"error":"database not found: 👨‍👩‍👧 family","fn":"UserMailAndName"}
+{"args":["a b",":"],"error":"database not found: a b","fn":"UserMailAndName"}
+{"args":["ΣΊΣΥΦΟΣ",":"],"error":"database not found: ΣΊΣΥΦΟΣ","fn":"UserMailAndName"}
+{"args":["a😀b",":"],"error":"database not found: a😀b","fn":"UserMailAndName"}
+{"args":["﻿bom",":"],"error":"database not found: ﻿bom","fn":"UserMailAndName"}
+{"args":["a²b x½ y①",":"],"error":"database not found: a²b x½ y①","fn":"UserMailAndName"}
+{"args":["aⅠb Ⅻ",":"],"error":"database not found: aⅠb Ⅻ","fn":"UserMailAndName"}
+{"args":["a𐐀b 𝐀bc",":"],"error":"database not found: a𐐀b 𝐀bc","fn":"UserMailAndName"}
+{"args":["कि ٣٤",":"],"error":"database not found: कि ٣٤","fn":"UserMailAndName"}
+{"args":["a..b  padded  ","héllo wörld"],"error":"database not found: a..b  padded  ","fn":"UserMailAndName"}
+{"args":["a..b  padded  ","👍🏽 thumbs"],"error":"database not found: a..b  padded  ","fn":"UserMailAndName"}
+{"args":["a..b  padded  ","日本語"],"error":"database not found: a..b  padded  ","fn":"UserMailAndName"}
+{"args":["a..b  padded  ",""],"error":"database not found: a..b  padded  ","fn":"UserMailAndName"}
+{"args":["a..b  padded  ","é"],"error":"database not found: a..b  padded  ","fn":"UserMailAndName"}
+{"args":["a..b  padded  ","İstanbul"],"error":"database not found: a..b  padded  ","fn":"UserMailAndName"}
+{"args":["a..b  padded  ","straße"],"error":"database not found: a..b  padded  ","fn":"UserMailAndName"}
+{"args":["a..b  padded  ","ılık ırmak"],"error":"database not found: a..b  padded  ","fn":"UserMailAndName"}
+{"args":["a..b  padded  ","👨‍👩‍👧 family"],"error":"database not found: a..b  padded  ","fn":"UserMailAndName"}
+{"args":["a..b  padded  ","a b"],"error":"database not found: a..b  padded  ","fn":"UserMailAndName"}
+{"args":["a..b  padded  ","ΣΊΣΥΦΟΣ"],"error":"database not found: a..b  padded  ","fn":"UserMailAndName"}
+{"args":["a..b  padded  ","a😀b"],"error":"database not found: a..b  padded  ","fn":"UserMailAndName"}
+{"args":["a..b  padded  ","﻿bom"],"error":"database not found: a..b  padded  ","fn":"UserMailAndName"}
+{"args":["a..b  padded  ","a²b x½ y①"],"error":"database not found: a..b  padded  ","fn":"UserMailAndName"}
+{"args":["a..b  padded  ","aⅠb Ⅻ"],"error":"database not found: a..b  padded  ","fn":"UserMailAndName"}
+{"args":["a..b  padded  ","a𐐀b 𝐀bc"],"error":"database not found: a..b  padded  ","fn":"UserMailAndName"}
+{"args":["a..b  padded  ","कि ٣٤"],"error":"database not found: a..b  padded  ","fn":"UserMailAndName"}
+{"args":[" ",0,"emoji 👍🏽 mix"],"error":"database not found:  ","fn":"UpdateUserName"}
+{"args":[":",100,":"],"error":"database not found: :","fn":"UpdateUserName"}
+{"args":["ünïcödéa:b:c",255,"src/a/b.ts"],"error":"database not found: ünïcödéa:b:c","fn":"UpdateUserName"}
+{"args":["trailing.trailing.",9223372036854775807,"hello worldİstanbul"],"error":"database not found: trailing.trailing.","fn":"UpdateUserName"}
+{"args":["ns:key.pathHELLO",1,"ey."],"error":"database not found: ns:key.pathHELLO","fn":"UpdateUserName"}
+{"args":["é",42,"Hello World"],"error":"database not found: é","fn":"UpdateUserName"}
+{"args":["{name} has {count} items",2147483647,"a.b.c"],"error":"database not found: {name} has {count} items","fn":"UpdateUserName"}
+{"args":["﻿bom",42,"emoji 👍🏽 mix"],"error":"database not found: ﻿bom","fn":"UpdateUserName"}
+{"args":["  padded  ",42,"abc"],"error":"database not found:   padded  ","fn":"UpdateUserName"}
+{"args":["日本語のテキスト",0,"ns:key.path"],"error":"database not found: 日本語のテキスト","fn":"UpdateUserName"}
+{"args":["a😀b😀c",2147483647,"tab\tseparated"],"error":"database not found: a😀b😀c","fn":"UpdateUserName"}
+{"args":["a.b.c",9223372036854775807,""],"error":"database not found: a.b.c","fn":"UpdateUserName"}
+{"args":["a",100,"日本語のテキスト"],"error":"database not found: a","fn":"UpdateUserName"}
+{"args":["日本語のテキスト",7,"スト"],"error":"database not found: 日本語のテキスト","fn":"UpdateUserName"}
+{"args":["héllo wörld",0,"emoji 👍🏽 mix"],"error":"database not found: héllo wörld","fn":"UpdateUserName"}
+{"args":["👍🏽 thumbs",0,"emoji 👍🏽 mix"],"error":"database not found: 👍🏽 thumbs","fn":"UpdateUserName"}
+{"args":["日本語",0,"emoji 👍🏽 mix"],"error":"database not found: 日本語","fn":"UpdateUserName"}
+{"args":["",0,"emoji 👍🏽 mix"],"error":"database path is required","fn":"UpdateUserName"}
+{"args":["é",0,"emoji 👍🏽 mix"],"error":"database not found: é","fn":"UpdateUserName"}
+{"args":["İstanbul",0,"emoji 👍🏽 mix"],"error":"database not found: İstanbul","fn":"UpdateUserName"}
+{"args":["straße",0,"emoji 👍🏽 mix"],"error":"database not found: straße","fn":"UpdateUserName"}
+{"args":["ılık ırmak",0,"emoji 👍🏽 mix"],"error":"database not found: ılık ırmak","fn":"UpdateUserName"}
+{"args":["👨‍👩‍👧 family",0,"emoji 👍🏽 mix"],"error":"database not found: 👨‍👩‍👧 family","fn":"UpdateUserName"}
+{"args":["a b",0,"emoji 👍🏽 mix"],"error":"database not found: a b","fn":"UpdateUserName"}
+{"args":["ΣΊΣΥΦΟΣ",0,"emoji 👍🏽 mix"],"error":"database not found: ΣΊΣΥΦΟΣ","fn":"UpdateUserName"}
+{"args":["a😀b",0,"emoji 👍🏽 mix"],"error":"database not found: a😀b","fn":"UpdateUserName"}
+{"args":["﻿bom",0,"emoji 👍🏽 mix"],"error":"database not found: ﻿bom","fn":"UpdateUserName"}
+{"args":["a²b x½ y①",0,"emoji 👍🏽 mix"],"error":"database not found: a²b x½ y①","fn":"UpdateUserName"}
+{"args":["aⅠb Ⅻ",0,"emoji 👍🏽 mix"],"error":"database not found: aⅠb Ⅻ","fn":"UpdateUserName"}
+{"args":["a𐐀b 𝐀bc",0,"emoji 👍🏽 mix"],"error":"database not found: a𐐀b 𝐀bc","fn":"UpdateUserName"}
+{"args":["कि ٣٤",0,"emoji 👍🏽 mix"],"error":"database not found: कि ٣٤","fn":"UpdateUserName"}
+{"args":[" ",2147483648,"emoji 👍🏽 mix"],"error":"database not found:  ","fn":"UpdateUserName"}
+{"args":[" ",9007199254740993,"emoji 👍🏽 mix"],"error":"database not found:  ","fn":"UpdateUserName"}
+{"args":[" ",9223372036854775807,"emoji 👍🏽 mix"],"error":"database not found:  ","fn":"UpdateUserName"}
+{"args":[" ",0,"héllo wörld"],"error":"database not found:  ","fn":"UpdateUserName"}
+{"args":[" ",0,"👍🏽 thumbs"],"error":"database not found:  ","fn":"UpdateUserName"}
+{"args":[" ",0,"日本語"],"error":"database not found:  ","fn":"UpdateUserName"}
+{"args":[" ",0,""],"error":"database not found:  ","fn":"UpdateUserName"}
+{"args":[" ",0,"é"],"error":"database not found:  ","fn":"UpdateUserName"}
+{"args":[" ",0,"İstanbul"],"error":"database not found:  ","fn":"UpdateUserName"}
+{"args":[" ",0,"straße"],"error":"database not found:  ","fn":"UpdateUserName"}
+{"args":[" ",0,"ılık ırmak"],"error":"database not found:  ","fn":"UpdateUserName"}
+{"args":[" ",0,"👨‍👩‍👧 family"],"error":"database not found:  ","fn":"UpdateUserName"}
+{"args":[" ",0,"a b"],"error":"database not found:  ","fn":"UpdateUserName"}
+{"args":[" ",0,"ΣΊΣΥΦΟΣ"],"error":"database not found:  ","fn":"UpdateUserName"}
+{"args":[" ",0,"a😀b"],"error":"database not found:  ","fn":"UpdateUserName"}
+{"args":[" ",0,"﻿bom"],"error":"database not found:  ","fn":"UpdateUserName"}
+{"args":[" ",0,"a²b x½ y①"],"error":"database not found:  ","fn":"UpdateUserName"}
+{"args":[" ",0,"aⅠb Ⅻ"],"error":"database not found:  ","fn":"UpdateUserName"}
+{"args":[" ",0,"a𐐀b 𝐀bc"],"error":"database not found:  ","fn":"UpdateUserName"}
+{"args":[" ",0,"कि ٣٤"],"error":"database not found:  ","fn":"UpdateUserName"}
+{"args":["😀{name} has {count} items",9223372036854775807],"error":"database not found: 😀{name} has {count} items","fn":"CountGroups"}
+{"args":["﻿bomline1\nline2",0],"error":"database not found: ﻿bomline1\nline2","fn":"CountGroups"}
+{"args":["tab\tseparated",9223372036854775807],"error":"database not found: tab\tseparated","fn":"CountGroups"}
+{"args":["日本語のテキスト",255],"error":"database not found: 日本語のテキスト","fn":"CountGroups"}
+{"args":[":",1],"error":"database not found: :","fn":"CountGroups"}
+{"args":["straße",2147483647],"error":"database not found: straße","fn":"CountGroups"}
+{"args":["ünïcödé",255],"error":"database not found: ünïcödé","fn":"CountGroups"}
+{"args":["  padded  ",42],"error":"database not found:   padded  ","fn":"CountGroups"}
+{"args":["hello",1],"error":"database not found: hello","fn":"CountGroups"}
+{"args":["a:b:c",9223372036854775807],"error":"database not found: a:b:c","fn":"CountGroups"}
+{"args":["日本語のテキスト",100],"error":"database not found: 日本語のテキスト","fn":"CountGroups"}
+{"args":["key_name-1",100],"error":"database not found: key_name-1","fn":"CountGroups"}
+{"args":["",255],"error":"database path is required","fn":"CountGroups"}
+{"args":["😀key_name-1",2],"error":"database not found: 😀key_name-1","fn":"CountGroups"}
+{"args":["tab\tseparated",0],"error":"database not found: tab\tseparated","fn":"CountGroups"}
+{"args":["trailing.",1],"error":"database not found: trailing.","fn":"CountGroups"}
+{"args":["a",42],"error":"database not found: a","fn":"CountGroups"}
+{"args":["héllo wörld",9223372036854775807],"error":"database not found: héllo wörld","fn":"CountGroups"}
+{"args":["👍🏽 thumbs",9223372036854775807],"error":"database not found: 👍🏽 thumbs","fn":"CountGroups"}
+{"args":["日本語",9223372036854775807],"error":"database not found: 日本語","fn":"CountGroups"}
+{"args":["",9223372036854775807],"error":"database path is required","fn":"CountGroups"}
+{"args":["é",9223372036854775807],"error":"database not found: é","fn":"CountGroups"}
+{"args":["İstanbul",9223372036854775807],"error":"database not found: İstanbul","fn":"CountGroups"}
+{"args":["straße",9223372036854775807],"error":"database not found: straße","fn":"CountGroups"}
+{"args":["ılık ırmak",9223372036854775807],"error":"database not found: ılık ırmak","fn":"CountGroups"}
+{"args":["👨‍👩‍👧 family",9223372036854775807],"error":"database not found: 👨‍👩‍👧 family","fn":"CountGroups"}
+{"args":["a b",9223372036854775807],"error":"database not found: a b","fn":"CountGroups"}
+{"args":["ΣΊΣΥΦΟΣ",9223372036854775807],"error":"database not found: ΣΊΣΥΦΟΣ","fn":"CountGroups"}
+{"args":["a😀b",9223372036854775807],"error":"database not found: a😀b","fn":"CountGroups"}
+{"args":["﻿bom",9223372036854775807],"error":"database not found: ﻿bom","fn":"CountGroups"}
+{"args":["a²b x½ y①",9223372036854775807],"error":"database not found: a²b x½ y①","fn":"CountGroups"}
+{"args":["aⅠb Ⅻ",9223372036854775807],"error":"database not found: aⅠb Ⅻ","fn":"CountGroups"}
+{"args":["a𐐀b 𝐀bc",9223372036854775807],"error":"database not found: a𐐀b 𝐀bc","fn":"CountGroups"}
+{"args":["कि ٣٤",9223372036854775807],"error":"database not found: कि ٣٤","fn":"CountGroups"}
+{"args":["😀{name} has {count} items",0],"error":"database not found: 😀{name} has {count} items","fn":"CountGroups"}
+{"args":["😀{name} has {count} items",2147483648],"error":"database not found: 😀{name} has {count} items","fn":"CountGroups"}
+{"args":["😀{name} has {count} items",9007199254740993],"error":"database not found: 😀{name} has {count} items","fn":"CountGroups"}
+{"args":["line1\nline2  padded  ","İstanbul"],"error":"database not found: line1\nline2  padded  ","fn":"GetUserPassword"}
+{"args":["{name} has {count} items","a"],"error":"database not found: {name} has {count} items","fn":"GetUserPassword"}
+{"args":["{name} has {count} items日本語のテキスト","tab\tseparated"],"error":"database not found: {name} has {count} items日本語のテキスト","fn":"GetUserPassword"}
+{"args":["trailing.","trailing."],"error":"database not found: trailing.","fn":"GetUserPassword"}
+{"args":["key_name-1","a😀b😀c"],"error":"database not found: key_name-1","fn":"GetUserPassword"}
+{"args":["src/a/b.ts","{name} has {count} items"],"error":"database not found: src/a/b.ts","fn":"GetUserPassword"}
+{"args":["a.","a..b"],"error":"database not found: a.","fn":"GetUserPassword"}
+{"args":["hello","straße"],"error":"database not found: hello","fn":"GetUserPassword"}
+{"args":["a..b","a.b.cİstanbul"],"error":"database not found: a..b","fn":"GetUserPassword"}
+{"args":["ΣΊΣΥΦΟΣ","日本語のテキストHello World"],"error":"database not found: ΣΊΣΥΦΟΣ","fn":"GetUserPassword"}
+{"args":["😀","😀"],"error":"database not found: 😀","fn":"GetUserPassword"}
+{"args":["é","ns:key.pathHELLO"],"error":"database not found: é","fn":"GetUserPassword"}
+{"args":["emoji 👍🏽 mix","a😀b😀c"],"error":"database not found: emoji 👍🏽 mix","fn":"GetUserPassword"}
+{"args":["key_name-1","key_"],"error":"database not found: key_name-1","fn":"GetUserPassword"}
+{"args":["a..b","b"],"error":"database not found: a..b","fn":"GetUserPassword"}
+{"args":["ab日本語のテキスト","{name} has {count} itemskey_name-1"],"error":"database not found: ab日本語のテキスト","fn":"GetUserPassword"}
+{"args":["hello","HELLO"],"error":"database not found: hello","fn":"GetUserPassword"}
+{"args":["a","a.b.c"],"error":"database not found: a","fn":"GetUserPassword"}
+{"args":["src/a/b.ts","﻿bom"],"error":"database not found: src/a/b.ts","fn":"GetUserPassword"}
+{"args":["/A/B.TSE","src/a/b.tsé"],"error":"database not found: /A/B.TSE","fn":"GetUserPassword"}
+{"args":["héllo wörld","İstanbul"],"error":"database not found: héllo wörld","fn":"GetUserPassword"}
+{"args":["👍🏽 thumbs","İstanbul"],"error":"database not found: 👍🏽 thumbs","fn":"GetUserPassword"}
+{"args":["日本語","İstanbul"],"error":"database not found: 日本語","fn":"GetUserPassword"}
+{"args":["","İstanbul"],"error":"database path is required","fn":"GetUserPassword"}
+{"args":["é","İstanbul"],"error":"database not found: é","fn":"GetUserPassword"}
+{"args":["İstanbul","İstanbul"],"error":"database not found: İstanbul","fn":"GetUserPassword"}
+{"args":["straße","İstanbul"],"error":"database not found: straße","fn":"GetUserPassword"}
+{"args":["ılık ırmak","İstanbul"],"error":"database not found: ılık ırmak","fn":"GetUserPassword"}
+{"args":["👨‍👩‍👧 family","İstanbul"],"error":"database not found: 👨‍👩‍👧 family","fn":"GetUserPassword"}
+{"args":["a b","İstanbul"],"error":"database not found: a b","fn":"GetUserPassword"}
+{"args":["ΣΊΣΥΦΟΣ","İstanbul"],"error":"database not found: ΣΊΣΥΦΟΣ","fn":"GetUserPassword"}
+{"args":["a😀b","İstanbul"],"error":"database not found: a😀b","fn":"GetUserPassword"}
+{"args":["﻿bom","İstanbul"],"error":"database not found: ﻿bom","fn":"GetUserPassword"}
+{"args":["a²b x½ y①","İstanbul"],"error":"database not found: a²b x½ y①","fn":"GetUserPassword"}
+{"args":["aⅠb Ⅻ","İstanbul"],"error":"database not found: aⅠb Ⅻ","fn":"GetUserPassword"}
+{"args":["a𐐀b 𝐀bc","İstanbul"],"error":"database not found: a𐐀b 𝐀bc","fn":"GetUserPassword"}
+{"args":["कि ٣٤","İstanbul"],"error":"database not found: कि ٣٤","fn":"GetUserPassword"}
+{"args":["line1\nline2  padded  ","héllo wörld"],"error":"database not found: line1\nline2  padded  ","fn":"GetUserPassword"}
+{"args":["line1\nline2  padded  ","👍🏽 thumbs"],"error":"database not found: line1\nline2  padded  ","fn":"GetUserPassword"}
+{"args":["line1\nline2  padded  ","日本語"],"error":"database not found: line1\nline2  padded  ","fn":"GetUserPassword"}
+{"args":["line1\nline2  padded  ",""],"error":"database not found: line1\nline2  padded  ","fn":"GetUserPassword"}
+{"args":["line1\nline2  padded  ","é"],"error":"database not found: line1\nline2  padded  ","fn":"GetUserPassword"}
+{"args":["line1\nline2  padded  ","straße"],"error":"database not found: line1\nline2  padded  ","fn":"GetUserPassword"}
+{"args":["line1\nline2  padded  ","ılık ırmak"],"error":"database not found: line1\nline2  padded  ","fn":"GetUserPassword"}
+{"args":["line1\nline2  padded  ","👨‍👩‍👧 family"],"error":"database not found: line1\nline2  padded  ","fn":"GetUserPassword"}
+{"args":["line1\nline2  padded  ","a b"],"error":"database not found: line1\nline2  padded  ","fn":"GetUserPassword"}
+{"args":["line1\nline2  padded  ","ΣΊΣΥΦΟΣ"],"error":"database not found: line1\nline2  padded  ","fn":"GetUserPassword"}
+{"args":["line1\nline2  padded  ","a😀b"],"error":"database not found: line1\nline2  padded  ","fn":"GetUserPassword"}
+{"args":["line1\nline2  padded  ","﻿bom"],"error":"database not found: line1\nline2  padded  ","fn":"GetUserPassword"}
+{"args":["line1\nline2  padded  ","a²b x½ y①"],"error":"database not found: line1\nline2  padded  ","fn":"GetUserPassword"}
+{"args":["line1\nline2  padded  ","aⅠb Ⅻ"],"error":"database not found: line1\nline2  padded  ","fn":"GetUserPassword"}
+{"args":["line1\nline2  padded  ","a𐐀b 𝐀bc"],"error":"database not found: line1\nline2  padded  ","fn":"GetUserPassword"}
+{"args":["line1\nline2  padded  ","कि ٣٤"],"error":"database not found: line1\nline2  padded  ","fn":"GetUserPassword"}
+{"args":["İstanbul","Hello Worldline1\nline2","İstanbul"],"error":"database not found: İstanbul","fn":"PasswordMatches"}
+{"args":["a😀b😀c","a.b.c","tab\tseparated"],"error":"database not found: a😀b😀c","fn":"PasswordMatches"}
+{"args":["./x/**/*.json","straße","{name} has {count} items😀"],"error":"database not found: ./x/**/*.json","fn":"PasswordMatches"}
+{"args":["a..b","eading",".leading"],"error":"database not found: a..b","fn":"PasswordMatches"}
+{"args":["Hello World","é","日本語のテキスト"],"error":"database not found: Hello World","fn":"PasswordMatches"}
+{"args":["é","ab","a😀b😀c"],"error":"database not found: é","fn":"PasswordMatches"}
+{"args":[":","Hello World","emoji 👍🏽 mix"],"error":"database not found: :","fn":"PasswordMatches"}
+{"args":["ünïcödé",".leading","trailing.:"],"error":"database not found: ünïcödé","fn":"PasswordMatches"}
+{"args":["key_name-1","ünïcödé","key_name-1"],"error":"database not found: key_name-1","fn":"PasswordMatches"}
+{"args":["hello","😀","HELLO"],"error":"database not found: hello","fn":"PasswordMatches"}
+{"args":[".leading","HELLO  padded  ","./x/**/*.json"],"error":"database not found: .leading","fn":"PasswordMatches"}
+{"args":["","﻿bom","atab\tseparated"],"error":"database path is required","fn":"PasswordMatches"}
+{"args":["ΣΊΣΥΦΟΣ","straße","hello"],"error":"database not found: ΣΊΣΥΦΟΣ","fn":"PasswordMatches"}
+{"args":["HELLO","trailing.","straßekey_name-1"],"error":"database not found: HELLO","fn":"PasswordMatches"}
+{"args":["./x/**/*.jsonhello world",".leading","line1\nline2ΣΊΣΥΦΟΣ"],"error":"database not found: ./x/**/*.jsonhello world","fn":"PasswordMatches"}
+{"args":["abc","😀hello","tab\tseparated"],"error":"database not found: abc","fn":"PasswordMatches"}
+{"args":[":","﻿bom:","﻿bom"],"error":"database not found: :","fn":"PasswordMatches"}
+{"args":["ünïcödétab\tseparated","trailing.","hello  padded  "],"error":"database not found: ünïcödétab\tseparated","fn":"PasswordMatches"}
+{"args":["abc","c","line1\nline2"],"error":"database not found: abc","fn":"PasswordMatches"}
+{"args":["","日本語のテキストa:b:c","a😀b😀c"],"error":"database path is required","fn":"PasswordMatches"}
+{"args":["héllo wörld","Hello Worldline1\nline2","İstanbul"],"error":"database not found: héllo wörld","fn":"PasswordMatches"}
+{"args":["👍🏽 thumbs","Hello Worldline1\nline2","İstanbul"],"error":"database not found: 👍🏽 thumbs","fn":"PasswordMatches"}
+{"args":["日本語","Hello Worldline1\nline2","İstanbul"],"error":"database not found: 日本語","fn":"PasswordMatches"}
+{"args":["","Hello Worldline1\nline2","İstanbul"],"error":"database path is required","fn":"PasswordMatches"}
+{"args":["é","Hello Worldline1\nline2","İstanbul"],"error":"database not found: é","fn":"PasswordMatches"}
+{"args":["straße","Hello Worldline1\nline2","İstanbul"],"error":"database not found: straße","fn":"PasswordMatches"}
+{"args":["ılık ırmak","Hello Worldline1\nline2","İstanbul"],"error":"database not found: ılık ırmak","fn":"PasswordMatches"}
+{"args":["👨‍👩‍👧 family","Hello Worldline1\nline2","İstanbul"],"error":"database not found: 👨‍👩‍👧 family","fn":"PasswordMatches"}
+{"args":["a b","Hello Worldline1\nline2","İstanbul"],"error":"database not found: a b","fn":"PasswordMatches"}
+{"args":["ΣΊΣΥΦΟΣ","Hello Worldline1\nline2","İstanbul"],"error":"database not found: ΣΊΣΥΦΟΣ","fn":"PasswordMatches"}
+{"args":["a😀b","Hello Worldline1\nline2","İstanbul"],"error":"database not found: a😀b","fn":"PasswordMatches"}
+{"args":["﻿bom","Hello Worldline1\nline2","İstanbul"],"error":"database not found: ﻿bom","fn":"PasswordMatches"}
+{"args":["a²b x½ y①","Hello Worldline1\nline2","İstanbul"],"error":"database not found: a²b x½ y①","fn":"PasswordMatches"}
+{"args":["aⅠb Ⅻ","Hello Worldline1\nline2","İstanbul"],"error":"database not found: aⅠb Ⅻ","fn":"PasswordMatches"}
+{"args":["a𐐀b 𝐀bc","Hello Worldline1\nline2","İstanbul"],"error":"database not found: a𐐀b 𝐀bc","fn":"PasswordMatches"}
+{"args":["कि ٣٤","Hello Worldline1\nline2","İstanbul"],"error":"database not found: कि ٣٤","fn":"PasswordMatches"}
+{"args":["İstanbul","héllo wörld","İstanbul"],"error":"database not found: İstanbul","fn":"PasswordMatches"}
+{"args":["İstanbul","👍🏽 thumbs","İstanbul"],"error":"database not found: İstanbul","fn":"PasswordMatches"}
+{"args":["İstanbul","日本語","İstanbul"],"error":"database not found: İstanbul","fn":"PasswordMatches"}
+{"args":["İstanbul","","İstanbul"],"error":"database not found: İstanbul","fn":"PasswordMatches"}
+{"args":["İstanbul","é","İstanbul"],"error":"database not found: İstanbul","fn":"PasswordMatches"}
+{"args":["İstanbul","İstanbul","İstanbul"],"error":"database not found: İstanbul","fn":"PasswordMatches"}
+{"args":["İstanbul","straße","İstanbul"],"error":"database not found: İstanbul","fn":"PasswordMatches"}
+{"args":["İstanbul","ılık ırmak","İstanbul"],"error":"database not found: İstanbul","fn":"PasswordMatches"}
+{"args":["İstanbul","👨‍👩‍👧 family","İstanbul"],"error":"database not found: İstanbul","fn":"PasswordMatches"}
+{"args":["İstanbul","a b","İstanbul"],"error":"database not found: İstanbul","fn":"PasswordMatches"}
+{"args":["İstanbul","ΣΊΣΥΦΟΣ","İstanbul"],"error":"database not found: İstanbul","fn":"PasswordMatches"}
+{"args":["İstanbul","a😀b","İstanbul"],"error":"database not found: İstanbul","fn":"PasswordMatches"}
+{"args":["İstanbul","﻿bom","İstanbul"],"error":"database not found: İstanbul","fn":"PasswordMatches"}
+{"args":["İstanbul","a²b x½ y①","İstanbul"],"error":"database not found: İstanbul","fn":"PasswordMatches"}
+{"args":["İstanbul","aⅠb Ⅻ","İstanbul"],"error":"database not found: İstanbul","fn":"PasswordMatches"}
+{"args":["İstanbul","a𐐀b 𝐀bc","İstanbul"],"error":"database not found: İstanbul","fn":"PasswordMatches"}
+{"args":["İstanbul","कि ٣٤","İstanbul"],"error":"database not found: İstanbul","fn":"PasswordMatches"}
+{"args":["İstanbul","Hello Worldline1\nline2","héllo wörld"],"error":"database not found: İstanbul","fn":"PasswordMatches"}
+{"args":["İstanbul","Hello Worldline1\nline2","👍🏽 thumbs"],"error":"database not found: İstanbul","fn":"PasswordMatches"}
+{"args":["İstanbul","Hello Worldline1\nline2","日本語"],"error":"database not found: İstanbul","fn":"PasswordMatches"}
+{"args":["İstanbul","Hello Worldline1\nline2",""],"error":"database not found: İstanbul","fn":"PasswordMatches"}
+{"args":["İstanbul","Hello Worldline1\nline2","é"],"error":"database not found: İstanbul","fn":"PasswordMatches"}
+{"args":["İstanbul","Hello Worldline1\nline2","straße"],"error":"database not found: İstanbul","fn":"PasswordMatches"}
+{"args":["İstanbul","Hello Worldline1\nline2","ılık ırmak"],"error":"database not found: İstanbul","fn":"PasswordMatches"}
+{"args":["İstanbul","Hello Worldline1\nline2","👨‍👩‍👧 family"],"error":"database not found: İstanbul","fn":"PasswordMatches"}
+{"args":["İstanbul","Hello Worldline1\nline2","a b"],"error":"database not found: İstanbul","fn":"PasswordMatches"}
+{"args":["İstanbul","Hello Worldline1\nline2","ΣΊΣΥΦΟΣ"],"error":"database not found: İstanbul","fn":"PasswordMatches"}
+{"args":["İstanbul","Hello Worldline1\nline2","a😀b"],"error":"database not found: İstanbul","fn":"PasswordMatches"}
+{"args":["İstanbul","Hello Worldline1\nline2","﻿bom"],"error":"database not found: İstanbul","fn":"PasswordMatches"}
+{"args":["İstanbul","Hello Worldline1\nline2","a²b x½ y①"],"error":"database not found: İstanbul","fn":"PasswordMatches"}
+{"args":["İstanbul","Hello Worldline1\nline2","aⅠb Ⅻ"],"error":"database not found: İstanbul","fn":"PasswordMatches"}
+{"args":["İstanbul","Hello Worldline1\nline2","a𐐀b 𝐀bc"],"error":"database not found: İstanbul","fn":"PasswordMatches"}
+{"args":["İstanbul","Hello Worldline1\nline2","कि ٣٤"],"error":"database not found: İstanbul","fn":"PasswordMatches"}
+{"args":["key_name-1",7],"error":"database not found: key_name-1","fn":"GroupTitles"}
+{"args":["ünïcödé",2147483647],"error":"database not found: ünïcödé","fn":"GroupTitles"}
+{"args":["tab\tseparatedkey_name-1",100],"error":"database not found: tab\tseparatedkey_name-1","fn":"GroupTitles"}
+{"args":["./x/**/*.json",2147483647],"error":"database not found: ./x/**/*.json","fn":"GroupTitles"}
+{"args":["  padded  ",42],"error":"database not found:   padded  ","fn":"GroupTitles"}
+{"args":["é",9223372036854775807],"error":"database not found: é","fn":"GroupTitles"}
+{"args":[".leading",2147483647],"error":"database not found: .leading","fn":"GroupTitles"}
+{"args":["﻿bom",1],"error":"database not found: ﻿bom","fn":"GroupTitles"}
+{"args":["{name} has {count} items",0],"error":"database not found: {name} has {count} items","fn":"GroupTitles"}
+{"args":["straße",255],"error":"database not found: straße","fn":"GroupTitles"}
+{"args":["{name} has {count} itemsns:key.path",100],"error":"database not found: {name} has {count} itemsns:key.path","fn":"GroupTitles"}
+{"args":["emoji 👍🏽 mix",255],"error":"database not found: emoji 👍🏽 mix","fn":"GroupTitles"}
+{"args":["héllo wörld",7],"error":"database not found: héllo wörld","fn":"GroupTitles"}
+{"args":["👍🏽 thumbs",7],"error":"database not found: 👍🏽 thumbs","fn":"GroupTitles"}
+{"args":["日本語",7],"error":"database not found: 日本語","fn":"GroupTitles"}
+{"args":["",7],"error":"database path is required","fn":"GroupTitles"}
+{"args":["é",7],"error":"database not found: é","fn":"GroupTitles"}
+{"args":["İstanbul",7],"error":"database not found: İstanbul","fn":"GroupTitles"}
+{"args":["straße",7],"error":"database not found: straße","fn":"GroupTitles"}
+{"args":["ılık ırmak",7],"error":"database not found: ılık ırmak","fn":"GroupTitles"}
+{"args":["👨‍👩‍👧 family",7],"error":"database not found: 👨‍👩‍👧 family","fn":"GroupTitles"}
+{"args":["a b",7],"error":"database not found: a b","fn":"GroupTitles"}
+{"args":["ΣΊΣΥΦΟΣ",7],"error":"database not found: ΣΊΣΥΦΟΣ","fn":"GroupTitles"}
+{"args":["a😀b",7],"error":"database not found: a😀b","fn":"GroupTitles"}
+{"args":["﻿bom",7],"error":"database not found: ﻿bom","fn":"GroupTitles"}
+{"args":["a²b x½ y①",7],"error":"database not found: a²b x½ y①","fn":"GroupTitles"}
+{"args":["aⅠb Ⅻ",7],"error":"database not found: aⅠb Ⅻ","fn":"GroupTitles"}
+{"args":["a𐐀b 𝐀bc",7],"error":"database not found: a𐐀b 𝐀bc","fn":"GroupTitles"}
+{"args":["कि ٣٤",7],"error":"database not found: कि ٣٤","fn":"GroupTitles"}
+{"args":["key_name-1",0],"error":"database not found: key_name-1","fn":"GroupTitles"}
+{"args":["key_name-1",2147483648],"error":"database not found: key_name-1","fn":"GroupTitles"}
+{"args":["key_name-1",9007199254740993],"error":"database not found: key_name-1","fn":"GroupTitles"}
+{"args":["key_name-1",9223372036854775807],"error":"database not found: key_name-1","fn":"GroupTitles"}
+{"args":["/home/hsy/project/Yin-Panel/rust/repository-rs/fixtures/repository.db"],"fn":"CountUsers","ok":2}
+{"args":["/nonexistent/repository.db"],"error":"database not found: /nonexistent/repository.db","fn":"CountUsers"}
+{"args":["/home/hsy/project/Yin-Panel/rust/repository-rs/fixtures/repository.db","admin@example.com"],"fn":"UserMailAndName","ok":["admin@example.com","Admin"]}
+{"args":["/home/hsy/project/Yin-Panel/rust/repository-rs/fixtures/repository.db","editor@example.com"],"fn":"UserMailAndName","ok":["editor@example.com","Editor"]}
+{"args":["/home/hsy/project/Yin-Panel/rust/repository-rs/fixtures/repository.db","missing@example.com"],"error":"record not found","fn":"UserMailAndName"}
+{"args":["/home/hsy/project/Yin-Panel/rust/repository-rs/fixtures/repository.db","admin@example.com"],"fn":"GetUserPassword","ok":"hash-admin"}
+{"args":["/home/hsy/project/Yin-Panel/rust/repository-rs/fixtures/repository.db","admin@example.com","hash-admin"],"fn":"PasswordMatches","ok":true}
+{"args":["/home/hsy/project/Yin-Panel/rust/repository-rs/fixtures/repository.db","admin@example.com","wrong"],"fn":"PasswordMatches","ok":false}
+{"args":["/home/hsy/project/Yin-Panel/rust/repository-rs/fixtures/repository.db",1],"fn":"CountGroups","ok":2}
+{"args":["/home/hsy/project/Yin-Panel/rust/repository-rs/fixtures/repository.db",2],"fn":"CountGroups","ok":1}
+{"args":["/home/hsy/project/Yin-Panel/rust/repository-rs/fixtures/repository.db",999],"fn":"CountGroups","ok":0}
+{"args":["/home/hsy/project/Yin-Panel/rust/repository-rs/fixtures/repository.db",1],"fn":"GroupTitles","ok":["APP","Tools"]}
+{"args":["/home/hsy/project/Yin-Panel/rust/repository-rs/fixtures/repository.db",2],"fn":"GroupTitles","ok":["Other"]}
+{"args":["/home/hsy/project/Yin-Panel/rust/repository-rs/fixtures/repository.db",999],"fn":"GroupTitles","ok":[]}
