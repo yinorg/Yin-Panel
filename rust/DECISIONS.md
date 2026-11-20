@@ -131,3 +131,22 @@ refuses to run while a unit has not passed `gate`, so the lift itself is blocked
 until either the gate's unit model is satisfied by hand-written crates with
 their own golden tests, or the team accepts route-level parity as the port's
 definition of done for these two units.
+
+## ADR-010: the Rust binary bootstraps and seeds its own database
+
+**Status:** accepted
+
+The Go build migrated and seeded at startup: schema upgrade, the three built-in
+themes with their revisions and assets, the default administrator, its personal
+Space pair and the default group. Removing the Go child therefore removed the
+only thing that created a database.
+
+`src/bootstrap.rs` now does the same: it runs `yin-db-tool`'s upgrade (the same
+schema) and, when the database has no account, inserts a seed generated from a
+freshly initialised Go database. The seed is not hand-written; it is captured
+from the oracle, and the tests compare the result: 24 tables with identical row
+counts, and identical `revision_record_v2` JSON and `asset_record_v2` bytes.
+
+The alternative — shipping a prebuilt `.db` template — was rejected: a template
+drifts from the schema the code expects, and every upgrade would have to patch
+two shapes.

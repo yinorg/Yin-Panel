@@ -46,8 +46,15 @@ rust-anything analyze backend --lang go --whole-app
 - Original recorded: 299 HTTP cases in `rust/app-cases/` (35 named inputs, 264
   traps), `299/299` passing against the Go baseline.
 - Front door: `rust/app` (axum), `299/299`, fallback `99.7%` (298/299).
-- Recorded cases: 384 (120 named inputs + 264 traps); original 384/384, front
-  door 384/384, fallback 0.0%.
+- Recorded cases: 384 (120 named inputs + 264 traps); original 384/384, and the
+  pure Rust binary 384/384 with fallback 0.0% (run it with
+  `--build "sh rust/record/run-rust.sh"`, which puts it in the recording working
+  directory).
+- `app lift` blockers, as the tool reports them: `wallpaperpack-rs` fails the
+  `error cases` gate check. Every other check passes; that one asks for a
+  recorded case where `Catalogue` fails, and its only error comes from a broken
+  compile-time `embed`, so no input can reach it. ADR-009 also leaves
+  `repository`/`database` without unit gates.
 - Rust answers directly (43 route registrations):
   - `GET /api/theme/v2/wallpaper/library` -> `rust/wallpaperpack-rs`
   - `GET /api/about`, `GET /api/system/capabilities`, `GET /api/oauth/config`,
@@ -62,7 +69,13 @@ rust-anything analyze backend --lang go --whole-app
     the theme reads (`current`, `packages`, `package/{id}`, `mine`, `effective`)
     -> `rust/app`
 - Ported library units not yet wired to a route: `rust/util-rs`.
-- Fallback rate: **0.0% (0/370)** over the recorded contract. The front door now
+- The binary is **pure Rust**: the Go child process, the proxy and the
+  `State<Original>` plumbing are gone. `src/bootstrap.rs` creates the database,
+  runs the schema upgrade and seeds a new installation; the seed was generated
+  from a freshly initialised Go database and is byte-identical (revision JSON,
+  token documents and every theme asset).
+- Fallback rate: **0.0% (0/384)** over the recorded contract, with no Go process
+  running. The front door now
   recognises the Go route table: a registered path is proxied, anything else
   answers Gin's 404, so the 264 trap cases are Rust's.
 - Every one of the 104 routes the Go build registers now has a Rust

@@ -84,7 +84,9 @@ pub fn asset(name: String) -> Option<(Vec<u8>, String)> {
     let name = name.trim_start_matches('/').to_string();
     if name.is_empty()
         || name.contains('\\')
-        || name.split('/').any(|part| part.is_empty() || part == "." || part == "..")
+        || name
+            .split('/')
+            .any(|part| part.is_empty() || part == "." || part == "..")
     {
         return None;
     }

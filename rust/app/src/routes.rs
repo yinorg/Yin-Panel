@@ -3,7 +3,7 @@
 //! `backend/internal/web/router/system`.
 
 use axum::Router;
-use axum::extract::{Multipart, Path, Query, Request, State};
+use axum::extract::{Multipart, Path, Query, Request};
 use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::response::IntoResponse;
 use axum::response::Response;
@@ -15,9 +15,8 @@ use serde_json::json;
 use crate::appcfg;
 use crate::auth::{self, AuthError};
 use crate::envelope::{self, error_code, success, success_data};
-use crate::original::Original;
 
-pub fn router() -> Router<Original> {
+pub fn router() -> Router<()> {
     Router::new()
         .route("/api/about", get(about))
         .route("/api/system/capabilities", get(capabilities))
@@ -6536,18 +6535,9 @@ pub fn pattern_matches(pattern: &str, path: &str) -> bool {
 /// proxied, because that route is not ported yet. A path it does not register
 /// answers exactly what Gin's NoRoute answers, and a trailing slash on a path
 /// whose trimmed form would match a `:param` route answers Gin's redirect.
-pub async fn go_fallback(
-    State(original): State<Original>,
-    req: Request,
-) -> Response {
+pub async fn go_fallback(req: Request) -> Response {
     let method = req.method().as_str().to_string();
     let path = req.uri().path().to_string();
-    if crate::go_routes::GO_ROUTES
-        .iter()
-        .any(|(route_method, pattern)| *route_method == method && pattern_matches(pattern, &path))
-    {
-        return crate::original::proxy(State(original), req).await;
-    }
     if path.len() > 1 && path.ends_with('/') {
         let trimmed = &path[..path.len() - 1];
         let candidate = format!("{trimmed}/x");
@@ -6952,7 +6942,7 @@ async fn copy_space(
     .await;
     let dst = match created {
         Ok(result) => result.last_insert_rowid(),
-        Err(error) => return envelope::database_error(),
+        Err(_) => return envelope::database_error(),
     };
     if sqlx::query(
         "INSERT INTO space_member (created_at, updated_at, space_id, user_id, role, source, joined_at) VALUES (?, ?, ?, ?, 'admin', 'manual', ?)",

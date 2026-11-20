@@ -3,31 +3,16 @@
 use std::collections::HashMap;
 
 use axum::Router;
-use axum::extract::{Request, State};
+use axum::extract::Request;
 use axum::response::Response;
 use axum::routing::get;
 
-use crate::original::{self, Original};
-
 mod wallpaperpack;
 
-/// `RUST_ANYTHING_UNIT_<NAME>=original` sends that unit back to the original.
-fn sent_to_original(unit: &str) -> bool {
-    std::env::var(format!("RUST_ANYTHING_UNIT_{unit}")).is_ok_and(|v| v == "original")
+pub fn router() -> Router<()> {
+    Router::new().route("/api/theme/v2/wallpaper/library", get(route_0))
 }
 
-pub fn router() -> Router<Original> {
-    Router::new()
-        .route(
-            "/api/theme/v2/wallpaper/library",
-            get(route_0).fallback(original::proxy),
-        )
-        .fallback(original::proxy)
-}
-
-async fn route_0(State(original): State<Original>, req: Request) -> Response {
-    if sent_to_original("WALLPAPERPACK") {
-        return original::proxy(State(original), req).await;
-    }
+async fn route_0(req: Request) -> Response {
     wallpaperpack::handle("GET /api/theme/v2/wallpaper/library", HashMap::new(), req).await
 }

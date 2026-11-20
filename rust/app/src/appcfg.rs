@@ -88,12 +88,16 @@ pub struct Ctx {
 
 static CTX: OnceLock<Ctx> = OnceLock::new();
 
-/// The recording harness starts the Go child in a scratch directory and the
-/// front door in the repository. `YIN_PANEL_RECORD_DIR` is the shared work
-/// directory; a deployment sets `YIN_PANEL_CONFIG` instead.
+/// The Go binary reads `conf.yaml` from its working directory. So does this one:
+/// an explicit `YIN_PANEL_CONFIG` wins, then `./conf.yaml`. The recording
+/// directory is the last resort, for a build started outside its work directory.
 fn config_path() -> PathBuf {
     if let Ok(explicit) = std::env::var("YIN_PANEL_CONFIG") {
         return PathBuf::from(explicit);
+    }
+    let local = PathBuf::from("conf.yaml");
+    if local.is_file() {
+        return local;
     }
     let work = std::env::var("YIN_PANEL_RECORD_DIR").unwrap_or_else(|_| {
         let tmp = std::env::var("TMPDIR").unwrap_or_else(|_| "/tmp".to_string());
@@ -103,14 +107,24 @@ fn config_path() -> PathBuf {
     if candidate.is_file() {
         return candidate;
     }
-    PathBuf::from("conf.yaml")
+    // Last resort, for a source checkout started from the repository root: the
+    // recording configuration. A deployment always has `./conf.yaml`.
+    let recorded = Path::new(env!("CARGO_MANIFEST_DIR")).join("../record/conf.yaml");
+    if recorded.is_file() {
+        return recorded;
+    }
+    local
 }
 
 pub fn ctx() -> &'static Ctx {
     CTX.get_or_init(|| {
         let path = config_path();
+        // The recording template carries `__PORT__`; the harness passes the
+        // real port in the environment.
+        let port = std::env::var("PORT").unwrap_or_default();
         let conf: Conf = std::fs::read_to_string(&path)
             .ok()
+            .map(|text| text.replace("__PORT__", &port))
             .and_then(|text| serde_yaml::from_str(&text).ok())
             .unwrap_or_default();
         let dir = path
@@ -145,7 +159,7 @@ impl Ctx {
             .await
     }
 
-    fn database_file(&self) -> PathBuf {
+    pub fn database_file(&self) -> PathBuf {
         let configured = if self.conf.sqlite.file_path.is_empty() {
             "./database/database.db"
         } else {

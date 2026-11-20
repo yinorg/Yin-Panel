@@ -6,11 +6,12 @@ Where the port stands. Read this first, then `MAP.md` and the ADRs that matter.
 
 | Thing | Value |
 | --- | --- |
-| Fallback rate | 0.0% (0/384) over the recorded contract; 1 route still proxies |
+| Fallback rate | 0.0% (0/384), pure Rust with no Go process |
 | Replay | 299/299 against the Go baseline and against the front door |
 | Units ported | 2 (`internal/biz/theme/wallpaperpack`, `internal/util`) + the Rust Core spine |
 | Routes owned by Rust | 43 registrations (about, capabilities, oauth config, login, logout, getUser, spaces, search-config, groups, items, members, public, moduleConfig, file list, bookmark tree, user list, user config, monitor status, theme preference, theme space, wallpaper library) |
 | Wave | 0 — leaf units |
+| Runtime | pure Rust: no Go child, no proxy; `src/bootstrap.rs` migrates and seeds a new install |
 | Database tooling | `rust/db-tool` upgrade + copy to SQLite/MySQL/PostgreSQL; PostgreSQL verified live, MySQL DDL-tested |
 | Monitor | live snapshot ported (CPU/memory/net); verified against Go on the same host |
 | Favicon | `getSiteFavicon` ported; manual comparison via a local fixture (no recorded cases) |
