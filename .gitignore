@@ -146,3 +146,6 @@ opencode.json
 # Created when the pure binary is replayed from the repository root
 rust/record/database.db
 rust/record/database.db-*
+source.db
+source.db-shm
+source.db-wal
