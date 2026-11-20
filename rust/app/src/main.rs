@@ -14,7 +14,11 @@ use original::shutdown_signal;
 async fn main() {
     original::report_fallbacks();
     let original = original::Original::start().await;
-    let app = units::router().with_state(original.clone());
+    // `units/mod.rs` belongs to `app wire` and is rewritten on every wire; the
+    // hand-ported routes are merged here so a wire cannot drop them.
+    let app = units::router()
+        .merge(routes::router())
+        .with_state(original.clone());
     let port = std::env::var("PORT")
         .ok()
         .and_then(|p| p.parse().ok())

@@ -61,6 +61,19 @@ pub fn router() -> Router<Original> {
             "/api/spaces/{space_id}/groups/{group_id}",
             post(update_group).delete(delete_group).put(update_group),
         )
+        .route("/api/spaces/{space_id}/items", post(create_item))
+        .route(
+            "/api/spaces/{space_id}/items/{item_id}",
+            axum::routing::put(update_item).delete(delete_item),
+        )
+        .route(
+            "/api/spaces/{space_id}/items/{item_id}/update",
+            post(update_item),
+        )
+        .route(
+            "/api/spaces/{space_id}/items/{item_id}/delete",
+            post(delete_item),
+        )
         .route(
             "/api/spaces/{space_id}/groups/{group_id}/update",
             post(update_group),
@@ -2135,6 +2148,284 @@ async fn delete_group(
         return envelope::error("delete failed");
     }
     match tx.commit().await {
+        Ok(_) => success(),
+        Err(error) => envelope::error(&error.to_string()),
+    }
+}
+
+fn valid_item_title(title: &str) -> bool {
+    title.trim().chars().count() <= 20
+}
+
+/// `ensureItemIcon`: a text icon with no source borrows its glyph from the
+/// title — up to five Han characters, else up to eight Latin letters, else the
+/// first non-space character.
+fn ensure_item_icon(title: &str, icon: &mut IconInfo) {
+    if icon.item_type != 4 || !icon.src.is_empty() {
+        return;
+    }
+    let trimmed = title.trim();
+    let mut han = String::new();
+    let mut latin = String::new();
+    let mut han_count = 0;
+    let mut latin_count = 0;
+    for ch in trimmed.chars() {
+        let code = ch as u32;
+        let is_han = (0x4E00..=0x9FFF).contains(&code)
+            || (0x3400..=0x4DBF).contains(&code)
+            || (0xF900..=0xFAFF).contains(&code);
+        if is_han && han_count < 5 {
+            han.push(ch);
+            han_count += 1;
+        }
+        if ch.is_ascii_alphabetic() && latin_count < 8 {
+            latin.push(ch);
+            latin_count += 1;
+        }
+    }
+    let mut text = if !han.is_empty() { han } else { latin };
+    if text.is_empty() {
+        text = trimmed.chars().find(|ch| !ch.is_whitespace()).map(String::from).unwrap_or_default();
+    }
+    if text.is_empty() {
+        text = "?".to_string();
+    }
+    *icon = IconInfo {
+        item_type: 1,
+        src: String::new(),
+        file_name: String::new(),
+        text,
+        background_color: "#2a2a2a6b".to_string(),
+    };
+}
+
+/// `SpaceRouter.CreateItem`.
+async fn create_item(
+    headers: HeaderMap,
+    Path(space_id): Path<i64>,
+    request: Request,
+) -> Response {
+    let user = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool.clone(),
+        Err(error) => return envelope::error(&error),
+    };
+    if !can_edit(&pool, user.id, space_id).await {
+        return error_code(1005);
+    }
+    let body = match axum::body::to_bytes(request.into_body(), 1 << 20).await {
+        Ok(body) => body,
+        Err(_) => return envelope::error("invalid request body"),
+    };
+    let mut input: ItemIn = match serde_json::from_slice(&body) {
+        Ok(input) => input,
+        Err(_) => return envelope::error(" [ invalid item or group]"),
+    };
+    if input.item_icon_group_id == 0 {
+        return envelope::error(" [ invalid item or group]");
+    }
+    if !valid_item_title(&input.title) {
+        return envelope::error(" [ title must be at most 20 characters]");
+    }
+    ensure_item_icon(&input.title, &mut input.icon);
+    let group: Option<(i64,)> = sqlx::query_as(
+        "SELECT id FROM item_icon_group WHERE id = ? AND space_id = ?",
+    )
+    .bind(input.item_icon_group_id)
+    .bind(space_id)
+    .fetch_optional(&pool)
+    .await
+    .unwrap_or(None);
+    if group.is_none() {
+        return error_code(404);
+    }
+    let now = now_like_go();
+    let icon_json = serde_json::to_string(&input.icon).unwrap_or_else(|_| "{}".to_string());
+    let result = sqlx::query(
+        "INSERT INTO item_icon (created_at, updated_at, icon_json, title, url, lan_url, mobile_url, description, open_method, sort, item_icon_group_id, user_id, space_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    )
+    .bind(&now)
+    .bind(&now)
+    .bind(&icon_json)
+    .bind(&input.title)
+    .bind(&input.url)
+    .bind(&input.lan_url)
+    .bind(&input.mobile_url)
+    .bind(&input.description)
+    .bind(input.open_method)
+    .bind(input.sort)
+    .bind(input.item_icon_group_id)
+    .bind(user.id)
+    .bind(space_id)
+    .execute(&pool)
+    .await;
+    let id = match result {
+        Ok(result) => result.last_insert_rowid(),
+        Err(error) => return envelope::error(&error.to_string()),
+    };
+    let row = match load_item(&pool, space_id, id).await {
+        Some(row) => row,
+        None => return error_code(404),
+    };
+    success_data(row)
+}
+
+async fn load_item(pool: &sqlx::SqlitePool, space_id: i64, id: i64) -> Option<serde_json::Value> {
+    let row = sqlx::query_as::<_, ItemRow>(
+        r#"SELECT id, created_at, updated_at, icon_json, title, url, lan_url, mobile_url,
+                  description, open_method, sort, item_icon_group_id, user_id, space_id
+           FROM item_icon WHERE id = ? AND space_id = ?"#,
+    )
+    .bind(id)
+    .bind(space_id)
+    .fetch_optional(pool)
+    .await
+    .unwrap_or(None)?;
+    let icon: IconInfo = serde_json::from_str(&row.icon_json).unwrap_or_default();
+    Some(serde_json::to_value(ItemOut {
+        id: row.id,
+        create_time: rfc3339(&row.created_at),
+        update_time: rfc3339(&row.updated_at),
+        icon,
+        title: row.title,
+        url: row.url,
+        lan_url: row.lan_url,
+        mobile_url: row.mobile_url,
+        description: row.description,
+        open_method: row.open_method,
+        sort: row.sort,
+        item_icon_group_id: row.item_icon_group_id,
+        user_id: row.user_id,
+        space_id: row.space_id,
+    })
+    .unwrap_or(serde_json::Value::Null))
+}
+
+#[derive(serde::Deserialize)]
+struct ItemIn {
+    #[serde(default)]
+    icon: IconInfo,
+    #[serde(default)]
+    title: String,
+    #[serde(default)]
+    url: String,
+    #[serde(default, rename = "lanUrl")]
+    lan_url: String,
+    #[serde(default, rename = "mobileUrl")]
+    mobile_url: String,
+    #[serde(default)]
+    description: String,
+    #[serde(default, rename = "openMethod")]
+    open_method: i64,
+    #[serde(default)]
+    sort: i64,
+    #[serde(default, rename = "itemIconGroupId")]
+    item_icon_group_id: i64,
+}
+
+/// `SpaceRouter.UpdateItem`.
+async fn update_item(
+    headers: HeaderMap,
+    Path((space_id, item_id)): Path<(i64, String)>,
+    request: Request,
+) -> Response {
+    let user = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    let item_id: i64 = match item_id.parse() {
+        Ok(value) => value,
+        Err(_) => return envelope::error(" [ invalid itemId]"),
+    };
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool.clone(),
+        Err(error) => return envelope::error(&error),
+    };
+    if !can_edit(&pool, user.id, space_id).await {
+        return error_code(1005);
+    }
+    let body = match axum::body::to_bytes(request.into_body(), 1 << 20).await {
+        Ok(body) => body,
+        Err(_) => return envelope::error("invalid request body"),
+    };
+    let mut input: ItemIn = match serde_json::from_slice(&body) {
+        Ok(input) => input,
+        Err(error) => return envelope::error(&format!(" [ {error}]")),
+    };
+    if input.item_icon_group_id == 0 {
+        return envelope::error(" [ invalid groupId]");
+    }
+    if !valid_item_title(&input.title) {
+        return envelope::error(" [ title must be at most 20 characters]");
+    }
+    ensure_item_icon(&input.title, &mut input.icon);
+    let group: Option<(i64,)> = sqlx::query_as(
+        "SELECT id FROM item_icon_group WHERE id = ? AND space_id = ?",
+    )
+    .bind(input.item_icon_group_id)
+    .bind(space_id)
+    .fetch_optional(&pool)
+    .await
+    .unwrap_or(None);
+    if group.is_none() {
+        return error_code(404);
+    }
+    let icon_json = serde_json::to_string(&input.icon).unwrap_or_else(|_| "{}".to_string());
+    let result = sqlx::query(
+        "UPDATE item_icon SET icon_json = ?, title = ?, url = ?, lan_url = ?, mobile_url = ?, description = ?, open_method = ?, sort = ?, item_icon_group_id = ?, updated_at = ? WHERE id = ? AND space_id = ?",
+    )
+    .bind(&icon_json)
+    .bind(&input.title)
+    .bind(&input.url)
+    .bind(&input.lan_url)
+    .bind(&input.mobile_url)
+    .bind(&input.description)
+    .bind(input.open_method)
+    .bind(input.sort)
+    .bind(input.item_icon_group_id)
+    .bind(now_like_go())
+    .bind(item_id)
+    .bind(space_id)
+    .execute(&pool)
+    .await;
+    match result {
+        Ok(_) => success(),
+        Err(error) => envelope::error(&error.to_string()),
+    }
+}
+
+/// `SpaceRouter.DeleteItem`.
+async fn delete_item(
+    headers: HeaderMap,
+    Path((space_id, item_id)): Path<(i64, String)>,
+) -> Response {
+    let user = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    let item_id: i64 = match item_id.parse() {
+        Ok(value) => value,
+        Err(_) => return envelope::error(" [ invalid itemId]"),
+    };
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool.clone(),
+        Err(error) => return envelope::error(&error),
+    };
+    if !can_edit(&pool, user.id, space_id).await {
+        return error_code(1005);
+    }
+    match sqlx::query("DELETE FROM item_icon WHERE id = ? AND space_id = ?")
+        .bind(item_id)
+        .bind(space_id)
+        .execute(&pool)
+        .await
+    {
         Ok(_) => success(),
         Err(error) => envelope::error(&error.to_string()),
     }

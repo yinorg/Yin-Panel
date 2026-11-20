@@ -18,7 +18,6 @@ fn sent_to_original(unit: &str) -> bool {
 
 pub fn router() -> Router<Original> {
     Router::new()
-        .merge(crate::routes::router())
         .route(
             "/api/theme/v2/wallpaper/library",
             get(route_0).fallback(original::proxy),
