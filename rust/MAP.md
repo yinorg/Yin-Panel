@@ -50,6 +50,8 @@ rust-anything analyze backend --lang go --whole-app
   - `GET /api/theme/v2/wallpaper/library` -> `rust/wallpaperpack-rs`
   - `GET /api/about`, `GET /api/system/capabilities`, `GET /api/oauth/config`,
     `POST /api/login`, `POST /api/logout`, `GET /api/user/getUser`,
-    `GET /api/spaces`, `GET /api/spaces/{id}/search-config` -> `rust/app`
+    `GET /api/spaces`, `GET /api/spaces/{id}/search-config`,
+    `GET /api/spaces/{id}/groups`, `GET /api/spaces/{id}/items`,
+    `GET /api/spaces/{id}/members` -> `rust/app`
 - Ported library units not yet wired to a route: `rust/util-rs`.
-- Fallback rate: 95.0% (284/299). Everything else is still proxied to Go.
+- Fallback rate: 94.0% (281/299). Everything else is still proxied to Go.
