@@ -3,7 +3,7 @@
 //! `backend/internal/web/router/system`.
 
 use axum::Router;
-use axum::extract::Request;
+use axum::extract::{Path, Request};
 use axum::http::{HeaderMap, HeaderValue, header};
 use axum::response::Response;
 use axum::routing::{get, post};
@@ -24,6 +24,8 @@ pub fn router() -> Router<Original> {
         .route("/api/login", post(login))
         .route("/api/logout", post(logout))
         .route("/api/user/getUser", get(get_user))
+        .route("/api/spaces", get(list_spaces))
+        .route("/api/spaces/{space_id}/search-config", get(search_config))
 }
 
 /// `AboutRouter.Get`.
@@ -228,4 +230,165 @@ async fn logout(headers: HeaderMap) -> Response {
         HeaderValue::from_str(&auth::cleared_cookie())
             .unwrap_or_else(|_| HeaderValue::from_static("")),
     )
+}
+
+/// `SpaceRouter.List`: the caller's own Yin spaces, each with its paired Yang
+/// id and the caller's edit right.
+async fn list_spaces(headers: HeaderMap) -> Response {
+    let user = match auth::user(&headers).await {
+        Ok(user) => user,
+        Err(AuthError::NotLoggedIn) => return error_code(1000),
+        Err(AuthError::Disabled) => return error_code(1004),
+    };
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool,
+        Err(error) => return envelope::error(&error),
+    };
+    let rows: Vec<SpaceRow> = match sqlx::query_as(
+        r#"SELECT id, created_at, updated_at, type, name, owner_user_id, pair_id, side,
+                  public_enabled, public_id, public_mode
+           FROM "space"
+           WHERE (owner_user_id = ? OR id IN (SELECT space_id FROM space_member WHERE user_id = ?))
+             AND side = 'yin'
+           ORDER BY type, created_at"#,
+    )
+    .bind(user.id)
+    .bind(user.id)
+    .fetch_all(pool)
+    .await
+    {
+        Ok(rows) => rows,
+        Err(error) => return envelope::error(&error.to_string()),
+    };
+
+    let mut items = Vec::with_capacity(rows.len());
+    for row in rows {
+        let paired: Option<(i64,)> =
+            sqlx::query_as(r#"SELECT id FROM "space" WHERE pair_id = ? AND side = 'yang' LIMIT 1"#)
+                .bind(row.id)
+                .fetch_optional(pool)
+                .await
+                .unwrap_or(None);
+        let role: Option<(String,)> =
+            sqlx::query_as(r#"SELECT role FROM space_member WHERE space_id = ? AND user_id = ? LIMIT 1"#)
+                .bind(row.id)
+                .bind(user.id)
+                .fetch_optional(pool)
+                .await
+                .unwrap_or(None);
+        let role = role.map(|value| value.0).unwrap_or_default();
+        let can_edit = row.owner_user_id == user.id || role == "admin" || role == "editor";
+        items.push(SpaceItem {
+            id: row.id,
+            create_time: rfc3339(&row.created_at),
+            update_time: rfc3339(&row.updated_at),
+            kind: row.kind,
+            name: row.name,
+            owner_user_id: row.owner_user_id,
+            pair_id: row.pair_id,
+            side: row.side,
+            paired_space_id: paired.map(|value| value.0),
+            public_enabled: row.public_enabled != 0,
+            public_id: row.public_id,
+            public_mode: row.public_mode,
+            can_edit,
+        });
+    }
+    envelope::success_struct(items)
+}
+
+/// `SpaceRouter.GetSearchConfig`: `null` data is omitted from the envelope, so
+/// an unset configuration answers `{"code":0,"msg":"OK"}`.
+async fn search_config(headers: HeaderMap, Path(space_id): Path<i64>) -> Response {
+    let user = match auth::user(&headers).await {
+        Ok(user) => user,
+        Err(AuthError::NotLoggedIn) => return error_code(1000),
+        Err(AuthError::Disabled) => return error_code(1004),
+    };
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool,
+        Err(error) => return envelope::error(&error),
+    };
+    let found: Option<(i64, String)> =
+        sqlx::query_as(r#"SELECT owner_user_id, search_config_json FROM "space" WHERE id = ?"#)
+            .bind(space_id)
+            .fetch_optional(pool)
+            .await
+            .unwrap_or(None);
+    let Some((owner, config)) = found else {
+        return error_code(404);
+    };
+    let member: Option<(String,)> = sqlx::query_as(
+        r#"SELECT role FROM space_member WHERE space_id = ? AND user_id = ? LIMIT 1"#,
+    )
+    .bind(space_id)
+    .bind(user.id)
+    .fetch_optional(pool)
+    .await
+    .unwrap_or(None);
+    if owner != user.id && member.is_none() {
+        return error_code(1005);
+    }
+    if config.is_empty() {
+        return success();
+    }
+    match serde_json::from_str::<serde_json::Value>(&config) {
+        Ok(value) => success_data(value),
+        Err(error) => envelope::error(&error.to_string()),
+    }
+}
+
+#[derive(sqlx::FromRow)]
+struct SpaceRow {
+    id: i64,
+    created_at: String,
+    updated_at: String,
+    #[sqlx(rename = "type")]
+    kind: String,
+    name: String,
+    owner_user_id: i64,
+    pair_id: i64,
+    side: String,
+    public_enabled: i64,
+    public_id: Option<String>,
+    public_mode: String,
+}
+
+/// Go stores `time.Time` in SQLite as `YYYY-MM-DD HH:MM:SS(.frac)(offset)` and
+/// encodes it as RFC 3339, which only differs by the separator.
+fn rfc3339(stored: &str) -> String {
+    match stored.split_once(' ') {
+        Some((date, rest)) => format!("{date}T{rest}"),
+        None => stored.to_string(),
+    }
+}
+
+/// `spaceListDTO`: the Space fields in Go's order, then `canEdit`.
+#[derive(Serialize)]
+struct SpaceItem {
+    id: i64,
+    #[serde(rename = "createTime")]
+    create_time: String,
+    #[serde(rename = "updateTime")]
+    update_time: String,
+    #[serde(rename = "type")]
+    kind: String,
+    name: String,
+    #[serde(rename = "ownerUserId")]
+    owner_user_id: i64,
+    #[serde(rename = "pairId")]
+    pair_id: i64,
+    side: String,
+    #[serde(rename = "pairedSpaceId", skip_serializing_if = "Option::is_none")]
+    paired_space_id: Option<i64>,
+    #[serde(rename = "publicEnabled")]
+    public_enabled: bool,
+    #[serde(rename = "publicId", skip_serializing_if = "Option::is_none")]
+    public_id: Option<String>,
+    #[serde(rename = "publicMode")]
+    public_mode: String,
+    #[serde(rename = "canEdit")]
+    can_edit: bool,
 }
