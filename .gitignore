@@ -142,3 +142,7 @@ opencode.json
 
 # Docker build artifact (produced by CI, never committed)
 /build-output/
+
+# Created when the pure binary is replayed from the repository root
+rust/record/database.db
+rust/record/database.db-*
