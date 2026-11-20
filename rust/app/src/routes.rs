@@ -58,6 +58,7 @@ pub fn router() -> Router<Original> {
             get(theme_preference).post(set_theme_preference),
         )
         .route("/api/theme/v2/admin/revisions", get(admin_revisions))
+        .route("/api/theme/v2/admin/packages", get(admin_revisions))
         .route("/api/theme/v2/admin/audit", get(admin_audit))
         .route(
             "/api/theme/v2/admin/trusted/{revision}",
@@ -77,6 +78,11 @@ pub fn router() -> Router<Original> {
         .route("/api/theme/v2/admin/trial", post(begin_trial))
         .route("/api/theme/v2/admin/confirm", post(confirm_trial))
         .route("/api/theme/v2/admin/rollback", post(rollback_theme))
+        .route(
+            "/api/theme/v2/space/{space_id}/mine",
+            axum::routing::put(set_user_space_theme).delete(clear_user_space_theme),
+        )
+        .route("/api/spaces/{space_id}/copy", post(copy_space))
         .route(
             "/api/theme/v2/wallpaper/library/assets/{version}/{*name}",
             get(wallpaper_library_asset),
@@ -6813,4 +6819,216 @@ fn static_error(status: StatusCode, body: &'static str, api_group: bool) -> Resp
         }
     }
     response
+}
+
+/// `SetUserSpaceThemeV2`: a per-Space override for the caller.
+async fn set_user_space_theme(
+    headers: HeaderMap,
+    Path(space_id): Path<String>,
+    request: Request,
+) -> Response {
+    let user = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    let space_id: i64 = match space_id.parse() {
+        Ok(value) => value,
+        Err(_) => return envelope::error(" [spaceId must be a positive integer]"),
+    };
+    let body = match axum::body::to_bytes(request.into_body(), 1 << 20).await {
+        Ok(body) => body,
+        Err(_) => return envelope::error("invalid request body"),
+    };
+    let req: RevisionRequest = match serde_json::from_slice(&body) {
+        Ok(req) => req,
+        Err(error) => return envelope::error(&format!(" [{}]", error)),
+    };
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool.clone(),
+        Err(error) => return envelope::error(&error),
+    };
+    let revision_id = if !req.revision.is_empty() {
+        req.revision.clone()
+    } else if !req.package_id.is_empty() {
+        match latest_revision_of(&pool, &req.package_id).await {
+            Ok(id) => id,
+            Err(_) => return error_code(404),
+        }
+    } else {
+        return envelope::error(" [packageId or revision is required]");
+    };
+    let revision: Option<(String,)> =
+        sqlx::query_as("SELECT package_id FROM revision_record_v2 WHERE id = ?")
+            .bind(&revision_id)
+            .fetch_optional(&pool)
+            .await
+            .unwrap_or(None);
+    let Some((package_id,)) = revision else {
+        return error_code(404);
+    };
+    match sqlx::query(
+        "INSERT INTO user_space_theme_preference_v2 (user_id, space_id, package_id, revision_id, updated_at)
+         VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(user_id, space_id) DO UPDATE SET package_id = excluded.package_id, revision_id = excluded.revision_id, updated_at = excluded.updated_at",
+    )
+    .bind(user.id)
+    .bind(space_id)
+    .bind(&package_id)
+    .bind(&revision_id)
+    .bind(now_like_go())
+    .execute(&pool)
+    .await
+    {
+        Ok(_) => success(),
+        Err(error) => envelope::error(&error.to_string()),
+    }
+}
+
+/// `ClearUserSpaceThemeV2`.
+async fn clear_user_space_theme(
+    headers: HeaderMap,
+    Path(space_id): Path<String>,
+) -> Response {
+    let user = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    let space_id: i64 = match space_id.parse() {
+        Ok(value) => value,
+        Err(_) => return envelope::error(" [spaceId must be a positive integer]"),
+    };
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool,
+        Err(error) => return envelope::error(&error),
+    };
+    match sqlx::query(
+        "DELETE FROM user_space_theme_preference_v2 WHERE user_id = ? AND space_id = ?",
+    )
+    .bind(user.id)
+    .bind(space_id)
+    .execute(pool)
+    .await
+    {
+        Ok(_) => success(),
+        Err(_) => envelope::database_error(),
+    }
+}
+
+/// `SpaceRouter.Copy`: a new shared Space holding copies of every group and item.
+async fn copy_space(
+    headers: HeaderMap,
+    Path(space_id): Path<i64>,
+    request: Request,
+) -> Response {
+    let user = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool.clone(),
+        Err(error) => return envelope::error(&error),
+    };
+    if !can_access(&pool, user.id, space_id).await {
+        return error_code(1005);
+    }
+    let source: Option<(String,)> = sqlx::query_as(r#"SELECT name FROM "space" WHERE id = ?"#)
+        .bind(space_id)
+        .fetch_optional(&pool)
+        .await
+        .unwrap_or(None);
+    let Some((source_name,)) = source else {
+        return error_code(404);
+    };
+    let body = axum::body::to_bytes(request.into_body(), 1 << 20)
+        .await
+        .unwrap_or_default();
+    let req: RenameRequest = serde_json::from_slice(&body).unwrap_or(RenameRequest { name: String::new() });
+    let name = if req.name.is_empty() {
+        format!("{source_name} Copy")
+    } else {
+        req.name
+    };
+    let now = now_like_go();
+    let mut tx = match pool.begin().await {
+        Ok(tx) => tx,
+        Err(error) => return envelope::error(&error.to_string()),
+    };
+    let created = sqlx::query(
+        r#"INSERT INTO "space" (created_at, updated_at, type, name, owner_user_id, pair_id, side, public_enabled, public_mode) VALUES (?, ?, 'shared', ?, ?, 0, 'yin', 0, 'direct')"#,
+    )
+    .bind(&now)
+    .bind(&now)
+    .bind(&name)
+    .bind(user.id)
+    .execute(&mut *tx)
+    .await;
+    let dst = match created {
+        Ok(result) => result.last_insert_rowid(),
+        Err(error) => return envelope::database_error(),
+    };
+    if sqlx::query(
+        "INSERT INTO space_member (created_at, updated_at, space_id, user_id, role, source, joined_at) VALUES (?, ?, ?, ?, 'admin', 'manual', ?)",
+    )
+    .bind(&now)
+    .bind(&now)
+    .bind(dst)
+    .bind(user.id)
+    .bind(&now)
+    .execute(&mut *tx)
+    .await
+    .is_err()
+    {
+        return envelope::database_error();
+    }
+    let groups: Vec<(i64, String, String, String, i64, Option<i64>)> = sqlx::query_as(
+        "SELECT id, icon, title, description, sort, parent_id FROM item_icon_group WHERE space_id = ?",
+    )
+    .bind(space_id)
+    .fetch_all(&mut *tx)
+    .await
+    .unwrap_or_default();
+    for (old_id, icon, title, description, sort, parent_id) in groups {
+        let inserted = sqlx::query(
+            "INSERT INTO item_icon_group (created_at, updated_at, icon, title, description, sort, user_id, space_id, parent_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(&now)
+        .bind(&now)
+        .bind(&icon)
+        .bind(&title)
+        .bind(&description)
+        .bind(sort)
+        .bind(user.id)
+        .bind(dst)
+        .bind(parent_id)
+        .execute(&mut *tx)
+        .await;
+        let new_group = match inserted {
+            Ok(result) => result.last_insert_rowid(),
+            Err(_) => return envelope::database_error(),
+        };
+        if sqlx::query(
+            "INSERT INTO item_icon (created_at, updated_at, icon_json, title, url, lan_url, mobile_url, description, open_method, sort, item_icon_group_id, user_id, space_id)
+             SELECT ?, ?, icon_json, title, url, lan_url, mobile_url, description, open_method, sort, ?, ?, ? FROM item_icon WHERE space_id = ? AND item_icon_group_id = ?",
+        )
+        .bind(&now)
+        .bind(&now)
+        .bind(new_group)
+        .bind(user.id)
+        .bind(dst)
+        .bind(space_id)
+        .bind(old_id)
+        .execute(&mut *tx)
+        .await
+        .is_err()
+        {
+            return envelope::database_error();
+        }
+    }
+    match tx.commit().await {
+        Ok(_) => success(),
+        Err(_) => envelope::database_error(),
+    }
 }
