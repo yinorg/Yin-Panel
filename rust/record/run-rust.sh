@@ -22,6 +22,9 @@ if [ ! -x "$bin" ]; then
 fi
 
 work="${YIN_PANEL_RECORD_DIR:-${TMPDIR:-/tmp}/yin-panel-record}"
+# The recorded cases are a sequence, so every run starts from an empty
+# installation, exactly as `run-original.sh` does.
+rm -rf "$work"
 mkdir -p "$work/uploads"
 cp "$root/rust/record/conf.yaml" "$work/conf.yaml"
 sed -i "s/__PORT__/$port/g" "$work/conf.yaml"

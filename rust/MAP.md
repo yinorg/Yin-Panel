@@ -50,6 +50,10 @@ rust-anything analyze backend --lang go --whole-app
   pure Rust binary 384/384 with fallback 0.0% (run it with
   `--build "sh rust/record/run-rust.sh"`, which puts it in the recording working
   directory).
+- `app lift` replays the binary directly, against the same recording working
+  directory. The recorded cases are a sequence, so clear it first:
+  `rm -rf /tmp/yin-panel-record && rust-anything app lift .`. With that, the lift
+  replay passes 384/384 and the only blocker left is:
 - `app lift` blockers, as the tool reports them: `wallpaperpack-rs` fails the
   `error cases` gate check. Every other check passes; that one asks for a
   recorded case where `Catalogue` fails, and its only error comes from a broken
