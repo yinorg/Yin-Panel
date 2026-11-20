@@ -16,6 +16,7 @@ fn error_message(code: i64) -> Option<&'static str> {
         1003 => Some("Incorrect username or password"),
         1004 => Some("Account disabled or not activated"),
         1005 => Some("No current permission for operation"),
+        404 => Some("Data not found"),
         1200 => Some("Server error"),
         _ => None,
     }

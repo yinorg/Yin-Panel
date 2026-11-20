@@ -33,6 +33,9 @@ pub fn router() -> Router<Original> {
         .route("/api/spaces/{space_id}/public", get(space_public))
         .route("/api/system/moduleConfig/getByName", get(module_config))
         .route("/api/file/getList", get(file_list))
+        .route("/api/spaces/{space_id}/bookmarks/tree", get(bookmarks_tree))
+        .route("/api/panel/users/getList", get(users_list))
+        .route("/api/panel/userConfig/getConfig", get(user_config))
 }
 
 /// `AboutRouter.Get`.
@@ -886,4 +889,180 @@ struct FileRow {
     created_at: String,
     updated_at: String,
     file_name: String,
+}
+
+/// `SpaceRouter.BookmarkTree`: groups ordered `sort, id`, items ordered
+/// `sort, id`, folded into a tree capped at `bookmarkTreeMaxDepth`.
+async fn bookmarks_tree(headers: HeaderMap, Path(space_id): Path<i64>) -> Response {
+    let pool = match guard(&headers, space_id).await {
+        Ok(pool) => pool,
+        Err(response) => return response,
+    };
+    let groups: Vec<(i64, String, String, Option<i64>)> = match sqlx::query_as(
+        r#"SELECT id, title, icon, parent_id FROM item_icon_group WHERE space_id = ? ORDER BY sort, id"#,
+    )
+    .bind(space_id)
+    .fetch_all(&pool)
+    .await
+    {
+        Ok(rows) => rows,
+        Err(error) => return envelope::error(&error.to_string()),
+    };
+    let items: Vec<(i64, String, String)> = match sqlx::query_as(
+        "SELECT item_icon_group_id, title, url FROM item_icon WHERE space_id = ? ORDER BY sort, id",
+    )
+    .bind(space_id)
+    .fetch_all(&pool)
+    .await
+    {
+        Ok(rows) => rows,
+        Err(error) => return envelope::error(&error.to_string()),
+    };
+    let known: std::collections::HashSet<i64> = groups.iter().map(|group| group.0).collect();
+    let mut children: std::collections::HashMap<i64, Vec<&(i64, String, String, Option<i64>)>> =
+        std::collections::HashMap::new();
+    for group in &groups {
+        let parent = match group.3 {
+            Some(parent) if known.contains(&parent) => parent,
+            _ => 0,
+        };
+        children.entry(parent).or_default().push(group);
+    }
+    let groups_json = build_tree(&children, &items, 0, 0);
+    success_data(json!({ "groups": groups_json }))
+}
+
+const BOOKMARK_TREE_MAX_DEPTH: i64 = 64;
+
+fn build_tree(
+    children: &std::collections::HashMap<i64, Vec<&(i64, String, String, Option<i64>)>>,
+    items: &[(i64, String, String)],
+    parent: i64,
+    depth: i64,
+) -> Vec<serde_json::Value> {
+    let Some(list) = children.get(&parent) else {
+        return Vec::new();
+    };
+    let mut out = Vec::with_capacity(list.len());
+    for group in list {
+        let group_items: Vec<serde_json::Value> = items
+            .iter()
+            .filter(|item| item.0 == group.0)
+            .map(|item| json!({ "title": item.1, "url": item.2 }))
+            .collect();
+        let nested = if depth < BOOKMARK_TREE_MAX_DEPTH {
+            build_tree(children, items, group.0, depth + 1)
+        } else {
+            Vec::new()
+        };
+        out.push(json!({
+            "title": group.1,
+            "icon": group.2,
+            "parentId": group.3,
+            "items": group_items,
+            "children": nested,
+        }));
+    }
+    out
+}
+
+/// `UsersRouter.GetList`: `LIMIT 0` for an absent `limit`, so an unpaged call
+/// answers an empty list (not null) with the real total.
+async fn users_list(
+    headers: HeaderMap,
+    Query(query): Query<std::collections::HashMap<String, String>>,
+) -> Response {
+    let user = match auth::user(&headers).await {
+        Ok(user) => user,
+        Err(AuthError::NotLoggedIn) => return error_code(1000),
+        Err(AuthError::Disabled) => return error_code(1004),
+    };
+    if user.role != 1 {
+        return error_code(1005);
+    }
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool,
+        Err(error) => return envelope::error(&error),
+    };
+    let total: (i64,) = sqlx::query_as(r#"SELECT COUNT(*) FROM "user""#)
+        .fetch_one(pool)
+        .await
+        .unwrap_or((0,));
+    let limit: i64 = query.get("limit").and_then(|value| value.parse().ok()).unwrap_or(0);
+    let page: i64 = query.get("page").and_then(|value| value.parse().ok()).unwrap_or(0);
+    let rows: Vec<UserRowOut> = if limit > 0 {
+        let offset = limit * (page.max(1) - 1);
+        sqlx::query_as(
+            r#"SELECT id, created_at, updated_at, name, head_image, status, role, mail,
+                      token_version FROM "user" ORDER BY id LIMIT ? OFFSET ?"#,
+        )
+        .bind(limit)
+        .bind(offset)
+        .fetch_all(pool)
+        .await
+        .unwrap_or_default()
+    } else {
+        Vec::new()
+    };
+    let list: Vec<serde_json::Value> = rows
+        .into_iter()
+        .map(|row| {
+            json!({
+                "id": row.id,
+                "createTime": rfc3339(&row.created_at),
+                "updateTime": rfc3339(&row.updated_at),
+                "password": "",
+                "name": row.name,
+                "headImage": row.head_image,
+                "status": row.status,
+                "role": row.role,
+                "mail": row.mail,
+                "token": "",
+            })
+        })
+        .collect();
+    success_data(json!({"count": total.0, "list": list}))
+}
+
+#[derive(sqlx::FromRow)]
+struct UserRowOut {
+    id: i64,
+    created_at: String,
+    updated_at: String,
+    name: String,
+    head_image: String,
+    status: i64,
+    role: i64,
+    mail: String,
+    token_version: i64,
+}
+
+/// `UserConfigRouter.GetConfig`: a missing row is `404 Data not found`.
+async fn user_config(headers: HeaderMap) -> Response {
+    let user = match auth::user(&headers).await {
+        Ok(user) => user,
+        Err(AuthError::NotLoggedIn) => return error_code(1000),
+        Err(AuthError::Disabled) => return error_code(1004),
+    };
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool,
+        Err(error) => return envelope::error(&error),
+    };
+    let row: Option<(String, String)> =
+        sqlx::query_as(r#"SELECT panel_json, language FROM user_config WHERE user_id = ?"#)
+            .bind(user.id)
+            .fetch_optional(pool)
+            .await
+            .unwrap_or(None);
+    let Some((panel_json, language)) = row else {
+        return error_code(404);
+    };
+    let panel: serde_json::Value = if panel_json.is_empty() {
+        serde_json::Value::Null
+    } else {
+        serde_json::from_str(&panel_json).unwrap_or(serde_json::Value::Null)
+    };
+    success_data(json!({"panel": panel, "language": language}))
 }
