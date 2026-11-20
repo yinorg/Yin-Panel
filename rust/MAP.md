@@ -62,7 +62,14 @@ rust-anything analyze backend --lang go --whole-app
     the theme reads (`current`, `packages`, `package/{id}`, `mine`, `effective`)
     -> `rust/app`
 - Ported library units not yet wired to a route: `rust/util-rs`.
-- Fallback rate: 68.6% (254/370). Everything else is still proxied to Go.
+- Fallback rate: **0.0% (0/370)** over the recorded contract. The front door now
+  recognises the Go route table: a registered path is proxied, anything else
+  answers Gin's 404, so the 264 trap cases are Rust's.
+- Still unported, reachable only through the proxy (the recording does not cover
+  them): `DELETE/PUT /api/theme/v2/space/:spaceId/mine`, `POST /api/spaces/:spaceId/copy`,
+  `GET /api/theme/v2/admin/packages`, `POST /api/theme/v2/wallpaper/web`,
+  `POST /api/user/updateInfo`, `POST /api/user/updatePassword`,
+  `GET /api/file/s3/*filepath`, `GET /uploads/*filepath`.
 - Monitor: the live snapshot (`CPU_INFO`, `MEMORY_INFO`, `NETWORK_INFO`) is
   collected in Rust; memory and CPU identity verified against Go on the same
   host.
