@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 use serde::Deserialize;
 
 pub mod copy;
+pub mod copy_sql;
 pub mod schema;
 pub mod upgrade;
 

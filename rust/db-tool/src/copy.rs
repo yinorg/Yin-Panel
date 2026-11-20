@@ -18,8 +18,8 @@ pub async fn run(source: &ConfigFile, target: &ConfigFile) -> Result<(), String>
     }
     match target.driver().as_str() {
         "sqlite" => copy_sqlite(&source_file, target).await,
-        "mysql" => Err("copying into MySQL is not implemented yet".to_string()),
-        "postgres" => Err("copying into PostgreSQL is not implemented yet".to_string()),
+        "mysql" => crate::copy_sql::run(source, &source_file, target, "mysql").await,
+        "postgres" => crate::copy_sql::run(source, &source_file, target, "postgres").await,
         other => Err(format!("unsupported target driver: {other}")),
     }
 }
@@ -32,13 +32,25 @@ async fn copy_sqlite(source: &Path, target: &ConfigFile) -> Result<(), String> {
     if let Some(parent) = destination.parent() {
         std::fs::create_dir_all(parent).map_err(|error| error.to_string())?;
     }
-    std::fs::copy(source, &destination).map_err(|error| {
-        format!(
-            "copying {} to {}: {error}",
-            source.display(),
-            destination.display()
-        )
-    })?;
+    if destination.exists() {
+        std::fs::remove_file(&destination).map_err(|error| error.to_string())?;
+    }
+    // A plain file copy misses everything still in the write-ahead log, which
+    // on a running deployment is most of the recent data. `VACUUM INTO` takes a
+    // consistent snapshot through SQLite itself.
+    let options = sqlx::sqlite::SqliteConnectOptions::new()
+        .filename(source)
+        .read_only(true);
+    let pool = sqlx::sqlite::SqlitePoolOptions::new()
+        .max_connections(1)
+        .connect_with(options)
+        .await
+        .map_err(|error| format!("opening {}: {error}", source.display()))?;
+    let statement = format!("VACUUM INTO '{}'", destination.display());
+    sqlx::Executor::execute(&pool, statement.as_str())
+        .await
+        .map_err(|error| format!("snapshotting {}: {error}", source.display()))?;
+    pool.close().await;
     println!("Copied {} to {}", source.display(), destination.display());
     let applied = upgrade::upgrade(&destination).await?;
     for step in applied {
