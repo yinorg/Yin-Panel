@@ -53,6 +53,22 @@ pub fn router() -> Router<Original> {
         )
         .route("/api/system/moduleConfig/save", post(module_config_save))
         .route("/api/panel/userConfig/setConfig", post(user_config_save))
+        .route(
+            "/api/spaces/{space_id}/groups",
+            post(create_group),
+        )
+        .route(
+            "/api/spaces/{space_id}/groups/{group_id}",
+            post(update_group).delete(delete_group).put(update_group),
+        )
+        .route(
+            "/api/spaces/{space_id}/groups/{group_id}/update",
+            post(update_group),
+        )
+        .route(
+            "/api/spaces/{space_id}/groups/{group_id}/delete",
+            post(delete_group),
+        )
 }
 
 /// `AboutRouter.Get`.
@@ -1824,4 +1840,302 @@ fn theme_wallpaper_entry(value: &str) -> bool {
             && !part.starts_with(['.', '-', '_'])
     };
     valid(package) && valid(entry)
+}
+
+/// `spaceRole`: `admin` for the owner, otherwise the member row's role.
+async fn space_role(pool: &sqlx::SqlitePool, user_id: i64, space_id: i64) -> String {
+    let owner: Option<(i64,)> = sqlx::query_as(r#"SELECT owner_user_id FROM "space" WHERE id = ?"#)
+        .bind(space_id)
+        .fetch_optional(pool)
+        .await
+        .unwrap_or(None);
+    match owner {
+        Some((owner_id,)) if owner_id == user_id => "admin".to_string(),
+        Some(_) => sqlx::query_as::<_, (String,)>(
+            "SELECT role FROM space_member WHERE space_id = ? AND user_id = ? LIMIT 1",
+        )
+        .bind(space_id)
+        .bind(user_id)
+        .fetch_optional(pool)
+        .await
+        .unwrap_or(None)
+        .map(|value| value.0)
+        .unwrap_or_default(),
+        None => String::new(),
+    }
+}
+
+async fn can_edit(pool: &sqlx::SqlitePool, user_id: i64, space_id: i64) -> bool {
+    matches!(space_role(pool, user_id, space_id).await.as_str(), "admin" | "editor")
+}
+
+#[derive(serde::Deserialize)]
+struct GroupRequest {
+    #[serde(default)]
+    title: String,
+    #[serde(default)]
+    icon: String,
+    #[serde(default, rename = "parentId")]
+    parent_id: Option<i64>,
+}
+
+/// `SpaceRouter.CreateGroup`.
+async fn create_group(
+    headers: HeaderMap,
+    Path(space_id): Path<i64>,
+    request: Request,
+) -> Response {
+    let user = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool.clone(),
+        Err(error) => return envelope::error(&error),
+    };
+    if !can_edit(&pool, user.id, space_id).await {
+        return error_code(1005);
+    }
+    let body = match axum::body::to_bytes(request.into_body(), 1 << 20).await {
+        Ok(body) => body,
+        Err(_) => return envelope::error("invalid request body"),
+    };
+    let req: GroupRequest = match serde_json::from_slice(&body) {
+        Ok(req) => req,
+        Err(error) => return envelope::error(&format!(" [ {error}]")),
+    };
+    if req.title.is_empty() {
+        return envelope::error(" [ Title为必填字段]");
+    }
+    if req.title.chars().count() > 50 {
+        return envelope::error(" [ Title长度不能超过50个字符]");
+    }
+    if let Some(parent) = req.parent_id {
+        if parent == 0 {
+            return envelope::error(" [ invalid parent group]");
+        }
+        let exists: Option<(i64,)> = sqlx::query_as(
+            "SELECT id FROM item_icon_group WHERE id = ? AND space_id = ?",
+        )
+        .bind(parent)
+        .bind(space_id)
+        .fetch_optional(&pool)
+        .await
+        .unwrap_or(None);
+        if exists.is_none() {
+            return envelope::error(" [ invalid parent group]");
+        }
+    }
+    let now = now_like_go();
+    let result = sqlx::query(
+        "INSERT INTO item_icon_group (created_at, updated_at, icon, title, description, sort, user_id, space_id, parent_id) VALUES (?, ?, ?, ?, '', 9999, ?, ?, ?)",
+    )
+    .bind(&now)
+    .bind(&now)
+    .bind(&req.icon)
+    .bind(&req.title)
+    .bind(user.id)
+    .bind(space_id)
+    .bind(req.parent_id)
+    .execute(&pool)
+    .await;
+    let id = match result {
+        Ok(result) => result.last_insert_rowid(),
+        Err(error) => return envelope::error(&error.to_string()),
+    };
+    let group = match load_group(&pool, space_id, id).await {
+        Some(group) => group,
+        None => return envelope::error("group not found"),
+    };
+    success_data(group)
+}
+
+async fn load_group(pool: &sqlx::SqlitePool, space_id: i64, id: i64) -> Option<serde_json::Value> {
+    let row = sqlx::query_as::<_, GroupRow>(
+        r#"SELECT id, created_at, updated_at, icon, title, description, sort, user_id, space_id,
+                  parent_id FROM item_icon_group WHERE id = ? AND space_id = ?"#,
+    )
+    .bind(id)
+    .bind(space_id)
+    .fetch_optional(pool)
+    .await
+    .unwrap_or(None)?;
+    Some(serde_json::to_value(GroupItem {
+        id: row.id,
+        create_time: rfc3339(&row.created_at),
+        update_time: rfc3339(&row.updated_at),
+        icon: row.icon,
+        title: row.title,
+        description: row.description,
+        sort: row.sort,
+        user_id: row.user_id,
+        space_id: row.space_id,
+        parent_id: row.parent_id,
+        item_count: 0,
+    })
+    .unwrap_or(serde_json::Value::Null))
+}
+
+async fn group_belongs(pool: &sqlx::SqlitePool, group_id: i64, space_id: i64) -> bool {
+    sqlx::query_as::<_, (i64,)>(
+        "SELECT id FROM item_icon_group WHERE id = ? AND space_id = ?",
+    )
+    .bind(group_id)
+    .bind(space_id)
+    .fetch_optional(pool)
+    .await
+    .unwrap_or(None)
+    .is_some()
+}
+
+/// `groupHasDescendant`: walking up from the candidate must not reach the group.
+async fn group_has_descendant(pool: &sqlx::SqlitePool, space_id: i64, group_id: i64, candidate: i64) -> bool {
+    let mut current = candidate;
+    let mut hops = 0;
+    while current != 0 && hops < 256 {
+        if current == group_id {
+            return true;
+        }
+        let parent: Option<(Option<i64>,)> = sqlx::query_as(
+            "SELECT parent_id FROM item_icon_group WHERE id = ? AND space_id = ?",
+        )
+        .bind(current)
+        .bind(space_id)
+        .fetch_optional(pool)
+        .await
+        .unwrap_or(None);
+        match parent.and_then(|value| value.0) {
+            Some(next) => current = next,
+            None => return false,
+        }
+        hops += 1;
+    }
+    false
+}
+
+/// `SpaceRouter.UpdateGroup`.
+async fn update_group(
+    headers: HeaderMap,
+    Path((space_id, group_id)): Path<(i64, String)>,
+    request: Request,
+) -> Response {
+    let user = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    let group_id: i64 = match group_id.parse() {
+        Ok(value) => value,
+        Err(_) => return envelope::error(" [ invalid groupId]"),
+    };
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool.clone(),
+        Err(error) => return envelope::error(&error),
+    };
+    if !can_edit(&pool, user.id, space_id).await {
+        return error_code(1005);
+    }
+    let body = match axum::body::to_bytes(request.into_body(), 1 << 20).await {
+        Ok(body) => body,
+        Err(_) => return envelope::error("invalid request body"),
+    };
+    let req: GroupRequest = match serde_json::from_slice(&body) {
+        Ok(req) => req,
+        Err(error) => return envelope::error(&format!(" [ {error}]")),
+    };
+    if req.title.is_empty() {
+        return envelope::error(" [ Title为必填字段]");
+    }
+    if let Some(parent) = req.parent_id {
+        if parent == group_id || !group_belongs(&pool, parent, space_id).await {
+            return envelope::error(" [ invalid parent group]");
+        }
+        if group_has_descendant(&pool, space_id, group_id, parent).await {
+            return envelope::error(" [ group cycle detected]");
+        }
+    }
+    let result = sqlx::query(
+        "UPDATE item_icon_group SET title = ?, icon = ?, parent_id = ?, updated_at = ? WHERE id = ? AND space_id = ?",
+    )
+    .bind(&req.title)
+    .bind(&req.icon)
+    .bind(req.parent_id)
+    .bind(now_like_go())
+    .bind(group_id)
+    .bind(space_id)
+    .execute(&pool)
+    .await;
+    match result {
+        Ok(_) => success(),
+        Err(error) => envelope::error(&error.to_string()),
+    }
+}
+
+/// `SpaceRouter.DeleteGroup`: the group, its descendants and their items.
+async fn delete_group(
+    headers: HeaderMap,
+    Path((space_id, group_id)): Path<(i64, String)>,
+) -> Response {
+    let user = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    let group_id: i64 = match group_id.parse() {
+        Ok(value) => value,
+        Err(_) => return envelope::error(" [ invalid groupId]"),
+    };
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool.clone(),
+        Err(error) => return envelope::error(&error),
+    };
+    if !can_edit(&pool, user.id, space_id).await {
+        return error_code(1005);
+    }
+    let mut ids = vec![group_id];
+    let mut index = 0;
+    while index < ids.len() {
+        let children: Vec<(i64,)> = sqlx::query_as(
+            "SELECT id FROM item_icon_group WHERE space_id = ? AND parent_id = ?",
+        )
+        .bind(space_id)
+        .bind(ids[index])
+        .fetch_all(&pool)
+        .await
+        .unwrap_or_default();
+        for (child,) in children {
+            ids.push(child);
+        }
+        index += 1;
+    }
+    let placeholders = vec!["?"; ids.len()].join(",");
+    let mut tx = match pool.begin().await {
+        Ok(tx) => tx,
+        Err(error) => return envelope::error(&error.to_string()),
+    };
+    let delete_items = format!(
+        "DELETE FROM item_icon WHERE space_id = ? AND item_icon_group_id IN ({placeholders})"
+    );
+    let mut statement = sqlx::query(&delete_items).bind(space_id);
+    for id in &ids {
+        statement = statement.bind(id);
+    }
+    if statement.execute(&mut *tx).await.is_err() {
+        return envelope::error("delete failed");
+    }
+    let delete_groups = format!(
+        "DELETE FROM item_icon_group WHERE space_id = ? AND id IN ({placeholders})"
+    );
+    let mut statement = sqlx::query(&delete_groups).bind(space_id);
+    for id in &ids {
+        statement = statement.bind(id);
+    }
+    if statement.execute(&mut *tx).await.is_err() {
+        return envelope::error("delete failed");
+    }
+    match tx.commit().await {
+        Ok(_) => success(),
+        Err(error) => envelope::error(&error.to_string()),
+    }
 }
