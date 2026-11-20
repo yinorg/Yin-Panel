@@ -34,6 +34,10 @@ pub fn router() -> Router<Original> {
         .route("/api/system/moduleConfig/getByName", get(module_config))
         .route("/api/file/getList", get(file_list))
         .route("/api/file/uploadImg", post(upload_image))
+        .route(
+            "/api/panel/itemIcon/getSiteFavicon",
+            post(get_site_favicon),
+        )
         .route("/api/spaces/{space_id}/bookmarks/tree", get(bookmarks_tree))
         .route("/api/panel/users/getList", get(users_list))
         .route("/api/panel/users/create", post(create_user))
@@ -6236,4 +6240,240 @@ async fn rollback_theme(headers: HeaderMap) -> Response {
         Ok(_) => success(),
         Err(error) => envelope::error(&error.to_string()),
     }
+}
+
+#[derive(serde::Deserialize)]
+struct FaviconRequest {
+    #[serde(default)]
+    url: String,
+}
+
+/// Every `<link>` tag's attributes, in document order.
+fn link_attributes(html: &str) -> Vec<Vec<(String, String)>> {
+    let mut out = Vec::new();
+    let lower = html.to_ascii_lowercase();
+    let mut cursor = 0;
+    while let Some(start) = lower[cursor..].find("<link") {
+        let start = cursor + start;
+        let Some(end) = lower[start..].find('>') else {
+            break;
+        };
+        let end = start + end;
+        let tag = &html[start..end];
+        let mut attributes = Vec::new();
+        let bytes = tag.as_bytes();
+        let mut index = 5; // after "<link"
+        while index < tag.len() {
+            while index < tag.len() && (bytes[index] as char).is_whitespace() {
+                index += 1;
+            }
+            let name_start = index;
+            while index < tag.len() && !matches!(bytes[index] as char, '=' | ' ' | '\t' | '\n' | '\r' | '/') {
+                index += 1;
+            }
+            if name_start == index {
+                index += 1;
+                continue;
+            }
+            let name = tag[name_start..index].to_ascii_lowercase();
+            while index < tag.len() && (bytes[index] as char).is_whitespace() {
+                index += 1;
+            }
+            if index >= tag.len() || bytes[index] != b'=' {
+                attributes.push((name, String::new()));
+                continue;
+            }
+            index += 1;
+            while index < tag.len() && (bytes[index] as char).is_whitespace() {
+                index += 1;
+            }
+            let value = if index < tag.len() && (bytes[index] == b'"' || bytes[index] == b'\'') {
+                let quote = bytes[index];
+                index += 1;
+                let value_start = index;
+                while index < tag.len() && bytes[index] != quote {
+                    index += 1;
+                }
+                let value = tag[value_start..index].to_string();
+                index += 1;
+                value
+            } else {
+                let value_start = index;
+                while index < tag.len() && !(bytes[index] as char).is_whitespace() {
+                    index += 1;
+                }
+                tag[value_start..index].to_string()
+            };
+            attributes.push((name, value));
+        }
+        out.push(attributes);
+        cursor = end + 1;
+    }
+    out
+}
+
+/// `favicon.GetOneFaviconURL`: the first icon a page declares, else the
+/// conventional `/favicon.ico`.
+async fn discover_icon(page_url: &str) -> Result<String, String> {
+    let client = reqwest::Client::builder()
+        .no_proxy()
+        .timeout(std::time::Duration::from_secs(8))
+        .build()
+        .map_err(|error| error.to_string())?;
+    let response = client
+        .get(page_url)
+        .header(
+            reqwest::header::USER_AGENT,
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3",
+        )
+        .send()
+        .await
+        .map_err(|error| error.to_string())?;
+    if !response.status().is_success() {
+        return Err(format!(
+            "HTTP request failed with status code {}",
+            response.status().as_u16()
+        ));
+    }
+    let html = response.text().await.map_err(|error| error.to_string())?;
+    let page = reqwest::Url::parse(page_url).map_err(|error| error.to_string())?;
+    for attributes in link_attributes(&html) {
+        let mut rel = String::new();
+        let mut href = String::new();
+        for (name, value) in attributes {
+            match name.as_str() {
+                "rel" => rel = value,
+                "href" => href = value,
+                _ => {}
+            }
+        }
+        if !rel.contains("icon") || href.is_empty() {
+            continue;
+        }
+        let Ok(icon) = page.join(href.trim()) else {
+            continue;
+        };
+        if matches!(icon.scheme(), "http" | "https") {
+            return Ok(icon.to_string());
+        }
+    }
+    // Many sites serve the conventional icon without declaring it. The authority
+    // keeps a non-default port, which `host_str` alone drops.
+    let host = match page.port() {
+        Some(port) => format!("{}:{port}", page.host_str().unwrap_or("")),
+        None => page.host_str().unwrap_or("").to_string(),
+    };
+    Ok(format!("{}://{host}/favicon.ico", page.scheme()))
+}
+
+/// `ItemIconRouter.GetSiteFavicon`: discover the icon, download it, store it and
+/// record the file row. The name is content-addressed by time in Go, so it is
+/// reproduced the same way rather than being made deterministic.
+async fn get_site_favicon(headers: HeaderMap, request: Request) -> Response {
+    let user = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    let body = match axum::body::to_bytes(request.into_body(), 1 << 20).await {
+        Ok(body) => body,
+        Err(_) => return envelope::error("invalid request body"),
+    };
+    let req: FaviconRequest = match serde_json::from_slice(&body) {
+        Ok(req) => req,
+        Err(error) => return envelope::error(&format!(" [{}]", error)),
+    };
+    if req.url.trim().is_empty() {
+        return success_data(json!({"iconUrl": "", "fileName": ""}));
+    }
+    let icon_url = match discover_icon(req.url.trim()).await {
+        Ok(url) => url,
+        Err(error) => {
+            return envelope::error(&format!("acquisition failed: get ico error:{error}"))
+        }
+    };
+    let parsed = match reqwest::Url::parse(req.url.trim()) {
+        Ok(url) => url,
+        Err(error) => return envelope::error(&format!("acquisition failed:{error}")),
+    };
+    // The icon URL loses its query string, as the Go handler does.
+    let icon = match reqwest::Url::parse(&icon_url) {
+        Ok(mut url) => {
+            url.set_query(None);
+            url.set_fragment(None);
+            url
+        }
+        Err(error) => {
+            return envelope::error(&format!("acquisition failed: parsed ico URL :{error}"))
+        }
+    };
+    let _ = &parsed;
+
+    let client = match reqwest::Client::builder()
+        .no_proxy()
+        .timeout(std::time::Duration::from_secs(10))
+        .build()
+    {
+        Ok(client) => client,
+        Err(error) => return envelope::error(&format!("acquisition failed: download {error}")),
+    };
+    let response = match client.get(icon.clone()).send().await {
+        Ok(response) => response,
+        Err(error) => return envelope::error(&format!("acquisition failed: download {error}")),
+    };
+    if !response.status().is_success() {
+        return envelope::error(&format!(
+            "acquisition failed: download HTTP request failed, status code: {}",
+            response.status().as_u16()
+        ));
+    }
+    let content = match response.bytes().await {
+        Ok(bytes) => bytes.to_vec(),
+        Err(error) => return envelope::error(&format!("acquisition failed: download {error}")),
+    };
+    if content.len() > 10 * 1024 * 1024 {
+        return envelope::error("acquisition failed: download 文件太大，不下载");
+    }
+
+    let url_file_name = icon
+        .path_segments()
+        .and_then(|mut segments| segments.next_back())
+        .unwrap_or("")
+        .to_string();
+    let extension = match url_file_name.rfind('.') {
+        Some(index) => url_file_name[index..].to_string(),
+        None => ".ico".to_string(),
+    };
+    let extension = if extension.is_empty() { ".ico".to_string() } else { extension };
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|value| format!("{}", value.as_nanos()))
+        .unwrap_or_default();
+    let file_name = format!("{}{}", hex_digest(format!("{url_file_name}{now}").as_bytes(), false), extension);
+    if store_object(&file_name, &content).is_err() {
+        return envelope::error("acquisition failed: download failed to upload file");
+    }
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool,
+        Err(error) => return envelope::error(&error),
+    };
+    let now = now_like_go();
+    if sqlx::query(
+        "INSERT INTO file (created_at, updated_at, user_id, file_name) VALUES (?, ?, ?, ?)",
+    )
+    .bind(&now)
+    .bind(&now)
+    .bind(user.id)
+    .bind(&file_name)
+    .execute(pool)
+    .await
+    .is_err()
+    {
+        return envelope::database_error();
+    }
+    // `ItemIconGetSiteFaviconResp` keeps `iconUrl` before `fileName`.
+    success_data(json!({
+        "iconUrl": format!("{}{}", upload_prefix(), file_name),
+        "fileName": file_name,
+    }))
 }
