@@ -38,6 +38,10 @@ pub fn router() -> Router<Original> {
             "/api/panel/itemIcon/getSiteFavicon",
             post(get_site_favicon),
         )
+        .route("/api/user/updateInfo", post(update_user_info))
+        .route("/api/user/updatePassword", post(update_password))
+        .route("/api/file/s3/{*filepath}", get(serve_stored_file_api))
+        .route("/uploads/{*filepath}", get(serve_stored_file))
         .route("/api/spaces/{space_id}/bookmarks/tree", get(bookmarks_tree))
         .route("/api/panel/users/getList", get(users_list))
         .route("/api/panel/users/create", post(create_user))
@@ -6587,4 +6591,226 @@ pub async fn go_fallback(
         "404 page not found",
     )
         .into_response()
+}
+
+#[derive(serde::Deserialize)]
+struct UpdateInfoRequest {
+    #[serde(default, rename = "headImage")]
+    head_image: String,
+    #[serde(default)]
+    name: String,
+}
+
+/// `UserRouter.UpdateInfo`: a 3–15 character nickname and an optional avatar.
+async fn update_user_info(headers: HeaderMap, request: Request) -> Response {
+    let user = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    let body = match axum::body::to_bytes(request.into_body(), 1 << 20).await {
+        Ok(body) => body,
+        Err(_) => return envelope::error("invalid request body"),
+    };
+    let req: UpdateInfoRequest = match serde_json::from_slice(&body) {
+        Ok(req) => req,
+        Err(error) => return envelope::error(&format!(" [{}]", error)),
+    };
+    let length = req.name.chars().count();
+    if req.name.is_empty() {
+        return envelope::error(" [ Name为必填字段]");
+    }
+    if length < 3 {
+        return envelope::error(" [ Name长度必须至少为3个字符]");
+    }
+    if length > 15 {
+        return envelope::error(" [ Name长度不能超过15个字符]");
+    }
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool.clone(),
+        Err(error) => return envelope::error(&error),
+    };
+    let existing: Option<(String,)> = sqlx::query_as(r#"SELECT name FROM "user" WHERE id = ?"#)
+        .bind(user.id)
+        .fetch_optional(&pool)
+        .await
+        .unwrap_or(None);
+    let Some((existing_name,)) = existing else {
+        return envelope::database_error();
+    };
+    let now = now_like_go();
+    let mut tx = match pool.begin().await {
+        Ok(tx) => tx,
+        Err(error) => return envelope::error(&error.to_string()),
+    };
+    if sqlx::query(r#"UPDATE "user" SET name = ?, head_image = ?, updated_at = ? WHERE id = ?"#)
+        .bind(&req.name)
+        .bind(&req.head_image)
+        .bind(&now)
+        .bind(user.id)
+        .execute(&mut *tx)
+        .await
+        .is_err()
+    {
+        return envelope::database_error();
+    }
+    if req.name != existing_name {
+        let _ = sqlx::query(
+            r#"UPDATE "space" SET name = ?, updated_at = ? WHERE type = 'personal' AND owner_user_id = ? AND (side = 'yin' OR side = '' OR side IS NULL)"#,
+        )
+        .bind(&req.name)
+        .bind(&now)
+        .bind(user.id)
+        .execute(&mut *tx)
+        .await;
+        let _ = sqlx::query(
+            r#"UPDATE "space" SET name = ?, updated_at = ? WHERE type = 'personal' AND owner_user_id = ? AND side = 'yang'"#,
+        )
+        .bind(format!("{}-B", req.name))
+        .bind(&now)
+        .bind(user.id)
+        .execute(&mut *tx)
+        .await;
+    }
+    match tx.commit().await {
+        Ok(_) => success(),
+        Err(error) => envelope::error(&error.to_string()),
+    }
+}
+
+#[derive(serde::Deserialize)]
+struct UpdatePasswordRequest {
+    #[serde(default, rename = "oldPassword")]
+    old_password: String,
+    #[serde(default, rename = "newPassword")]
+    new_password: String,
+}
+
+/// `UserRouter.UpdatePasssword`: check the old password, store the new hash and
+/// revoke every issued token.
+async fn update_password(headers: HeaderMap, request: Request) -> Response {
+    let user = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    let body = match axum::body::to_bytes(request.into_body(), 1 << 20).await {
+        Ok(body) => body,
+        Err(_) => return envelope::error("invalid request body"),
+    };
+    let req: UpdatePasswordRequest = match serde_json::from_slice(&body) {
+        Ok(req) => req,
+        Err(error) => return envelope::error(&format!(" [{}]", error)),
+    };
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool,
+        Err(error) => return envelope::error(&error),
+    };
+    let stored: Option<(String,)> = sqlx::query_as(r#"SELECT password FROM "user" WHERE id = ?"#)
+        .bind(user.id)
+        .fetch_optional(pool)
+        .await
+        .unwrap_or(None);
+    let Some((stored,)) = stored else {
+        return envelope::error(" [record not found]");
+    };
+    if stored != password_encryption(&req.old_password) {
+        return error_code(1007);
+    }
+    let now = now_like_go();
+    let mut tx = match pool.begin().await {
+        Ok(tx) => tx,
+        Err(error) => return envelope::error(&error.to_string()),
+    };
+    if sqlx::query(
+        r#"UPDATE "user" SET password = ?, token_version = token_version + 1, updated_at = ? WHERE id = ?"#,
+    )
+    .bind(password_encryption(&req.new_password))
+    .bind(&now)
+    .bind(user.id)
+    .execute(&mut *tx)
+    .await
+    .is_err()
+    {
+        return envelope::database_error();
+    }
+    if tx.commit().await.is_err() {
+        return envelope::database_error();
+    }
+    success()
+}
+
+/// `FileRouter.GetS3File`: an uploaded file from local storage, with the cache
+/// policy its content-hash name allows.
+async fn serve_stored_file(Path(filepath): Path<String>) -> Response {
+    serve_stored(filepath, false).await
+}
+
+/// The `/api` registration of the same handler; failures carry `no-store`.
+async fn serve_stored_file_api(Path(filepath): Path<String>) -> Response {
+    serve_stored(filepath, true).await
+}
+
+async fn serve_stored(filepath: String, api_group: bool) -> Response {
+    let name = filepath.trim_start_matches('/').to_string();
+    if name.is_empty() {
+        return static_error(StatusCode::BAD_REQUEST, "{\"error\":\"file path is required\"}", api_group);
+    }
+    let path = storage_dir().join(&name);
+    let content = match std::fs::read(&path) {
+        Ok(content) => content,
+        Err(_) => {
+            return static_error(
+                StatusCode::NOT_FOUND,
+                "{\"error\":\"failed to get file\"}",
+                api_group,
+            )
+        }
+    };
+    let extension = extension_of(&name);
+    let content_type = match extension.as_str() {
+        ".jpg" | ".jpeg" => "image/jpeg",
+        ".png" => "image/png",
+        ".gif" => "image/gif",
+        ".svg" => "image/svg+xml",
+        ".webp" => "image/webp",
+        ".mp4" => "video/mp4",
+        ".webm" => "video/webm",
+        _ => "application/octet-stream",
+    };
+    let base = name.rsplit('/').next().unwrap_or(&name).to_string();
+    let mut response = Response::new(axum::body::Body::from(content.clone()));
+    {
+        let out = response.headers_mut();
+        out.insert(
+            header::CONTENT_TYPE,
+            HeaderValue::from_str(content_type).unwrap_or(HeaderValue::from_static("application/octet-stream")),
+        );
+        out.insert(
+            header::CONTENT_DISPOSITION,
+            HeaderValue::from_str(&format!("inline; filename={base}"))
+                .unwrap_or(HeaderValue::from_static("inline")),
+        );
+        out.insert(
+            header::CACHE_CONTROL,
+            HeaderValue::from_static("public, max-age=31536000, immutable"),
+        );
+    }
+    response
+}
+
+/// A JSON error from the static file routes, with the middleware headers the
+/// matched route would add.
+fn static_error(status: StatusCode, body: &'static str, api_group: bool) -> Response {
+    let mut response = (status, [(header::CONTENT_TYPE, HeaderValue::from_static("application/json; charset=utf-8"))], body).into_response();
+    {
+        let headers = response.headers_mut();
+        headers.insert(header::REFERRER_POLICY, HeaderValue::from_static("strict-origin-when-cross-origin"));
+        headers.insert(header::X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
+        headers.insert(header::X_FRAME_OPTIONS, HeaderValue::from_static("SAMEORIGIN"));
+        if api_group {
+            headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+        }
+    }
+    response
 }
