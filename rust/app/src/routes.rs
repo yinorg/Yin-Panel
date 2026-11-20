@@ -97,6 +97,10 @@ pub fn router() -> Router<Original> {
             "/api/spaces/{space_id}/items/with-icon",
             post(create_item_with_icon),
         )
+        .route(
+            "/api/spaces/{space_id}/bookmarks/import-batch",
+            post(import_bookmarks),
+        )
         .route("/api/spaces/{space_id}/items/sort", post(sort_items))
         .route("/api/spaces/{space_id}/groups/sort", post(sort_groups))
         .route(
@@ -4025,4 +4029,333 @@ async fn create_item_with_icon(
         Some(item) => success_data(item),
         None => error_code(404),
     }
+}
+
+#[derive(serde::Deserialize)]
+struct BookmarkBatch {
+    #[serde(default)]
+    groups: Vec<BookmarkNode>,
+}
+
+#[derive(serde::Deserialize)]
+struct BookmarkNode {
+    #[serde(default)]
+    title: String,
+    #[serde(default)]
+    icon: String,
+    #[serde(default)]
+    items: Vec<BookmarkItem>,
+    #[serde(default)]
+    children: Vec<BookmarkNode>,
+}
+
+#[derive(serde::Deserialize)]
+struct BookmarkItem {
+    #[serde(default)]
+    title: String,
+    #[serde(default)]
+    url: String,
+    #[serde(default, rename = "uploadKey")]
+    upload_key: String,
+    #[serde(default)]
+    icon: IconInfo,
+}
+
+struct ImportSummary {
+    groups: i64,
+    skipped: i64,
+    seen: std::collections::HashSet<String>,
+    items: Vec<(String, String, i64, i64, i64, i64, String)>,
+}
+
+fn limit_title(title: &str) -> String {
+    title.trim().chars().take(20).collect()
+}
+
+/// `importBookmarkNode`: find or create the folder, then add its links, skipping
+/// a link that is already stored or repeated in the same file.
+fn import_node<'a>(
+    tx: &'a mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    icons: &'a std::collections::HashMap<String, IconInfo>,
+    space_id: i64,
+    user_id: i64,
+    parent_id: Option<i64>,
+    node: &'a BookmarkNode,
+    index: i64,
+    summary: &'a mut ImportSummary,
+) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), String>> + Send + 'a>> {
+    Box::pin(async move {
+        let title = node.title.trim().to_string();
+        if title.is_empty() {
+            return Ok(());
+        }
+        let found: Option<(i64,)> = match parent_id {
+            None => sqlx::query_as(
+                "SELECT id FROM item_icon_group WHERE space_id = ? AND title = ? AND parent_id IS NULL LIMIT 1",
+            )
+            .bind(space_id)
+            .bind(&title)
+            .fetch_optional(&mut **tx)
+            .await
+            .map_err(|error| error.to_string())?,
+            Some(parent) => sqlx::query_as(
+                "SELECT id FROM item_icon_group WHERE space_id = ? AND title = ? AND parent_id = ? LIMIT 1",
+            )
+            .bind(space_id)
+            .bind(&title)
+            .bind(parent)
+            .fetch_optional(&mut **tx)
+            .await
+            .map_err(|error| error.to_string())?,
+        };
+        let group_id = match found {
+            Some((id,)) => id,
+            None => {
+                let inserted = sqlx::query(
+                    "INSERT INTO item_icon_group (created_at, updated_at, icon, title, description, sort, user_id, space_id, parent_id) VALUES (?, ?, ?, ?, '', ?, ?, ?, ?)",
+                )
+                .bind(now_like_go())
+                .bind(now_like_go())
+                .bind(&node.icon)
+                .bind(&title)
+                .bind(index)
+                .bind(user_id)
+                .bind(space_id)
+                .bind(parent_id)
+                .execute(&mut **tx)
+                .await
+                .map_err(|error| error.to_string())?;
+                summary.groups += 1;
+                inserted.last_insert_rowid()
+            }
+        };
+
+        for (item_index, bookmark) in node.items.iter().enumerate() {
+            if bookmark.url.trim().is_empty() {
+                continue;
+            }
+            let key = format!("{group_id}\t{}", bookmark.url);
+            if summary.seen.contains(&key) {
+                summary.skipped += 1;
+                continue;
+            }
+            let existing: (i64,) = sqlx::query_as(
+                "SELECT COUNT(*) FROM item_icon WHERE space_id = ? AND item_icon_group_id = ? AND url = ?",
+            )
+            .bind(space_id)
+            .bind(group_id)
+            .bind(&bookmark.url)
+            .fetch_one(&mut **tx)
+            .await
+            .map_err(|error| error.to_string())?;
+            if existing.0 > 0 {
+                summary.seen.insert(key);
+                summary.skipped += 1;
+                continue;
+            }
+            summary.seen.insert(key);
+
+            let mut icon = if bookmark.upload_key.is_empty() {
+                IconInfo {
+                    item_type: bookmark.icon.item_type,
+                    src: bookmark.icon.src.clone(),
+                    file_name: bookmark.icon.file_name.clone(),
+                    text: bookmark.icon.text.clone(),
+                    background_color: bookmark.icon.background_color.clone(),
+                }
+            } else {
+                match icons.get(&bookmark.upload_key) {
+                    Some(uploaded) => IconInfo {
+                        item_type: uploaded.item_type,
+                        src: uploaded.src.clone(),
+                        file_name: uploaded.file_name.clone(),
+                        text: String::new(),
+                        background_color: String::new(),
+                    },
+                    None => return Err("invalid uploadKey".to_string()),
+                }
+            };
+            if icon.item_type == 0 {
+                icon.item_type = 4;
+            }
+            // `importBookmarkNode` stores the icon it picked *before*
+            // `ensureItemIcon` runs, so a text icon is persisted with
+            // `itemType: 4` and an empty glyph rather than the derived letter.
+            let icon_json = serde_json::to_string(&icon).unwrap_or_else(|_| "{}".to_string());
+            summary.items.push((
+                icon_json,
+                limit_title(&bookmark.title),
+                group_id,
+                item_index as i64,
+                space_id,
+                user_id,
+                bookmark.url.clone(),
+            ));
+        }
+
+        for (child_index, child) in node.children.iter().enumerate() {
+            import_node(
+                tx,
+                icons,
+                space_id,
+                user_id,
+                Some(group_id),
+                child,
+                child_index as i64,
+                summary,
+            )
+            .await?;
+        }
+        Ok(())
+    })
+}
+
+/// `SpaceRouter.ImportBookmarksBatch`.
+async fn import_bookmarks(
+    headers: HeaderMap,
+    Path(space_id): Path<i64>,
+    mut multipart: Multipart,
+) -> Response {
+    let user = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool.clone(),
+        Err(error) => return envelope::error(&error),
+    };
+    if !can_edit(&pool, user.id, space_id).await {
+        return error_code(1005);
+    }
+
+    let mut bookmarks_json: Option<String> = None;
+    let mut files: std::collections::HashMap<String, (String, Vec<u8>)> =
+        std::collections::HashMap::new();
+    while let Some(field) = multipart.next_field().await.unwrap_or(None) {
+        let name = field.name().unwrap_or("").to_string();
+        if name == "bookmarks" {
+            bookmarks_json = field.text().await.ok();
+            continue;
+        }
+        if name.trim().is_empty() {
+            return envelope::error(" [invalid file]");
+        }
+        let file_name = field.file_name().unwrap_or("").to_string();
+        if file_name.is_empty() {
+            continue;
+        }
+        match field.bytes().await {
+            Ok(data) => {
+                files.insert(name, (file_name, data.to_vec()));
+            }
+            Err(_) => return envelope::error(" [invalid file]"),
+        }
+    }
+    let Some(bookmarks_json) = bookmarks_json else {
+        return envelope::error(" [invalid bookmarks]");
+    };
+    let batch: BookmarkBatch = match serde_json::from_str(&bookmarks_json) {
+        Ok(batch) => batch,
+        Err(_) => return envelope::error(" [invalid bookmarks]"),
+    };
+
+    let mut icons: std::collections::HashMap<String, IconInfo> = std::collections::HashMap::new();
+    for (key, (original, content)) in files {
+        if content.len() > 5 << 20 {
+            return envelope::error(" [icon too large]");
+        }
+        let ext = extension_of(&original);
+        if !ICON_EXTENSIONS.contains(&ext.as_str()) {
+            return envelope::error(" [unsupported icon]");
+        }
+        let name = format!("{}{}", hex_digest(&content, true), ext);
+        if store_object(&name, &content).is_err() {
+            return error_code(1300);
+        }
+        icons.insert(
+            key,
+            IconInfo {
+                item_type: 2,
+                src: format!("{}{}", upload_prefix(), name),
+                file_name: name,
+                text: String::new(),
+                background_color: String::new(),
+            },
+        );
+    }
+
+    let mut tx = match pool.begin().await {
+        Ok(tx) => tx,
+        Err(error) => return envelope::error(&error.to_string()),
+    };
+    let now = now_like_go();
+    for icon in icons.values() {
+        let count: (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM file WHERE user_id = ? AND file_name = ?")
+                .bind(user.id)
+                .bind(&icon.file_name)
+                .fetch_one(&mut *tx)
+                .await
+                .unwrap_or((0,));
+        if count.0 == 0
+            && sqlx::query(
+                "INSERT INTO file (created_at, updated_at, user_id, file_name) VALUES (?, ?, ?, ?)",
+            )
+            .bind(&now)
+            .bind(&now)
+            .bind(user.id)
+            .bind(&icon.file_name)
+            .execute(&mut *tx)
+            .await
+            .is_err()
+        {
+            return envelope::error("create file record");
+        }
+    }
+    let mut summary = ImportSummary {
+        groups: 0,
+        skipped: 0,
+        seen: std::collections::HashSet::new(),
+        items: Vec::new(),
+    };
+    for (index, node) in batch.groups.iter().enumerate() {
+        if let Err(error) =
+            import_node(&mut tx, &icons, space_id, user.id, None, node, index as i64, &mut summary).await
+        {
+            return envelope::error(&error);
+        }
+    }
+    for (icon_json, title, group_id, sort, space, owner, url) in &summary.items {
+        if sqlx::query(
+            "INSERT INTO item_icon (created_at, updated_at, icon_json, title, url, lan_url, mobile_url, description, open_method, sort, item_icon_group_id, user_id, space_id) VALUES (?, ?, ?, ?, ?, '', '', '', 2, ?, ?, ?, ?)",
+        )
+        .bind(&now)
+        .bind(&now)
+        .bind(icon_json)
+        .bind(title)
+        .bind(url)
+        .bind(sort)
+        .bind(group_id)
+        .bind(owner)
+        .bind(space)
+        .execute(&mut *tx)
+        .await
+        .is_err()
+        {
+            return envelope::error("create item");
+        }
+    }
+    if let Err(error) = tx.commit().await {
+        return envelope::error(&error.to_string());
+    }
+    let files_json: serde_json::Map<String, serde_json::Value> = icons
+        .iter()
+        .map(|(key, icon)| (key.clone(), serde_json::to_value(icon).unwrap_or_default()))
+        .collect();
+    success_data(json!({
+        "files": serde_json::Value::Object(files_json),
+        "groups": summary.groups,
+        "skipped": summary.skipped,
+    }))
 }
