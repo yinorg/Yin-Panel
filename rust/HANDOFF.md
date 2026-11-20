@@ -11,6 +11,7 @@ Where the port stands. Read this first, then `MAP.md` and the ADRs that matter.
 | Units ported | 2 (`internal/biz/theme/wallpaperpack`, `internal/util`) + the Rust Core spine |
 | Routes owned by Rust | 43 registrations (about, capabilities, oauth config, login, logout, getUser, spaces, search-config, groups, items, members, public, moduleConfig, file list, bookmark tree, user list, user config, monitor status, theme preference, theme space, wallpaper library) |
 | Wave | 0 — leaf units |
+| Database tooling | `rust/db-tool` upgrade + SQLite copy, tested; MySQL/PostgreSQL copy pending |
 
 ## What is in place
 
