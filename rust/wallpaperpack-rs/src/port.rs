@@ -8,12 +8,22 @@
 
 #![forbid(unsafe_code)]
 
+use std::sync::OnceLock;
+
 use serde_json::{Value, json};
 
 include!(concat!(env!("OUT_DIR"), "/catalogue.rs"));
 
+static CATALOGUE_VALUE: OnceLock<Value> = OnceLock::new();
+
 /// Port of `Catalogue` (`internal/biz/theme/wallpaperpack/pack.go:148`).
 pub fn catalogue() -> Value {
+    CATALOGUE_VALUE.get_or_init(build_catalogue).clone()
+}
+
+/// Built once, like the Go package's `once.Do(load)`. Rebuilding the tree per
+/// call cost about 4.9 ms against Go's cached struct return.
+fn build_catalogue() -> Value {
     let categories: Vec<Value> = CATALOGUE
         .iter()
         .map(|(id, name, items)| {

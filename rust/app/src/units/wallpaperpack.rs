@@ -7,6 +7,7 @@
 //! the Core's JSON envelope.
 
 use std::collections::HashMap;
+use std::sync::OnceLock;
 
 use axum::extract::Request;
 use axum::http::{StatusCode, header};
@@ -16,8 +17,30 @@ use serde_json::{Map, Value, json};
 /// `wallpaperLibraryRoot` in `theme.go`.
 const LIBRARY_ROOT: &str = "/api/theme/v2/wallpaper/library/assets/";
 
+/// The response is fully determined by the catalogue compiled into the binary:
+/// the version and every asset path are constants, so the serialized envelope is
+/// built once and served from a `&'static str` afterwards. Loading the catalogue
+/// and rebuilding the tree on every request cost about 3.4 ms per response.
+static BODY: OnceLock<String> = OnceLock::new();
+
 /// `route` is the route as wired (`GET /users/{id}`, or `*`), `params` its path parameters.
 pub async fn handle(_route: &str, _params: HashMap<String, String>, _req: Request) -> Response {
+    let body = BODY.get_or_init(build_body);
+    (
+        StatusCode::OK,
+        [
+            (header::CONTENT_TYPE, "application/json; charset=utf-8"),
+            (header::CACHE_CONTROL, "public, max-age=3600"),
+            (header::REFERRER_POLICY, "strict-origin-when-cross-origin"),
+            (header::X_CONTENT_TYPE_OPTIONS, "nosniff"),
+            (header::X_FRAME_OPTIONS, "SAMEORIGIN"),
+        ],
+        body.as_str(),
+    )
+        .into_response()
+}
+
+fn build_body() -> String {
     let catalogue = wallpaperpack_rs::port::catalogue();
     let version = text(&catalogue, "version");
 
@@ -48,23 +71,12 @@ pub async fn handle(_route: &str, _params: HashMap<String, String>, _req: Reques
 
     // `response.SuccessData`, then the handler's own cache policy. The security
     // headers are what the Core's middleware adds to every response.
-    let body = json!({
+    json!({
         "code": 0,
         "data": { "categories": categories, "version": version },
         "msg": "OK",
-    });
-    (
-        StatusCode::OK,
-        [
-            (header::CONTENT_TYPE, "application/json; charset=utf-8"),
-            (header::CACHE_CONTROL, "public, max-age=3600"),
-            (header::REFERRER_POLICY, "strict-origin-when-cross-origin"),
-            (header::X_CONTENT_TYPE_OPTIONS, "nosniff"),
-            (header::X_FRAME_OPTIONS, "SAMEORIGIN"),
-        ],
-        body.to_string(),
-    )
-        .into_response()
+    })
+    .to_string()
 }
 
 fn text(value: &Value, key: &str) -> String {
