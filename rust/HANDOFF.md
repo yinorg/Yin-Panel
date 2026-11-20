@@ -6,10 +6,10 @@ Where the port stands. Read this first, then `MAP.md` and the ADRs that matter.
 
 | Thing | Value |
 | --- | --- |
-| Fallback rate | 94.0% (281/299 requests) |
+| Fallback rate | 92.6% (277/299 requests) |
 | Replay | 299/299 against the Go baseline and against the front door |
 | Units ported | 2 (`internal/biz/theme/wallpaperpack`, `internal/util`) + the Rust Core spine |
-| Routes owned by Rust | 11 (about, capabilities, oauth config, login, logout, getUser, spaces, search-config, groups, items, members, wallpaper library) |
+| Routes owned by Rust | 14 (about, capabilities, oauth config, login, logout, getUser, spaces, search-config, groups, items, members, public, moduleConfig, file list, wallpaper library) |
 | Wave | 0 — leaf units |
 
 ## What is in place

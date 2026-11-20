@@ -52,6 +52,7 @@ rust-anything analyze backend --lang go --whole-app
     `POST /api/login`, `POST /api/logout`, `GET /api/user/getUser`,
     `GET /api/spaces`, `GET /api/spaces/{id}/search-config`,
     `GET /api/spaces/{id}/groups`, `GET /api/spaces/{id}/items`,
-    `GET /api/spaces/{id}/members` -> `rust/app`
+    `GET /api/spaces/{id}/members`, `GET /api/spaces/{id}/public`,
+    `GET /api/system/moduleConfig/getByName`, `GET /api/file/getList` -> `rust/app`
 - Ported library units not yet wired to a route: `rust/util-rs`.
-- Fallback rate: 94.0% (281/299). Everything else is still proxied to Go.
+- Fallback rate: 92.6% (277/299). Everything else is still proxied to Go.
