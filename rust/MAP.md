@@ -63,6 +63,8 @@ rust-anything analyze backend --lang go --whole-app
     -> `rust/app`
 - Ported library units not yet wired to a route: `rust/util-rs`.
 - Fallback rate: 68.6% (254/370). Everything else is still proxied to Go.
+- Favicon: `getSiteFavicon` ported and compared against Go through the fixture
+  in `rust/record/favicon-fixture/` (not recordable, so verified by hand).
 - Theme package pipeline: archive parsing, manifest and resource validation,
   Ed25519 signature check, preview store, `admin/preview`, `preview/:token`, its
   asset route and `admin/install` are ported and verified against Go. The DTCG
