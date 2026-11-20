@@ -3,7 +3,7 @@
 //! `backend/internal/web/router/system`.
 
 use axum::Router;
-use axum::extract::{Path, Request};
+use axum::extract::{Path, Query, Request};
 use axum::http::{HeaderMap, HeaderValue, header};
 use axum::response::Response;
 use axum::routing::{get, post};
@@ -26,6 +26,9 @@ pub fn router() -> Router<Original> {
         .route("/api/user/getUser", get(get_user))
         .route("/api/spaces", get(list_spaces))
         .route("/api/spaces/{space_id}/search-config", get(search_config))
+        .route("/api/spaces/{space_id}/groups", get(groups))
+        .route("/api/spaces/{space_id}/items", get(items))
+        .route("/api/spaces/{space_id}/members", get(members))
 }
 
 /// `AboutRouter.Get`.
@@ -391,4 +394,329 @@ struct SpaceItem {
     public_mode: String,
     #[serde(rename = "canEdit")]
     can_edit: bool,
+}
+
+/// `canAccessSpace`: the owner or any member.
+async fn can_access(pool: &sqlx::SqlitePool, user_id: i64, space_id: i64) -> bool {
+    let owner: Option<(i64,)> = sqlx::query_as(r#"SELECT owner_user_id FROM "space" WHERE id = ?"#)
+        .bind(space_id)
+        .fetch_optional(pool)
+        .await
+        .unwrap_or(None);
+    match owner {
+        Some((owner_id,)) if owner_id == user_id => true,
+        Some(_) => sqlx::query_as::<_, (i64,)>(
+            r#"SELECT id FROM space_member WHERE space_id = ? AND user_id = ? LIMIT 1"#,
+        )
+        .bind(space_id)
+        .bind(user_id)
+        .fetch_optional(pool)
+        .await
+        .unwrap_or(None)
+        .is_some(),
+        None => false,
+    }
+}
+
+async fn guard(headers: &HeaderMap, space_id: i64) -> Result<sqlx::SqlitePool, Response> {
+    let user = match auth::user(headers).await {
+        Ok(user) => user,
+        Err(AuthError::NotLoggedIn) => return Err(error_code(1000)),
+        Err(AuthError::Disabled) => return Err(error_code(1004)),
+    };
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool.clone(),
+        Err(error) => return Err(envelope::error(&error)),
+    };
+    if !can_access(&pool, user.id, space_id).await {
+        return Err(error_code(1005));
+    }
+    Ok(pool)
+}
+
+/// `SpaceRouter.Groups`: one grouped count for the whole Space.
+async fn groups(headers: HeaderMap, Path(space_id): Path<i64>) -> Response {
+    let pool = match guard(&headers, space_id).await {
+        Ok(pool) => pool,
+        Err(response) => return response,
+    };
+    let rows: Vec<GroupRow> = match sqlx::query_as(
+        r#"SELECT id, created_at, updated_at, icon, title, description, sort, user_id, space_id,
+                  parent_id
+           FROM item_icon_group WHERE space_id = ? ORDER BY sort, created_at"#,
+    )
+    .bind(space_id)
+    .fetch_all(&pool)
+    .await
+    {
+        Ok(rows) => rows,
+        Err(error) => return envelope::error(&error.to_string()),
+    };
+    let counts: Vec<(i64, i64)> = sqlx::query_as(
+        "SELECT item_icon_group_id, COUNT(*) FROM item_icon WHERE space_id = ? GROUP BY item_icon_group_id",
+    )
+    .bind(space_id)
+    .fetch_all(&pool)
+    .await
+    .unwrap_or_default();
+    let mut items = Vec::with_capacity(rows.len());
+    for row in rows {
+        let count = counts
+            .iter()
+            .find(|(group, _)| *group == row.id)
+            .map(|(_, total)| *total)
+            .unwrap_or(0);
+        items.push(GroupItem {
+            id: row.id,
+            create_time: rfc3339(&row.created_at),
+            update_time: rfc3339(&row.updated_at),
+            icon: row.icon,
+            title: row.title,
+            description: row.description,
+            sort: row.sort,
+            user_id: row.user_id,
+            space_id: row.space_id,
+            parent_id: row.parent_id,
+            item_count: count,
+        });
+    }
+    envelope::success_struct(items)
+}
+
+/// `SpaceRouter.Items`: `sort, created_at, id` order, optional group filter and
+/// the 200-row page cap.
+async fn items(
+    headers: HeaderMap,
+    Path(space_id): Path<i64>,
+    Query(query): Query<std::collections::HashMap<String, String>>,
+) -> Response {
+    let pool = match guard(&headers, space_id).await {
+        Ok(pool) => pool,
+        Err(response) => return response,
+    };
+    let mut sql = String::from(
+        r#"SELECT id, created_at, updated_at, icon_json, title, url, lan_url, mobile_url,
+                  description, open_method, sort, item_icon_group_id, user_id, space_id
+           FROM item_icon WHERE space_id = ?"#,
+    );
+    let group = query.get("groupId").cloned().unwrap_or_default();
+    if !group.is_empty() {
+        sql.push_str(" AND item_icon_group_id = ?");
+    }
+    sql.push_str(" ORDER BY sort, created_at, id");
+    let mut binder = sqlx::query_as::<_, ItemRow>(&sql).bind(space_id);
+    if !group.is_empty() {
+        binder = binder.bind(group.parse::<i64>().unwrap_or(-1));
+    }
+    let page: i64 = query
+        .get("page")
+        .and_then(|value| value.parse().ok())
+        .unwrap_or(0);
+    if page > 0 {
+        let mut size: i64 = query
+            .get("pageSize")
+            .and_then(|value| value.parse().ok())
+            .unwrap_or(0);
+        if size < 1 {
+            size = 50;
+        }
+        if size > 200 {
+            size = 200;
+        }
+        sql.clear();
+        sql.push_str(
+            r#"SELECT id, created_at, updated_at, icon_json, title, url, lan_url, mobile_url,
+                      description, open_method, sort, item_icon_group_id, user_id, space_id
+               FROM item_icon WHERE space_id = ?"#,
+        );
+        if !group.is_empty() {
+            sql.push_str(" AND item_icon_group_id = ?");
+        }
+        sql.push_str(" ORDER BY sort, created_at, id LIMIT ? OFFSET ?");
+        let mut paged = sqlx::query_as::<_, ItemRow>(&sql).bind(space_id);
+        if !group.is_empty() {
+            paged = paged.bind(group.parse::<i64>().unwrap_or(-1));
+        }
+        paged = paged.bind(size).bind((page - 1) * size);
+        binder = paged;
+    }
+    let rows = match binder.fetch_all(&pool).await {
+        Ok(rows) => rows,
+        Err(error) => return envelope::error(&error.to_string()),
+    };
+    let items: Vec<ItemOut> = rows
+        .into_iter()
+        .map(|row| {
+            let icon = if row.icon_json.is_empty() {
+                IconInfo::default()
+            } else {
+                serde_json::from_str(&row.icon_json).unwrap_or_default()
+            };
+            ItemOut {
+                id: row.id,
+                create_time: rfc3339(&row.created_at),
+                update_time: rfc3339(&row.updated_at),
+                icon,
+                title: row.title,
+                url: row.url,
+                lan_url: row.lan_url,
+                mobile_url: row.mobile_url,
+                description: row.description,
+                open_method: row.open_method,
+                sort: row.sort,
+                item_icon_group_id: row.item_icon_group_id,
+                user_id: row.user_id,
+                space_id: row.space_id,
+            }
+        })
+        .collect();
+    envelope::success_struct(items)
+}
+
+/// `SpaceRouter.Members`: `map[string]any` in Go, so keys come out sorted.
+async fn members(headers: HeaderMap, Path(space_id): Path<i64>) -> Response {
+    let pool = match guard(&headers, space_id).await {
+        Ok(pool) => pool,
+        Err(response) => return response,
+    };
+    let rows: Vec<MemberRow> = match sqlx::query_as(
+        r#"SELECT id, space_id, user_id, role, source, joined_at
+           FROM space_member WHERE space_id = ? ORDER BY id"#,
+    )
+    .bind(space_id)
+    .fetch_all(&pool)
+    .await
+    {
+        Ok(rows) => rows,
+        Err(error) => return envelope::error(&error.to_string()),
+    };
+    let mut out = Vec::with_capacity(rows.len());
+    for row in rows {
+        let account: Option<(String, String)> =
+            sqlx::query_as(r#"SELECT mail, name FROM "user" WHERE id = ?"#)
+                .bind(row.user_id)
+                .fetch_optional(&pool)
+                .await
+                .unwrap_or(None);
+        let (email, name) = account.unwrap_or_default();
+        out.push(json!({
+            "id": row.id,
+            "spaceId": row.space_id,
+            "userId": row.user_id,
+            "email": email,
+            "name": name,
+            "role": row.role,
+            "source": row.source,
+            "joinedAt": rfc3339(&row.joined_at),
+        }));
+    }
+    success_data(serde_json::Value::Array(out))
+}
+
+#[derive(sqlx::FromRow)]
+struct GroupRow {
+    id: i64,
+    created_at: String,
+    updated_at: String,
+    icon: String,
+    title: String,
+    description: String,
+    sort: i64,
+    user_id: i64,
+    space_id: i64,
+    parent_id: Option<i64>,
+}
+
+#[derive(sqlx::FromRow)]
+struct ItemRow {
+    id: i64,
+    created_at: String,
+    updated_at: String,
+    icon_json: String,
+    title: String,
+    url: String,
+    lan_url: String,
+    mobile_url: String,
+    description: String,
+    open_method: i64,
+    sort: i64,
+    item_icon_group_id: i64,
+    user_id: i64,
+    space_id: i64,
+}
+
+#[derive(sqlx::FromRow)]
+struct MemberRow {
+    id: i64,
+    space_id: i64,
+    user_id: i64,
+    role: String,
+    source: String,
+    joined_at: String,
+}
+
+#[derive(Serialize)]
+struct GroupItem {
+    id: i64,
+    #[serde(rename = "createTime")]
+    create_time: String,
+    #[serde(rename = "updateTime")]
+    update_time: String,
+    icon: String,
+    title: String,
+    description: String,
+    sort: i64,
+    #[serde(rename = "userId")]
+    user_id: i64,
+    #[serde(rename = "spaceId")]
+    space_id: i64,
+    #[serde(rename = "parentId", skip_serializing_if = "Option::is_none")]
+    parent_id: Option<i64>,
+    #[serde(rename = "itemCount", skip_serializing_if = "is_zero")]
+    item_count: i64,
+}
+
+fn is_zero(value: &i64) -> bool {
+    *value == 0
+}
+
+#[derive(Default, Serialize, serde::Deserialize)]
+struct IconInfo {
+    #[serde(rename = "itemType", default)]
+    item_type: i64,
+    #[serde(default)]
+    src: String,
+    #[serde(rename = "fileName", default)]
+    file_name: String,
+    #[serde(default)]
+    text: String,
+    #[serde(rename = "backgroundColor", default)]
+    background_color: String,
+}
+
+#[derive(Serialize)]
+struct ItemOut {
+    id: i64,
+    #[serde(rename = "createTime")]
+    create_time: String,
+    #[serde(rename = "updateTime")]
+    update_time: String,
+    icon: IconInfo,
+    title: String,
+    url: String,
+    #[serde(rename = "lanUrl")]
+    lan_url: String,
+    #[serde(rename = "mobileUrl")]
+    mobile_url: String,
+    description: String,
+    #[serde(rename = "openMethod")]
+    open_method: i64,
+    sort: i64,
+    #[serde(rename = "itemIconGroupId")]
+    item_icon_group_id: i64,
+    #[serde(rename = "userId")]
+    user_id: i64,
+    #[serde(rename = "spaceId")]
+    space_id: i64,
 }
