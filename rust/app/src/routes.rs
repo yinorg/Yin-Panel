@@ -45,7 +45,20 @@ pub fn router() -> Router<Original> {
         .route("/api/system/monitor/getSnapshot", post(monitor_disabled))
         .route("/api/system/monitor/getDiskMountpoints", post(monitor_disabled))
         .route("/api/system/monitor/getDiskStateByPath", post(monitor_disabled))
-        .route("/api/theme/v2/preference", get(theme_preference))
+        .route(
+            "/api/theme/v2/preference",
+            get(theme_preference).post(set_theme_preference),
+        )
+        .route("/api/theme/v2/admin/revisions", get(admin_revisions))
+        .route("/api/theme/v2/admin/audit", get(admin_audit))
+        .route(
+            "/api/theme/v2/admin/trusted/{revision}",
+            get(admin_trusted),
+        )
+        .route(
+            "/api/theme/v2/wallpaper/web/{id}/{name}",
+            get(web_wallpaper_asset),
+        )
         .route("/api/theme/v2/space/{space_id}", get(theme_space))
         .route("/api/theme/v2/current", get(theme_current))
         .route("/api/theme/v2/packages", get(theme_packages))
@@ -4814,4 +4827,362 @@ struct AdminUser {
     role: i64,
     mail: String,
     token: String,
+}
+
+#[derive(serde::Deserialize)]
+struct PreferenceRequest {
+    #[serde(default)]
+    revision: String,
+    #[serde(default, rename = "packageId")]
+    package_id: String,
+    #[serde(default)]
+    mode: String,
+    #[serde(default, rename = "themeMode")]
+    theme_mode: String,
+}
+
+/// `SetUserThemeSelectionV2`: the user's activation and colour scheme.
+async fn select_user_theme(
+    pool: &sqlx::SqlitePool,
+    user_id: i64,
+    package_id: &str,
+    revision_id: &str,
+    mode: &str,
+) -> Result<(), String> {
+    let package: Option<(i64,)> = sqlx::query_as(
+        "SELECT 1 FROM package_record_v2 WHERE id = ? AND removed = 0",
+    )
+    .bind(package_id)
+    .fetch_optional(pool)
+    .await
+    .unwrap_or(None);
+    if package.is_none() {
+        return Err("record not found".to_string());
+    }
+    let revision: Option<(i64,)> = sqlx::query_as(
+        "SELECT 1 FROM revision_record_v2 WHERE id = ? AND package_id = ?",
+    )
+    .bind(revision_id)
+    .bind(package_id)
+    .fetch_optional(pool)
+    .await
+    .unwrap_or(None);
+    if revision.is_none() {
+        return Err("record not found".to_string());
+    }
+    let scope = format!("user:{user_id}");
+    let now = now_like_go();
+    sqlx::query(
+        "INSERT INTO activation_record_v2 (scope, package_id, active_revision_id, last_good_revision_id, pending_revision_id, trial_started_at, updated_at)
+         VALUES (?, ?, ?, ?, '', NULL, ?)
+         ON CONFLICT(scope) DO UPDATE SET package_id = excluded.package_id, active_revision_id = excluded.active_revision_id, last_good_revision_id = excluded.last_good_revision_id, pending_revision_id = '', trial_started_at = NULL, updated_at = excluded.updated_at",
+    )
+    .bind(&scope)
+    .bind(package_id)
+    .bind(revision_id)
+    .bind(revision_id)
+    .bind(&now)
+    .execute(pool)
+    .await
+    .map_err(|error| error.to_string())?;
+    sqlx::query(
+        "INSERT INTO user_theme_preference_v2 (user_id, mode, theme_mode, updated_at)
+         VALUES (?, ?, 'custom', ?)
+         ON CONFLICT(user_id) DO UPDATE SET mode = excluded.mode, theme_mode = 'custom', updated_at = excluded.updated_at",
+    )
+    .bind(user_id)
+    .bind(mode)
+    .bind(&now)
+    .execute(pool)
+    .await
+    .map_err(|error| error.to_string())?;
+    sqlx::query(
+        "INSERT INTO audit_record (actor_id, action, package_id, created_at) VALUES (?, 'select', ?, ?)",
+    )
+    .bind(user_id)
+    .bind(package_id)
+    .bind(&now)
+    .execute(pool)
+    .await
+    .map_err(|error| error.to_string())?;
+    Ok(())
+}
+
+/// `ThemeRouter.SetPreference`.
+async fn set_theme_preference(headers: HeaderMap, request: Request) -> Response {
+    let user = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    let body = match axum::body::to_bytes(request.into_body(), 1 << 20).await {
+        Ok(body) => body,
+        Err(_) => return envelope::error("invalid request body"),
+    };
+    let req: PreferenceRequest = match serde_json::from_slice(&body) {
+        Ok(req) => req,
+        Err(error) => return envelope::error(&format!(" [{}]", error)),
+    };
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool.clone(),
+        Err(error) => return envelope::error(&error),
+    };
+    if !req.revision.is_empty() || !req.package_id.is_empty() || !req.mode.is_empty() {
+        let mode = if req.mode.is_empty() { "auto".to_string() } else { req.mode.clone() };
+        if !matches!(mode.as_str(), "light" | "dark" | "auto") {
+            return envelope::error(" [mode must be light, dark, or auto]");
+        }
+        let revision_id = if !req.revision.is_empty() {
+            req.revision.clone()
+        } else if !req.package_id.is_empty() {
+            match latest_revision_of(&pool, &req.package_id).await {
+                Ok(id) => id,
+                Err(_) => return error_code(404),
+            }
+        } else {
+            let instance = match instance_default_revision(&pool).await {
+                Ok(id) => id,
+                Err(error) => return envelope::error(&error),
+            };
+            activation_revision(&pool, "instance").await.unwrap_or(instance)
+        };
+        let revision: Option<(String,)> =
+            sqlx::query_as("SELECT package_id FROM revision_record_v2 WHERE id = ?")
+                .bind(&revision_id)
+                .fetch_optional(&pool)
+                .await
+                .unwrap_or(None);
+        let Some((package_id,)) = revision else {
+            return error_code(404);
+        };
+        if let Err(error) =
+            select_user_theme(&pool, user.id, &package_id, &revision_id, &mode).await
+        {
+            if error == "record not found" {
+                return error_code(404);
+            }
+            return envelope::error(&error);
+        }
+    }
+    if !req.theme_mode.is_empty() {
+        if !matches!(req.theme_mode.as_str(), "custom" | "follow-space") {
+            return envelope::error(" [themeMode must be custom or follow-space]");
+        }
+        let now = now_like_go();
+        let existing: Option<(String,)> =
+            sqlx::query_as("SELECT mode FROM user_theme_preference_v2 WHERE user_id = ?")
+                .bind(user.id)
+                .fetch_optional(&pool)
+                .await
+                .unwrap_or(None);
+        let mode = existing.map(|value| value.0).unwrap_or_else(|| "auto".to_string());
+        if let Err(error) = sqlx::query(
+            "INSERT INTO user_theme_preference_v2 (user_id, mode, theme_mode, updated_at)
+             VALUES (?, ?, ?, ?)
+             ON CONFLICT(user_id) DO UPDATE SET theme_mode = excluded.theme_mode, updated_at = excluded.updated_at",
+        )
+        .bind(user.id)
+        .bind(&mode)
+        .bind(&req.theme_mode)
+        .bind(&now)
+        .execute(&pool)
+        .await
+        {
+            return envelope::error(&error.to_string());
+        }
+    }
+    success()
+}
+
+/// `ThemeRouter.RevisionsV2`.
+async fn admin_revisions() -> Response {
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool,
+        Err(error) => return envelope::error(&error),
+    };
+    let packages: Vec<(String, String, String)> = sqlx::query_as(
+        "SELECT id, name, latest_revision FROM package_record_v2 WHERE removed = 0 ORDER BY id",
+    )
+    .fetch_all(pool)
+    .await
+    .unwrap_or_default();
+    let mut package_list = Vec::with_capacity(packages.len());
+    for (id, name, revision_id) in packages {
+        let revision: Option<(String, i64, String)> = sqlx::query_as(
+            "SELECT version, verified, created_at FROM revision_record_v2 WHERE id = ?",
+        )
+        .bind(&revision_id)
+        .fetch_optional(pool)
+        .await
+        .unwrap_or(None);
+        let (version, verified, created_at) = revision.unwrap_or_default();
+        package_list.push(json!({
+            "id": id,
+            "name": name,
+            "version": version,
+            "revision": revision_id,
+            "verified": verified != 0,
+            "createdAt": rfc3339(&created_at),
+        }));
+    }
+    let revisions: Vec<(String, String, String, i64, String)> = sqlx::query_as(
+        "SELECT id, package_id, version, verified, created_at FROM revision_record_v2 ORDER BY package_id, created_at DESC",
+    )
+    .fetch_all(pool)
+    .await
+    .unwrap_or_default();
+    let revision_list: Vec<serde_json::Value> = revisions
+        .into_iter()
+        .map(|(id, package_id, version, verified, created_at)| {
+            // `gin.H`, so the keys come out sorted.
+            json!({
+                "createdAt": rfc3339(&created_at),
+                "id": id,
+                "packageId": package_id,
+                "verified": verified != 0,
+                "version": version,
+            })
+        })
+        .collect();
+    let instance = instance_default_revision(pool).await.unwrap_or_default();
+    let default_revision = activation_revision(pool, "instance").await.unwrap_or(instance);
+    let default_package: (String,) = sqlx::query_as(
+        "SELECT package_id FROM revision_record_v2 WHERE id = ?",
+    )
+    .bind(&default_revision)
+    .fetch_optional(pool)
+    .await
+    .unwrap_or(None)
+    .unwrap_or_default();
+    let activation: Option<(String, String, String, Option<String>)> = sqlx::query_as(
+        "SELECT active_revision_id, last_good_revision_id, pending_revision_id, trial_started_at FROM activation_record_v2 WHERE scope = 'instance'",
+    )
+    .fetch_optional(pool)
+    .await
+    .unwrap_or(None);
+    let (active, last_good, pending, trial) = activation.unwrap_or_default();
+    success_data(json!({
+        "activeRevision": active,
+        "defaultPackage": default_package.0,
+        "lastGoodRevision": last_good,
+        "packages": package_list,
+        "pendingRevision": pending,
+        "revisions": revision_list,
+        "trialStartedAt": trial.map(|value| rfc3339(&value)),
+    }))
+}
+
+/// `ThemeRouter.Audit`: the newest 200 theme actions.
+async fn admin_audit() -> Response {
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool,
+        Err(error) => return envelope::error(&error),
+    };
+    let rows: Vec<(i64, i64, String, String, String)> = match sqlx::query_as(
+        "SELECT id, actor_id, action, package_id, created_at FROM audit_record ORDER BY created_at DESC LIMIT 200",
+    )
+    .fetch_all(pool)
+    .await
+    {
+        Ok(rows) => rows,
+        Err(error) => return envelope::error(&error.to_string()),
+    };
+    let list: Vec<serde_json::Value> = rows
+        .into_iter()
+        .map(|(id, actor, action, package, created_at)| {
+            json!({
+                "id": id,
+                "actorId": actor,
+                "action": action,
+                "packageId": package,
+                "createdAt": rfc3339(&created_at),
+            })
+        })
+        .collect();
+    success_data(serde_json::Value::Array(list))
+}
+
+/// `ThemeRouter.TrustedRuntimePolicyV2`.
+async fn admin_trusted(Path(revision): Path<String>) -> Response {
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool,
+        Err(error) => return envelope::error(&error),
+    };
+    let exists: Option<(i64,)> =
+        sqlx::query_as("SELECT 1 FROM revision_record_v2 WHERE id = ?")
+            .bind(&revision)
+            .fetch_optional(pool)
+            .await
+            .unwrap_or(None);
+    if exists.is_none() {
+        return error_code(404);
+    }
+    let row: Option<(i64,)> = sqlx::query_as(
+        "SELECT enabled FROM trusted_runtime_policy_v2 WHERE revision_id = ?",
+    )
+    .bind(&revision)
+    .fetch_optional(pool)
+    .await
+    .unwrap_or(None);
+    success_data(json!({
+        "enabled": row.map(|value| value.0 != 0).unwrap_or(false),
+        "revision": revision,
+    }))
+}
+
+/// `ThemeRouter.WebWallpaperAsset`: `index.html` or the poster file.
+async fn web_wallpaper_asset(
+    Path((id, name)): Path<(String, String)>,
+) -> Response {
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool,
+        Err(error) => return envelope::error(&error),
+    };
+    let row: Option<(Vec<u8>, Vec<u8>, String)> = sqlx::query_as(
+        "SELECT html, poster, poster_type FROM web_wallpaper_record WHERE id = ?",
+    )
+    .bind(&id)
+    .fetch_optional(pool)
+    .await
+    .unwrap_or(None);
+    let Some((html, poster, poster_type)) = row else {
+        return envelope::empty_not_found();
+    };
+    let (media_type, content) = if name == "index.html" {
+        ("text/html".to_string(), html)
+    } else {
+        let expected = match poster_type.as_str() {
+            "image/png" => "poster.png",
+            "image/jpeg" => "poster.jpg",
+            "image/webp" => "poster.webp",
+            _ => "",
+        };
+        if name != expected {
+            return envelope::empty_not_found();
+        }
+        (poster_type, poster)
+    };
+    let mut response = Response::new(axum::body::Body::from(content.clone()));
+    {
+        let out = response.headers_mut();
+        for (key, value) in envelope::headers() {
+            out.insert(key, value);
+        }
+        out.insert(header::CONTENT_TYPE, HeaderValue::from_str(&media_type).unwrap_or(HeaderValue::from_static("application/octet-stream")));
+        out.insert(header::X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
+        out.insert(header::CACHE_CONTROL, HeaderValue::from_static("public, max-age=31536000, immutable, no-transform"));
+        if media_type == "text/html" {
+            use sha2::{Digest, Sha256};
+            let digest = Sha256::digest(&content);
+            let etag = format!("\"{}\"", digest.iter().map(|byte| format!("{byte:02x}")).collect::<String>());
+            out.insert(header::ETAG, HeaderValue::from_str(&etag).unwrap_or(HeaderValue::from_static("")));
+            out.insert(header::CONTENT_SECURITY_POLICY, HeaderValue::from_static("sandbox allow-scripts; default-src 'none'; script-src 'unsafe-inline' https://static.cloudflareinsights.com; style-src 'unsafe-inline'; img-src data:; connect-src https://cloudflareinsights.com; font-src 'none'; media-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'none'"));
+            out.insert(header::REFERRER_POLICY, HeaderValue::from_static("no-referrer"));
+        }
+    }
+    response
 }
