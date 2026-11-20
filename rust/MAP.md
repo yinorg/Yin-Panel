@@ -157,3 +157,12 @@ answers `HEAD` from every `GET` handler.
 
 Rollback is `cp build-output/yin-panel-go backend/yin-panel` and restart, or
 `cd backend && go build -o ../build-output/yin-panel-go .` first if it is stale.
+
+## Upgrading an existing Go deployment
+
+An upgrade is: stop the Go process, replace `yin-panel`, start it. The same
+`conf.yaml`, SQLite file, `uploads/` and `web/` are used; sessions stay valid
+because the JWT secret and claim set are the same; the schema upgrade is the one
+`rust/db-tool` performs. `scripts/verify-upgrade.sh` runs the whole cycle
+(Go → Rust → Go) and asserts nothing is lost. Details and limits:
+`rust/UPGRADE.md`.

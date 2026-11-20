@@ -14,6 +14,7 @@ Where the port stands. Read this first, then `MAP.md` and the ADRs that matter.
 | Runtime | pure Rust: no Go child, no proxy; `src/bootstrap.rs` migrates and seeds a new install |
 | Static site | `src/site.rs` serves `web/` like `registerStaticRoutes`; compared against Go |
 | Deployment | `scripts/deploy-rust.sh` runs the local service from the Rust binary since 2026-11-20 (rollback: `build-output/yin-panel-go`) |
+| Go → Rust upgrade | `scripts/verify-upgrade.sh` proves the cycle on a scratch directory: sessions, password hashes, rows, uploads, theme and the frontend carry over, no row is lost, and going back to Go reads what Rust wrote (`rust/UPGRADE.md`) |
 | Database tooling | `rust/db-tool` upgrade + copy to SQLite/MySQL/PostgreSQL; PostgreSQL verified live, MySQL DDL-tested |
 | Database unit | `rust/database-rs` (`MigrateDB`) gate **passed**, 233/233; `migrate-db` is a command in the binary |
 | Other units | `response-rs` 25/25, `storage-rs` 100/100, `theme-rs` 111/111, `repository-rs` 344/344, `util-rs` 868/868 — all gate **passed** |
