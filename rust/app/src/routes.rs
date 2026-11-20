@@ -83,6 +83,7 @@ pub fn router() -> Router<Original> {
             axum::routing::put(set_user_space_theme).delete(clear_user_space_theme),
         )
         .route("/api/spaces/{space_id}/copy", post(copy_space))
+        .route("/api/theme/v2/wallpaper/web", post(upload_web_wallpaper))
         .route(
             "/api/theme/v2/wallpaper/library/assets/{version}/{*name}",
             get(wallpaper_library_asset),
@@ -7031,4 +7032,141 @@ async fn copy_space(
         Ok(_) => success(),
         Err(_) => envelope::database_error(),
     }
+}
+
+/// `validWallpaperBytes`: the media type must match the bytes.
+fn valid_wallpaper_bytes(media_type: &str, data: &[u8]) -> bool {
+    match media_type {
+        "image/png" => data.len() >= 8 && data[..8] == [0x89, b'P', b'N', b'G', b'\r', b'\n', 0x1a, b'\n'],
+        "image/jpeg" => data.len() >= 3 && data[..3] == [0xff, 0xd8, 0xff],
+        "image/gif" => data.len() >= 6 && (&data[..6] == b"GIF87a" || &data[..6] == b"GIF89a"),
+        "image/webp" => data.len() >= 12 && &data[..4] == b"RIFF" && &data[8..12] == b"WEBP",
+        "video/mp4" => data.len() >= 12 && data.len() <= 20 << 20 && &data[4..8] == b"ftyp",
+        "video/webm" => data.len() >= 4 && data.len() <= 20 << 20 && data[..4] == [0x1a, 0x45, 0xdf, 0xa3],
+        "text/html" => !data.is_empty() && data.len() <= 5 << 20 && std::str::from_utf8(data).is_ok(),
+        _ => false,
+    }
+}
+
+const MAX_WEB_WALLPAPER: usize = 6 << 20;
+
+/// `ParseWebWallpaper`: exactly `index.html` and one `poster.*` at the archive
+/// root.
+fn parse_web_wallpaper(data: &[u8]) -> Result<(Vec<u8>, Vec<u8>, String), String> {
+    if data.is_empty() || data.len() > MAX_WEB_WALLPAPER {
+        return Err("web wallpaper package exceeds 6 MiB".to_string());
+    }
+    let mut archive = zip::ZipArchive::new(std::io::Cursor::new(data))
+        .map_err(|error| error.to_string())?;
+    if archive.len() != 2 {
+        return Err("web wallpaper must contain index.html and one poster".to_string());
+    }
+    let mut html: Option<Vec<u8>> = None;
+    let mut poster: Option<(Vec<u8>, String)> = None;
+    for index in 0..archive.len() {
+        let mut entry = archive.by_index(index).map_err(|error| error.to_string())?;
+        let name = entry.name().to_string();
+        if entry.is_dir()
+            || name.contains('/')
+            || name.contains('\\')
+            || entry.size() > MAX_WEB_WALLPAPER as u64
+        {
+            return Err(format!("unsafe web wallpaper file {name:?}"));
+        }
+        let mut content = Vec::new();
+        let mut limited = std::io::Read::take(entry, MAX_WEB_WALLPAPER as u64 + 1);
+        std::io::Read::read_to_end(&mut limited, &mut content)
+            .map_err(|_| "invalid web wallpaper content".to_string())?;
+        if content.len() > MAX_WEB_WALLPAPER {
+            return Err("invalid web wallpaper content".to_string());
+        }
+        match name.as_str() {
+            "index.html" => html = Some(content),
+            "poster.png" => poster = Some((content, "image/png".to_string())),
+            "poster.jpg" => poster = Some((content, "image/jpeg".to_string())),
+            "poster.webp" => poster = Some((content, "image/webp".to_string())),
+            other => return Err(format!("unexpected web wallpaper file {other:?}")),
+        }
+    }
+    let html = html.ok_or_else(|| "web wallpaper must contain index.html and one poster".to_string())?;
+    let (poster, poster_type) =
+        poster.ok_or_else(|| "web wallpaper must contain index.html and one poster".to_string())?;
+    if html.len() + poster.len() > MAX_WEB_WALLPAPER
+        || !valid_wallpaper_bytes("text/html", &html)
+        || !valid_wallpaper_bytes(&poster_type, &poster)
+    {
+        return Err("invalid web wallpaper or poster".to_string());
+    }
+    Ok((html, poster, poster_type))
+}
+
+/// `POST /api/theme/v2/wallpaper/web`: a self-contained web wallpaper archive.
+async fn upload_web_wallpaper(headers: HeaderMap, mut multipart: Multipart) -> Response {
+    let user = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    let mut data: Option<Vec<u8>> = None;
+    while let Some(field) = multipart.next_field().await.unwrap_or(None) {
+        if field.name() == Some("package") {
+            match field.bytes().await {
+                Ok(bytes) => data = Some(bytes.to_vec()),
+                Err(_) => return envelope::error(" [web wallpaper package is required]"),
+            }
+        }
+    }
+    let Some(data) = data else {
+        return envelope::error(" [web wallpaper package is required]");
+    };
+    if data.len() > MAX_WEB_WALLPAPER {
+        return envelope::error(" [web wallpaper package exceeds 6 MiB]");
+    }
+    let (html, poster, poster_type) = match parse_web_wallpaper(&data) {
+        Ok(parts) => parts,
+        Err(error) => return envelope::error(&format!(" [{error}]")),
+    };
+    use sha2::{Digest, Sha256};
+    let mut hasher = Sha256::new();
+    hasher.update(format!("{}:", user.id).as_bytes());
+    hasher.update(&html);
+    hasher.update(&poster);
+    let id: String = hasher.finalize().iter().map(|byte| format!("{byte:02x}")).collect();
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool,
+        Err(error) => return envelope::error(&error),
+    };
+    let exists: Option<(i64,)> =
+        sqlx::query_as("SELECT 1 FROM web_wallpaper_record WHERE id = ?")
+            .bind(&id)
+            .fetch_optional(pool)
+            .await
+            .unwrap_or(None);
+    if exists.is_none() {
+        if sqlx::query(
+            "INSERT INTO web_wallpaper_record (id, owner_id, html, poster, poster_type, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+        )
+        .bind(&id)
+        .bind(user.id)
+        .bind(&html)
+        .bind(&poster)
+        .bind(&poster_type)
+        .bind(now_like_go())
+        .execute(pool)
+        .await
+        .is_err()
+        {
+            return envelope::database_error();
+        }
+    }
+    let poster_name = match poster_type.as_str() {
+        "image/jpeg" => "poster.jpg",
+        "image/webp" => "poster.webp",
+        _ => "poster.png",
+    };
+    let root = format!("/api/theme/v2/wallpaper/web/{id}/");
+    success_data(json!({
+        "poster": format!("{root}{poster_name}"),
+        "source": format!("{root}index.html"),
+    }))
 }
