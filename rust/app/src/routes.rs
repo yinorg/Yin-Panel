@@ -59,6 +59,13 @@ pub fn router() -> Router<Original> {
             "/api/theme/v2/revisions/{revision}",
             get(theme_revision),
         )
+        .route("/api/theme/v2/admin/preview", post(theme_preview_upload))
+        .route("/api/theme/v2/admin/install", post(theme_install))
+        .route("/api/theme/v2/preview/{token}", get(theme_preview_get))
+        .route(
+            "/api/theme/v2/preview/{token}/assets/{*name}",
+            get(theme_preview_asset),
+        )
         .route(
             "/api/theme/v2/grants/{revision}",
             get(theme_grant).post(set_theme_grant).delete(revoke_theme_grant),
@@ -5613,4 +5620,267 @@ async fn revoke_theme_grant(
         Ok(_) => success(),
         Err(error) => envelope::error(&error.to_string()),
     }
+}
+
+// ------------------------------------------------------------ theme packages
+
+/// `POST /api/theme/v2/admin/preview`.
+async fn theme_preview_upload(headers: HeaderMap, mut multipart: Multipart) -> Response {
+    let user = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    if user.role != 1 {
+        return error_code(1005);
+    }
+    let mut data: Option<Vec<u8>> = None;
+    while let Some(field) = multipart.next_field().await.unwrap_or(None) {
+        if field.name() == Some("package") {
+            match field.bytes().await {
+                Ok(bytes) => data = Some(bytes.to_vec()),
+                Err(_) => return envelope::error(" [invalid multipart theme upload]"),
+            }
+        }
+    }
+    let Some(data) = data else {
+        return envelope::error(" [theme package file is required]");
+    };
+    if data.len() > crate::packages::MAX_ARCHIVE {
+        return envelope::error(" [theme package exceeds 32 MiB]");
+    }
+    let package = match crate::packages::parse_archive(&data, true) {
+        Ok(package) => package,
+        Err(error) => return envelope::error(&format!(" [{error}]")),
+    };
+    let token = match crate::packages::save_preview(package.clone()) {
+        Ok(token) => token,
+        Err(error) => return envelope::error(&error),
+    };
+    success_data(json!({
+        "token": token,
+        "package": package.preview_public(&token),
+    }))
+}
+
+/// `POST /api/theme/v2/admin/install`.
+async fn theme_install(headers: HeaderMap, mut multipart: Multipart) -> Response {
+    let user = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    if user.role != 1 {
+        return error_code(1005);
+    }
+    let mut data: Option<Vec<u8>> = None;
+    let mut confirm = false;
+    while let Some(field) = multipart.next_field().await.unwrap_or(None) {
+        match field.name() {
+            Some("package") => match field.bytes().await {
+                Ok(bytes) => data = Some(bytes.to_vec()),
+                Err(_) => return envelope::error(" [invalid multipart theme upload]"),
+            },
+            Some("confirmUnverified") => {
+                let value = field.text().await.unwrap_or_default();
+                confirm = value.eq_ignore_ascii_case("true");
+            }
+            _ => {}
+        }
+    }
+    let Some(data) = data else {
+        return envelope::error(" [theme package file is required]");
+    };
+    if data.len() > crate::packages::MAX_ARCHIVE {
+        return envelope::error(" [theme package exceeds 32 MiB]");
+    }
+    let package = match crate::packages::parse_archive(&data, confirm) {
+        Ok(package) => package,
+        Err(error) => return envelope::error(&format!(" [{error}]")),
+    };
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool.clone(),
+        Err(error) => return envelope::error(&error),
+    };
+    if install_package(&pool, user.id, &package).await.is_err() {
+        // `InstallPackageV2` failures go through `response.ErrorDatabase`, which
+        // answers code 1200 and drops the underlying text.
+        return envelope::database_error();
+    }
+    success_data(json!({
+        "id": package.manifest.id,
+        "preview": false,
+        "revision": package.revision,
+        "verified": package.verified,
+    }))
+}
+
+/// `InstallPackageV2`.
+async fn install_package(
+    pool: &sqlx::SqlitePool,
+    actor_id: i64,
+    package: &crate::packages::Package,
+) -> Result<(), String> {
+    let manifest = &package.manifest;
+    let manifest_json = serde_json::to_string(manifest).map_err(|error| error.to_string())?;
+    let tokens_json = serde_json::to_string(&package.tokens).map_err(|error| error.to_string())?;
+    let now = now_like_go();
+    let mut tx = pool.begin().await.map_err(|error| error.to_string())?;
+    let existing: Option<(String,)> = sqlx::query_as(
+        "SELECT id FROM revision_record_v2 WHERE package_id = ? AND version = ?",
+    )
+    .bind(&manifest.id)
+    .bind(&manifest.version)
+    .fetch_optional(&mut *tx)
+    .await
+    .unwrap_or(None);
+    if let Some((existing_id,)) = existing {
+        if existing_id != package.revision {
+            return Err("same theme package version has different content".to_string());
+        }
+        if sqlx::query(
+            "UPDATE package_record_v2 SET name = ?, latest_revision = ?, removed = 0 WHERE id = ?",
+        )
+        .bind(&manifest.name)
+        .bind(&package.revision)
+        .bind(&manifest.id)
+        .execute(&mut *tx)
+        .await
+        .is_err()
+        {
+            return Err("install failed".to_string());
+        }
+    } else {
+        let record: Option<(i64,)> =
+            sqlx::query_as("SELECT removed FROM package_record_v2 WHERE id = ?")
+                .bind(&manifest.id)
+                .fetch_optional(&mut *tx)
+                .await
+                .unwrap_or(None);
+        match record {
+            None => {
+                sqlx::query(
+                    "INSERT INTO package_record_v2 (id, name, latest_revision, removed, created_at, updated_at) VALUES (?, ?, '', 0, ?, ?)",
+                )
+                .bind(&manifest.id)
+                .bind(&manifest.name)
+                .bind(&now)
+                .bind(&now)
+                .execute(&mut *tx)
+                .await
+                .map_err(|error| error.to_string())?;
+            }
+            Some((removed,)) if removed != 0 => {
+                return Err(
+                    "removed theme packages must be explicitly restored before installation"
+                        .to_string(),
+                )
+            }
+            Some(_) => {}
+        }
+        sqlx::query(
+            "INSERT INTO revision_record_v2 (id, package_id, version, manifest_json, tokens_json, verified, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(&package.revision)
+        .bind(&manifest.id)
+        .bind(&manifest.version)
+        .bind(&manifest_json)
+        .bind(&tokens_json)
+        .bind(package.verified as i64)
+        .bind(&now)
+        .execute(&mut *tx)
+        .await
+        .map_err(|error| error.to_string())?;
+        for (name, (media_type, content)) in &package.files {
+            sqlx::query(
+                "INSERT INTO asset_record_v2 (revision_id, path, media_type, content) VALUES (?, ?, ?, ?)",
+            )
+            .bind(&package.revision)
+            .bind(name)
+            .bind(media_type)
+            .bind(content)
+            .execute(&mut *tx)
+            .await
+            .map_err(|error| error.to_string())?;
+        }
+        if sqlx::query(
+            "UPDATE package_record_v2 SET name = ?, latest_revision = ?, removed = 0 WHERE id = ?",
+        )
+        .bind(&manifest.name)
+        .bind(&package.revision)
+        .bind(&manifest.id)
+        .execute(&mut *tx)
+        .await
+        .is_err()
+        {
+            return Err("install failed".to_string());
+        }
+        // Only a new revision is an auditable install; re-installing the same
+        // version is a no-op that Go does not record.
+        sqlx::query(
+            "INSERT INTO audit_record (actor_id, action, package_id, created_at) VALUES (?, 'install-v2', ?, ?)",
+        )
+        .bind(actor_id)
+        .bind(&manifest.id)
+        .bind(&now)
+        .execute(&mut *tx)
+        .await
+        .map_err(|error| error.to_string())?;
+    }
+    tx.commit().await.map_err(|error| error.to_string())
+}
+
+/// `GET /api/theme/v2/preview/:token`.
+async fn theme_preview_get(Path(token): Path<String>) -> Response {
+    match crate::packages::get_preview(&token) {
+        Some(package) => success_data(package.preview_public(&token)),
+        None => error_code(404),
+    }
+}
+
+/// `GET /api/theme/v2/preview/:token/assets/*name`.
+async fn theme_preview_asset(Path((token, raw_name)): Path<(String, String)>) -> Response {
+    let name = raw_name.trim_start_matches('/');
+    let Some(package) = crate::packages::get_preview(&token) else {
+        return envelope::empty_not_found();
+    };
+    let Some((media_type, content)) = package.files.get(name) else {
+        return envelope::empty_not_found();
+    };
+    serve_bytes(media_type, content)
+}
+
+/// `serveThemeAsset` for an in-memory asset: nosniff, the immutable policy, an
+/// ETag on HTML and the document sandbox policy.
+fn serve_bytes(media_type: &str, content: &[u8]) -> Response {
+    let is_html = media_type == "text/html";
+    let mut response = Response::new(axum::body::Body::from(content.to_vec()));
+    {
+        let out = response.headers_mut();
+        for (key, value) in envelope::headers() {
+            out.insert(key, value);
+        }
+        out.insert(
+            header::CONTENT_TYPE,
+            HeaderValue::from_str(media_type).unwrap_or(HeaderValue::from_static("application/octet-stream")),
+        );
+        out.insert(header::X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
+        let cache = if is_html {
+            "public, max-age=0, must-revalidate, no-transform"
+        } else {
+            "public, max-age=31536000, immutable, no-transform"
+        };
+        out.insert(header::CACHE_CONTROL, HeaderValue::from_static(cache));
+        if is_html {
+            use sha2::{Digest, Sha256};
+            let digest = Sha256::digest(content);
+            let etag = format!("\"{}\"", digest.iter().map(|byte| format!("{byte:02x}")).collect::<String>());
+            out.insert(header::ETAG, HeaderValue::from_str(&etag).unwrap_or(HeaderValue::from_static("")));
+            out.insert(header::CONTENT_SECURITY_POLICY, HeaderValue::from_static("sandbox allow-scripts; default-src 'none'; script-src 'unsafe-inline' https://static.cloudflareinsights.com; style-src 'unsafe-inline'; img-src data:; connect-src https://cloudflareinsights.com; font-src 'none'; media-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'none'"));
+            out.insert(header::REFERRER_POLICY, HeaderValue::from_static("no-referrer"));
+        } else if media_type == "image/svg+xml" {
+            out.insert(header::CONTENT_SECURITY_POLICY, HeaderValue::from_static("sandbox; default-src 'none'; script-src 'none'; style-src 'unsafe-inline'; img-src data: blob:; object-src 'none'; form-action 'none'; base-uri 'none'"));
+            out.insert(header::REFERRER_POLICY, HeaderValue::from_static("no-referrer"));
+        }
+    }
+    response
 }

@@ -2,6 +2,7 @@ mod appcfg;
 mod auth;
 mod envelope;
 mod original;
+mod packages;
 mod routes;
 mod units;
 
