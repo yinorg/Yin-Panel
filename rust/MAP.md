@@ -56,6 +56,8 @@ rust-anything analyze backend --lang go --whole-app
     `GET /api/system/moduleConfig/getByName`, `GET /api/file/getList`,
     `GET /api/spaces/{id}/bookmarks/tree`, `GET /api/panel/users/getList`,
     `GET /api/panel/userConfig/getConfig`, the monitor status readers,
-    `GET /api/theme/v2/preference`, `GET /api/theme/v2/space/{id}` -> `rust/app`
+    `GET /api/theme/v2/preference`, `GET /api/theme/v2/space/{id}`,
+    the theme reads (`current`, `packages`, `package/{id}`, `mine`, `effective`)
+    -> `rust/app`
 - Ported library units not yet wired to a route: `rust/util-rs`.
-- Fallback rate: 90.3% (270/299). Everything else is still proxied to Go.
+- Fallback rate: 85.3% (255/299). Everything else is still proxied to Go.
