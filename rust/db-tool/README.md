@@ -17,8 +17,11 @@ address, retires the legacy columns and the `team` table, and only then creates
 `uk_user_mail`. A second run reports `Already up to date.`
 
 `copy` writes a SQLite deployment into another configured database. SQLite
-targets are a file copy followed by `upgrade`; MySQL/MariaDB and PostgreSQL
-targets are not implemented yet and are rejected with a clear message.
+targets are a consistent snapshot (`VACUUM INTO`) followed by `upgrade`.
+MySQL/MariaDB and PostgreSQL targets get the schema rendered in that dialect and
+every table copied; the target is cleared first, so a failed run can be repeated.
+The source is snapshotted through SQLite, so rows still in the write-ahead log
+are included.
 
 The schema statements in `src/schema.rs` are generated from a fully migrated
 database and are idempotent, so they describe both a fresh install and the

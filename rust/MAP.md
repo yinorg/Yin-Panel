@@ -63,5 +63,7 @@ rust-anything analyze backend --lang go --whole-app
     -> `rust/app`
 - Ported library units not yet wired to a route: `rust/util-rs`.
 - Fallback rate: 73.4% (254/346). Everything else is still proxied to Go.
-- `rust/db-tool`: SQLite schema upgrade (all steps) and `migrate-db` into a
-  SQLite target, with tests. MySQL/PostgreSQL copy is still missing.
+- `rust/db-tool`: SQLite schema upgrade (all steps) and `migrate-db` into
+  SQLite, MySQL and PostgreSQL, with tests. The PostgreSQL path was verified
+  against a real server (24 tables, row counts matched, re-runnable). MySQL is
+  covered by DDL unit tests only.
