@@ -45,12 +45,15 @@ func validateInputStruct(params interface{}) (errMsg string, err error) {
 	if err = validate.Struct(params); err != nil {
 		trans := validateTransInit(validate)
 		verrs := err.(validator.ValidationErrors)
-		// errs := make(map[string]string)
-		for _, value := range verrs.Translate(trans) {
-			// errs[key[strings.Index(key, ".")+1:]] = value
-			errMsg += " " + value
+		translated := verrs.Translate(trans)
+		// Walk the errors in declaration order: `Translate` returns a map, and
+		// iterating that map directly made two identical requests report their
+		// fields in random order.
+		for _, fieldErr := range verrs {
+			if text, ok := translated[fieldErr.Namespace()]; ok {
+				errMsg += " " + text
+			}
 		}
-		// fmt.Println(errs)
 	}
 	return
 }
