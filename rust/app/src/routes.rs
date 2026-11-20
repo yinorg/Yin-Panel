@@ -53,7 +53,15 @@ pub fn router() -> Router<Original> {
         .route("/api/theme/v2/admin/audit", get(admin_audit))
         .route(
             "/api/theme/v2/admin/trusted/{revision}",
-            get(admin_trusted),
+            get(admin_trusted).put(set_trusted),
+        )
+        .route(
+            "/api/theme/v2/revisions/{revision}",
+            get(theme_revision),
+        )
+        .route(
+            "/api/theme/v2/grants/{revision}",
+            get(theme_grant).post(set_theme_grant).delete(revoke_theme_grant),
         )
         .route(
             "/api/theme/v2/wallpaper/web/{id}/{name}",
@@ -5185,4 +5193,424 @@ async fn web_wallpaper_asset(
         }
     }
     response
+}
+
+/// `ThemeRouter.PackageV2`: one revision's public package.
+async fn theme_revision(Path(revision): Path<String>) -> Response {
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool,
+        Err(error) => return envelope::error(&error),
+    };
+    match revision_public(pool, &revision).await {
+        Ok(value) => success_data(value),
+        Err(_) => envelope::empty_not_found(),
+    }
+}
+
+#[derive(serde::Deserialize)]
+struct TrustedRequest {
+    #[serde(default)]
+    enabled: bool,
+}
+
+/// `ThemeRouter.SetTrustedRuntimePolicyV2`: an administrator switches the
+/// trusted runtime on or off for one revision.
+async fn set_trusted(
+    headers: HeaderMap,
+    Path(revision): Path<String>,
+    request: Request,
+) -> Response {
+    let user = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    if user.role != 1 {
+        return error_code(1005);
+    }
+    let body = match axum::body::to_bytes(request.into_body(), 1 << 20).await {
+        Ok(body) => body,
+        Err(_) => return envelope::error("invalid request body"),
+    };
+    let req: TrustedRequest = match serde_json::from_slice(&body) {
+        Ok(req) => req,
+        Err(error) => return envelope::error(&format!(" [{}]", error)),
+    };
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool,
+        Err(error) => return envelope::error(&error),
+    };
+    let manifest_row: Option<(String,)> =
+        sqlx::query_as("SELECT manifest_json FROM revision_record_v2 WHERE id = ?")
+            .bind(&revision)
+            .fetch_optional(pool)
+            .await
+            .unwrap_or(None);
+    let Some((manifest_json,)) = manifest_row else {
+        return error_code(404);
+    };
+    if req.enabled {
+        let manifest: serde_json::Value =
+            serde_json::from_str(&manifest_json).unwrap_or_default();
+        if !supported_modes(&manifest).iter().any(|mode| mode == "trusted") {
+            return envelope::error(" [theme does not declare support for the trusted runtime]");
+        }
+    }
+    let now = now_like_go();
+    match sqlx::query(
+        "INSERT INTO trusted_runtime_policy_v2 (revision_id, enabled, updated_by, updated_at)
+         VALUES (?, ?, ?, ?)
+         ON CONFLICT(revision_id) DO UPDATE SET enabled = excluded.enabled, updated_by = excluded.updated_by, updated_at = excluded.updated_at",
+    )
+    .bind(&revision)
+    .bind(req.enabled as i64)
+    .bind(user.id)
+    .bind(&now)
+    .execute(pool)
+    .await
+    {
+        Ok(_) => {
+            if !req.enabled {
+                // Disabling the runtime also withdraws every trusted grant.
+                let _ = sqlx::query(
+                    "DELETE FROM grant_record_v2 WHERE revision_id = ? AND execution_mode = 'trusted'",
+                )
+                .bind(&revision)
+                .execute(pool)
+                .await;
+            }
+            success()
+        }
+        Err(error) => envelope::error(&error.to_string()),
+    }
+}
+
+fn manifest_field<'a>(manifest: &'a serde_json::Value, path: &[&str]) -> Option<&'a serde_json::Value> {
+    let mut current = manifest;
+    for key in path {
+        current = current.get(*key)?;
+    }
+    Some(current)
+}
+
+fn supported_modes(manifest: &serde_json::Value) -> Vec<String> {
+    manifest_field(manifest, &["runtime", "supportedModes"])
+        .and_then(serde_json::Value::as_array)
+        .map(|modes| {
+            modes
+                .iter()
+                .filter_map(serde_json::Value::as_str)
+                .map(str::to_string)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn declared_permissions(manifest: &serde_json::Value) -> Vec<String> {
+    let mut out = Vec::new();
+    for key in ["required", "optional"] {
+        if let Some(list) = manifest_field(manifest, &["permissions", key]).and_then(serde_json::Value::as_array) {
+            for permission in list {
+                if let Some(name) = permission.get("name").and_then(serde_json::Value::as_str) {
+                    out.push(name.to_string());
+                }
+            }
+        }
+    }
+    out
+}
+
+fn required_permissions(manifest: &serde_json::Value) -> Vec<String> {
+    manifest_field(manifest, &["permissions", "required"])
+        .and_then(serde_json::Value::as_array)
+        .map(|list| {
+            list.iter()
+                .filter_map(|permission| permission.get("name"))
+                .filter_map(serde_json::Value::as_str)
+                .map(str::to_string)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// `ValidateThemeGrantV2`.
+fn validate_grant(
+    manifest: &serde_json::Value,
+    execution_mode: &str,
+    permissions: &[String],
+) -> Result<(), String> {
+    if !matches!(execution_mode, "sandbox" | "trusted")
+        || !supported_modes(manifest).iter().any(|mode| mode == execution_mode)
+    {
+        return Err(format!("theme does not support the {execution_mode} runtime"));
+    }
+    let allowed = declared_permissions(manifest);
+    let mut granted = std::collections::HashSet::new();
+    for permission in permissions {
+        if !allowed.iter().any(|name| name == permission) || !granted.insert(permission.clone()) {
+            return Err(format!("theme permission {permission:?} is not declared or is duplicated"));
+        }
+    }
+    for required in required_permissions(manifest) {
+        if !granted.contains(&required) {
+            return Err(format!("required theme permission {required:?} must be granted"));
+        }
+    }
+    Ok(())
+}
+
+fn is_builtin_theme(id: &str) -> bool {
+    matches!(id, "org.yin.default" | "org.yin.glass" | "org.yin.directory")
+}
+
+/// `ImplicitBuiltinPermissionsV2`: a verified built-in theme needs no grant.
+async fn implicit_builtin_permissions(
+    pool: &sqlx::SqlitePool,
+    revision: &str,
+) -> Option<Vec<String>> {
+    let row = sqlx::query_as::<_, (String, i64)>(
+        "SELECT manifest_json, verified FROM revision_record_v2 WHERE id = ?",
+    )
+    .bind(revision)
+            .fetch_optional(pool)
+            .await
+            .unwrap_or(None)?;
+    let (manifest_json, verified) = row;
+    if verified == 0 {
+        return None;
+    }
+    let manifest: serde_json::Value = serde_json::from_str(&manifest_json).ok()?;
+    if !is_builtin_theme(manifest.get("id").and_then(serde_json::Value::as_str).unwrap_or("")) {
+        return None;
+    }
+    Some(required_permissions(&manifest))
+}
+
+fn execution_mode_from(query: &std::collections::HashMap<String, String>) -> (String, bool) {
+    let mode = query
+        .get("executionMode")
+        .cloned()
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| "sandbox".to_string());
+    let valid = matches!(mode.as_str(), "sandbox" | "trusted");
+    (mode, valid)
+}
+
+/// `ThemeRouter.ThemeGrantV2`.
+async fn theme_grant(
+    headers: HeaderMap,
+    Path(revision): Path<String>,
+    Query(query): Query<std::collections::HashMap<String, String>>,
+) -> Response {
+    let user = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    let (execution_mode, valid) = execution_mode_from(&query);
+    if !valid {
+        return envelope::error(" [executionMode must be sandbox or trusted]");
+    }
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool,
+        Err(error) => return envelope::error(&error),
+    };
+    let row: Option<(String,)> =
+        sqlx::query_as("SELECT manifest_json FROM revision_record_v2 WHERE id = ?")
+            .bind(&revision)
+            .fetch_optional(pool)
+            .await
+            .unwrap_or(None);
+    let Some((manifest_json,)) = row else {
+        return error_code(404);
+    };
+    let manifest: serde_json::Value = serde_json::from_str(&manifest_json).unwrap_or_default();
+    let available = supported_modes(&manifest).iter().any(|mode| mode == &execution_mode);
+    let trusted_enabled: Option<(i64,)> = sqlx::query_as(
+        "SELECT enabled FROM trusted_runtime_policy_v2 WHERE revision_id = ?",
+    )
+    .bind(&revision)
+    .fetch_optional(pool)
+    .await
+    .unwrap_or(None);
+    let available = if execution_mode == "trusted" {
+        available && trusted_enabled.map(|value| value.0 != 0).unwrap_or(false)
+    } else {
+        available
+    };
+    let grant: Option<(String, String, String)> = sqlx::query_as(
+        "SELECT revision_id, execution_mode, permissions_json FROM grant_record_v2 WHERE user_id = ? AND revision_id = ? AND execution_mode = ?",
+    )
+    .bind(user.id)
+    .bind(&revision)
+    .bind(&execution_mode)
+    .fetch_optional(pool)
+    .await
+    .unwrap_or(None);
+    if let Some((revision_id, mode, permissions_json)) = grant {
+        let permissions: Vec<String> = serde_json::from_str(&permissions_json).unwrap_or_default();
+        return success_data(json!({
+            "available": available,
+            "executionMode": mode,
+            "granted": available,
+            "permissions": permissions,
+            "revision": revision_id,
+        }));
+    }
+    if let Some(permissions) = implicit_builtin_permissions(pool, &revision).await {
+        let permissions = if execution_mode == "sandbox" { permissions } else { Vec::new() };
+        let granted = execution_mode == "sandbox" && available;
+        return success_data(json!({
+            "available": available,
+            "executionMode": execution_mode,
+            "granted": granted,
+            "permissions": permissions,
+            "revision": revision,
+        }));
+    }
+    success_data(json!({
+        "available": available,
+        "executionMode": execution_mode,
+        "granted": false,
+        "permissions": Vec::<String>::new(),
+        "revision": revision,
+    }))
+}
+
+#[derive(serde::Deserialize)]
+struct GrantRequest {
+    #[serde(default, rename = "executionMode")]
+    execution_mode: String,
+    #[serde(default)]
+    permissions: Vec<String>,
+}
+
+/// `ThemeRouter.SetThemeGrantV2`.
+async fn set_theme_grant(
+    headers: HeaderMap,
+    Path(revision): Path<String>,
+    request: Request,
+) -> Response {
+    let user = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    let body = match axum::body::to_bytes(request.into_body(), 1 << 20).await {
+        Ok(body) => body,
+        Err(_) => return envelope::error("invalid request body"),
+    };
+    let req: GrantRequest = match serde_json::from_slice(&body) {
+        Ok(req) => req,
+        Err(error) => return envelope::error(&format!(" [{}]", error)),
+    };
+    let execution_mode = if req.execution_mode.is_empty() {
+        "sandbox".to_string()
+    } else {
+        req.execution_mode.clone()
+    };
+    if !matches!(execution_mode.as_str(), "sandbox" | "trusted") {
+        return envelope::error(" [executionMode must be sandbox or trusted]");
+    }
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool,
+        Err(error) => return envelope::error(&error),
+    };
+    let row: Option<(String,)> =
+        sqlx::query_as("SELECT manifest_json FROM revision_record_v2 WHERE id = ?")
+            .bind(&revision)
+            .fetch_optional(pool)
+            .await
+            .unwrap_or(None);
+    let Some((manifest_json,)) = row else {
+        return error_code(404);
+    };
+    let manifest: serde_json::Value = match serde_json::from_str(&manifest_json) {
+        Ok(value) => value,
+        Err(_) => return envelope::database_error(),
+    };
+    if let Err(error) = validate_grant(&manifest, &execution_mode, &req.permissions) {
+        return envelope::error(&format!(" [{error}]"));
+    }
+    if execution_mode == "trusted" {
+        let enabled: Option<(i64,)> = sqlx::query_as(
+            "SELECT enabled FROM trusted_runtime_policy_v2 WHERE revision_id = ? AND enabled = 1",
+        )
+        .bind(&revision)
+        .fetch_optional(pool)
+        .await
+        .unwrap_or(None);
+        if enabled.is_none() {
+            return error_code(1005);
+        }
+    }
+    let permissions = serde_json::to_string(&req.permissions).unwrap_or_else(|_| "[]".to_string());
+    match sqlx::query(
+        "INSERT INTO grant_record_v2 (user_id, revision_id, execution_mode, permissions_json, updated_at)
+         VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(user_id, revision_id, execution_mode) DO UPDATE SET permissions_json = excluded.permissions_json, updated_at = excluded.updated_at",
+    )
+    .bind(user.id)
+    .bind(&revision)
+    .bind(&execution_mode)
+    .bind(&permissions)
+    .bind(now_like_go())
+    .execute(pool)
+    .await
+    {
+        Ok(_) => success(),
+        Err(error) => envelope::error(&error.to_string()),
+    }
+}
+
+/// `ThemeRouter.RevokeThemeGrantV2`: a built-in sandbox grant becomes an empty
+/// explicit grant instead of being deleted, because the built-in would
+/// otherwise be granted implicitly again.
+async fn revoke_theme_grant(
+    headers: HeaderMap,
+    Path(revision): Path<String>,
+    Query(query): Query<std::collections::HashMap<String, String>>,
+) -> Response {
+    let user = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    let (execution_mode, valid) = execution_mode_from(&query);
+    if !valid {
+        return envelope::error(" [executionMode must be sandbox or trusted]");
+    }
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool,
+        Err(error) => return envelope::error(&error),
+    };
+    if execution_mode == "sandbox" && implicit_builtin_permissions(pool, &revision).await.is_some() {
+        let result = sqlx::query(
+            "INSERT INTO grant_record_v2 (user_id, revision_id, execution_mode, permissions_json, updated_at)
+             VALUES (?, ?, 'sandbox', '[]', ?)
+             ON CONFLICT(user_id, revision_id, execution_mode) DO UPDATE SET permissions_json = '[]', updated_at = excluded.updated_at",
+        )
+        .bind(user.id)
+        .bind(&revision)
+        .bind(now_like_go())
+        .execute(pool)
+        .await;
+        return match result {
+            Ok(_) => success(),
+            Err(error) => envelope::error(&error.to_string()),
+        };
+    }
+    match sqlx::query(
+        "DELETE FROM grant_record_v2 WHERE user_id = ? AND revision_id = ? AND execution_mode = ?",
+    )
+    .bind(user.id)
+    .bind(&revision)
+    .bind(&execution_mode)
+    .execute(pool)
+    .await
+    {
+        Ok(_) => success(),
+        Err(error) => envelope::error(&error.to_string()),
+    }
 }
