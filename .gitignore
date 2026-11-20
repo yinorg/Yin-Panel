@@ -143,6 +143,9 @@ opencode.json
 # Docker build artifact (produced by CI, never committed)
 /build-output/
 
+# Built by rust/bench/compare.sh next to its source, never committed
+rust/bench/loadgen/loadgen
+
 # Created when the pure binary is replayed from the repository root
 rust/record/database.db
 rust/record/database.db-*

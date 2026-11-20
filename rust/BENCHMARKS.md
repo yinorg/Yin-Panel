@@ -1,8 +1,9 @@
 # Benchmarks: Go backend vs the Rust port
 
 The first four sections compare Go with the **front door** while routes were
-still being ported. Section 5 is the current one: **two standalone services**,
-Go and pure Rust, on the same host, database and frontend.
+still being ported. Section 5 was the first standalone comparison. Section 6
+supersedes it with repeated, alternating runs and a load generator that rejects
+error responses.
 
 Measured on 2026-11-20, Intel Xeon D-1581 @ 1.80 GHz (28 threads), Linux,
 loopback HTTP, warm caches. Numbers are one run each; treat ±10% as noise.
@@ -211,3 +212,106 @@ Go starts at ~60 MiB and peaks near 94 MiB on the same work.
 - `/api/spaces` was measured **after** fixing an N+1 in the Rust handler (two
   extra queries per Space); before the fix it was 744 RPS at `c=1` and 3,852 at
   `c=32`. Go always batched, and its comment says so.
+- **This section disabled Go's read pool** (`sqlite.read_pool_size: -1`). The
+  shipped `conf.yaml` leaves the key unset, which enables four read-only
+  connections. Section 6 runs both builds with their real configuration, and
+  there the `theme/current` gap disappears.
+
+## 6. Repeated, alternating measurement (2026-11-20, M0)
+
+Section 5 used one run per cell, a load generator that counted an HTTP 200 with
+a business error as a success, and a Go build whose SQLite read pool was
+disabled. Every one of those understated Go or overstated Rust. This section is
+the current baseline.
+
+Method:
+
+- one Go and one Rust process, started by `rust/bench/pair.sh` from the **same
+  VACUUM-safe database snapshot**, the same `backend/conf.yaml`, the same
+  `web/`, each on its own port;
+- `enable_monitor: false` on both, so this measures the request path; the
+  monitor has its own measurement below;
+- `rust/bench/loadgen` counts a request only when the transport, the complete
+  body, the status and the JSON envelope `code` all pass; a business error is a
+  failure and the run exits non-zero;
+- five repetitions per side per endpoint, alternating which side runs first, so
+  a drift on the host hits both;
+- `rust/bench/compare.sh` reports the median and the observed range. The range
+  matters: the machine is shared and this is not a lab.
+
+Reproduce (the pair refuses to start on a busy port and only stops the pids it
+started):
+
+```sh
+rust/bench/pair.sh up --work /tmp/yin-panel-pair \
+    --source-db backend/database/database.db --go-port 3010 --rust-port 3011
+rust/bench/compare.sh --go http://127.0.0.1:3010 --rust http://127.0.0.1:3011 \
+    --reps 5 --requests 1500 --concurrency 1
+rust/bench/compare.sh --go http://127.0.0.1:3010 --rust http://127.0.0.1:3011 \
+    --reps 5 --requests 3000 --concurrency 32
+rust/bench/pair.sh down --work /tmp/yin-panel-pair
+```
+
+### One connection (latency)
+
+| Endpoint | Side | OK/fail | RPS median | RPS range | p50 | p95 | p99 | CPU/req |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `/api/about` | Go | 7,500/0 | 4,650 | 2,880–4,950 | 0.20 ms | 0.28 ms | 0.34 ms | 180 µs |
+| | Rust | 7,500/0 | **5,777** | 5,380–5,980 | 0.17 ms | 0.21 ms | 0.26 ms | **60 µs** |
+| `/` | Go | 7,500/0 | 3,687 | 3,563–3,759 | 0.25 ms | 0.43 ms | 0.66 ms | 280 µs |
+| | Rust | 7,500/0 | **4,865** | 4,747–4,964 | 0.19 ms | 0.28 ms | 0.46 ms | **80 µs** |
+| `theme/v2/current` | Go | 7,500/0 | **852** | 822–860 | 1.12 ms | 1.58 ms | 1.98 ms | 1,107 µs |
+| | Rust | 7,500/0 | 678 | 647–687 | 1.44 ms | 1.67 ms | 2.02 ms | 1,107 µs |
+| `/api/spaces` | Go | 7,500/0 | **1,080** | 1,063–1,106 | 0.90 ms | 1.08 ms | 1.52 ms | 980 µs |
+| | Rust | 7,500/0 | 1,035 | 951–1,051 | 0.96 ms | 1.08 ms | 1.20 ms | 913 µs |
+
+### 32 connections (throughput)
+
+| Endpoint | Side | OK/fail | RPS median | RPS range | p50 | p95 | p99 | CPU/req |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `/api/about` | Go | 15,000/0 | 23,764 | 23,295–24,662 | 1.19 ms | 3.02 ms | 4.36 ms | 213 µs |
+| | Rust | 15,000/0 | **26,203** | 24,900–27,679 | 1.15 ms | 2.85 ms | 4.33 ms | **70 µs** |
+| `/` | Go | 15,000/0 | 7,632 | 7,366–7,751 | 3.86 ms | 8.10 ms | 10.51 ms | 450 µs |
+| | Rust | 15,000/0 | **8,233** | 8,180–8,443 | 3.57 ms | 7.75 ms | 10.28 ms | **117 µs** |
+| `theme/v2/current` | Go | 15,000/0 | 3,673 | 3,407–3,689 | 8.15 ms | 16.08 ms | 20.03 ms | 1,567 µs |
+| | Rust | 15,000/0 | 3,554 | 3,417–3,594 | 8.97 ms | 10.21 ms | 12.28 ms | **1,120 µs** |
+| `/api/spaces` | Go | 15,000/0 | **5,836** | 4,165–5,883 | 5.13 ms | 9.56 ms | 12.10 ms | 993 µs |
+| | Rust | 15,000/0 | 5,328 | 5,254–5,431 | 5.94 ms | 6.63 ms | 7.20 ms | 750 µs |
+
+### What changed from section 5
+
+- `theme/v2/current` is **level**, not "Go wins by 30%". With Go's read pool
+  enabled it reaches ~3,670 RPS at `c=32` against Rust's ~3,550, and at `c=1`
+  the two use exactly the same CPU per request (1,107 µs). The remaining
+  difference is latency, not computation, and the earlier pool-queueing
+  explanation is not supported by this measurement.
+- `/api/spaces` is Rust ~0.91x at `c=32` but with a tighter tail (p99 7.2 ms vs
+  Go's 12.1 ms) and less CPU per request. Go's range at `c=32` (4,165–5,883)
+  shows the host noise; a single run could report either side as the winner.
+- The absolute RPS of `/` is lower than section 5 for both builds because this
+  pair runs beside the live service and a second listener on a disk with under
+  3 GiB free. Compare the two sides, not the absolute numbers.
+
+### Monitor snapshot, measured separately
+
+The live deployment ran with `enable_monitor: true`. Before the change every
+`POST /api/system/monitor/getSnapshot` waited for a one-second CPU sample:
+
+```
+200 1.003714s
+200 1.003670s
+200 1.003717s
+```
+
+After serving the snapshot from a three-second background collection, the same
+call on the same deployment:
+
+```
+200 0.001022s
+200 0.000775s
+200 0.000716s
+```
+
+A collection still takes about a second, as Go's `cpu.Percent(time.Second, true)`
+does, but it happens once before the listener opens and then off the request
+path, which is exactly what `internal/biz/cache/monitor.go` does.

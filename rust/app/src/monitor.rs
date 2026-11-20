@@ -37,8 +37,40 @@ pub struct NetInfo {
     pub name: String,
 }
 
-/// The Go collector's map keys.
-pub async fn snapshot() -> BTreeMap<String, serde_json::Value> {
+/// The Go collector's map keys, refreshed in the background.
+///
+/// `internal/biz/cache/monitor.go` runs one collection immediately at start and
+/// then every `cacheSecond` (3) seconds, and `GetSnapshot` only copies the last
+/// result. Requesting a snapshot therefore never waits for a CPU sample. This
+/// cache mirrors that: `start()` collects once and spawns a three-second ticker.
+static SNAPSHOT: std::sync::OnceLock<tokio::sync::RwLock<BTreeMap<String, serde_json::Value>>> =
+    std::sync::OnceLock::new();
+
+fn cache() -> &'static tokio::sync::RwLock<BTreeMap<String, serde_json::Value>> {
+    SNAPSHOT.get_or_init(|| tokio::sync::RwLock::new(BTreeMap::new()))
+}
+
+/// Collect once, then keep the cache fresh. Mirrors `Monitor.Start`: the first
+/// collection is complete before the caller returns, so the first request after
+/// startup already sees data, exactly as the Go service does.
+pub async fn start() {
+    collect().await;
+    tokio::spawn(async move {
+        let mut ticker = tokio::time::interval(std::time::Duration::from_secs(3));
+        ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        // The interval's first tick is immediate; the initial collect above
+        // already did that work, so wait for the next one.
+        ticker.tick().await;
+        loop {
+            ticker.tick().await;
+            collect().await;
+        }
+    });
+}
+
+/// One collection. A piece that fails keeps the previous value, as the Go
+/// collector does by only inserting the values that did not error.
+async fn collect() {
     let mut values = BTreeMap::new();
     if let Ok(cpu) = cpu_info().await {
         values.insert("CPU_INFO".to_string(), serde_json::to_value(cpu).unwrap_or_default());
@@ -53,8 +85,18 @@ pub async fn snapshot() -> BTreeMap<String, serde_json::Value> {
         "NETWORK_INFO".to_string(),
         serde_json::to_value(net_info()).unwrap_or_default(),
     );
-    values
+    let mut guard = cache().write().await;
+    for (key, value) in values {
+        guard.insert(key, value);
+    }
 }
+
+/// The last collected snapshot. Empty until the first collection finishes,
+/// which `start()` completes before the listener opens.
+pub async fn snapshot() -> BTreeMap<String, serde_json::Value> {
+    cache().read().await.clone()
+}
+
 
 fn read(path: &str) -> Option<String> {
     std::fs::read_to_string(path).ok()

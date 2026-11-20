@@ -28,34 +28,90 @@ binary. Nothing else moves.
 
 ## Verified
 
-`scripts/verify-upgrade.sh [port]` (default 3040) runs the whole cycle on a
-scratch directory:
+`scripts/verify-upgrade.sh [port] [--keep]` (default port 3040) runs the whole
+cycle on a scratch directory:
 
 ```
 phase 1  Go on an empty directory: seed, Space/group/item, upload, theme
-phase 2  stop Go, note every row count, start Rust on the same directory
+phase 2  stop Go, snapshot every table row and upload, start Rust on the same directory
 phase 3  Rust serves the Go session cookie, the Go password, the Go Space,
-         item, upload and theme selection, and the frontend
+         group, item, the upload (byte-for-byte) and theme selection, and the frontend
 phase 3b Rust writes its own Space and group
-phase 3c no Go row is lost or duplicated (all 24 tables compared)
+phase 3c every Go row and upload still present, compared by content
 phase 4  back to Go: the Rust-minted session is accepted and the Space and
          group Rust wrote are readable
+phase 4b content comparison again, after Go has read the Rust state
+```
+
+### What "compared by content" means
+
+`scripts/upgrade_compare.py snapshot` records every table with its columns and
+every row as a column-name to value map; `compare` treats the rows as multisets.
+A row count would not notice a value rewritten in place, or one row deleted and
+another inserted. Both are failures here, and uploads are compared by sha256,
+not by an HTTP status. Columns a schema upgrade adds or retires are reported
+separately and the surviving rows are compared on the columns both snapshots
+share.
+
+The tool proves what it catches:
+
+```
+$ python3 scripts/upgrade_compare.py selftest
+  ok   identical database passes
+  ok   rewritten value is caught
+  ok   delete plus insert is caught
+  ok   added column is tolerated
+  ok   changed upload is caught
+  ok   deleted upload is caught
+  ok   ignoring a primary key is refused
+  ok   ignored column still detects a deleted row
+  8/8 comparison self-checks pass
+```
+
+### The script only stops what it started
+
+`up` refuses to run when the target port is busy, and the run fails if the
+listener is not the child it started. It records one pid and kills only that
+pid, so a shared host cannot lose an unrelated service to this test. A busy
+port is an operator decision, never something the script resolves by killing a
+process.
+
+```
+$ ./scripts/verify-upgrade.sh 3055        # 3055 already served by a dummy
+FAIL: port 3055 is already in use by pid 25360; refusing to start a test that would stop it
+$ curl -o /dev/null -w '%{http_code}' http://127.0.0.1:3055/   # dummy still up
+200
 ```
 
 A run against a fresh Go deployment:
 
 ```
 schema work Rust reported   (nothing to change)
-session, password, spaces, items, upload, theme, static: OK
+session, password, spaces, groups, items, upload bytes, theme, static: OK
 lost rows: none
+every row and upload present: 36 rows across 24 tables, 1 uploads
 Rust session, spaces and groups: OK
-upgrade is seamless and reversible
+every row and upload present: 36 rows across 24 tables, 1 uploads
+upgrade keeps every row and byte, and is reversible
 ```
 
 The in-place upgrade of the **real** deployment was also exercised: its
 `space` table still carried the retired `team_id` column and the
 `idx_space_team_id` index. The first Rust start dropped the index and the
 column, reported it in the log, and the service came up with all existing data.
+
+## Known differences
+
+- **Go re-installs the built-in themes on every start; Rust does not.** Go's
+  `EnsureBuiltinV2` calls `InstallPackageV2` for all three built-ins at boot,
+  and the GORM update bumps `package_record_v2.updated_at` even when the revision
+  is unchanged. Rust seeds them only on an empty database. Consequence: a
+  database whose built-in revisions are older than the shipped ones keeps the
+  old themes after a switch to Rust, where Go would have upgraded them. The
+  timestamp refresh is named explicitly in the check
+  (`--ignore-column package_record_v2.updated_at`) instead of being hidden;
+  every other package column must match. This needs a Rust startup path that
+  mirrors `EnsureBuiltinV2`.
 
 ## Known limits
 

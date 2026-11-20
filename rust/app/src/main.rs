@@ -99,6 +99,12 @@ async fn serve() {
         eprintln!("database startup failed: {error}");
         std::process::exit(1);
     }
+    // `global.CacheMonitor.Start()` runs only when the monitor is enabled, and
+    // the first collection completes before the listener opens so the first
+    // snapshot request already has data.
+    if appcfg::ctx().conf.base.enable_monitor {
+        monitor::start().await;
+    }
     // `units/mod.rs` belongs to `app wire` and is rewritten on every wire; the
     // hand-ported routes are merged here so a wire cannot drop them. Every route
     // the Go build registered is now answered here, so there is no child process
