@@ -3970,16 +3970,27 @@ async fn create_item_with_icon(
     }
     let mut item_json: Option<String> = None;
     let mut icon: Option<(String, Vec<u8>)> = None;
-    while let Some(field) = multipart.next_field().await.unwrap_or(None) {
+    // `c.FormFile` fails the whole handler when the part cannot be read, so a
+    // multipart error is an answer, not a reason to drop the icon silently.
+    loop {
+        let field = match multipart.next_field().await {
+            Ok(Some(field)) => field,
+            Ok(None) => break,
+            Err(_) => return envelope::error(" [invalid multipart upload]"),
+        };
         let name = field.name().unwrap_or("").to_string();
         match name.as_str() {
             "item" => {
-                item_json = field.text().await.ok();
+                item_json = match field.text().await {
+                    Ok(text) => Some(text),
+                    Err(_) => return envelope::error(" [invalid multipart upload]"),
+                };
             }
             "imgfile" => {
                 let file_name = field.file_name().unwrap_or("").to_string();
-                if let Ok(data) = field.bytes().await {
-                    icon = Some((file_name, data.to_vec()));
+                match field.bytes().await {
+                    Ok(data) => icon = Some((file_name, data.to_vec())),
+                    Err(_) => return envelope::error(" [icon too large]"),
                 }
             }
             _ => {}
