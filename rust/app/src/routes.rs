@@ -5211,25 +5211,9 @@ async fn web_wallpaper_asset(
         }
         (poster_type, poster)
     };
-    let mut response = Response::new(axum::body::Body::from(content.clone()));
-    {
-        let out = response.headers_mut();
-        for (key, value) in envelope::headers() {
-            out.insert(key, value);
-        }
-        out.insert(header::CONTENT_TYPE, HeaderValue::from_str(&media_type).unwrap_or(HeaderValue::from_static("application/octet-stream")));
-        out.insert(header::X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
-        out.insert(header::CACHE_CONTROL, HeaderValue::from_static("public, max-age=31536000, immutable, no-transform"));
-        if media_type == "text/html" {
-            use sha2::{Digest, Sha256};
-            let digest = Sha256::digest(&content);
-            let etag = format!("\"{}\"", digest.iter().map(|byte| format!("{byte:02x}")).collect::<String>());
-            out.insert(header::ETAG, HeaderValue::from_str(&etag).unwrap_or(HeaderValue::from_static("")));
-            out.insert(header::CONTENT_SECURITY_POLICY, HeaderValue::from_static("sandbox allow-scripts; default-src 'none'; script-src 'unsafe-inline' https://static.cloudflareinsights.com; style-src 'unsafe-inline'; img-src data:; connect-src https://cloudflareinsights.com; font-src 'none'; media-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'none'"));
-            out.insert(header::REFERRER_POLICY, HeaderValue::from_static("no-referrer"));
-        }
-    }
-    response
+    // `serveThemeAsset`: HTML revalidates and carries the sandbox policy, every
+    // other asset is immutable.
+    serve_bytes(&media_type, &content)
 }
 
 /// `ThemeRouter.PackageV2`: one revision's public package.
