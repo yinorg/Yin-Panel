@@ -46,7 +46,11 @@ listener_pid() {
     ss -ltnp "sport = :$1" 2>/dev/null | grep -oP 'pid=\K[0-9]+' | head -1 || true
 }
 
-exe_of() { readlink -f "/proc/$1/exe" 2>/dev/null || true; }
+exe_of() {
+    # A binary replaced by a redeploy reads back as "... (deleted)"; the pid is
+    # still the process this pair started.
+    readlink -f "/proc/$1/exe" 2>/dev/null | sed 's/ (deleted)$//' || true
+}
 
 snapshot_db() { # source destination
     python3 - "$1" "$2" <<'PY'
@@ -162,8 +166,11 @@ case "$command" in
                 continue
             fi
             exe="$(exe_of "$pid")"
-            [[ "$(basename "$exe")" == "yin-panel" ]] ||
-                die "pid $pid is $exe, not the yin-panel this pair started; refusing to stop it"
+            # The rollback artifact is `yin-panel-go`; both names are this pair's.
+            case "$(basename "$exe")" in
+                yin-panel|yin-panel-go) ;;
+                *) die "pid $pid is $exe, not the yin-panel this pair started; refusing to stop it" ;;
+            esac
             kill "$pid" 2>/dev/null || true
         done
         for side in go rust; do

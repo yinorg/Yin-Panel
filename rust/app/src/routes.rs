@@ -6721,7 +6721,18 @@ async fn serve_stored(headers: &HeaderMap, filepath: String, api_group: bool) ->
         return static_error(StatusCode::BAD_REQUEST, "{\"error\":\"file path is required\"}", api_group);
     }
     let path = storage_dir().join(&name);
-    let content = match std::fs::read(&path) {
+    // Uploads can be tens of megabytes; a small image is cheaper to read inline.
+    let size = std::fs::metadata(&path).map(|metadata| metadata.len()).unwrap_or(0);
+    let read = if size >= 256 * 1024 {
+        let path = path.clone();
+        tokio::task::spawn_blocking(move || std::fs::read(&path))
+            .await
+            .map_err(|error| error.to_string())
+            .and_then(|result| result.map_err(|error| error.to_string()))
+    } else {
+        std::fs::read(&path).map_err(|error| error.to_string())
+    };
+    let content = match read {
         Ok(content) => content,
         Err(_) => {
             return static_error(

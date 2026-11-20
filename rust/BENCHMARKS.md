@@ -315,3 +315,24 @@ call on the same deployment:
 A collection still takes about a second, as Go's `cpu.Percent(time.Second, true)`
 does, but it happens once before the listener opens and then off the request
 path, which is exactly what `internal/biz/cache/monitor.go` does.
+
+### Post-optimisation cross-check
+
+The runs above were taken before the compression and range work. Re-running
+`compare.sh` with the same pair after those changes (5 repetitions, `c=32`,
+3,000 requests) keeps every endpoint in the same band:
+
+| Endpoint | Go RPS | Rust RPS | Rust CPU/req | Go CPU/req |
+| --- | ---: | ---: | ---: | ---: |
+| `/api/about` | 22,937 | 25,963 | 77 µs | 293 µs |
+| `/` | 7,747 | 8,096 | 127 µs | 457 µs |
+| `theme/v2/current` | 3,660 | 3,569 | 1,123 µs | 1,520 µs |
+| `/api/spaces` | 5,649 | 5,063 | 793 µs | 1,023 µs |
+
+`/api/gzip` now costs Rust CPU on compressed routes and saves the client
+90% of the bytes; the figures above are measured **without** `Accept-Encoding:
+gzip`, so they isolate the uncompressed path. `/` moved from 117 µs to 127 µs
+per request because the file is stat'ed to decide whether to read it inline or
+off the async workers; that stat is what keeps a 500 KB asset from blocking a
+runtime thread, and the small-file path stays inline because offloading a
+13 KB file measured 66 µs worse with no p99 gain.
