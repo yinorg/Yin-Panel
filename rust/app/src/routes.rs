@@ -73,7 +73,6 @@ pub fn router() -> Router<Original> {
             "/api/spaces/{space_id}/members/{user_id}/delete",
             post(remove_member),
         )
-        .route("/api/spaces/{space_id}", post(rename_space))
         .route(
             "/api/spaces/{space_id}/search-config",
             post(set_search_config),
@@ -99,6 +98,11 @@ pub fn router() -> Router<Original> {
             "/api/spaces/{space_id}/layout/arrange",
             post(arrange_layout),
         )
+        .route(
+            "/api/spaces/{space_id}",
+            axum::routing::delete(delete_space).post(rename_space),
+        )
+        .route("/api/spaces/{space_id}/delete", post(delete_space))
         .route("/api/spaces/shared", post(create_space))
         .route("/api/spaces/teams", post(create_space))
         .route(
@@ -1482,7 +1486,7 @@ async fn theme_effective(
         .and_then(|value| value.trim().parse::<i64>().ok())
         .filter(|value| *value > 0);
     if query.get("spaceId").is_some() && space_id.is_none() {
-        return envelope::error(" [ spaceId must be a positive integer]");
+        return envelope::error(" [spaceId must be a positive integer]");
     }
     let user = auth::user(&headers).await.ok();
     let ctx = appcfg::ctx();
@@ -1710,7 +1714,7 @@ async fn module_config_save(headers: HeaderMap, request: Request) -> Response {
     };
     let payload: serde_json::Value = match serde_json::from_slice(&body) {
         Ok(value) => value,
-        Err(error) => return envelope::error(&format!(" [ {error}]")),
+        Err(error) => return envelope::error(&format!(" [{error}]")),
     };
     let name = payload
         .get("name")
@@ -1790,7 +1794,7 @@ async fn user_config_save(headers: HeaderMap, request: Request) -> Response {
     };
     let payload: serde_json::Value = match serde_json::from_slice(&body) {
         Ok(value) => value,
-        Err(error) => return envelope::error(&format!(" [ {error}]")),
+        Err(error) => return envelope::error(&format!(" [{error}]")),
     };
     let language = payload
         .get("language")
@@ -1798,7 +1802,7 @@ async fn user_config_save(headers: HeaderMap, request: Request) -> Response {
         .unwrap_or("")
         .to_string();
     if !language.is_empty() && !supported_language(&language) {
-        return envelope::error(" [ invalid language]");
+        return envelope::error(" [invalid language]");
     }
     let panel = payload.get("panel").cloned().filter(|value| value.is_object());
     if let Some(panel) = &panel {
@@ -1807,7 +1811,7 @@ async fn user_config_save(headers: HeaderMap, request: Request) -> Response {
             .and_then(serde_json::Value::as_str)
             .unwrap_or("");
         if !mode.is_empty() && !matches!(mode, "theme" | "custom" | "library" | "none") {
-            return envelope::error(" [ invalid wallpaper mode]");
+            return envelope::error(" [invalid wallpaper mode]");
         }
         if mode == "library" {
             let entry = panel
@@ -1819,7 +1823,7 @@ async fn user_config_save(headers: HeaderMap, request: Request) -> Response {
                 .and_then(serde_json::Value::as_bool)
                 .unwrap_or(false);
             if !known && !theme_wallpaper_entry(entry) {
-                return envelope::error(" [ invalid wallpaper library entry]");
+                return envelope::error(" [invalid wallpaper library entry]");
             }
         }
     }
@@ -1955,7 +1959,7 @@ async fn create_group(
     };
     let req: GroupRequest = match serde_json::from_slice(&body) {
         Ok(req) => req,
-        Err(error) => return envelope::error(&format!(" [ {error}]")),
+        Err(error) => return envelope::error(&format!(" [{error}]")),
     };
     if req.title.is_empty() {
         return envelope::error(" [ Title为必填字段]");
@@ -1965,7 +1969,7 @@ async fn create_group(
     }
     if let Some(parent) = req.parent_id {
         if parent == 0 {
-            return envelope::error(" [ invalid parent group]");
+            return envelope::error(" [invalid parent group]");
         }
         let exists: Option<(i64,)> = sqlx::query_as(
             "SELECT id FROM item_icon_group WHERE id = ? AND space_id = ?",
@@ -1976,7 +1980,7 @@ async fn create_group(
         .await
         .unwrap_or(None);
         if exists.is_none() {
-            return envelope::error(" [ invalid parent group]");
+            return envelope::error(" [invalid parent group]");
         }
     }
     let now = now_like_go();
@@ -2078,7 +2082,7 @@ async fn update_group(
     };
     let group_id: i64 = match group_id.parse() {
         Ok(value) => value,
-        Err(_) => return envelope::error(" [ invalid groupId]"),
+        Err(_) => return envelope::error(" [invalid groupId]"),
     };
     let ctx = appcfg::ctx();
     let pool = match ctx.pool().await {
@@ -2094,17 +2098,17 @@ async fn update_group(
     };
     let req: GroupRequest = match serde_json::from_slice(&body) {
         Ok(req) => req,
-        Err(error) => return envelope::error(&format!(" [ {error}]")),
+        Err(error) => return envelope::error(&format!(" [{error}]")),
     };
     if req.title.is_empty() {
         return envelope::error(" [ Title为必填字段]");
     }
     if let Some(parent) = req.parent_id {
         if parent == group_id || !group_belongs(&pool, parent, space_id).await {
-            return envelope::error(" [ invalid parent group]");
+            return envelope::error(" [invalid parent group]");
         }
         if group_has_descendant(&pool, space_id, group_id, parent).await {
-            return envelope::error(" [ group cycle detected]");
+            return envelope::error(" [group cycle detected]");
         }
     }
     let result = sqlx::query(
@@ -2135,7 +2139,7 @@ async fn delete_group(
     };
     let group_id: i64 = match group_id.parse() {
         Ok(value) => value,
-        Err(_) => return envelope::error(" [ invalid groupId]"),
+        Err(_) => return envelope::error(" [invalid groupId]"),
     };
     let ctx = appcfg::ctx();
     let pool = match ctx.pool().await {
@@ -2262,13 +2266,13 @@ async fn create_item(
     };
     let mut input: ItemIn = match serde_json::from_slice(&body) {
         Ok(input) => input,
-        Err(_) => return envelope::error(" [ invalid item or group]"),
+        Err(_) => return envelope::error(" [invalid item or group]"),
     };
     if input.item_icon_group_id == 0 {
-        return envelope::error(" [ invalid item or group]");
+        return envelope::error(" [invalid item or group]");
     }
     if !valid_item_title(&input.title) {
-        return envelope::error(" [ title must be at most 20 characters]");
+        return envelope::error(" [title must be at most 20 characters]");
     }
     ensure_item_icon(&input.title, &mut input.icon);
     let group: Option<(i64,)> = sqlx::query_as(
@@ -2378,7 +2382,7 @@ async fn update_item(
     };
     let item_id: i64 = match item_id.parse() {
         Ok(value) => value,
-        Err(_) => return envelope::error(" [ invalid itemId]"),
+        Err(_) => return envelope::error(" [invalid itemId]"),
     };
     let ctx = appcfg::ctx();
     let pool = match ctx.pool().await {
@@ -2394,13 +2398,13 @@ async fn update_item(
     };
     let mut input: ItemIn = match serde_json::from_slice(&body) {
         Ok(input) => input,
-        Err(error) => return envelope::error(&format!(" [ {error}]")),
+        Err(error) => return envelope::error(&format!(" [{error}]")),
     };
     if input.item_icon_group_id == 0 {
-        return envelope::error(" [ invalid groupId]");
+        return envelope::error(" [invalid groupId]");
     }
     if !valid_item_title(&input.title) {
-        return envelope::error(" [ title must be at most 20 characters]");
+        return envelope::error(" [title must be at most 20 characters]");
     }
     ensure_item_icon(&input.title, &mut input.icon);
     let group: Option<(i64,)> = sqlx::query_as(
@@ -2449,7 +2453,7 @@ async fn delete_item(
     };
     let item_id: i64 = match item_id.parse() {
         Ok(value) => value,
-        Err(_) => return envelope::error(" [ invalid itemId]"),
+        Err(_) => return envelope::error(" [invalid itemId]"),
     };
     let ctx = appcfg::ctx();
     let pool = match ctx.pool().await {
@@ -2536,10 +2540,10 @@ async fn add_member(
     };
     let req: MemberAddRequest = match serde_json::from_slice(&body) {
         Ok(req) => req,
-        Err(_) => return envelope::error(" [ invalid member request]"),
+        Err(_) => return envelope::error(" [invalid member request]"),
     };
     if !valid_space_role(&req.role) {
-        return envelope::error(" [ invalid member request]");
+        return envelope::error(" [invalid member request]");
     }
     let email = req.email.trim().to_lowercase();
     let target: Option<(i64,)> =
@@ -2610,7 +2614,7 @@ async fn update_member(
     };
     let target: i64 = match user_id.parse() {
         Ok(value) => value,
-        Err(_) => return envelope::error(" [ invalid userId]"),
+        Err(_) => return envelope::error(" [invalid userId]"),
     };
     let ctx = appcfg::ctx();
     let pool = match ctx.pool().await {
@@ -2626,10 +2630,10 @@ async fn update_member(
     };
     let req: MemberRoleRequest = match serde_json::from_slice(&body) {
         Ok(req) => req,
-        Err(_) => return envelope::error(" [ invalid role]"),
+        Err(_) => return envelope::error(" [invalid role]"),
     };
     if !valid_space_role(&req.role) {
-        return envelope::error(" [ invalid role]");
+        return envelope::error(" [invalid role]");
     }
     let exists: Option<(i64,)> = sqlx::query_as(r#"SELECT id FROM "space" WHERE id = ?"#)
         .bind(space_id)
@@ -2667,7 +2671,7 @@ async fn remove_member(
     };
     let target: i64 = match user_id.parse() {
         Ok(value) => value,
-        Err(_) => return envelope::error(" [ invalid userId]"),
+        Err(_) => return envelope::error(" [invalid userId]"),
     };
     let ctx = appcfg::ctx();
     let pool = match ctx.pool().await {
@@ -2733,7 +2737,7 @@ async fn rename_space(
     };
     let req: RenameRequest = match serde_json::from_slice(&body) {
         Ok(req) => req,
-        Err(_) => return envelope::error(" [ invalid name]"),
+        Err(_) => return envelope::error(" [invalid name]"),
     };
     if req.name.is_empty() {
         return envelope::error(" [ Name为必填字段]");
@@ -2808,7 +2812,7 @@ async fn set_search_config(
     };
     let value: serde_json::Value = match serde_json::from_slice(&body) {
         Ok(value) => value,
-        Err(_) => return envelope::error(" [ invalid search config]"),
+        Err(_) => return envelope::error(" [invalid search config]"),
     };
     let url = value
         .get("currentSearchEngine")
@@ -2816,7 +2820,7 @@ async fn set_search_config(
         .and_then(serde_json::Value::as_str)
         .unwrap_or("");
     if url.is_empty() {
-        return envelope::error(" [ invalid search config]");
+        return envelope::error(" [invalid search config]");
     }
     match sqlx::query(r#"UPDATE "space" SET search_config_json = ?, updated_at = ? WHERE id = ?"#)
         .bind(value.to_string())
@@ -2848,10 +2852,28 @@ async fn get_wallpaper(headers: HeaderMap, Path(space_id): Path<i64>) -> Respons
     if stored.is_empty() {
         return success();
     }
-    match serde_json::from_str::<serde_json::Value>(&stored) {
-        Ok(value) => success_data(value),
+    match serde_json::from_str::<SpaceWallpaper>(&stored) {
+        Ok(value) => match serde_json::to_value(value) {
+            Ok(value) => success_data(value),
+            Err(error) => envelope::error(&error.to_string()),
+        },
         Err(error) => envelope::error(&error.to_string()),
     }
+}
+
+/// `SpaceWallpaperConfig` in Go: `mode` then the optional fields.
+#[derive(serde::Serialize, serde::Deserialize)]
+struct SpaceWallpaper {
+    #[serde(default)]
+    mode: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    kind: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    source: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    poster: String,
+    #[serde(default, rename = "libraryEntry", skip_serializing_if = "String::is_empty")]
+    library_entry: String,
 }
 
 fn valid_wallpaper_mode(mode: &str) -> bool {
@@ -2882,14 +2904,14 @@ async fn set_wallpaper(
     };
     let value: serde_json::Value = match serde_json::from_slice(&body) {
         Ok(value) => value,
-        Err(_) => return envelope::error(" [ invalid wallpaper config]"),
+        Err(_) => return envelope::error(" [invalid wallpaper config]"),
     };
     let mode = value
         .get("mode")
         .and_then(serde_json::Value::as_str)
         .unwrap_or("");
     if !valid_wallpaper_mode(mode) {
-        return envelope::error(" [ invalid wallpaper config]");
+        return envelope::error(" [invalid wallpaper config]");
     }
     let stored = if mode == "none" {
         String::new()
@@ -2965,14 +2987,14 @@ async fn add_oidc_group(
     };
     let req: OidcGroupRequest = match serde_json::from_slice(&body) {
         Ok(req) => req,
-        Err(_) => return envelope::error(" [ invalid OIDC group rule]"),
+        Err(_) => return envelope::error(" [invalid OIDC group rule]"),
     };
     if req.provider.is_empty()
         || req.group_name.is_empty()
         || !valid_space_role(&req.role)
         || req.role == "admin"
     {
-        return envelope::error(" [ invalid OIDC group rule]");
+        return envelope::error(" [invalid OIDC group rule]");
     }
     let now = now_like_go();
     let result = sqlx::query(
@@ -3022,7 +3044,7 @@ async fn delete_oidc_group(
     };
     let rule_id: i64 = match rule_id.parse() {
         Ok(value) => value,
-        Err(_) => return envelope::error(" [ invalid ruleId]"),
+        Err(_) => return envelope::error(" [invalid ruleId]"),
     };
     let ctx = appcfg::ctx();
     let pool = match ctx.pool().await {
@@ -3073,7 +3095,7 @@ async fn transfer_space(
     };
     let req: TransferRequest = match serde_json::from_slice(&body) {
         Ok(req) => req,
-        Err(_) => return envelope::error(" [ invalid userId]"),
+        Err(_) => return envelope::error(" [invalid userId]"),
     };
     let email = req.email.trim().to_lowercase();
     let target: Option<(i64,)> = sqlx::query_as(r#"SELECT id FROM "user" WHERE mail = ?"#)
@@ -3203,7 +3225,7 @@ async fn create_space(headers: HeaderMap, request: Request) -> Response {
     };
     let req: RenameRequest = match serde_json::from_slice(&body) {
         Ok(req) => req,
-        Err(_) => return envelope::error(" [ invalid name]"),
+        Err(_) => return envelope::error(" [invalid name]"),
     };
     if req.name.is_empty() {
         return envelope::error(" [ Name为必填字段]");
@@ -3329,10 +3351,10 @@ async fn sort_items(
     };
     let req: ItemSortRequest = match serde_json::from_slice(&body) {
         Ok(req) => req,
-        Err(_) => return envelope::error(" [ invalid sort request]"),
+        Err(_) => return envelope::error(" [invalid sort request]"),
     };
     if req.group_id == 0 {
-        return envelope::error(" [ invalid sort request]");
+        return envelope::error(" [invalid sort request]");
     }
     let mut tx = match pool.begin().await {
         Ok(tx) => tx,
@@ -3393,14 +3415,14 @@ async fn sort_groups(
     };
     let req: GroupSortRequest = match serde_json::from_slice(&body) {
         Ok(req) => req,
-        Err(_) => return envelope::error(" [ invalid group sort request]"),
+        Err(_) => return envelope::error(" [invalid group sort request]"),
     };
     if req.sort_groups.is_empty() {
-        return envelope::error(" [ invalid group sort request]");
+        return envelope::error(" [invalid group sort request]");
     }
     if let Some(parent) = req.parent_id {
         if !group_belongs(&pool, parent, space_id).await {
-            return envelope::error(" [ invalid parent group]");
+            return envelope::error(" [invalid parent group]");
         }
     }
     let siblings: Vec<i64> = match req.parent_id {
@@ -3425,7 +3447,7 @@ async fn sort_groups(
     .map(|(id,)| id)
     .collect();
     if siblings.is_empty() || siblings.len() != req.sort_groups.len() {
-        return envelope::error(" [ group sort must include every sibling]");
+        return envelope::error(" [group sort must include every sibling]");
     }
     let mut seen_ids = std::collections::HashSet::new();
     let mut seen_sorts = std::collections::HashSet::new();
@@ -3436,7 +3458,7 @@ async fn sort_groups(
             || !seen_ids.insert(entry.id)
             || !seen_sorts.insert(entry.sort)
         {
-            return envelope::error(" [ group sort must include every sibling]");
+            return envelope::error(" [group sort must include every sibling]");
         }
     }
     let mut tx = match pool.begin().await {
@@ -3507,27 +3529,27 @@ async fn arrange_layout(
     };
     let req: ArrangeRequest = match serde_json::from_slice(&body) {
         Ok(req) => req,
-        Err(_) => return envelope::error(" [ invalid layout request]"),
+        Err(_) => return envelope::error(" [invalid layout request]"),
     };
     if req.items.is_empty() && req.groups.is_empty() {
-        return envelope::error(" [ invalid layout request]");
+        return envelope::error(" [invalid layout request]");
     }
     let mut seen_items = std::collections::HashSet::new();
     for item in &req.items {
         if item.id == 0 || item.item_icon_group_id == 0 {
-            return envelope::error(" [ invalid item entry]");
+            return envelope::error(" [invalid item entry]");
         }
         if !seen_items.insert(item.id) {
-            return envelope::error(" [ duplicate item entry]");
+            return envelope::error(" [duplicate item entry]");
         }
     }
     let mut seen_groups = std::collections::HashSet::new();
     for group in &req.groups {
         if group.id == 0 {
-            return envelope::error(" [ invalid group entry]");
+            return envelope::error(" [invalid group entry]");
         }
         if !seen_groups.insert(group.id) {
-            return envelope::error(" [ duplicate group entry]");
+            return envelope::error(" [duplicate group entry]");
         }
     }
     let mut tx = match pool.begin().await {
@@ -3544,7 +3566,7 @@ async fn arrange_layout(
         .await
         .unwrap_or(None);
         if exists.is_none() {
-            return envelope::error(&format!(" [ item {} is not in this space]", item.id));
+            return envelope::error(&format!(" [item {} is not in this space]", item.id));
         }
         let group: Option<(i64,)> = sqlx::query_as(
             "SELECT id FROM item_icon_group WHERE id = ? AND space_id = ?",
@@ -3556,7 +3578,7 @@ async fn arrange_layout(
         .unwrap_or(None);
         if group.is_none() {
             return envelope::error(&format!(
-                " [ target group {} is not in this space]",
+                " [target group {} is not in this space]",
                 item.item_icon_group_id
             ));
         }
@@ -3584,7 +3606,7 @@ async fn arrange_layout(
         .await
         .unwrap_or(None);
         if exists.is_none() {
-            return envelope::error(&format!(" [ group {} is not in this space]", group.id));
+            return envelope::error(&format!(" [group {} is not in this space]", group.id));
         }
         if sqlx::query("UPDATE item_icon_group SET sort = ?, updated_at = ? WHERE id = ?")
             .bind(group.sort)
@@ -3601,4 +3623,119 @@ async fn arrange_layout(
         Ok(_) => success(),
         Err(error) => envelope::error(&error.to_string()),
     }
+}
+
+/// `SpaceRouter.DeleteSpace` plus `deleteSpaceData`: the rows go in one
+/// transaction, and a stored file is removed only when nothing else references
+/// it. Storage failures after the commit are logged, never rolled back.
+async fn delete_space(headers: HeaderMap, Path(space_id): Path<i64>) -> Response {
+    let user = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool.clone(),
+        Err(error) => return envelope::error(&error),
+    };
+    let space: Option<(i64, String)> =
+        sqlx::query_as(r#"SELECT owner_user_id, type FROM "space" WHERE id = ?"#)
+            .bind(space_id)
+            .fetch_optional(&pool)
+            .await
+            .unwrap_or(None);
+    let Some((owner, kind)) = space else {
+        return error_code(404);
+    };
+    if owner != user.id {
+        return error_code(1005);
+    }
+    if kind == "personal" {
+        return envelope::error("a personal space cannot be deleted");
+    }
+    let ids = paired_ids(&pool, space_id).await;
+    let placeholders = vec!["?"; ids.len()].join(",");
+
+    let mut tx = match pool.begin().await {
+        Ok(tx) => tx,
+        Err(error) => return envelope::error(&error.to_string()),
+    };
+
+    // Files named by this Space's item icons, kept only if nothing else uses them.
+    let item_sql = format!(
+        "SELECT icon_json FROM item_icon WHERE space_id IN ({placeholders})"
+    );
+    let mut query = sqlx::query_as::<_, (String,)>(&item_sql);
+    for id in &ids {
+        query = query.bind(id);
+    }
+    let icons = query.fetch_all(&mut *tx).await.unwrap_or_default();
+    let mut referenced: std::collections::HashSet<String> = std::collections::HashSet::new();
+    for (icon_json,) in icons {
+        if let Ok(info) = serde_json::from_str::<IconInfo>(&icon_json) {
+            if !info.file_name.is_empty() {
+                referenced.insert(info.file_name);
+            }
+        }
+    }
+    let mut removed: Vec<String> = Vec::new();
+    for name in &referenced {
+        let used: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM item_icon WHERE icon_json LIKE ?")
+            .bind(format!("%\"{name}\"%"))
+            .fetch_one(&mut *tx)
+            .await
+            .unwrap_or((0,));
+        if used.0 > 0 {
+            continue;
+        }
+        let deleted = sqlx::query("DELETE FROM file WHERE file_name = ?")
+            .bind(name)
+            .execute(&mut *tx)
+            .await;
+        if deleted.is_ok() {
+            removed.push(name.clone());
+        }
+    }
+
+    for table in [
+        "item_icon",
+        "item_icon_group",
+        "space_member",
+        "space_o_id_c_group",
+    ] {
+        let sql = format!("DELETE FROM {table} WHERE space_id IN ({placeholders})");
+        let mut statement = sqlx::query(&sql);
+        for id in &ids {
+            statement = statement.bind(id);
+        }
+        if statement.execute(&mut *tx).await.is_err() {
+            return envelope::error("delete failed");
+        }
+    }
+    let sql = format!(r#"DELETE FROM "space" WHERE id IN ({placeholders})"#);
+    let mut statement = sqlx::query(&sql);
+    for id in &ids {
+        statement = statement.bind(id);
+    }
+    if statement.execute(&mut *tx).await.is_err() {
+        return envelope::error("delete failed");
+    }
+    if let Err(error) = tx.commit().await {
+        return envelope::error(&error.to_string());
+    }
+
+    let bucket = if ctx.conf.rclone.bucket.is_empty() {
+        "uploads".to_string()
+    } else {
+        ctx.conf.rclone.bucket.clone()
+    };
+    let dir = if std::path::Path::new(&bucket).is_absolute() {
+        std::path::PathBuf::from(&bucket)
+    } else {
+        ctx.dir.join(&bucket)
+    };
+    for name in removed {
+        let _ = std::fs::remove_file(dir.join(&name));
+    }
+    success()
 }

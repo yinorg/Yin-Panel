@@ -1,0 +1,1 @@
+{"code":0,"data":[{"email":"admin@yiniot.com","id":1,"joinedAt":"[..]","name":"admin@yiniot.com","role":"admin","source":"manual","spaceId":1,"userId":1},{"email":"member@local.test","id":5,"joinedAt":"[..]","name":"Member","role":"viewer","source":"manual","spaceId":1,"userId":2}],"msg":"OK"}

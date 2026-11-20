@@ -1,6 +1,6 @@
 [request]
 method = "PUT"
-path = "/api/spaces/1/groups/2"
+path = "/api/spaces/1/groups/3"
 body = '{"title":"Recording Group Updated","icon":"material-symbols:apps"}'
 
 [request.headers]
