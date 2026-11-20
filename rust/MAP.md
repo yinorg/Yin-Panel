@@ -46,8 +46,8 @@ rust-anything analyze backend --lang go --whole-app
 - Original recorded: 299 HTTP cases in `rust/app-cases/` (35 named inputs, 264
   traps), `299/299` passing against the Go baseline.
 - Front door: `rust/app` (axum), `299/299`, fallback `99.7%` (298/299).
-- Recorded cases: 362 (98 named inputs + 264 traps); original 362/362, front
-  door 362/362.
+- Recorded cases: 370 (106 named inputs + 264 traps); original 370/370, front
+  door 370/370.
 - Rust answers directly (43 route registrations):
   - `GET /api/theme/v2/wallpaper/library` -> `rust/wallpaperpack-rs`
   - `GET /api/about`, `GET /api/system/capabilities`, `GET /api/oauth/config`,
@@ -62,7 +62,7 @@ rust-anything analyze backend --lang go --whole-app
     the theme reads (`current`, `packages`, `package/{id}`, `mine`, `effective`)
     -> `rust/app`
 - Ported library units not yet wired to a route: `rust/util-rs`.
-- Fallback rate: 70.2% (254/362). Everything else is still proxied to Go.
+- Fallback rate: 68.6% (254/370). Everything else is still proxied to Go.
 - Theme package pipeline: archive parsing, manifest and resource validation,
   Ed25519 signature check, preview store, `admin/preview`, `preview/:token`, its
   asset route and `admin/install` are ported and verified against Go. The DTCG
