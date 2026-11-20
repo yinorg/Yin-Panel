@@ -58,10 +58,15 @@ rust-anything analyze backend --lang go --whole-app
 - `repository` still has no unit crate: `bridge` on `internal/biz/repository`
   yields only the constructors and `CalcOffset`, because every repository method
   hangs off a receiver that holds the package-level `*gorm.DB` (ADR-009).
-- `app lift` replays the binary directly, against the same recording working
-  directory. The recorded cases are a sequence, so clear it first:
-  `rm -rf /tmp/yin-panel-record && rust-anything app lift .`. With that, the lift
-  replay passes 384/384 and the only blocker left is:
+- `app lift` builds a copy of `rust/app` (without `rust/record/`) and replays it
+  from the repository root, so the configuration must exist in the recording
+  directory it falls back to. Prepare it first:
+  ```
+  rm -rf /tmp/yin-panel-record && mkdir -p /tmp/yin-panel-record/uploads
+  cp rust/record/conf.yaml /tmp/yin-panel-record/conf.yaml
+  rust-anything app lift .
+  ```
+  With that, the lift replay passes 384/384 and the only blocker left is:
 - `app lift` blockers, as the tool reports them: `wallpaperpack-rs` fails the
   `error cases` gate check. Every other check passes; that one asks for a
   recorded case where `Catalogue` fails, and its only error comes from a broken
