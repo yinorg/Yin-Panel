@@ -61,6 +61,14 @@ pub fn router() -> Router<Original> {
         )
         .route("/api/theme/v2/admin/preview", post(theme_preview_upload))
         .route("/api/theme/v2/admin/install", post(theme_install))
+        .route(
+            "/api/theme/v2/admin/packages/{package_id}",
+            axum::routing::delete(remove_package),
+        )
+        .route("/api/theme/v2/admin/default", post(set_default_package))
+        .route("/api/theme/v2/admin/trial", post(begin_trial))
+        .route("/api/theme/v2/admin/confirm", post(confirm_trial))
+        .route("/api/theme/v2/admin/rollback", post(rollback_theme))
         .route("/api/theme/v2/preview/{token}", get(theme_preview_get))
         .route(
             "/api/theme/v2/preview/{token}/assets/{*name}",
@@ -5883,4 +5891,349 @@ fn serve_bytes(media_type: &str, content: &[u8]) -> Response {
         }
     }
     response
+}
+
+#[derive(serde::Deserialize)]
+struct RevisionRequest {
+    #[serde(default, rename = "packageId")]
+    package_id: String,
+    #[serde(default)]
+    revision: String,
+}
+
+/// `RemovePackageV2`: built-in themes are protected; a removed package's
+/// activations fall back to the seeded Yin package.
+async fn remove_package(
+    headers: HeaderMap,
+    Path(package_id): Path<String>,
+) -> Response {
+    let user = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    if user.role != 1 {
+        return error_code(1005);
+    }
+    if is_builtin_theme(&package_id) {
+        return envelope::error(" [built-in themes cannot be removed]");
+    }
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool.clone(),
+        Err(error) => return envelope::error(&error),
+    };
+    let record: Option<(i64,)> = sqlx::query_as(
+        "SELECT removed FROM package_record_v2 WHERE id = ? AND removed = 0",
+    )
+    .bind(&package_id)
+    .fetch_optional(&pool)
+    .await
+    .unwrap_or(None);
+    if record.is_none() {
+        return error_code(404);
+    }
+    let yin: Option<(String,)> = sqlx::query_as(
+        "SELECT latest_revision FROM package_record_v2 WHERE id = 'org.yin.default' AND removed = 0",
+    )
+    .fetch_optional(&pool)
+    .await
+    .unwrap_or(None);
+    let Some((yin_revision,)) = yin else {
+        return envelope::database_error();
+    };
+    let now = now_like_go();
+    let mut tx = match pool.begin().await {
+        Ok(tx) => tx,
+        Err(error) => return envelope::error(&error.to_string()),
+    };
+    let steps = [
+        sqlx::query("UPDATE package_record_v2 SET removed = 1, updated_at = ? WHERE id = ?")
+            .bind(&now)
+            .bind(&package_id)
+            .execute(&mut *tx)
+            .await,
+        sqlx::query(
+            "UPDATE activation_record_v2 SET package_id = 'org.yin.default', active_revision_id = ?, last_good_revision_id = ?, pending_revision_id = '', trial_started_at = NULL, updated_at = ? WHERE package_id = ?",
+        )
+        .bind(&yin_revision)
+        .bind(&yin_revision)
+        .bind(&now)
+        .bind(&package_id)
+        .execute(&mut *tx)
+        .await,
+        sqlx::query(
+            "INSERT INTO audit_record (actor_id, action, package_id, created_at) VALUES (?, 'remove-v2', ?, ?)",
+        )
+        .bind(user.id)
+        .bind(&package_id)
+        .bind(&now)
+        .execute(&mut *tx)
+        .await,
+    ];
+    for step in steps {
+        if step.is_err() {
+            return envelope::error("remove failed");
+        }
+    }
+    match tx.commit().await {
+        Ok(_) => success(),
+        Err(error) => envelope::error(&error.to_string()),
+    }
+}
+
+/// `SetDefaultV2`: activates a revision for the whole instance.
+async fn set_default_package(headers: HeaderMap, request: Request) -> Response {
+    let user = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    if user.role != 1 {
+        return error_code(1005);
+    }
+    let body = match axum::body::to_bytes(request.into_body(), 1 << 20).await {
+        Ok(body) => body,
+        Err(_) => return envelope::error("invalid request body"),
+    };
+    let req: RevisionRequest = match serde_json::from_slice(&body) {
+        Ok(req) => req,
+        Err(error) => return envelope::error(&format!(" [{}]", error)),
+    };
+    if req.revision.is_empty() && req.package_id.is_empty() {
+        return envelope::error(" [revision or packageId is required]");
+    }
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool.clone(),
+        Err(error) => return envelope::error(&error),
+    };
+    let revision_id = if !req.revision.is_empty() {
+        req.revision.clone()
+    } else {
+        match latest_revision_of(&pool, &req.package_id).await {
+            Ok(id) => id,
+            Err(_) => return error_code(404),
+        }
+    };
+    let revision: Option<(String,)> =
+        sqlx::query_as("SELECT package_id FROM revision_record_v2 WHERE id = ?")
+            .bind(&revision_id)
+            .fetch_optional(&pool)
+            .await
+            .unwrap_or(None);
+    let Some((package_id,)) = revision else {
+        return error_code(404);
+    };
+    let now = now_like_go();
+    match sqlx::query(
+        "INSERT INTO activation_record_v2 (scope, package_id, active_revision_id, last_good_revision_id, pending_revision_id, trial_started_at, updated_at)
+         VALUES ('instance', ?, ?, ?, '', NULL, ?)
+         ON CONFLICT(scope) DO UPDATE SET package_id = excluded.package_id, active_revision_id = excluded.active_revision_id, last_good_revision_id = excluded.last_good_revision_id, pending_revision_id = '', trial_started_at = NULL, updated_at = excluded.updated_at",
+    )
+    .bind(&package_id)
+    .bind(&revision_id)
+    .bind(&revision_id)
+    .bind(&now)
+    .execute(&pool)
+    .await
+    {
+        Ok(_) => success(),
+        Err(error) => envelope::error(&error.to_string()),
+    }
+}
+
+/// `BeginTrialV2`: marks a revision pending for the 30 second trial window.
+async fn begin_trial(headers: HeaderMap, request: Request) -> Response {
+    let user = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    if user.role != 1 {
+        return error_code(1005);
+    }
+    let body = match axum::body::to_bytes(request.into_body(), 1 << 20).await {
+        Ok(body) => body,
+        Err(_) => return envelope::error("invalid request body"),
+    };
+    let req: RevisionRequest = match serde_json::from_slice(&body) {
+        Ok(req) => req,
+        Err(error) => return envelope::error(&format!(" [{}]", error)),
+    };
+    if req.revision.is_empty() {
+        return envelope::error(" [revision is required]");
+    }
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool.clone(),
+        Err(error) => return envelope::error(&error),
+    };
+    let revision: Option<(String,)> =
+        sqlx::query_as("SELECT package_id FROM revision_record_v2 WHERE id = ?")
+            .bind(&req.revision)
+            .fetch_optional(&pool)
+            .await
+            .unwrap_or(None);
+    let Some((package_id,)) = revision else {
+        return error_code(404);
+    };
+    let removed: Option<(i64,)> = sqlx::query_as(
+        "SELECT removed FROM package_record_v2 WHERE id = ?",
+    )
+    .bind(&package_id)
+    .fetch_optional(&pool)
+    .await
+    .unwrap_or(None);
+    if removed.map(|value| value.0).unwrap_or(1) != 0 {
+        return error_code(404);
+    }
+    let now = now_like_go();
+    match sqlx::query(
+        "INSERT INTO activation_record_v2 (scope, package_id, active_revision_id, last_good_revision_id, pending_revision_id, trial_started_at, updated_at)
+         VALUES ('instance', ?, '', '', ?, ?, ?)
+         ON CONFLICT(scope) DO UPDATE SET pending_revision_id = excluded.pending_revision_id, trial_started_at = excluded.trial_started_at, updated_at = excluded.updated_at",
+    )
+    .bind(&package_id)
+    .bind(&req.revision)
+    .bind(&now)
+    .bind(&now)
+    .execute(&pool)
+    .await
+    {
+        Ok(_) => success_data(json!({
+            "expiresInSeconds": 30,
+            "revision": req.revision,
+        })),
+        Err(error) => envelope::error(&error.to_string()),
+    }
+}
+
+/// `ConfirmTrialV2`: promotes the pending revision and marks it healthy.
+async fn confirm_trial(headers: HeaderMap, request: Request) -> Response {
+    let user = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    if user.role != 1 {
+        return error_code(1005);
+    }
+    let body = match axum::body::to_bytes(request.into_body(), 1 << 20).await {
+        Ok(body) => body,
+        Err(_) => return envelope::error("invalid request body"),
+    };
+    let req: RevisionRequest = match serde_json::from_slice(&body) {
+        Ok(req) => req,
+        Err(error) => return envelope::error(&format!(" [{}]", error)),
+    };
+    if req.revision.is_empty() {
+        return envelope::error(" [revision is required]");
+    }
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool.clone(),
+        Err(error) => return envelope::error(&error),
+    };
+    let activation: Option<(String,)> = sqlx::query_as(
+        "SELECT pending_revision_id FROM activation_record_v2 WHERE scope = 'instance'",
+    )
+    .fetch_optional(&pool)
+    .await
+    .unwrap_or(None);
+    let Some((pending,)) = activation else {
+        return envelope::error(" [record not found]");
+    };
+    if pending.is_empty() || pending != req.revision {
+        return envelope::error(" [no matching theme activation trial]");
+    }
+    let revision: Option<(String,)> =
+        sqlx::query_as("SELECT package_id FROM revision_record_v2 WHERE id = ?")
+            .bind(&req.revision)
+            .fetch_optional(&pool)
+            .await
+            .unwrap_or(None);
+    let Some((package_id,)) = revision else {
+        return envelope::error(" [record not found]");
+    };
+    let now = now_like_go();
+    let mut tx = match pool.begin().await {
+        Ok(tx) => tx,
+        Err(error) => return envelope::error(&error.to_string()),
+    };
+    if sqlx::query(
+        "UPDATE activation_record_v2 SET package_id = ?, active_revision_id = ?, pending_revision_id = '', trial_started_at = NULL, updated_at = ? WHERE scope = 'instance'",
+    )
+    .bind(&package_id)
+    .bind(&req.revision)
+    .bind(&now)
+    .execute(&mut *tx)
+    .await
+    .is_err()
+    {
+        return envelope::error("confirm failed");
+    }
+    if sqlx::query(
+        "UPDATE activation_record_v2 SET last_good_revision_id = ?, updated_at = ? WHERE scope = 'instance' AND active_revision_id = ? AND pending_revision_id = ''",
+    )
+    .bind(&req.revision)
+    .bind(&now)
+    .bind(&req.revision)
+    .execute(&mut *tx)
+    .await
+    .is_err()
+    {
+        return envelope::database_error();
+    }
+    match tx.commit().await {
+        Ok(_) => success(),
+        Err(error) => envelope::error(&error.to_string()),
+    }
+}
+
+/// `RollbackV2`: back to the last good revision, or the seeded default.
+async fn rollback_theme(headers: HeaderMap) -> Response {
+    let user = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    if user.role != 1 {
+        return error_code(1005);
+    }
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool.clone(),
+        Err(error) => return envelope::error(&error),
+    };
+    let fallback = match instance_default_revision(&pool).await {
+        Ok(revision) => revision,
+        Err(_) => return envelope::database_error(),
+    };
+    let activation: Option<(String,)> = sqlx::query_as(
+        "SELECT last_good_revision_id FROM activation_record_v2 WHERE scope = 'instance'",
+    )
+    .fetch_optional(&pool)
+    .await
+    .unwrap_or(None);
+    let Some((last_good,)) = activation else {
+        return envelope::database_error();
+    };
+    let revision_id = if last_good.is_empty() { fallback } else { last_good };
+    let revision: Option<(String,)> =
+        sqlx::query_as("SELECT package_id FROM revision_record_v2 WHERE id = ?")
+            .bind(&revision_id)
+            .fetch_optional(&pool)
+            .await
+            .unwrap_or(None);
+    let Some((package_id,)) = revision else {
+        return envelope::database_error();
+    };
+    match sqlx::query(
+        "UPDATE activation_record_v2 SET package_id = ?, active_revision_id = ?, pending_revision_id = '', trial_started_at = NULL, updated_at = ? WHERE scope = 'instance'",
+    )
+    .bind(&package_id)
+    .bind(&revision_id)
+    .bind(now_like_go())
+    .execute(&pool)
+    .await
+    {
+        Ok(_) => success(),
+        Err(error) => envelope::error(&error.to_string()),
+    }
 }
