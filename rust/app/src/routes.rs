@@ -51,6 +51,8 @@ pub fn router() -> Router<Original> {
             "/api/theme/v2/assets/{revision}/{*name}",
             get(theme_asset),
         )
+        .route("/api/system/moduleConfig/save", post(module_config_save))
+        .route("/api/panel/userConfig/setConfig", post(user_config_save))
 }
 
 /// `AboutRouter.Get`.
@@ -1615,4 +1617,211 @@ fn parse_range(value: &str, total: u64) -> Option<(u64, u64)> {
         return None;
     }
     Some((start, end))
+}
+
+/// The timestamps GORM writes: local time, nanosecond fraction, numeric offset.
+fn now_like_go() -> String {
+    let offset = time::UtcOffset::current_local_offset().unwrap_or(time::UtcOffset::UTC);
+    let now = time::OffsetDateTime::now_utc().to_offset(offset);
+    let format = time::macros::format_description!(
+        "[year]-[month]-[day] [hour]:[minute]:[second].[subsecond digits:9][offset_hour sign:mandatory]:[offset_minute]"
+    );
+    now.format(&format).unwrap_or_default()
+}
+
+/// `ModuleConfigRouter.Save`: Go binds `Value` into `map[string]interface{}`, so
+/// a non-object value is rejected with the decoder's own message.
+async fn module_config_save(headers: HeaderMap, request: Request) -> Response {
+    let user = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    let body = match axum::body::to_bytes(request.into_body(), 1 << 20).await {
+        Ok(body) => body,
+        Err(_) => return envelope::error("invalid request body"),
+    };
+    let payload: serde_json::Value = match serde_json::from_slice(&body) {
+        Ok(value) => value,
+        Err(error) => return envelope::error(&format!(" [ {error}]")),
+    };
+    let name = payload
+        .get("name")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("")
+        .to_string();
+    let value = payload.get("value").cloned().unwrap_or(serde_json::Value::Null);
+    if !value.is_object() && !value.is_null() {
+        let kind = match &value {
+            serde_json::Value::String(_) => "string",
+            serde_json::Value::Number(_) => "number",
+            serde_json::Value::Bool(_) => "bool",
+            serde_json::Value::Array(_) => "array",
+            _ => "value",
+        };
+        return envelope::error(&format!(
+            " [json: cannot unmarshal {kind} into Go struct field ModuleConfig.value of type map[string]interface {{}}]"
+        ));
+    }
+    let stored = if value.is_null() {
+        "null".to_string()
+    } else {
+        value.to_string()
+    };
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool,
+        Err(error) => return envelope::error(&error),
+    };
+    let now = now_like_go();
+    let existing: Option<(i64,)> = sqlx::query_as(
+        "SELECT id FROM module_config WHERE user_id = ? AND name = ? LIMIT 1",
+    )
+    .bind(user.id)
+    .bind(&name)
+    .fetch_optional(pool)
+    .await
+    .unwrap_or(None);
+    let result = match existing {
+        Some((id,)) => {
+            sqlx::query("UPDATE module_config SET value_json = ?, updated_at = ? WHERE id = ?")
+                .bind(&stored)
+                .bind(&now)
+                .bind(id)
+                .execute(pool)
+                .await
+        }
+        None => {
+            sqlx::query(
+                "INSERT INTO module_config (created_at, updated_at, user_id, name, value_json) VALUES (?, ?, ?, ?, ?)",
+            )
+            .bind(&now)
+            .bind(&now)
+            .bind(user.id)
+            .bind(&name)
+            .bind(&stored)
+            .execute(pool)
+            .await
+        }
+    };
+    match result {
+        Ok(_) => success(),
+        Err(error) => envelope::error(&error.to_string()),
+    }
+}
+
+/// `UserConfigRouter.SetConfig`: only a request that carries a panel rewrites
+/// the stored one, as in `SaveUserConfig`.
+async fn user_config_save(headers: HeaderMap, request: Request) -> Response {
+    let user = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    let body = match axum::body::to_bytes(request.into_body(), 1 << 20).await {
+        Ok(body) => body,
+        Err(_) => return envelope::error("invalid request body"),
+    };
+    let payload: serde_json::Value = match serde_json::from_slice(&body) {
+        Ok(value) => value,
+        Err(error) => return envelope::error(&format!(" [ {error}]")),
+    };
+    let language = payload
+        .get("language")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("")
+        .to_string();
+    if !language.is_empty() && !supported_language(&language) {
+        return envelope::error(" [ invalid language]");
+    }
+    let panel = payload.get("panel").cloned().filter(|value| value.is_object());
+    if let Some(panel) = &panel {
+        let mode = panel
+            .get("wallpaperMode")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("");
+        if !mode.is_empty() && !matches!(mode, "theme" | "custom" | "library" | "none") {
+            return envelope::error(" [ invalid wallpaper mode]");
+        }
+        if mode == "library" {
+            let entry = panel
+                .get("wallpaperLibraryEntry")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or("");
+            let known = wallpaperpack_rs::port::find(entry.to_string())
+                .get(1)
+                .and_then(serde_json::Value::as_bool)
+                .unwrap_or(false);
+            if !known && !theme_wallpaper_entry(entry) {
+                return envelope::error(" [ invalid wallpaper library entry]");
+            }
+        }
+    }
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool,
+        Err(error) => return envelope::error(&error),
+    };
+    let existing: Option<(i64,)> =
+        sqlx::query_as("SELECT 1 FROM user_config WHERE user_id = ? LIMIT 1")
+            .bind(user.id)
+            .fetch_optional(pool)
+            .await
+            .unwrap_or(None);
+    let result = match existing {
+        Some(_) => match &panel {
+            Some(panel) => {
+                sqlx::query("UPDATE user_config SET panel_json = ?, language = ? WHERE user_id = ?")
+                    .bind(panel.to_string())
+                    .bind(&language)
+                    .bind(user.id)
+                    .execute(pool)
+                    .await
+            }
+            None => {
+                sqlx::query("UPDATE user_config SET language = ? WHERE user_id = ?")
+                    .bind(&language)
+                    .bind(user.id)
+                    .execute(pool)
+                    .await
+            }
+        },
+        None => {
+            sqlx::query(
+                "INSERT INTO user_config (user_id, panel_json, language) VALUES (?, ?, ?)",
+            )
+            .bind(user.id)
+            .bind(panel.as_ref().map(|value| value.to_string()).unwrap_or_default())
+            .bind(&language)
+            .execute(pool)
+            .await
+        }
+    };
+    match result {
+        Ok(_) => success(),
+        Err(error) => envelope::error(&error.to_string()),
+    }
+}
+
+fn supported_language(language: &str) -> bool {
+    matches!(
+        language,
+        "auto" | "en-US" | "zh-CN" | "zh-TW" | "ja-JP" | "ko-KR" | "de-DE" | "fr-FR"
+            | "es-ES" | "pt-BR" | "ru-RU" | "id-ID" | "tr-TR" | "pl-PL" | "it-IT"
+            | "nl-NL" | "hi-IN" | "th-TH"
+    )
+}
+
+/// `themeWallpaperEntryV2`: `<packageId>:<entryId>`, both dot/dash/underscore-safe.
+fn theme_wallpaper_entry(value: &str) -> bool {
+    let Some((package, entry)) = value.split_once(':') else {
+        return false;
+    };
+    let valid = |part: &str| {
+        !part.is_empty()
+            && part.len() <= 64
+            && part
+                .chars()
+                .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '.' | '_' | '-'))
+            && !part.starts_with(['.', '-', '_'])
+    };
+    valid(package) && valid(entry)
 }
