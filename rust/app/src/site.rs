@@ -5,7 +5,7 @@
 //! are never cached, and the SPA routes fall back to `index.html`.
 
 use axum::extract::Path;
-use axum::http::{HeaderValue, StatusCode, header};
+use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
 use axum::Router;
@@ -83,12 +83,17 @@ fn http_date(modified: std::time::SystemTime) -> String {
 }
 
 /// One file with the headers `gin.Context.File` (`http.ServeContent`) sets.
-fn serve_file(relative: &str, cache: Option<&str>, content: Vec<u8>) -> Response {
+fn serve_file(
+    request: &HeaderMap,
+    relative: &str,
+    cache: Option<&str>,
+    content: Vec<u8>,
+) -> Response {
     let path = web_root().join(relative);
     let modified = std::fs::metadata(&path)
         .and_then(|metadata| metadata.modified())
         .ok();
-    let mut response = Response::new(axum::body::Body::from(content.clone()));
+    let mut response = Response::new(axum::body::Body::empty());
     {
         let headers = response.headers_mut();
         for (key, value) in crate::envelope::headers() {
@@ -130,7 +135,8 @@ fn serve_file(relative: &str, cache: Option<&str>, content: Vec<u8>) -> Response
             }
         }
     }
-    response
+    let (parts, _) = response.into_parts();
+    crate::content::serve(request, parts, &content)
 }
 
 /// `gin.Dir(dir, false)` for a missing file: 404, an empty body and the headers
@@ -170,32 +176,32 @@ fn missing(cache: Option<&str>) -> Response {
     response
 }
 
-fn read(relative: &str, cache: Option<&str>) -> Response {
+fn read(request: &HeaderMap, relative: &str, cache: Option<&str>) -> Response {
     match std::fs::read(web_root().join(relative)) {
-        Ok(content) => serve_file(relative, cache, content),
+        Ok(content) => serve_file(request, relative, cache, content),
         Err(_) => missing(cache),
     }
 }
 
-async fn root() -> Response {
-    read("index.html", None)
+async fn root(headers: HeaderMap) -> Response {
+    read(&headers, "index.html", None)
 }
 
-async fn register_sw() -> Response {
-    read("registerSW.js", None)
+async fn register_sw(headers: HeaderMap) -> Response {
+    read(&headers, "registerSW.js", None)
 }
 
-async fn service_worker() -> Response {
-    read("sw.js", None)
+async fn service_worker(headers: HeaderMap) -> Response {
+    read(&headers, "sw.js", None)
 }
 
-async fn manifest() -> Response {
-    read("manifest.webmanifest", None)
+async fn manifest(headers: HeaderMap) -> Response {
+    read(&headers, "manifest.webmanifest", None)
 }
 
 /// `/clear.html` also expires the session cookie, which script cannot reach.
-async fn clear() -> Response {
-    let mut response = read("clear.html", None);
+async fn clear(headers: HeaderMap) -> Response {
+    let mut response = read(&headers, "clear.html", None);
     response.headers_mut().insert(
         header::SET_COOKIE,
         HeaderValue::from_str(&crate::auth::cleared_cookie())
@@ -205,7 +211,7 @@ async fn clear() -> Response {
 }
 
 /// `/workbox-:filename`: only a `.js` file in the web root.
-async fn workbox(Path(filename): Path<String>) -> Response {
+async fn workbox(headers: HeaderMap, Path(filename): Path<String>) -> Response {
     if !filename.ends_with(".js") || filename.contains('/') {
         return (
             StatusCode::NOT_FOUND,
@@ -214,13 +220,21 @@ async fn workbox(Path(filename): Path<String>) -> Response {
         )
             .into_response();
     }
-    read(&format!("workbox-{filename}"), Some(IMMUTABLE))
+    read(&headers, &format!("workbox-{filename}"), Some(IMMUTABLE))
 }
 
-async fn assets(Path(path): Path<String>) -> Response {
-    read(&format!("assets/{}", path.trim_start_matches('/')), Some(IMMUTABLE))
+async fn assets(headers: HeaderMap, Path(path): Path<String>) -> Response {
+    read(
+        &headers,
+        &format!("assets/{}", path.trim_start_matches('/')),
+        Some(IMMUTABLE),
+    )
 }
 
-async fn custom(Path(path): Path<String>) -> Response {
-    read(&format!("custom/{}", path.trim_start_matches('/')), Some(CUSTOM))
+async fn custom(headers: HeaderMap, Path(path): Path<String>) -> Response {
+    read(
+        &headers,
+        &format!("custom/{}", path.trim_start_matches('/')),
+        Some(CUSTOM),
+    )
 }

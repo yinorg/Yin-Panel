@@ -1721,71 +1721,11 @@ async fn theme_asset(
         }
     }
 
-    // `http.ServeContent`: a matching If-None-Match turns the response into a 304.
-    if let (Some(etag), Some(if_none_match)) = (&etag, headers.get(header::IF_NONE_MATCH)) {
-        if if_none_match.to_str().map(str::trim).ok() == Some(etag.as_str()) {
-            *response.status_mut() = axum::http::StatusCode::NOT_MODIFIED;
-            return response;
-        }
-    }
-
-    let total = content.len() as u64;
-    if let Some(range) = headers.get(header::RANGE).and_then(|value| value.to_str().ok()) {
-        if let Some((start, end)) = parse_range(range, total) {
-            let slice = content[start as usize..=end as usize].to_vec();
-            *response.status_mut() = axum::http::StatusCode::PARTIAL_CONTENT;
-            response.headers_mut().insert(
-                header::CONTENT_RANGE,
-                HeaderValue::from_str(&format!("bytes {start}-{end}/{total}"))
-                    .unwrap_or(HeaderValue::from_static("")),
-            );
-            *response.body_mut() = axum::body::Body::from(slice);
-            return response;
-        }
-        if range.starts_with("bytes=") {
-            *response.status_mut() = axum::http::StatusCode::RANGE_NOT_SATISFIABLE;
-            response.headers_mut().insert(
-                header::CONTENT_RANGE,
-                HeaderValue::from_str(&format!("bytes */{total}")).unwrap_or(HeaderValue::from_static("")),
-            );
-            return response;
-        }
-    }
-
-    *response.body_mut() = axum::body::Body::from(content);
-    response
+    // `http.ServeContent`: conditional requests and byte ranges.
+    let (parts, _) = response.into_parts();
+    crate::content::serve(&headers, parts, &content)
 }
 
-/// A single `bytes=start-end|start-|-suffix` range, as `http.ServeContent`
-/// accepts it.
-fn parse_range(value: &str, total: u64) -> Option<(u64, u64)> {
-    let spec = value.strip_prefix("bytes=")?;
-    if spec.contains(',') || total == 0 {
-        return None;
-    }
-    let (start, end) = spec.split_once('-')?;
-    if start.is_empty() {
-        let suffix: u64 = end.parse().ok()?;
-        if suffix == 0 {
-            return None;
-        }
-        let length = suffix.min(total);
-        return Some((total - length, total - 1));
-    }
-    let start: u64 = start.parse().ok()?;
-    if start >= total {
-        return None;
-    }
-    let end = if end.is_empty() {
-        total - 1
-    } else {
-        end.parse::<u64>().ok()?.min(total - 1)
-    };
-    if end < start {
-        return None;
-    }
-    Some((start, end))
-}
 
 /// The timestamps GORM writes: local time, nanosecond fraction, numeric offset.
 fn now_like_go() -> String {
@@ -5216,6 +5156,7 @@ async fn admin_trusted(Path(revision): Path<String>) -> Response {
 
 /// `ThemeRouter.WebWallpaperAsset`: `index.html` or the poster file.
 async fn web_wallpaper_asset(
+    headers: HeaderMap,
     Path((id, name)): Path<(String, String)>,
 ) -> Response {
     let ctx = appcfg::ctx();
@@ -5249,7 +5190,7 @@ async fn web_wallpaper_asset(
     };
     // `serveThemeAsset`: HTML revalidates and carries the sandbox policy, every
     // other asset is immutable.
-    serve_bytes(&media_type, &content)
+    serve_bytes(&headers, &media_type, &content)
 }
 
 /// `ThemeRouter.PackageV2`: one revision's public package.
@@ -5888,7 +5829,10 @@ async fn theme_preview_get(Path(token): Path<String>) -> Response {
 }
 
 /// `GET /api/theme/v2/preview/:token/assets/*name`.
-async fn theme_preview_asset(Path((token, raw_name)): Path<(String, String)>) -> Response {
+async fn theme_preview_asset(
+    headers: HeaderMap,
+    Path((token, raw_name)): Path<(String, String)>,
+) -> Response {
     let name = raw_name.trim_start_matches('/');
     let Some(package) = crate::packages::get_preview(&token) else {
         return envelope::empty_not_found();
@@ -5896,14 +5840,14 @@ async fn theme_preview_asset(Path((token, raw_name)): Path<(String, String)>) ->
     let Some((media_type, content)) = package.files.get(name) else {
         return envelope::empty_not_found();
     };
-    serve_bytes(media_type, content)
+    serve_bytes(&headers, media_type, content)
 }
 
 /// `serveThemeAsset` for an in-memory asset: nosniff, the immutable policy, an
 /// ETag on HTML and the document sandbox policy.
-fn serve_bytes(media_type: &str, content: &[u8]) -> Response {
+fn serve_bytes(headers: &HeaderMap, media_type: &str, content: &[u8]) -> Response {
     let is_html = media_type == "text/html";
-    let mut response = Response::new(axum::body::Body::from(content.to_vec()));
+    let mut response = Response::new(axum::body::Body::empty());
     {
         let out = response.headers_mut();
         for (key, value) in envelope::headers() {
@@ -5932,7 +5876,8 @@ fn serve_bytes(media_type: &str, content: &[u8]) -> Response {
             out.insert(header::REFERRER_POLICY, HeaderValue::from_static("no-referrer"));
         }
     }
-    response
+    let (parts, _) = response.into_parts();
+    crate::content::serve(headers, parts, content)
 }
 
 #[derive(serde::Deserialize)]
@@ -6519,6 +6464,7 @@ async fn get_site_favicon(headers: HeaderMap, request: Request) -> Response {
 /// `ThemeRouter.WallpaperLibraryAsset`: the packaged artwork, only under the
 /// catalogue's own version prefix.
 async fn wallpaper_library_asset(
+    headers: HeaderMap,
     Path((version, raw_name)): Path<(String, String)>,
 ) -> Response {
     let catalogue = wallpaperpack_rs::port::catalogue();
@@ -6532,7 +6478,7 @@ async fn wallpaper_library_asset(
     }
     let name = raw_name.trim_start_matches('/').to_string();
     match wallpaperpack_rs::port::asset(name) {
-        Some((content, media_type)) => serve_bytes(&media_type, &content),
+        Some((content, media_type)) => serve_bytes(&headers, &media_type, &content),
         None => envelope::empty_not_found(),
     }
 }
@@ -6760,16 +6706,16 @@ async fn update_password(headers: HeaderMap, request: Request) -> Response {
 
 /// `FileRouter.GetS3File`: an uploaded file from local storage, with the cache
 /// policy its content-hash name allows.
-async fn serve_stored_file(Path(filepath): Path<String>) -> Response {
-    serve_stored(filepath, false).await
+async fn serve_stored_file(headers: HeaderMap, Path(filepath): Path<String>) -> Response {
+    serve_stored(&headers, filepath, false).await
 }
 
 /// The `/api` registration of the same handler; failures carry `no-store`.
-async fn serve_stored_file_api(Path(filepath): Path<String>) -> Response {
-    serve_stored(filepath, true).await
+async fn serve_stored_file_api(headers: HeaderMap, Path(filepath): Path<String>) -> Response {
+    serve_stored(&headers, filepath, true).await
 }
 
-async fn serve_stored(filepath: String, api_group: bool) -> Response {
+async fn serve_stored(headers: &HeaderMap, filepath: String, api_group: bool) -> Response {
     let name = filepath.trim_start_matches('/').to_string();
     if name.is_empty() {
         return static_error(StatusCode::BAD_REQUEST, "{\"error\":\"file path is required\"}", api_group);
@@ -6814,6 +6760,13 @@ async fn serve_stored(filepath: String, api_group: bool) -> Response {
             HeaderValue::from_static("public, max-age=31536000, immutable"),
         );
     }
+    // `GetS3File` sends only mp4/webm through `http.ServeContent`; an image is
+    // written with `c.Data` and therefore has no ranges.
+    if matches!(extension.as_str(), ".mp4" | ".webm") {
+        let (parts, _) = response.into_parts();
+        return crate::content::serve(headers, parts, &content);
+    }
+    *response.body_mut() = axum::body::Body::from(content);
     response
 }
 
@@ -7210,4 +7163,100 @@ pub async fn head_gate(req: Request, next: axum::middleware::Next) -> Response {
         }
     }
     next.run(req).await
+}
+
+/// `apiGzip` from `backend/internal/web/router/router.go`.
+///
+/// gin-contrib/gzip compresses every `/api` response when the client offers
+/// gzip: there is no minimum length, the content type is not inspected, the four
+/// extensions it excludes are already-compressed images, error statuses stay
+/// plain, and a strong ETag is weakened to `W/`. Reproducing those rules rather
+/// than dropping in a generic compression layer keeps the header and the body
+/// in agreement, which is what `TestAPICompressionNeverLabelsAPlainBody`
+/// protects: a response must never be labelled gzip without being gzip.
+pub async fn api_gzip(req: Request, next: axum::middleware::Next) -> Response {
+    const EXCLUDED_EXTENSIONS: [&str; 4] = ["png", "gif", "jpeg", "jpg"];
+    let path = req.uri().path().to_string();
+    let offered = req
+        .headers()
+        .get(header::ACCEPT_ENCODING)
+        .and_then(|value| value.to_str().ok())
+        .map(|value| value.contains("gzip"))
+        .unwrap_or(false);
+    let upgrading = req
+        .headers()
+        .get(header::CONNECTION)
+        .and_then(|value| value.to_str().ok())
+        .map(|value| value.to_ascii_lowercase().contains("upgrade"))
+        .unwrap_or(false);
+    if !offered || upgrading || !path.starts_with("/api/") {
+        return next.run(req).await;
+    }
+    let extension = path
+        .rsplit('/')
+        .next()
+        .and_then(|name| name.rsplit_once('.'))
+        .map(|(_, extension)| extension.to_ascii_lowercase())
+        .unwrap_or_default();
+    if EXCLUDED_EXTENSIONS.contains(&extension.as_str()) {
+        return next.run(req).await;
+    }
+
+    let response = next.run(req).await;
+    if response.status().as_u16() >= 400
+        || response.headers().contains_key(header::CONTENT_ENCODING)
+    {
+        return response;
+    }
+    let (mut parts, body) = response.into_parts();
+    let bytes = match axum::body::to_bytes(body, usize::MAX).await {
+        Ok(bytes) => bytes,
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "").into_response(),
+    };
+    // gin-contrib only starts compressing once the handler writes a body, so an
+    // empty 204 stays empty rather than carrying a gzip header with no stream.
+    if bytes.is_empty() {
+        return Response::from_parts(parts, axum::body::Body::from(bytes));
+    }
+    use std::io::Write as _;
+    let mut encoder = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
+    if encoder.write_all(&bytes).is_err() {
+        return Response::from_parts(parts, axum::body::Body::from(bytes));
+    }
+    let compressed = match encoder.finish() {
+        Ok(compressed) => compressed,
+        Err(_) => return Response::from_parts(parts, axum::body::Body::from(bytes)),
+    };
+
+    parts.headers.remove(header::CONTENT_LENGTH);
+    parts
+        .headers
+        .insert(header::CONTENT_ENCODING, HeaderValue::from_static("gzip"));
+    let vary = parts
+        .headers
+        .get(header::VARY)
+        .and_then(|value| value.to_str().ok())
+        .map(str::to_string)
+        .unwrap_or_default();
+    let vary = if vary.is_empty() {
+        "Accept-Encoding".to_string()
+    } else if vary.contains("Accept-Encoding") {
+        vary
+    } else {
+        format!("{vary}, Accept-Encoding")
+    };
+    if let Ok(value) = HeaderValue::from_str(&vary) {
+        parts.headers.insert(header::VARY, value);
+    }
+    if let Some(etag) = parts
+        .headers
+        .get(header::ETAG)
+        .and_then(|value| value.to_str().ok())
+        .map(str::to_string)
+        && !etag.starts_with("W/")
+        && let Ok(value) = HeaderValue::from_str(&format!("W/{etag}"))
+    {
+        parts.headers.insert(header::ETAG, value);
+    }
+    Response::from_parts(parts, axum::body::Body::from(compressed))
 }

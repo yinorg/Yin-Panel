@@ -12,6 +12,7 @@ path = "src/main.rs"
 [dependencies]
 axum = { version = "0.8", features = ["multipart"] }
 base64 = "0.22"
+flate2 = "1"
 rand = "0.8"
 ed25519-dalek = "2"
 jsonwebtoken = "9"

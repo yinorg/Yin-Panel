@@ -73,6 +73,8 @@ pub struct OauthProvider {
 
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct Rclone {
+    #[serde(default, rename = "type")]
+    pub kind: String,
     #[serde(default)]
     pub bucket: String,
 }

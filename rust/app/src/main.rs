@@ -1,5 +1,6 @@
 mod appcfg;
 mod bootstrap;
+mod content;
 mod go_routes;
 mod auth;
 mod envelope;
@@ -92,6 +93,26 @@ fn migrate_db() -> std::process::ExitCode {
 
 async fn serve() {
     report_fallbacks();
+    // The Go build refuses these two configurations; this build serves SQLite
+    // over local storage only. Silently opening a local SQLite file for a MySQL
+    // deployment, or writing uploads to disk for an S3 deployment, would look
+    // like a successful start and lose data.
+    let conf = &appcfg::ctx().conf;
+    let drive = conf.base.database_drive.trim().to_ascii_lowercase();
+    if !drive.is_empty() && drive != "sqlite" {
+        eprintln!(
+            "unsupported database drive: {}\nthis build serves sqlite only; move the data with `yin-panel migrate-db`",
+            conf.base.database_drive.trim()
+        );
+        std::process::exit(1);
+    }
+    if !conf.rclone.kind.is_empty() && conf.rclone.kind != "local" {
+        eprintln!(
+            "Core only supports local storage; use the Enterprise image for {:?}",
+            conf.rclone.kind
+        );
+        std::process::exit(1);
+    }
     // The Go build created and seeded the database at startup; this binary does
     // the same, so an empty directory is a working installation.
     let database = appcfg::ctx().database_file();
@@ -117,6 +138,7 @@ async fn serve() {
         // Gin answers a method mismatch with the same NoRoute as an unknown
         // path; axum would answer 405 with an `Allow` header.
         .method_not_allowed_fallback(routes::go_fallback)
+        .layer(axum::middleware::from_fn(routes::api_gzip))
         .layer(axum::middleware::from_fn(routes::head_gate));
     let port = appcfg::ctx().listen_port();
     let listener = tokio::net::TcpListener::bind(SocketAddr::from(([0, 0, 0, 0], port)))
