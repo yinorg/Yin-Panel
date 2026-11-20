@@ -1,0 +1,47 @@
+{
+  "schema": "rust-anything/bridge@1",
+  "root": "/home/hsy/project/Yin-Panel/backend",
+  "unit": "pkg/storage/",
+  "language": "go",
+  "kind": "ffi",
+  "crate_name": "storage-rs",
+  "exports": [
+    {
+      "name": "ContentAddressedKey",
+      "file": "pkg/storage/key.go",
+      "line": 10,
+      "params": [
+        {
+          "name": "hexDigest",
+          "ts_type": "string",
+          "optional": false,
+          "rest": false,
+          "native_type": "string"
+        },
+        {
+          "name": "extension",
+          "ts_type": "string",
+          "optional": false,
+          "rest": false,
+          "native_type": "string"
+        }
+      ],
+      "returns": "string",
+      "is_async": false,
+      "is_generator": false,
+      "type_params": [],
+      "uses_instanceof": false,
+      "native_return": "(string, error)",
+      "prototype": "func ContentAddressedKey(hexDigest, extension string) (string, error)"
+    }
+  ],
+  "classes": [],
+  "js_only": [
+    {
+      "name": "NewLocal",
+      "file": "pkg/storage/local.go",
+      "line": 18,
+      "reason": "takes or returns a pointer (`*Local`)"
+    }
+  ]
+}

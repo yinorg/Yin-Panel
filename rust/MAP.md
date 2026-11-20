@@ -50,6 +50,15 @@ rust-anything analyze backend --lang go --whole-app
   pure Rust binary 384/384 with fallback 0.0% (run it with
   `--build "sh rust/record/run-rust.sh"`, which puts it in the recording working
   directory).
+- Ported units and their gate status:
+  | crate | gate | cases |
+  | --- | --- | --- |
+  | `util-rs` | **pass** | 868/868 |
+  | `database-rs` (`MigrateDB`) | **pass** | 233/233 |
+  | `response-rs` (`GetErrorMsgByCode`) | **pass** | 25/25 |
+  | `storage-rs` (`ContentAddressedKey`) | **pass** | 100/100 |
+  | `wallpaperpack-rs` | fails **only** `error cases` | 212/212 |
+  | `internal/biz/service` | cannot be bridged: every export depends on a repository interface | — |
 - Database unit: `rust/database-rs` is bridged from `internal/infra/database` and
   **passes gate** (233/233 recorded cases, error cases included). It ports
   `MigrateDB`; the rest of that package takes the package-level `*gorm.DB` and

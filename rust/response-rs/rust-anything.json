@@ -1,0 +1,106 @@
+{
+  "schema": "rust-anything/bridge@1",
+  "root": "/home/hsy/project/Yin-Panel/backend",
+  "unit": "internal/web/model/response/",
+  "language": "go",
+  "kind": "ffi",
+  "crate_name": "response-rs",
+  "exports": [
+    {
+      "name": "GetErrorMsgByCode",
+      "file": "internal/web/model/response/apiReturn.go",
+      "line": 83,
+      "params": [
+        {
+          "name": "code",
+          "ts_type": "int",
+          "optional": false,
+          "rest": false,
+          "native_type": "int"
+        }
+      ],
+      "returns": "[string, boolean]",
+      "is_async": false,
+      "is_generator": false,
+      "type_params": [],
+      "uses_instanceof": false,
+      "native_return": "(string, bool)",
+      "prototype": "func GetErrorMsgByCode(code int) (string, bool)"
+    }
+  ],
+  "classes": [],
+  "js_only": [
+    {
+      "name": "ApiReturn",
+      "file": "internal/web/model/response/apiReturn.go",
+      "line": 9,
+      "reason": "takes or returns a pointer (`*gin.Context`)"
+    },
+    {
+      "name": "SuccessData",
+      "file": "internal/web/model/response/apiReturn.go",
+      "line": 20,
+      "reason": "takes or returns a pointer (`*gin.Context`)"
+    },
+    {
+      "name": "SuccessListData",
+      "file": "internal/web/model/response/apiReturn.go",
+      "line": 24,
+      "reason": "takes or returns a pointer (`*gin.Context`)"
+    },
+    {
+      "name": "Success",
+      "file": "internal/web/model/response/apiReturn.go",
+      "line": 31,
+      "reason": "takes or returns a pointer (`*gin.Context`)"
+    },
+    {
+      "name": "ErrorCode",
+      "file": "internal/web/model/response/apiReturn.go",
+      "line": 36,
+      "reason": "takes or returns a pointer (`*gin.Context`)"
+    },
+    {
+      "name": "Error",
+      "file": "internal/web/model/response/apiReturn.go",
+      "line": 41,
+      "reason": "takes or returns a pointer (`*gin.Context`)"
+    },
+    {
+      "name": "ErrorNoAccess",
+      "file": "internal/web/model/response/apiReturn.go",
+      "line": 46,
+      "reason": "takes or returns a pointer (`*gin.Context`)"
+    },
+    {
+      "name": "ErrorParamFomat",
+      "file": "internal/web/model/response/apiReturn.go",
+      "line": 51,
+      "reason": "takes or returns a pointer (`*gin.Context`)"
+    },
+    {
+      "name": "ErrorDatabase",
+      "file": "internal/web/model/response/apiReturn.go",
+      "line": 57,
+      "reason": "takes or returns a pointer (`*gin.Context`)"
+    },
+    {
+      "name": "ErrorDataNotFound",
+      "file": "internal/web/model/response/apiReturn.go",
+      "line": 62,
+      "reason": "takes or returns a pointer (`*gin.Context`)"
+    },
+    {
+      "name": "ErrorByCode",
+      "file": "internal/web/model/response/apiReturn.go",
+      "line": 66,
+      "reason": "takes or returns a pointer (`*gin.Context`)"
+    },
+    {
+      "name": "ErrorByCodeAndMsg",
+      "file": "internal/web/model/response/apiReturn.go",
+      "line": 75,
+      "reason": "takes or returns a pointer (`*gin.Context`)"
+    }
+  ]
+}

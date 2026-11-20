@@ -1,0 +1,100 @@
+{"args":["lo","hello"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["tab\tseparateda😀b😀c","İstanbul"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["line1\nline2","./x/**/*.json"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["  padded  ",":"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["  padded  ","ded "],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["日本語のテキスト","のテ"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["Hello World","İstanbul"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["a:b:c","emoji 👍🏽 mix"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["a..b","{name} has {count} items"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["a.b.c","日本語のテキスト"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["ΣΊΣΥΦΟΣ","😀"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["HELLO","abc"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["straße","﻿bomtrailing."],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["tab\tseparated","﻿bomtab\tseparated"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["日本語のテキスト","hello"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["ns:key.pathΣΊΣΥΦΟΣ","pathΣΊΣΥΦ"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["😀é",".leading"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["é","É"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["tab\tseparated","tab\tseparated"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["key_name-1","  padded  a"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["日本語のテキスト","straße"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["d","  padded  "],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["trailing.","é"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["key_name-1","a..b"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["a","ab"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["日本語のテキスト","hello world"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["a:b:c","é"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["line1\nline2","straßehello"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["a😀b😀csrc/a/b.ts","a:b:ctrailing."],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["İ","İstanbul"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["./x/**/*.json","*.js"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["tab\tseparated",".leading"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["İstanbul",""],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["﻿bom","bo"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["﻿bom","a😀b😀c"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["😀","ab"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["a..b","a.b.c"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["abc","a..b:"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["﻿b","😀﻿bom"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["HELLO","emoji 👍🏽 mix"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["abc","  padded  "],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["straße","a😀b😀c"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["a:b:c","aa.b.c"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["nbul","straßeİstanbul"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["./x/**/*.json","日本語のテキスト"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["trailing.","ΣΊΣΥΦΟΣ"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["key_name-1ΣΊΣΥΦΟΣ",":"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["abc","abc"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["a😀b😀c","  padded  "],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["a..b","  padded  İstanbul"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["ab","emoji 👍🏽 mix"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["{name} has {count} items","{count} items"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["ünïcödé","é"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["é","a.b.c"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["tanbu","İstanbul"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["key_name-1","HELLO"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["abc日本語のテキスト","hello world"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["emoji 👍🏽 mix","emoji 👍🏽 mix"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["İstanbul","n"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["ab","a..b"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["héllo wörld","hello"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["👍🏽 thumbs","hello"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["日本語","hello"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["","hello"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["é","hello"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["İstanbul","hello"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["straße","hello"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["ılık ırmak","hello"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["👨‍👩‍👧 family","hello"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["a b","hello"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["ΣΊΣΥΦΟΣ","hello"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["a😀b","hello"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["﻿bom","hello"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["a²b x½ y①","hello"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["aⅠb Ⅻ","hello"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["a𐐀b 𝐀bc","hello"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["कि ٣٤","hello"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["lo","héllo wörld"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["lo","👍🏽 thumbs"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["lo","日本語"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["lo",""],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["lo","é"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["lo","İstanbul"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["lo","straße"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["lo","ılık ırmak"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["lo","👨‍👩‍👧 family"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["lo","a b"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["lo","ΣΊΣΥΦΟΣ"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["lo","a😀b"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["lo","﻿bom"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["lo","a²b x½ y①"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["lo","aⅠb Ⅻ"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["lo","a𐐀b 𝐀bc"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["lo","कि ٣٤"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","png"],"fn":"ContentAddressedKey","ok":"aa/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.png"}
+{"args":["AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",""],"fn":"ContentAddressedKey","ok":"aa/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+{"args":["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",".JPG"],"fn":"ContentAddressedKey","ok":"aa/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg"}
+{"args":["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","a/b"],"error":"invalid file extension","fn":"ContentAddressedKey"}
+{"args":["short","png"],"error":"SHA-256 digest must contain 64 hexadecimal characters","fn":"ContentAddressedKey"}
+{"args":["gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg","png"],"error":"SHA-256 digest must be hexadecimal","fn":"ContentAddressedKey"}

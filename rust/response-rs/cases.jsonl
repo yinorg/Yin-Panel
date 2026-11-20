@@ -1,0 +1,25 @@
+{"args":[42],"fn":"GetErrorMsgByCode","ok":["",false]}
+{"args":[2147483647],"fn":"GetErrorMsgByCode","ok":["",false]}
+{"args":[9223372036854775807],"fn":"GetErrorMsgByCode","ok":["",false]}
+{"args":[1],"fn":"GetErrorMsgByCode","ok":["",false]}
+{"args":[0],"fn":"GetErrorMsgByCode","ok":["",false]}
+{"args":[-2147483648],"fn":"GetErrorMsgByCode","ok":["",false]}
+{"args":[2],"fn":"GetErrorMsgByCode","ok":["",false]}
+{"args":[100],"fn":"GetErrorMsgByCode","ok":["",false]}
+{"args":[-100],"fn":"GetErrorMsgByCode","ok":["",false]}
+{"args":[-1],"fn":"GetErrorMsgByCode","ok":["",false]}
+{"args":[7],"fn":"GetErrorMsgByCode","ok":["",false]}
+{"args":[255],"fn":"GetErrorMsgByCode","ok":["",false]}
+{"args":[-7],"fn":"GetErrorMsgByCode","ok":["",false]}
+{"args":[2147483648],"fn":"GetErrorMsgByCode","ok":["",false]}
+{"args":[-2147483649],"fn":"GetErrorMsgByCode","ok":["",false]}
+{"args":[9007199254740993],"fn":"GetErrorMsgByCode","ok":["",false]}
+{"args":[-9223372036854775808],"fn":"GetErrorMsgByCode","ok":["",false]}
+{"args":[1000],"fn":"GetErrorMsgByCode","ok":["Not logged in yet",true]}
+{"args":[1007],"fn":"GetErrorMsgByCode","ok":["Old password error",true]}
+{"args":[1200],"fn":"GetErrorMsgByCode","ok":["Database error",true]}
+{"args":[1301],"fn":"GetErrorMsgByCode","ok":["Unsupported file format",true]}
+{"args":[1400],"fn":"GetErrorMsgByCode","ok":["Parameter format error",true]}
+{"args":[0],"fn":"GetErrorMsgByCode","ok":["",false]}
+{"args":[-1],"fn":"GetErrorMsgByCode","ok":["",false]}
+{"args":[99999],"fn":"GetErrorMsgByCode","ok":["",false]}
