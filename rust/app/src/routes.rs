@@ -3,7 +3,7 @@
 //! `backend/internal/web/router/system`.
 
 use axum::Router;
-use axum::extract::{Path, Query, Request};
+use axum::extract::{Multipart, Path, Query, Request};
 use axum::http::{HeaderMap, HeaderValue, header};
 use axum::response::IntoResponse;
 use axum::response::Response;
@@ -33,6 +33,7 @@ pub fn router() -> Router<Original> {
         .route("/api/spaces/{space_id}/public", get(space_public))
         .route("/api/system/moduleConfig/getByName", get(module_config))
         .route("/api/file/getList", get(file_list))
+        .route("/api/file/uploadImg", post(upload_image))
         .route("/api/spaces/{space_id}/bookmarks/tree", get(bookmarks_tree))
         .route("/api/panel/users/getList", get(users_list))
         .route("/api/panel/userConfig/getConfig", get(user_config))
@@ -92,6 +93,10 @@ pub fn router() -> Router<Original> {
         .route("/api/spaces/{space_id}/transfer", post(transfer_space))
         .route("/api/spaces/{space_id}/clear", post(clear_space))
         .route("/api/spaces/{space_id}/items", post(create_item))
+        .route(
+            "/api/spaces/{space_id}/items/with-icon",
+            post(create_item_with_icon),
+        )
         .route("/api/spaces/{space_id}/items/sort", post(sort_items))
         .route("/api/spaces/{space_id}/groups/sort", post(sort_groups))
         .route(
@@ -3738,4 +3743,286 @@ async fn delete_space(headers: HeaderMap, Path(space_id): Path<i64>) -> Response
         let _ = std::fs::remove_file(dir.join(&name));
     }
     success()
+}
+
+const ICON_EXTENSIONS: [&str; 7] = [".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".ico"];
+const UPLOAD_EXTENSIONS: [&str; 9] = [
+    ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".ico", ".mp4", ".webm",
+];
+
+fn upload_prefix() -> String {
+    let prefix = &appcfg::ctx().conf.base.url_prefix;
+    if prefix.is_empty() {
+        "/uploads/".to_string()
+    } else {
+        prefix.clone()
+    }
+}
+
+fn storage_dir() -> std::path::PathBuf {
+    let ctx = appcfg::ctx();
+    let bucket = if ctx.conf.rclone.bucket.is_empty() {
+        "uploads".to_string()
+    } else {
+        ctx.conf.rclone.bucket.clone()
+    };
+    let path = std::path::Path::new(&bucket);
+    if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        ctx.dir.join(path)
+    }
+}
+
+/// `storage.Local.Upload`: the object is written once and left in place when it
+/// already exists, because the name is its content hash.
+fn store_object(name: &str, content: &[u8]) -> Result<(), String> {
+    if name.is_empty() || name.contains("..") {
+        return Err("invalid object key".to_string());
+    }
+    let path = storage_dir().join(name);
+    if path.is_file() {
+        return Ok(());
+    }
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+    }
+    std::fs::write(&path, content).map_err(|error| error.to_string())
+}
+
+fn extension_of(name: &str) -> String {
+    match name.rfind('.') {
+        Some(index) => name[index..].to_lowercase(),
+        None => String::new(),
+    }
+}
+
+fn hex_digest(bytes: &[u8], sha256: bool) -> String {
+    if sha256 {
+        use sha2::{Digest, Sha256};
+        Sha256::digest(bytes)
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect()
+    } else {
+        Md5::digest(bytes)
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect()
+    }
+}
+
+/// `FileRouter.UploadImg`: MD5-named content, one `file` row per upload.
+async fn upload_image(headers: HeaderMap, mut multipart: Multipart) -> Response {
+    if let Err(response) = require_user(&headers).await {
+        return response;
+    }
+    let user = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    let mut uploaded: Option<(String, Vec<u8>)> = None;
+    while let Some(field) = multipart.next_field().await.unwrap_or(None) {
+        let name = field.name().unwrap_or("").to_string();
+        if name != "imgfile" {
+            continue;
+        }
+        let file_name = field.file_name().unwrap_or("").to_string();
+        let data = match field.bytes().await {
+            Ok(data) => data.to_vec(),
+            Err(_) => return error_code(1300),
+        };
+        uploaded = Some((file_name, data));
+        break;
+    }
+    let Some((original, content)) = uploaded else {
+        return error_code(1300);
+    };
+    let ext = extension_of(&original);
+    if !UPLOAD_EXTENSIONS.contains(&ext.as_str()) {
+        return error_code(1301);
+    }
+    if ext == ".mp4" || ext == ".webm" {
+        if content.len() > 20 << 20 {
+            return error_code(1300);
+        }
+        let valid = if ext == ".mp4" {
+            content.len() >= 8 && &content[4..8] == b"ftyp"
+        } else {
+            content.len() >= 4 && &content[..4] == b"\x1a\x45\xdf\xa3"
+        };
+        if !valid {
+            return error_code(1301);
+        }
+    }
+    let file_name = format!("{}{}", hex_digest(&content, false), ext);
+    if store_object(&file_name, &content).is_err() {
+        return error_code(1300);
+    }
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool,
+        Err(_) => return error_code(1300),
+    };
+    let now = now_like_go();
+    if sqlx::query(
+        "INSERT INTO file (created_at, updated_at, user_id, file_name) VALUES (?, ?, ?, ?)",
+    )
+    .bind(&now)
+    .bind(&now)
+    .bind(user.id)
+    .bind(&file_name)
+    .execute(pool)
+    .await
+    .is_err()
+    {
+        return error_code(1300);
+    }
+    success_data(json!({
+        "fileName": file_name,
+        "imageUrl": format!("{}{}", upload_prefix(), file_name),
+    }))
+}
+
+/// `SpaceRouter.CreateItemWithIcon`: the item arrives as a JSON form field and
+/// the icon as an optional SHA-256-named file beside it.
+async fn create_item_with_icon(
+    headers: HeaderMap,
+    Path(space_id): Path<i64>,
+    mut multipart: Multipart,
+) -> Response {
+    let user = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool.clone(),
+        Err(error) => return envelope::error(&error),
+    };
+    if !can_edit(&pool, user.id, space_id).await {
+        return error_code(1005);
+    }
+    let mut item_json: Option<String> = None;
+    let mut icon: Option<(String, Vec<u8>)> = None;
+    while let Some(field) = multipart.next_field().await.unwrap_or(None) {
+        let name = field.name().unwrap_or("").to_string();
+        match name.as_str() {
+            "item" => {
+                item_json = field.text().await.ok();
+            }
+            "imgfile" => {
+                let file_name = field.file_name().unwrap_or("").to_string();
+                if let Ok(data) = field.bytes().await {
+                    icon = Some((file_name, data.to_vec()));
+                }
+            }
+            _ => {}
+        }
+    }
+    let Some(item_json) = item_json else {
+        return envelope::error(" [invalid item or group]");
+    };
+    let mut input: ItemIn = match serde_json::from_str(&item_json) {
+        Ok(input) => input,
+        Err(_) => return envelope::error(" [invalid item or group]"),
+    };
+    if input.item_icon_group_id == 0 || !valid_item_title(&input.title) {
+        return envelope::error(" [invalid item or group]");
+    }
+    let group: Option<(i64,)> = sqlx::query_as(
+        "SELECT id FROM item_icon_group WHERE id = ? AND space_id = ?",
+    )
+    .bind(input.item_icon_group_id)
+    .bind(space_id)
+    .fetch_optional(&pool)
+    .await
+    .unwrap_or(None);
+    if group.is_none() {
+        return error_code(404);
+    }
+
+    let mut stored: Option<String> = None;
+    if let Some((original, content)) = icon {
+        if content.len() > 5 << 20 {
+            return envelope::error(" [icon too large]");
+        }
+        let ext = extension_of(&original);
+        if !ICON_EXTENSIONS.contains(&ext.as_str()) {
+            return envelope::error(" [unsupported icon]");
+        }
+        let file_name = format!("{}{}", hex_digest(&content, true), ext);
+        if store_object(&file_name, &content).is_err() {
+            return error_code(1300);
+        }
+        input.icon = IconInfo {
+            item_type: 2,
+            src: format!("{}{}", upload_prefix(), file_name),
+            file_name: file_name.clone(),
+            text: String::new(),
+            background_color: String::new(),
+        };
+        stored = Some(file_name);
+    } else {
+        ensure_item_icon(&input.title, &mut input.icon);
+    }
+    let icon_json = serde_json::to_string(&input.icon).unwrap_or_else(|_| "{}".to_string());
+    let now = now_like_go();
+    let mut tx = match pool.begin().await {
+        Ok(tx) => tx,
+        Err(error) => return envelope::error(&error.to_string()),
+    };
+    if let Some(name) = &stored {
+        let count: (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) FROM file WHERE user_id = ? AND file_name = ?",
+        )
+        .bind(user.id)
+        .bind(name)
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap_or((0,));
+        if count.0 == 0
+            && sqlx::query(
+                "INSERT INTO file (created_at, updated_at, user_id, file_name) VALUES (?, ?, ?, ?)",
+            )
+            .bind(&now)
+            .bind(&now)
+            .bind(user.id)
+            .bind(name)
+            .execute(&mut *tx)
+            .await
+            .is_err()
+        {
+            return envelope::error("create file record");
+        }
+    }
+    let inserted = sqlx::query(
+        "INSERT INTO item_icon (created_at, updated_at, icon_json, title, url, lan_url, mobile_url, description, open_method, sort, item_icon_group_id, user_id, space_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    )
+    .bind(&now)
+    .bind(&now)
+    .bind(&icon_json)
+    .bind(&input.title)
+    .bind(&input.url)
+    .bind(&input.lan_url)
+    .bind(&input.mobile_url)
+    .bind(&input.description)
+    .bind(input.open_method)
+    .bind(input.sort)
+    .bind(input.item_icon_group_id)
+    .bind(user.id)
+    .bind(space_id)
+    .execute(&mut *tx)
+    .await;
+    let id = match inserted {
+        Ok(result) => result.last_insert_rowid(),
+        Err(error) => return envelope::error(&error.to_string()),
+    };
+    if let Err(error) = tx.commit().await {
+        return envelope::error(&error.to_string());
+    }
+    match load_item(&pool, space_id, id).await {
+        Some(item) => success_data(item),
+        None => error_code(404),
+    }
 }
