@@ -63,6 +63,11 @@ rust-anything analyze backend --lang go --whole-app
     -> `rust/app`
 - Ported library units not yet wired to a route: `rust/util-rs`.
 - Fallback rate: 70.2% (254/362). Everything else is still proxied to Go.
+- Theme package pipeline: archive parsing, manifest and resource validation,
+  Ed25519 signature check, preview store, `admin/preview`, `preview/:token`, its
+  asset route and `admin/install` are ported and verified against Go. The DTCG
+  validator is narrower than `dtcg_v2.go`. Installing has no recorded cases
+  (the recorder cannot attach files) and is verified manually.
 - `rust/db-tool`: SQLite schema upgrade (all steps) and `migrate-db` into
   SQLite, MySQL and PostgreSQL, with tests. The PostgreSQL path was verified
   against a real server (24 tables, row counts matched, re-runnable). MySQL is
