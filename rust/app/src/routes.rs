@@ -93,6 +93,14 @@ pub fn router() -> Router<Original> {
         .route("/api/spaces/{space_id}/transfer", post(transfer_space))
         .route("/api/spaces/{space_id}/clear", post(clear_space))
         .route("/api/spaces/{space_id}/items", post(create_item))
+        .route("/api/spaces/{space_id}/items/sort", post(sort_items))
+        .route("/api/spaces/{space_id}/groups/sort", post(sort_groups))
+        .route(
+            "/api/spaces/{space_id}/layout/arrange",
+            post(arrange_layout),
+        )
+        .route("/api/spaces/shared", post(create_space))
+        .route("/api/spaces/teams", post(create_space))
         .route(
             "/api/spaces/{space_id}/items/{item_id}",
             axum::routing::put(update_item).delete(delete_item),
@@ -3175,6 +3183,419 @@ async fn clear_space(headers: HeaderMap, Path(space_id): Path<i64>) -> Response 
         .is_err()
     {
         return envelope::error("clear failed");
+    }
+    match tx.commit().await {
+        Ok(_) => success(),
+        Err(error) => envelope::error(&error.to_string()),
+    }
+}
+
+/// `SpaceRouter.CreateSpace`: the Yin Space, its Yang twin, both admin rows and
+/// the default `APP` group in each.
+async fn create_space(headers: HeaderMap, request: Request) -> Response {
+    let user = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    let body = match axum::body::to_bytes(request.into_body(), 1 << 20).await {
+        Ok(body) => body,
+        Err(_) => return envelope::error("invalid request body"),
+    };
+    let req: RenameRequest = match serde_json::from_slice(&body) {
+        Ok(req) => req,
+        Err(_) => return envelope::error(" [ invalid name]"),
+    };
+    if req.name.is_empty() {
+        return envelope::error(" [ Name为必填字段]");
+    }
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool.clone(),
+        Err(error) => return envelope::error(&error),
+    };
+    let now = now_like_go();
+    let mut tx = match pool.begin().await {
+        Ok(tx) => tx,
+        Err(error) => return envelope::error(&error.to_string()),
+    };
+    let created = sqlx::query(
+        r#"INSERT INTO "space" (created_at, updated_at, type, name, owner_user_id, pair_id, side, public_enabled, public_mode) VALUES (?, ?, 'shared', ?, ?, 0, 'yin', 0, 'direct')"#,
+    )
+    .bind(&now)
+    .bind(&now)
+    .bind(&req.name)
+    .bind(user.id)
+    .execute(&mut *tx)
+    .await;
+    let yin_id = match created {
+        Ok(result) => result.last_insert_rowid(),
+        Err(error) => return envelope::error(&error.to_string()),
+    };
+    if sqlx::query(r#"UPDATE "space" SET pair_id = ? WHERE id = ?"#)
+        .bind(yin_id)
+        .bind(yin_id)
+        .execute(&mut *tx)
+        .await
+        .is_err()
+    {
+        return envelope::error("create failed");
+    }
+    let yang = sqlx::query(
+        r#"INSERT INTO "space" (created_at, updated_at, type, name, owner_user_id, pair_id, side, public_enabled, public_mode) VALUES (?, ?, 'shared', ?, ?, ?, 'yang', 0, 'direct')"#,
+    )
+    .bind(&now)
+    .bind(&now)
+    .bind(format!("{}-B", req.name))
+    .bind(user.id)
+    .bind(yin_id)
+    .execute(&mut *tx)
+    .await;
+    let yang_id = match yang {
+        Ok(result) => result.last_insert_rowid(),
+        Err(error) => return envelope::error(&error.to_string()),
+    };
+    for sid in [yin_id, yang_id] {
+        if sqlx::query(
+            "INSERT INTO space_member (created_at, updated_at, space_id, user_id, role, source, joined_at) VALUES (?, ?, ?, ?, 'admin', 'manual', ?)",
+        )
+        .bind(&now)
+        .bind(&now)
+        .bind(sid)
+        .bind(user.id)
+        .bind(&now)
+        .execute(&mut *tx)
+        .await
+        .is_err()
+        {
+            return envelope::error("create failed");
+        }
+        if sqlx::query(
+            "INSERT INTO item_icon_group (created_at, updated_at, icon, title, description, sort, user_id, space_id) VALUES (?, ?, 'material-symbols:apps', 'APP', '', 0, ?, ?)",
+        )
+        .bind(&now)
+        .bind(&now)
+        .bind(user.id)
+        .bind(sid)
+        .execute(&mut *tx)
+        .await
+        .is_err()
+        {
+            return envelope::error("create failed");
+        }
+    }
+    match tx.commit().await {
+        Ok(_) => success(),
+        Err(error) => envelope::error(&error.to_string()),
+    }
+}
+
+#[derive(serde::Deserialize)]
+struct ItemSortRequest {
+    #[serde(default, rename = "groupId")]
+    group_id: i64,
+    #[serde(default, rename = "sortItems")]
+    sort_items: Vec<SortEntry>,
+}
+
+#[derive(serde::Deserialize)]
+struct SortEntry {
+    #[serde(default)]
+    id: i64,
+    #[serde(default)]
+    sort: i64,
+}
+
+/// `SpaceRouter.SortItems`.
+async fn sort_items(
+    headers: HeaderMap,
+    Path(space_id): Path<i64>,
+    request: Request,
+) -> Response {
+    let user = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool.clone(),
+        Err(error) => return envelope::error(&error),
+    };
+    if !can_edit(&pool, user.id, space_id).await {
+        return error_code(1005);
+    }
+    let body = match axum::body::to_bytes(request.into_body(), 1 << 20).await {
+        Ok(body) => body,
+        Err(_) => return envelope::error("invalid request body"),
+    };
+    let req: ItemSortRequest = match serde_json::from_slice(&body) {
+        Ok(req) => req,
+        Err(_) => return envelope::error(" [ invalid sort request]"),
+    };
+    if req.group_id == 0 {
+        return envelope::error(" [ invalid sort request]");
+    }
+    let mut tx = match pool.begin().await {
+        Ok(tx) => tx,
+        Err(error) => return envelope::error(&error.to_string()),
+    };
+    for entry in &req.sort_items {
+        if sqlx::query(
+            "UPDATE item_icon SET sort = ?, updated_at = ? WHERE id = ? AND space_id = ? AND item_icon_group_id = ?",
+        )
+        .bind(entry.sort)
+        .bind(now_like_go())
+        .bind(entry.id)
+        .bind(space_id)
+        .bind(req.group_id)
+        .execute(&mut *tx)
+        .await
+        .is_err()
+        {
+            return envelope::error("sort failed");
+        }
+    }
+    match tx.commit().await {
+        Ok(_) => success(),
+        Err(error) => envelope::error(&error.to_string()),
+    }
+}
+
+#[derive(serde::Deserialize)]
+struct GroupSortRequest {
+    #[serde(default, rename = "parentId")]
+    parent_id: Option<i64>,
+    #[serde(default, rename = "sortGroups")]
+    sort_groups: Vec<SortEntry>,
+}
+
+/// `SpaceRouter.SortGroups`: every sibling must appear exactly once with a
+/// distinct, positive sort value.
+async fn sort_groups(
+    headers: HeaderMap,
+    Path(space_id): Path<i64>,
+    request: Request,
+) -> Response {
+    let user = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool.clone(),
+        Err(error) => return envelope::error(&error),
+    };
+    if !can_edit(&pool, user.id, space_id).await {
+        return error_code(1005);
+    }
+    let body = match axum::body::to_bytes(request.into_body(), 1 << 20).await {
+        Ok(body) => body,
+        Err(_) => return envelope::error("invalid request body"),
+    };
+    let req: GroupSortRequest = match serde_json::from_slice(&body) {
+        Ok(req) => req,
+        Err(_) => return envelope::error(" [ invalid group sort request]"),
+    };
+    if req.sort_groups.is_empty() {
+        return envelope::error(" [ invalid group sort request]");
+    }
+    if let Some(parent) = req.parent_id {
+        if !group_belongs(&pool, parent, space_id).await {
+            return envelope::error(" [ invalid parent group]");
+        }
+    }
+    let siblings: Vec<i64> = match req.parent_id {
+        None => sqlx::query_as(
+            "SELECT id FROM item_icon_group WHERE space_id = ? AND parent_id IS NULL",
+        )
+        .bind(space_id)
+        .fetch_all(&pool)
+        .await
+        .unwrap_or_default()
+        .into_iter(),
+        Some(parent) => sqlx::query_as(
+            "SELECT id FROM item_icon_group WHERE space_id = ? AND parent_id = ?",
+        )
+        .bind(space_id)
+        .bind(parent)
+        .fetch_all(&pool)
+        .await
+        .unwrap_or_default()
+        .into_iter(),
+    }
+    .map(|(id,)| id)
+    .collect();
+    if siblings.is_empty() || siblings.len() != req.sort_groups.len() {
+        return envelope::error(" [ group sort must include every sibling]");
+    }
+    let mut seen_ids = std::collections::HashSet::new();
+    let mut seen_sorts = std::collections::HashSet::new();
+    for entry in &req.sort_groups {
+        if entry.id == 0
+            || entry.sort < 1
+            || !siblings.contains(&entry.id)
+            || !seen_ids.insert(entry.id)
+            || !seen_sorts.insert(entry.sort)
+        {
+            return envelope::error(" [ group sort must include every sibling]");
+        }
+    }
+    let mut tx = match pool.begin().await {
+        Ok(tx) => tx,
+        Err(error) => return envelope::error(&error.to_string()),
+    };
+    for entry in &req.sort_groups {
+        // The parent scope is enforced by the sibling check above.
+        if sqlx::query(
+            "UPDATE item_icon_group SET sort = ?, updated_at = ? WHERE id = ? AND space_id = ?",
+        )
+        .bind(entry.sort)
+        .bind(now_like_go())
+        .bind(entry.id)
+        .bind(space_id)
+        .execute(&mut *tx)
+        .await
+        .is_err()
+        {
+            return envelope::error("sort failed");
+        }
+    }
+    match tx.commit().await {
+        Ok(_) => success(),
+        Err(error) => envelope::error(&error.to_string()),
+    }
+}
+
+#[derive(serde::Deserialize)]
+struct ArrangeRequest {
+    #[serde(default)]
+    items: Vec<ArrangeItem>,
+    #[serde(default)]
+    groups: Vec<SortEntry>,
+}
+
+#[derive(serde::Deserialize)]
+struct ArrangeItem {
+    #[serde(default)]
+    id: i64,
+    #[serde(default, rename = "itemIconGroupId")]
+    item_icon_group_id: i64,
+    #[serde(default)]
+    sort: i64,
+}
+
+/// `SpaceRouter.ArrangeLayout`: items may change group and sort, groups sort.
+async fn arrange_layout(
+    headers: HeaderMap,
+    Path(space_id): Path<i64>,
+    request: Request,
+) -> Response {
+    let user = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool.clone(),
+        Err(error) => return envelope::error(&error),
+    };
+    if !can_edit(&pool, user.id, space_id).await {
+        return error_code(1005);
+    }
+    let body = match axum::body::to_bytes(request.into_body(), 1 << 20).await {
+        Ok(body) => body,
+        Err(_) => return envelope::error("invalid request body"),
+    };
+    let req: ArrangeRequest = match serde_json::from_slice(&body) {
+        Ok(req) => req,
+        Err(_) => return envelope::error(" [ invalid layout request]"),
+    };
+    if req.items.is_empty() && req.groups.is_empty() {
+        return envelope::error(" [ invalid layout request]");
+    }
+    let mut seen_items = std::collections::HashSet::new();
+    for item in &req.items {
+        if item.id == 0 || item.item_icon_group_id == 0 {
+            return envelope::error(" [ invalid item entry]");
+        }
+        if !seen_items.insert(item.id) {
+            return envelope::error(" [ duplicate item entry]");
+        }
+    }
+    let mut seen_groups = std::collections::HashSet::new();
+    for group in &req.groups {
+        if group.id == 0 {
+            return envelope::error(" [ invalid group entry]");
+        }
+        if !seen_groups.insert(group.id) {
+            return envelope::error(" [ duplicate group entry]");
+        }
+    }
+    let mut tx = match pool.begin().await {
+        Ok(tx) => tx,
+        Err(error) => return envelope::error(&error.to_string()),
+    };
+    for item in &req.items {
+        let exists: Option<(i64,)> = sqlx::query_as(
+            "SELECT id FROM item_icon WHERE id = ? AND space_id = ?",
+        )
+        .bind(item.id)
+        .bind(space_id)
+        .fetch_optional(&mut *tx)
+        .await
+        .unwrap_or(None);
+        if exists.is_none() {
+            return envelope::error(&format!(" [ item {} is not in this space]", item.id));
+        }
+        let group: Option<(i64,)> = sqlx::query_as(
+            "SELECT id FROM item_icon_group WHERE id = ? AND space_id = ?",
+        )
+        .bind(item.item_icon_group_id)
+        .bind(space_id)
+        .fetch_optional(&mut *tx)
+        .await
+        .unwrap_or(None);
+        if group.is_none() {
+            return envelope::error(&format!(
+                " [ target group {} is not in this space]",
+                item.item_icon_group_id
+            ));
+        }
+        if sqlx::query(
+            "UPDATE item_icon SET item_icon_group_id = ?, sort = ?, updated_at = ? WHERE id = ?",
+        )
+        .bind(item.item_icon_group_id)
+        .bind(item.sort)
+        .bind(now_like_go())
+        .bind(item.id)
+        .execute(&mut *tx)
+        .await
+        .is_err()
+        {
+            return envelope::error("arrange failed");
+        }
+    }
+    for group in &req.groups {
+        let exists: Option<(i64,)> = sqlx::query_as(
+            "SELECT id FROM item_icon_group WHERE id = ? AND space_id = ?",
+        )
+        .bind(group.id)
+        .bind(space_id)
+        .fetch_optional(&mut *tx)
+        .await
+        .unwrap_or(None);
+        if exists.is_none() {
+            return envelope::error(&format!(" [ group {} is not in this space]", group.id));
+        }
+        if sqlx::query("UPDATE item_icon_group SET sort = ?, updated_at = ? WHERE id = ?")
+            .bind(group.sort)
+            .bind(now_like_go())
+            .bind(group.id)
+            .execute(&mut *tx)
+            .await
+            .is_err()
+        {
+            return envelope::error("arrange failed");
+        }
     }
     match tx.commit().await {
         Ok(_) => success(),
