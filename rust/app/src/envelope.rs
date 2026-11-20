@@ -46,10 +46,40 @@ pub fn headers() -> [(header::HeaderName, HeaderValue); 5] {
 
 /// `response.ApiReturn`: the envelope, with `data` present only when non-null.
 pub fn body(code: i64, msg: &str, data: Option<Value>) -> String {
-    match data {
+    let text = match data {
         Some(data) => json!({"code": code, "data": data, "msg": msg}).to_string(),
         None => json!({"code": code, "msg": msg}).to_string(),
+    };
+    escape_go(&text)
+}
+
+/// Go's `encoding/json` escapes `<`, `>`, `&`, U+2028 and U+2029 inside strings.
+/// serde_json does not, and the theme manifests contain `>=0.4.0`.
+pub fn escape_go(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    for ch in text.chars() {
+        match ch {
+            '<' => out.push_str("\\u003c"),
+            '>' => out.push_str("\\u003e"),
+            '&' => out.push_str("\\u0026"),
+            '\u{2028}' => out.push_str("\\u2028"),
+            '\u{2029}' => out.push_str("\\u2029"),
+            _ => out.push(ch),
+        }
     }
+    out
+}
+
+/// `c.Status(404)` in Gin: no body and no content type, only the middleware
+/// headers.
+pub fn empty_not_found() -> Response {
+    let mut response = StatusCode::NOT_FOUND.into_response();
+    for (name, value) in headers() {
+        if name != header::CONTENT_TYPE {
+            response.headers_mut().insert(name, value);
+        }
+    }
+    response
 }
 
 /// A body whose `data` is a struct: serialising the struct directly keeps its
@@ -69,7 +99,7 @@ pub fn success_struct<T: serde::Serialize>(data: T) -> Response {
         msg: "OK",
     })
     .unwrap_or_else(|_| body(-1, "Server error", None));
-    (StatusCode::OK, headers(), body).into_response()
+    (StatusCode::OK, headers(), escape_go(&body)).into_response()
 }
 
 pub fn success_data(data: Value) -> Response {

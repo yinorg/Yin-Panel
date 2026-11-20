@@ -42,6 +42,11 @@ pub fn router() -> Router<Original> {
         .route("/api/system/monitor/getDiskStateByPath", post(monitor_disabled))
         .route("/api/theme/v2/preference", get(theme_preference))
         .route("/api/theme/v2/space/{space_id}", get(theme_space))
+        .route("/api/theme/v2/current", get(theme_current))
+        .route("/api/theme/v2/packages", get(theme_packages))
+        .route("/api/theme/v2/package/{package_id}", get(theme_package))
+        .route("/api/theme/v2/mine", get(theme_mine))
+        .route("/api/theme/v2/effective", get(theme_effective))
 }
 
 /// `AboutRouter.Get`.
@@ -614,14 +619,14 @@ async fn members(headers: HeaderMap, Path(space_id): Path<i64>) -> Response {
                 .unwrap_or(None);
         let (email, name) = account.unwrap_or_default();
         out.push(json!({
-            "id": row.id,
-            "spaceId": row.space_id,
-            "userId": row.user_id,
             "email": email,
+            "id": row.id,
+            "joinedAt": rfc3339(&row.joined_at),
             "name": name,
             "role": row.role,
             "source": row.source,
-            "joinedAt": rfc3339(&row.joined_at),
+            "spaceId": row.space_id,
+            "userId": row.user_id,
         }));
     }
     success_data(serde_json::Value::Array(out))
@@ -783,8 +788,8 @@ async fn space_public(headers: HeaderMap, Path(space_id): Path<i64>) -> Response
     };
     success_data(json!({
         "enabled": enabled != 0,
-        "publicId": public_id,
         "mode": mode,
+        "publicId": public_id,
     }))
 }
 
@@ -873,10 +878,10 @@ async fn file_list(
         .into_iter()
         .map(|row| {
             json!({
-                "src": format!("{prefix}{}", row.file_name),
+                "createTime": rfc3339(&row.created_at),
                 "fileName": row.file_name,
                 "id": row.id,
-                "createTime": rfc3339(&row.created_at),
+                "src": format!("{prefix}{}", row.file_name),
                 "updateTime": rfc3339(&row.updated_at),
             })
         })
@@ -962,11 +967,11 @@ fn build_tree(
             Vec::new()
         };
         out.push(json!({
-            "title": group.1,
-            "icon": group.2,
-            "parentId": group.3,
-            "items": group_items,
             "children": nested,
+            "icon": group.2,
+            "items": group_items,
+            "parentId": group.3,
+            "title": group.1,
         }));
     }
     out
@@ -1164,9 +1169,9 @@ async fn theme_space(headers: HeaderMap, Path(space_id): Path<i64>) -> Response 
     let theme = space_theme.map(|(package_id, revision)| json!({"packageId": package_id, "revision": revision}));
     let override_value = override_theme.map(|(package_id, revision)| json!({"packageId": package_id, "revision": revision}));
     success_data(json!({
+        "override": override_value,
         "spaceId": space_id,
         "theme": theme,
-        "override": override_value,
     }))
 }
 
@@ -1176,4 +1181,300 @@ async fn require_user(headers: &HeaderMap) -> Result<auth::UserRow, Response> {
         Err(AuthError::NotLoggedIn) => Err(error_code(1000)),
         Err(AuthError::Disabled) => Err(error_code(1004)),
     }
+}
+
+/// `PackageRevisionPublicV2`: the stored manifest and tokens pass through in
+/// their stored order, with the asset URL added to each resource.
+async fn revision_public(pool: &sqlx::SqlitePool, revision_id: &str) -> Result<serde_json::Value, String> {
+    let row: Option<(String, String, i64)> = sqlx::query_as(
+        "SELECT manifest_json, tokens_json, verified FROM revision_record_v2 WHERE id = ?",
+    )
+    .bind(revision_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(|error| error.to_string())?;
+    let Some((manifest_json, tokens_json, verified)) = row else {
+        return Err("revision not found".to_string());
+    };
+    let mut manifest: serde_json::Value =
+        serde_json::from_str(&manifest_json).map_err(|error| error.to_string())?;
+    if let Some(resources) = manifest
+        .get_mut("resources")
+        .and_then(serde_json::Value::as_array_mut)
+    {
+        for resource in resources {
+            let path = resource
+                .get("path")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or("")
+                .to_string();
+            let escaped: Vec<String> = path.split('/').map(path_escape).collect();
+            resource["url"] = json!(format!(
+                "/api/theme/v2/assets/{}/{}",
+                path_escape(revision_id),
+                escaped.join("/")
+            ));
+        }
+    }
+    let tokens: serde_json::Value =
+        serde_json::from_str(&tokens_json).map_err(|error| error.to_string())?;
+    Ok(json!({
+        "manifest": manifest,
+        "tokens": tokens,
+        "verified": verified != 0,
+        "revision": revision_id,
+    }))
+}
+
+/// `url.PathEscape` for one path segment.
+fn path_escape(segment: &str) -> String {
+    let mut out = String::with_capacity(segment.len());
+    for byte in segment.bytes() {
+        let keep = byte.is_ascii_alphanumeric()
+            || matches!(byte, b'-' | b'_' | b'.' | b'~' | b'+' | b'$' | b'&' | b'!' | b'*' | b'\'' | b'(' | b')' | b',' | b';' | b'=' | b':' | b'@');
+        if keep {
+            out.push(byte as char);
+        } else {
+            out.push_str(&format!("%{byte:02X}"));
+        }
+    }
+    out
+}
+
+async fn latest_revision_of(pool: &sqlx::SqlitePool, package_id: &str) -> Result<String, String> {
+    let row: Option<(String,)> = sqlx::query_as(
+        "SELECT latest_revision FROM package_record_v2 WHERE id = ? AND removed = 0",
+    )
+    .bind(package_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(|error| error.to_string())?;
+    row.map(|value| value.0)
+        .ok_or_else(|| "package not found".to_string())
+}
+
+async fn instance_default_revision(pool: &sqlx::SqlitePool) -> Result<String, String> {
+    latest_revision_of(pool, "org.yin.default").await
+}
+
+async fn activation_revision(pool: &sqlx::SqlitePool, scope: &str) -> Option<String> {
+    let row: Option<(String,)> = sqlx::query_as(
+        "SELECT active_revision_id FROM activation_record_v2 WHERE scope = ?",
+    )
+    .bind(scope)
+    .fetch_optional(pool)
+    .await
+    .unwrap_or(None);
+    row.map(|value| value.0).filter(|value| !value.is_empty())
+}
+
+/// `ThemeRouter.CurrentV2`: the instance default package.
+async fn theme_current() -> Response {
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool,
+        Err(error) => return envelope::error(&error),
+    };
+    let revision = match instance_default_revision(pool).await {
+        Ok(revision) => revision,
+        Err(error) => return envelope::error(&error),
+    };
+    match revision_public(pool, &revision).await {
+        Ok(value) => success_data(value),
+        Err(error) => envelope::error(&error),
+    }
+}
+
+/// `ThemeRouter.PublicListV2`.
+async fn theme_packages() -> Response {
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool,
+        Err(error) => return envelope::error(&error),
+    };
+    let packages: Vec<(String, String, String)> = sqlx::query_as(
+        "SELECT id, name, latest_revision FROM package_record_v2 WHERE removed = 0 ORDER BY id",
+    )
+    .fetch_all(pool)
+    .await
+    .unwrap_or_default();
+    let mut out = Vec::with_capacity(packages.len());
+    for (id, name, revision_id) in packages {
+        let revision: Option<(String, i64, String)> = sqlx::query_as(
+            "SELECT version, verified, created_at FROM revision_record_v2 WHERE id = ?",
+        )
+        .bind(&revision_id)
+        .fetch_optional(pool)
+        .await
+        .unwrap_or(None);
+        let (version, verified, created_at) = revision.unwrap_or_default();
+        out.push(json!({
+            "id": id,
+            "name": name,
+            "version": version,
+            "revision": revision_id,
+            "verified": verified != 0,
+            "createdAt": rfc3339(&created_at),
+        }));
+    }
+    success_data(serde_json::Value::Array(out))
+}
+
+/// `ThemeRouter.PackageByIDV2`.
+async fn theme_package(Path(package_id): Path<String>) -> Response {
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool,
+        Err(error) => return envelope::error(&error),
+    };
+    let revision = match latest_revision_of(pool, &package_id).await {
+        Ok(revision) => revision,
+        Err(_) => return envelope::empty_not_found(),
+    };
+    match revision_public(pool, &revision).await {
+        Ok(value) => success_data(value),
+        Err(_) => envelope::empty_not_found(),
+    }
+}
+
+/// `ThemeRouter.Mine`: the revision the caller runs and their stored choice.
+async fn theme_mine(headers: HeaderMap) -> Response {
+    let user = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool,
+        Err(error) => return envelope::error(&error),
+    };
+    let instance = match instance_default_revision(pool).await {
+        Ok(revision) => revision,
+        Err(error) => return envelope::error(&error),
+    };
+    let system = activation_revision(pool, "instance")
+        .await
+        .unwrap_or(instance);
+    let scope = format!("user:{}", user.id);
+    let selected = activation_revision(pool, &scope).await;
+    let revision = selected.clone().unwrap_or(system);
+    let package = match revision_public(pool, &revision).await {
+        Ok(value) => value,
+        Err(error) => return envelope::error(&error),
+    };
+    let (mode, theme_mode) = user_theme_modes(pool, user.id).await;
+    let package_id = sqlx::query_as::<_, (String,)>(
+        "SELECT package_id FROM activation_record_v2 WHERE scope = ?",
+    )
+    .bind(&scope)
+    .fetch_optional(pool)
+    .await
+    .unwrap_or(None)
+    .map(|value| value.0)
+    .unwrap_or_default();
+    success_data(json!({
+        "package": package,
+        "preference": {
+            "mode": mode,
+            "packageId": package_id,
+            "revision": revision,
+            "themeMode": theme_mode,
+        },
+    }))
+}
+
+async fn user_theme_modes(pool: &sqlx::SqlitePool, user_id: i64) -> (String, String) {
+    let row: Option<(String, String)> = sqlx::query_as(
+        "SELECT mode, theme_mode FROM user_theme_preference_v2 WHERE user_id = ?",
+    )
+    .bind(user_id)
+    .fetch_optional(pool)
+    .await
+    .unwrap_or(None);
+    let (mode, theme_mode) = row.unwrap_or_else(|| ("auto".to_string(), "follow-space".to_string()));
+    (
+        if mode.is_empty() { "auto".into() } else { mode },
+        if theme_mode.is_empty() { "follow-space".into() } else { theme_mode },
+    )
+}
+
+/// `ResolveThemeV2` and `ThemeRouter.EffectiveV2`.
+async fn theme_effective(
+    headers: HeaderMap,
+    Query(query): Query<std::collections::HashMap<String, String>>,
+) -> Response {
+    let space_id: Option<i64> = query
+        .get("spaceId")
+        .and_then(|value| value.trim().parse::<i64>().ok())
+        .filter(|value| *value > 0);
+    if query.get("spaceId").is_some() && space_id.is_none() {
+        return envelope::error(" [ spaceId must be a positive integer]");
+    }
+    let user = auth::user(&headers).await.ok();
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool,
+        Err(error) => return envelope::error(&error),
+    };
+    let instance = match instance_default_revision(pool).await {
+        Ok(revision) => revision,
+        Err(error) => return envelope::error(&error),
+    };
+    let system = activation_revision(pool, "instance")
+        .await
+        .unwrap_or(instance);
+
+    let mut resolution: Option<(String, &str)> = None;
+    if let (Some(user), Some(space)) = (&user, space_id) {
+        let row: Option<(String,)> = sqlx::query_as(
+            "SELECT revision_id FROM user_space_theme_preference_v2 WHERE user_id = ? AND space_id = ?",
+        )
+        .bind(user.id)
+        .bind(space)
+        .fetch_optional(pool)
+        .await
+        .unwrap_or(None);
+        if let Some((revision,)) = row {
+            resolution = Some((revision, "user-space"));
+        }
+    }
+    if resolution.is_none() {
+        if let Some(user) = &user {
+            let (_, choice) = user_theme_modes(pool, user.id).await;
+            if choice == "custom" {
+                let scope = format!("user:{}", user.id);
+                if let Some(revision) = activation_revision(pool, &scope).await {
+                    resolution = Some((revision, "user"));
+                }
+            }
+        }
+    }
+    if resolution.is_none() {
+        if let Some(space) = space_id {
+            let row: Option<(String,)> =
+                sqlx::query_as("SELECT revision_id FROM space_theme_preference_v2 WHERE space_id = ?")
+                    .bind(space)
+                    .fetch_optional(pool)
+                    .await
+                    .unwrap_or(None);
+            if let Some((revision,)) = row {
+                resolution = Some((revision, "space"));
+            }
+        }
+    }
+    let (revision, source) = resolution.unwrap_or((system, "system"));
+    let package = match revision_public(pool, &revision).await {
+        Ok(value) => value,
+        Err(error) => return envelope::error(&error),
+    };
+    let mode = match &user {
+        Some(user) => user_theme_modes(pool, user.id).await.0,
+        None => "auto".to_string(),
+    };
+    success_data(json!({
+        "mode": mode,
+        "package": package,
+        "revision": revision,
+        "source": source,
+    }))
 }
