@@ -36,6 +36,12 @@ pub fn router() -> Router<Original> {
         .route("/api/spaces/{space_id}/bookmarks/tree", get(bookmarks_tree))
         .route("/api/panel/users/getList", get(users_list))
         .route("/api/panel/userConfig/getConfig", get(user_config))
+        .route("/api/system/monitor/getEnableStatus", post(monitor_enable_status))
+        .route("/api/system/monitor/getSnapshot", post(monitor_disabled))
+        .route("/api/system/monitor/getDiskMountpoints", post(monitor_disabled))
+        .route("/api/system/monitor/getDiskStateByPath", post(monitor_disabled))
+        .route("/api/theme/v2/preference", get(theme_preference))
+        .route("/api/theme/v2/space/{space_id}", get(theme_space))
 }
 
 /// `AboutRouter.Get`.
@@ -1065,4 +1071,109 @@ async fn user_config(headers: HeaderMap) -> Response {
         serde_json::from_str(&panel_json).unwrap_or(serde_json::Value::Null)
     };
     success_data(json!({"panel": panel, "language": language}))
+}
+
+/// `MonitorRouter.GetEnableStatus`.
+async fn monitor_enable_status(headers: HeaderMap) -> Response {
+    if let Err(response) = require_user(&headers).await {
+        return response;
+    }
+    let conf = &appcfg::ctx().conf;
+    let refresh = if conf.base.monitor_refresh_interval > 0 {
+        conf.base.monitor_refresh_interval
+    } else {
+        10
+    };
+    success_data(json!({
+        "enabled": conf.base.enable_monitor,
+        "refresh_interval": refresh,
+    }))
+}
+
+/// `MonitorRouter.GetSnapshot` and the disk readers while the monitor is off.
+async fn monitor_disabled(headers: HeaderMap) -> Response {
+    if let Err(response) = require_user(&headers).await {
+        return response;
+    }
+    if !appcfg::ctx().conf.base.enable_monitor {
+        return envelope::error("system monitor is disabled");
+    }
+    // A live snapshot needs the monitor port (B8); until then the honest answer
+    // is the same failure the Go service gives when the monitor is enabled but
+    // the cache is empty.
+    envelope::error("failed")
+}
+
+/// `ThemeRouter.Preference`: the stored mode, or `auto` / `follow-space`.
+async fn theme_preference(headers: HeaderMap) -> Response {
+    let user = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool,
+        Err(error) => return envelope::error(&error),
+    };
+    let row: Option<(String, String)> = sqlx::query_as(
+        "SELECT mode, theme_mode FROM user_theme_preference_v2 WHERE user_id = ?",
+    )
+    .bind(user.id)
+    .fetch_optional(pool)
+    .await
+    .unwrap_or(None);
+    let (mode, theme_mode) = row.unwrap_or_else(|| ("auto".to_string(), "follow-space".to_string()));
+    let mode = if mode.is_empty() { "auto".to_string() } else { mode };
+    let theme_mode = if theme_mode.is_empty() {
+        "follow-space".to_string()
+    } else {
+        theme_mode
+    };
+    success_data(json!({"mode": mode, "themeMode": theme_mode}))
+}
+
+/// `ThemeRouter.SpaceThemeV2`: the Space default and the caller's override.
+async fn theme_space(headers: HeaderMap, Path(space_id): Path<i64>) -> Response {
+    if let Err(response) = require_user(&headers).await {
+        return response;
+    }
+    let user = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool,
+        Err(error) => return envelope::error(&error),
+    };
+    let space_theme: Option<(String, String)> = sqlx::query_as(
+        "SELECT package_id, revision_id FROM space_theme_preference_v2 WHERE space_id = ?",
+    )
+    .bind(space_id)
+    .fetch_optional(pool)
+    .await
+    .unwrap_or(None);
+    let override_theme: Option<(String, String)> = sqlx::query_as(
+        "SELECT package_id, revision_id FROM user_space_theme_preference_v2 WHERE user_id = ? AND space_id = ?",
+    )
+    .bind(user.id)
+    .bind(space_id)
+    .fetch_optional(pool)
+    .await
+    .unwrap_or(None);
+    let theme = space_theme.map(|(package_id, revision)| json!({"packageId": package_id, "revision": revision}));
+    let override_value = override_theme.map(|(package_id, revision)| json!({"packageId": package_id, "revision": revision}));
+    success_data(json!({
+        "spaceId": space_id,
+        "theme": theme,
+        "override": override_value,
+    }))
+}
+
+async fn require_user(headers: &HeaderMap) -> Result<auth::UserRow, Response> {
+    match auth::user(headers).await {
+        Ok(user) => Ok(user),
+        Err(AuthError::NotLoggedIn) => Err(error_code(1000)),
+        Err(AuthError::Disabled) => Err(error_code(1004)),
+    }
 }

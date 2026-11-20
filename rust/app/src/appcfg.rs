@@ -36,6 +36,8 @@ pub struct Base {
     #[serde(default)]
     pub enable_monitor: bool,
     #[serde(default)]
+    pub monitor_refresh_interval: i64,
+    #[serde(default)]
     pub url_prefix: String,
 }
 
