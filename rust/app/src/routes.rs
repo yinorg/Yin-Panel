@@ -74,6 +74,24 @@ pub fn router() -> Router<Original> {
             post(remove_member),
         )
         .route("/api/spaces/{space_id}", post(rename_space))
+        .route(
+            "/api/spaces/{space_id}/search-config",
+            post(set_search_config),
+        )
+        .route(
+            "/api/spaces/{space_id}/wallpaper",
+            get(get_wallpaper).post(set_wallpaper),
+        )
+        .route(
+            "/api/spaces/{space_id}/oidc-groups",
+            get(list_oidc_groups).post(add_oidc_group),
+        )
+        .route(
+            "/api/spaces/{space_id}/oidc-groups/{rule_id}",
+            axum::routing::delete(delete_oidc_group),
+        )
+        .route("/api/spaces/{space_id}/transfer", post(transfer_space))
+        .route("/api/spaces/{space_id}/clear", post(clear_space))
         .route("/api/spaces/{space_id}/items", post(create_item))
         .route(
             "/api/spaces/{space_id}/items/{item_id}",
@@ -2751,6 +2769,412 @@ async fn rename_space(
         {
             return envelope::error("rename failed");
         }
+    }
+    match tx.commit().await {
+        Ok(_) => success(),
+        Err(error) => envelope::error(&error.to_string()),
+    }
+}
+
+/// `SpaceRouter.SetSearchConfig`.
+async fn set_search_config(
+    headers: HeaderMap,
+    Path(space_id): Path<i64>,
+    request: Request,
+) -> Response {
+    let user = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool.clone(),
+        Err(error) => return envelope::error(&error),
+    };
+    if !can_edit(&pool, user.id, space_id).await {
+        return error_code(1005);
+    }
+    let body = match axum::body::to_bytes(request.into_body(), 1 << 20).await {
+        Ok(body) => body,
+        Err(_) => return envelope::error("invalid request body"),
+    };
+    let value: serde_json::Value = match serde_json::from_slice(&body) {
+        Ok(value) => value,
+        Err(_) => return envelope::error(" [ invalid search config]"),
+    };
+    let url = value
+        .get("currentSearchEngine")
+        .and_then(|engine| engine.get("url"))
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("");
+    if url.is_empty() {
+        return envelope::error(" [ invalid search config]");
+    }
+    match sqlx::query(r#"UPDATE "space" SET search_config_json = ?, updated_at = ? WHERE id = ?"#)
+        .bind(value.to_string())
+        .bind(now_like_go())
+        .bind(space_id)
+        .execute(&pool)
+        .await
+    {
+        Ok(_) => success(),
+        Err(error) => envelope::error(&error.to_string()),
+    }
+}
+
+/// `SpaceRouter.GetWallpaperConfig`.
+async fn get_wallpaper(headers: HeaderMap, Path(space_id): Path<i64>) -> Response {
+    let pool = match guard(&headers, space_id).await {
+        Ok(pool) => pool,
+        Err(response) => return response,
+    };
+    let row: Option<(String,)> =
+        sqlx::query_as(r#"SELECT wallpaper_json FROM "space" WHERE id = ?"#)
+            .bind(space_id)
+            .fetch_optional(&pool)
+            .await
+            .unwrap_or(None);
+    let Some((stored,)) = row else {
+        return error_code(404);
+    };
+    if stored.is_empty() {
+        return success();
+    }
+    match serde_json::from_str::<serde_json::Value>(&stored) {
+        Ok(value) => success_data(value),
+        Err(error) => envelope::error(&error.to_string()),
+    }
+}
+
+fn valid_wallpaper_mode(mode: &str) -> bool {
+    matches!(mode, "theme" | "library" | "custom" | "none")
+}
+
+/// `SpaceRouter.SetWallpaperConfig`: `none` stores an empty column.
+async fn set_wallpaper(
+    headers: HeaderMap,
+    Path(space_id): Path<i64>,
+    request: Request,
+) -> Response {
+    let user = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool.clone(),
+        Err(error) => return envelope::error(&error),
+    };
+    if !can_edit(&pool, user.id, space_id).await {
+        return error_code(1005);
+    }
+    let body = match axum::body::to_bytes(request.into_body(), 1 << 20).await {
+        Ok(body) => body,
+        Err(_) => return envelope::error("invalid request body"),
+    };
+    let value: serde_json::Value = match serde_json::from_slice(&body) {
+        Ok(value) => value,
+        Err(_) => return envelope::error(" [ invalid wallpaper config]"),
+    };
+    let mode = value
+        .get("mode")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("");
+    if !valid_wallpaper_mode(mode) {
+        return envelope::error(" [ invalid wallpaper config]");
+    }
+    let stored = if mode == "none" {
+        String::new()
+    } else {
+        value.to_string()
+    };
+    match sqlx::query(r#"UPDATE "space" SET wallpaper_json = ?, updated_at = ? WHERE id = ?"#)
+        .bind(&stored)
+        .bind(now_like_go())
+        .bind(space_id)
+        .execute(&pool)
+        .await
+    {
+        Ok(_) => success(),
+        Err(error) => envelope::error(&error.to_string()),
+    }
+}
+
+/// `SpaceRouter.OIDCGroups` (the list the routes expose alongside add/delete).
+async fn list_oidc_groups(headers: HeaderMap, Path(space_id): Path<i64>) -> Response {
+    let pool = match guard(&headers, space_id).await {
+        Ok(pool) => pool,
+        Err(response) => return response,
+    };
+    let rows: Vec<(i64, String, String, String, String, String)> = match sqlx::query_as(
+        "SELECT id, created_at, updated_at, provider, group_name, role FROM space_o_id_c_group WHERE space_id = ? ORDER BY id",
+    )
+    .bind(space_id)
+    .fetch_all(&pool)
+    .await
+    {
+        Ok(rows) => rows,
+        Err(error) => return envelope::error(&error.to_string()),
+    };
+    let list: Vec<serde_json::Value> = rows
+        .into_iter()
+        .map(|row| {
+            json!({
+                "id": row.0,
+                "createTime": rfc3339(&row.1),
+                "updateTime": rfc3339(&row.2),
+                "spaceId": space_id,
+                "provider": row.3,
+                "groupName": row.4,
+                "role": row.5,
+            })
+        })
+        .collect();
+    success_data(serde_json::Value::Array(list))
+}
+
+/// `SpaceRouter.AddOIDCGroup`: a rule may grant editor or viewer, never admin.
+async fn add_oidc_group(
+    headers: HeaderMap,
+    Path(space_id): Path<i64>,
+    request: Request,
+) -> Response {
+    let user = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool.clone(),
+        Err(error) => return envelope::error(&error),
+    };
+    if !can_manage(&pool, user.id, space_id).await {
+        return error_code(1005);
+    }
+    let body = match axum::body::to_bytes(request.into_body(), 1 << 20).await {
+        Ok(body) => body,
+        Err(_) => return envelope::error("invalid request body"),
+    };
+    let req: OidcGroupRequest = match serde_json::from_slice(&body) {
+        Ok(req) => req,
+        Err(_) => return envelope::error(" [ invalid OIDC group rule]"),
+    };
+    if req.provider.is_empty()
+        || req.group_name.is_empty()
+        || !valid_space_role(&req.role)
+        || req.role == "admin"
+    {
+        return envelope::error(" [ invalid OIDC group rule]");
+    }
+    let now = now_like_go();
+    let result = sqlx::query(
+        "INSERT INTO space_o_id_c_group (created_at, updated_at, space_id, provider, group_name, role) VALUES (?, ?, ?, ?, ?, ?)",
+    )
+    .bind(&now)
+    .bind(&now)
+    .bind(space_id)
+    .bind(&req.provider)
+    .bind(&req.group_name)
+    .bind(&req.role)
+    .execute(&pool)
+    .await;
+    let id = match result {
+        Ok(result) => result.last_insert_rowid(),
+        Err(error) => return envelope::error(&error.to_string()),
+    };
+    success_data(json!({
+        "id": id,
+        "createTime": rfc3339(&now),
+        "updateTime": rfc3339(&now),
+        "spaceId": space_id,
+        "provider": req.provider,
+        "groupName": req.group_name,
+        "role": req.role,
+    }))
+}
+
+#[derive(serde::Deserialize)]
+struct OidcGroupRequest {
+    #[serde(default)]
+    provider: String,
+    #[serde(default, rename = "groupName")]
+    group_name: String,
+    #[serde(default)]
+    role: String,
+}
+
+/// `SpaceRouter.DeleteOIDCGroup`.
+async fn delete_oidc_group(
+    headers: HeaderMap,
+    Path((space_id, rule_id)): Path<(i64, String)>,
+) -> Response {
+    let user = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    let rule_id: i64 = match rule_id.parse() {
+        Ok(value) => value,
+        Err(_) => return envelope::error(" [ invalid ruleId]"),
+    };
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool.clone(),
+        Err(error) => return envelope::error(&error),
+    };
+    if !can_manage(&pool, user.id, space_id).await {
+        return error_code(1005);
+    }
+    match sqlx::query("DELETE FROM space_o_id_c_group WHERE id = ? AND space_id = ?")
+        .bind(rule_id)
+        .bind(space_id)
+        .execute(&pool)
+        .await
+    {
+        Ok(_) => success(),
+        Err(error) => envelope::error(&error.to_string()),
+    }
+}
+
+#[derive(serde::Deserialize)]
+struct TransferRequest {
+    #[serde(default)]
+    email: String,
+}
+
+/// `SpaceRouter.Transfer`: the new owner is made admin, the old one editor.
+async fn transfer_space(
+    headers: HeaderMap,
+    Path(space_id): Path<i64>,
+    request: Request,
+) -> Response {
+    let user = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool.clone(),
+        Err(error) => return envelope::error(&error),
+    };
+    if !can_manage(&pool, user.id, space_id).await {
+        return error_code(1005);
+    }
+    let body = match axum::body::to_bytes(request.into_body(), 1 << 20).await {
+        Ok(body) => body,
+        Err(_) => return envelope::error("invalid request body"),
+    };
+    let req: TransferRequest = match serde_json::from_slice(&body) {
+        Ok(req) => req,
+        Err(_) => return envelope::error(" [ invalid userId]"),
+    };
+    let email = req.email.trim().to_lowercase();
+    let target: Option<(i64,)> = sqlx::query_as(r#"SELECT id FROM "user" WHERE mail = ?"#)
+        .bind(&email)
+        .fetch_optional(&pool)
+        .await
+        .unwrap_or(None);
+    let Some((target_id,)) = target else {
+        return error_code(404);
+    };
+    let mut tx = match pool.begin().await {
+        Ok(tx) => tx,
+        Err(error) => return envelope::error(&error.to_string()),
+    };
+    let now = now_like_go();
+    let steps = [
+        sqlx::query(r#"UPDATE "space" SET owner_user_id = ?, updated_at = ? WHERE id = ?"#)
+            .bind(target_id)
+            .bind(&now)
+            .bind(space_id)
+            .execute(&mut *tx),
+    ];
+    for step in steps {
+        if step.await.is_err() {
+            return envelope::error("transfer failed");
+        }
+    }
+    if sqlx::query(
+        "UPDATE space_member SET role = 'editor' WHERE space_id = ? AND user_id = ?",
+    )
+    .bind(space_id)
+    .bind(user.id)
+    .execute(&mut *tx)
+    .await
+    .is_err()
+    {
+        return envelope::error("transfer failed");
+    }
+    // The target may not have a row yet; make one, or promote the existing one.
+    let existing: Option<(i64,)> = sqlx::query_as(
+        "SELECT id FROM space_member WHERE space_id = ? AND user_id = ? LIMIT 1",
+    )
+    .bind(space_id)
+    .bind(target_id)
+    .fetch_optional(&mut *tx)
+    .await
+    .unwrap_or(None);
+    let result = match existing {
+        Some((id,)) => {
+            sqlx::query("UPDATE space_member SET role = 'admin' WHERE id = ?")
+                .bind(id)
+                .execute(&mut *tx)
+                .await
+        }
+        None => {
+            sqlx::query(
+                "INSERT INTO space_member (created_at, updated_at, space_id, user_id, role, source, joined_at) VALUES (?, ?, ?, ?, 'admin', 'manual', ?)",
+            )
+            .bind(&now)
+            .bind(&now)
+            .bind(space_id)
+            .bind(target_id)
+            .bind(&now)
+            .execute(&mut *tx)
+            .await
+        }
+    };
+    if result.is_err() {
+        return envelope::error("transfer failed");
+    }
+    match tx.commit().await {
+        Ok(_) => success(),
+        Err(error) => envelope::error(&error.to_string()),
+    }
+}
+
+/// `SpaceRouter.ClearSpace`: items and groups, in one transaction.
+async fn clear_space(headers: HeaderMap, Path(space_id): Path<i64>) -> Response {
+    let user = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool.clone(),
+        Err(error) => return envelope::error(&error),
+    };
+    if !can_manage(&pool, user.id, space_id).await {
+        return error_code(1005);
+    }
+    let mut tx = match pool.begin().await {
+        Ok(tx) => tx,
+        Err(error) => return envelope::error(&error.to_string()),
+    };
+    if sqlx::query("DELETE FROM item_icon WHERE space_id = ?")
+        .bind(space_id)
+        .execute(&mut *tx)
+        .await
+        .is_err()
+    {
+        return envelope::error("clear failed");
+    }
+    if sqlx::query("DELETE FROM item_icon_group WHERE space_id = ?")
+        .bind(space_id)
+        .execute(&mut *tx)
+        .await
+        .is_err()
+    {
+        return envelope::error("clear failed");
     }
     match tx.commit().await {
         Ok(_) => success(),
