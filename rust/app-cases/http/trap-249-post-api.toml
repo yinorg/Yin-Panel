@@ -1,0 +1,13 @@
+[request]
+method = "POST"
+path = "/api/stra%C3%9Fe"
+body = '{"mail":"admin@yiniot.com","password":"wrong-password"}'
+
+[request.headers]
+Content-Type = "application/json"
+
+[response]
+status = 404
+
+[response.headers]
+content-type = "text/plain"

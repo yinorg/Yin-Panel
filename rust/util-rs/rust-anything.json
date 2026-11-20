@@ -1,0 +1,116 @@
+{
+  "schema": "rust-anything/bridge@1",
+  "root": "/home/hsy/project/Yin-Panel/backend",
+  "unit": "internal/util/",
+  "language": "go",
+  "kind": "ffi",
+  "crate_name": "util-rs",
+  "exports": [
+    {
+      "name": "Md5",
+      "file": "internal/util/base.go",
+      "line": 12,
+      "params": [
+        {
+          "name": "str",
+          "ts_type": "string",
+          "optional": false,
+          "rest": false,
+          "native_type": "string"
+        }
+      ],
+      "returns": "string",
+      "is_async": false,
+      "is_generator": false,
+      "type_params": [],
+      "uses_instanceof": false,
+      "native_return": "(string)",
+      "prototype": "func Md5(str string) string"
+    },
+    {
+      "name": "PathExists",
+      "file": "internal/util/base.go",
+      "line": 17,
+      "params": [
+        {
+          "name": "path",
+          "ts_type": "string",
+          "optional": false,
+          "rest": false,
+          "native_type": "string"
+        }
+      ],
+      "returns": "boolean",
+      "is_async": false,
+      "is_generator": false,
+      "type_params": [],
+      "uses_instanceof": false,
+      "native_return": "(bool, error)",
+      "prototype": "func PathExists(path string) (bool, error)"
+    },
+    {
+      "name": "PasswordEncryption",
+      "file": "internal/util/base.go",
+      "line": 38,
+      "params": [
+        {
+          "name": "password",
+          "ts_type": "string",
+          "optional": false,
+          "rest": false,
+          "native_type": "string"
+        }
+      ],
+      "returns": "string",
+      "is_async": false,
+      "is_generator": false,
+      "type_params": [],
+      "uses_instanceof": false,
+      "native_return": "(string)",
+      "prototype": "func PasswordEncryption(password string) string"
+    },
+    {
+      "name": "RedirectURL",
+      "file": "internal/util/base.go",
+      "line": 54,
+      "params": [
+        {
+          "name": "rootUrl",
+          "ts_type": "string",
+          "optional": false,
+          "rest": false,
+          "native_type": "string"
+        },
+        {
+          "name": "provider",
+          "ts_type": "string",
+          "optional": false,
+          "rest": false,
+          "native_type": "string"
+        }
+      ],
+      "returns": "string",
+      "is_async": false,
+      "is_generator": false,
+      "type_params": [],
+      "uses_instanceof": false,
+      "native_return": "(string)",
+      "prototype": "func RedirectURL(rootUrl, provider string) string"
+    }
+  ],
+  "classes": [],
+  "js_only": [
+    {
+      "name": "InArray",
+      "file": "internal/util/base.go",
+      "line": 28,
+      "reason": "generic: Go instantiates it per type"
+    },
+    {
+      "name": "ToJSONString",
+      "file": "internal/util/base.go",
+      "line": 43,
+      "reason": "`any`: values of any type"
+    }
+  ]
+}

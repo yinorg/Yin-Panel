@@ -1,0 +1,13 @@
+[request]
+method = "POST"
+path = "/api/a%C2%A0b"
+body = '{"mail":"not-an-email","password":"x"}'
+
+[request.headers]
+Content-Type = "application/json"
+
+[response]
+status = 404
+
+[response.headers]
+content-type = "text/plain"

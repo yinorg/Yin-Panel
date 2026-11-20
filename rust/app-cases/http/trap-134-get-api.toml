@@ -1,0 +1,10 @@
+[request]
+method = "GET"
+path = "/api/theme/v2/package/"
+
+[response]
+status = 301
+
+[response.headers]
+content-type = "text/html; charset=utf-8"
+location = "/api/theme/v2/package"

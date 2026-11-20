@@ -1,0 +1,18 @@
+[request]
+method = "POST"
+path = "/api/login"
+body = '{"mail":"admin@yiniot.com","password":"admin@yiniot.com"}'
+
+[request.headers]
+Content-Type = "application/json"
+
+[response]
+status = 200
+
+[response.headers]
+cache-control = "no-store"
+content-type = "application/json; charset=utf-8"
+referrer-policy = "strict-origin-when-cross-origin"
+set-cookie = "yin_token=[..]; Path=/; Max-Age=31536000; HttpOnly; SameSite=Lax"
+x-content-type-options = "nosniff"
+x-frame-options = "SAMEORIGIN"

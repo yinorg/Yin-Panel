@@ -1,0 +1,27 @@
+# Configuration used only by the rust-anything baseline recording.
+# Never used by a deployment: the database is a throwaway file created by
+# `run-original.sh` on every start.
+base:
+  http_port: __PORT__
+  root_url: http://127.0.0.1:__PORT__
+  database_drive: sqlite
+  enable_static_server: false
+  enable_monitor: false
+  monitor_refresh_interval: 10
+  enable_node_proxy: false
+  enable_metrics: false
+  url_prefix: /uploads/
+
+sqlite:
+  file_path: ./database.db
+  # One connection is enough for a recording and makes the run deterministic.
+  read_pool_size: -1
+
+jwt:
+  # Fixed on purpose: recorded cases carry a cookie minted from this secret.
+  secret: recording-only-secret
+  expire: 8760
+
+rclone:
+  type: local
+  bucket: uploads

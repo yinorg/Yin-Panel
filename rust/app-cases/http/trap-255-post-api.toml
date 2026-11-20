@@ -1,0 +1,13 @@
+[request]
+method = "POST"
+path = "/api/%E6%97%A5%E6%9C%AC%E8%AA%9E"
+body = '{"mail":"admin@yiniot.com","password":"admin@yiniot.com"}'
+
+[request.headers]
+Content-Type = "application/json"
+
+[response]
+status = 404
+
+[response.headers]
+content-type = "text/plain"

@@ -1,0 +1,1 @@
+{"code":-1,"msg":" [json: cannot unmarshal string into Go struct field ModuleConfig.value of type map[string]interface {}]"}

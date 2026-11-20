@@ -1,0 +1,1 @@
+{"fn":"PathExists","args":["\u0000"],"actual":{"error":"stat  : invalid argument"},"reason":"The Go bridge passes strings through a NUL-terminated C boundary, so a path containing U+0000 arrives empty. No HTTP request can carry a NUL in a path, and the Rust port itself handles a real NUL correctly when called directly."}

@@ -1,0 +1,53 @@
+{
+  "schema": "rust-anything/bridge@1",
+  "root": "/home/hsy/project/Yin-Panel/backend",
+  "unit": "internal/biz/theme/wallpaperpack/",
+  "language": "go",
+  "kind": "ffi",
+  "crate_name": "wallpaperpack-rs",
+  "exports": [
+    {
+      "name": "Catalogue",
+      "file": "internal/biz/theme/wallpaperpack/pack.go",
+      "line": 148,
+      "params": [],
+      "returns": "{ version: string; categories: unknown[] }",
+      "is_async": false,
+      "is_generator": false,
+      "type_params": [],
+      "uses_instanceof": false,
+      "native_return": "(Pack, error)",
+      "prototype": "func Catalogue() (Pack, error)"
+    },
+    {
+      "name": "Find",
+      "file": "internal/biz/theme/wallpaperpack/pack.go",
+      "line": 156,
+      "params": [
+        {
+          "name": "id",
+          "ts_type": "string",
+          "optional": false,
+          "rest": false,
+          "native_type": "string"
+        }
+      ],
+      "returns": "[{ id: string; name: string; kind: string; source: string; poster: string }, boolean]",
+      "is_async": false,
+      "is_generator": false,
+      "type_params": [],
+      "uses_instanceof": false,
+      "native_return": "(Entry, bool)",
+      "prototype": "func Find(id string) (Entry, bool)"
+    }
+  ],
+  "classes": [],
+  "js_only": [
+    {
+      "name": "Asset",
+      "file": "internal/biz/theme/wallpaperpack/pack.go",
+      "line": 174,
+      "reason": "132 MB of packaged artwork; the asset route stays proxied until storage is ported"
+    }
+  ]
+}
