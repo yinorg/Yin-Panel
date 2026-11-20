@@ -30,12 +30,31 @@ fn main() -> std::process::ExitCode {
     if std::env::args().nth(1).as_deref() == Some("migrate-db") {
         return migrate_db();
     }
+    if let Some(path) = config_argument() {
+        // `-c <path>`, as the Go binary takes it.
+        // SAFETY: single-threaded here, before the runtime starts.
+        unsafe { std::env::set_var("YIN_PANEL_CONFIG", path) };
+    }
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
         .expect("a tokio runtime");
     runtime.block_on(serve());
     std::process::ExitCode::SUCCESS
+}
+
+/// `-c <path>` or `-c=<path>`, the flag the Go binary accepts.
+fn config_argument() -> Option<String> {
+    let mut args = std::env::args().skip(1);
+    while let Some(arg) = args.next() {
+        if arg == "-c" || arg == "--config" {
+            return args.next();
+        }
+        if let Some(value) = arg.strip_prefix("-c=").or_else(|| arg.strip_prefix("--config=")) {
+            return Some(value.to_string());
+        }
+    }
+    None
 }
 
 /// `runMigrateDB`: `-source`/`-target`, the same messages and exit codes.
