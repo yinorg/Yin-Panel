@@ -1,6 +1,6 @@
 # App replay
 
-Build: `sh rust/record/run-rust.sh`
+Build: `/home/hsy/project/Yin-Panel/rust/app/target/debug/run-original`
 
 Passed: 384/384
 
