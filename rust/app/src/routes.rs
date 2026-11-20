@@ -47,6 +47,10 @@ pub fn router() -> Router<Original> {
         .route("/api/theme/v2/package/{package_id}", get(theme_package))
         .route("/api/theme/v2/mine", get(theme_mine))
         .route("/api/theme/v2/effective", get(theme_effective))
+        .route(
+            "/api/theme/v2/assets/{revision}/{*name}",
+            get(theme_asset),
+        )
 }
 
 /// `AboutRouter.Get`.
@@ -1477,4 +1481,138 @@ async fn theme_effective(
         "revision": revision,
         "source": source,
     }))
+}
+
+/// `ThemeRouter.AssetV2` plus `serveThemeAsset`: the stored bytes, the media
+/// type, an ETag for HTML, and `http.ServeContent`'s conditional and range
+/// behaviour.
+async fn theme_asset(
+    headers: HeaderMap,
+    Path((revision, raw_name)): Path<(String, String)>,
+) -> Response {
+    let name = raw_name.trim_start_matches('/');
+    if name.is_empty()
+        || name.contains('\\')
+        || name.starts_with("../")
+        || name.split('/').any(|part| part == "." || part == "..")
+        || name.contains("//")
+    {
+        return envelope::empty_not_found();
+    }
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool,
+        Err(error) => return envelope::error(&error),
+    };
+    let row: Option<(String, Vec<u8>)> = sqlx::query_as(
+        "SELECT media_type, content FROM asset_record_v2 WHERE revision_id = ? AND path = ?",
+    )
+    .bind(&revision)
+    .bind(name)
+    .fetch_optional(pool)
+    .await
+    .unwrap_or(None);
+    let Some((media_type, content)) = row else {
+        return envelope::empty_not_found();
+    };
+
+    let is_html = media_type == "text/html";
+    let etag = if is_html {
+        use sha2::{Digest, Sha256};
+        let digest = Sha256::digest(&content);
+        Some(format!("\"{}\"", digest.iter().map(|byte| format!("{byte:02x}")).collect::<String>()))
+    } else {
+        None
+    };
+
+    let mut response = Response::new(axum::body::Body::empty());
+    {
+        let out = response.headers_mut();
+        for (key, value) in envelope::headers() {
+            out.insert(key, value);
+        }
+        out.insert(header::CONTENT_TYPE, HeaderValue::from_str(&media_type).unwrap_or(HeaderValue::from_static("application/octet-stream")));
+        out.insert(header::X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
+        let cache = if is_html {
+            "public, max-age=0, must-revalidate, no-transform"
+        } else {
+            "public, max-age=31536000, immutable, no-transform"
+        };
+        out.insert(header::CACHE_CONTROL, HeaderValue::from_static(cache));
+        if let Some(etag) = &etag {
+            out.insert(header::ETAG, HeaderValue::from_str(etag).unwrap_or(HeaderValue::from_static("")));
+        }
+        if is_html {
+            out.insert(header::CONTENT_SECURITY_POLICY, HeaderValue::from_static("sandbox allow-scripts; default-src 'none'; script-src 'unsafe-inline' https://static.cloudflareinsights.com; style-src 'unsafe-inline'; img-src data:; connect-src https://cloudflareinsights.com; font-src 'none'; media-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'none'"));
+            out.insert(header::REFERRER_POLICY, HeaderValue::from_static("no-referrer"));
+        } else if media_type == "image/svg+xml" {
+            out.insert(header::CONTENT_SECURITY_POLICY, HeaderValue::from_static("sandbox; default-src 'none'; script-src 'none'; style-src 'unsafe-inline'; img-src data: blob:; object-src 'none'; form-action 'none'; base-uri 'none'"));
+            out.insert(header::REFERRER_POLICY, HeaderValue::from_static("no-referrer"));
+        }
+    }
+
+    // `http.ServeContent`: a matching If-None-Match turns the response into a 304.
+    if let (Some(etag), Some(if_none_match)) = (&etag, headers.get(header::IF_NONE_MATCH)) {
+        if if_none_match.to_str().map(str::trim).ok() == Some(etag.as_str()) {
+            *response.status_mut() = axum::http::StatusCode::NOT_MODIFIED;
+            return response;
+        }
+    }
+
+    let total = content.len() as u64;
+    if let Some(range) = headers.get(header::RANGE).and_then(|value| value.to_str().ok()) {
+        if let Some((start, end)) = parse_range(range, total) {
+            let slice = content[start as usize..=end as usize].to_vec();
+            *response.status_mut() = axum::http::StatusCode::PARTIAL_CONTENT;
+            response.headers_mut().insert(
+                header::CONTENT_RANGE,
+                HeaderValue::from_str(&format!("bytes {start}-{end}/{total}"))
+                    .unwrap_or(HeaderValue::from_static("")),
+            );
+            *response.body_mut() = axum::body::Body::from(slice);
+            return response;
+        }
+        if range.starts_with("bytes=") {
+            *response.status_mut() = axum::http::StatusCode::RANGE_NOT_SATISFIABLE;
+            response.headers_mut().insert(
+                header::CONTENT_RANGE,
+                HeaderValue::from_str(&format!("bytes */{total}")).unwrap_or(HeaderValue::from_static("")),
+            );
+            return response;
+        }
+    }
+
+    *response.body_mut() = axum::body::Body::from(content);
+    response
+}
+
+/// A single `bytes=start-end|start-|-suffix` range, as `http.ServeContent`
+/// accepts it.
+fn parse_range(value: &str, total: u64) -> Option<(u64, u64)> {
+    let spec = value.strip_prefix("bytes=")?;
+    if spec.contains(',') || total == 0 {
+        return None;
+    }
+    let (start, end) = spec.split_once('-')?;
+    if start.is_empty() {
+        let suffix: u64 = end.parse().ok()?;
+        if suffix == 0 {
+            return None;
+        }
+        let length = suffix.min(total);
+        return Some((total - length, total - 1));
+    }
+    let start: u64 = start.parse().ok()?;
+    if start >= total {
+        return None;
+    }
+    let end = if end.is_empty() {
+        total - 1
+    } else {
+        end.parse::<u64>().ok()?.min(total - 1)
+    };
+    if end < start {
+        return None;
+    }
+    Some((start, end))
 }
