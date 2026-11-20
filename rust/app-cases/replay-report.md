@@ -2,8 +2,8 @@
 
 Build: `rust/app/target/release/run-original`
 
-Passed: 341/341
+Passed: 346/346
 
-Fallback rate: 74.8% (255/341 cases answered by the original)
+Fallback rate: 73.4% (254/346 cases answered by the original)
 
 Every case matches.

@@ -36,6 +36,10 @@ pub fn router() -> Router<Original> {
         .route("/api/file/uploadImg", post(upload_image))
         .route("/api/spaces/{space_id}/bookmarks/tree", get(bookmarks_tree))
         .route("/api/panel/users/getList", get(users_list))
+        .route("/api/panel/users/create", post(create_user))
+        .route("/api/panel/users/update", post(update_user))
+        .route("/api/panel/users/delete", post(delete_user))
+        .route("/api/file/delete", post(delete_file))
         .route("/api/panel/userConfig/getConfig", get(user_config))
         .route("/api/system/monitor/getEnableStatus", post(monitor_enable_status))
         .route("/api/system/monitor/getSnapshot", post(monitor_disabled))
@@ -4358,4 +4362,456 @@ async fn import_bookmarks(
         "groups": summary.groups,
         "skipped": summary.skipped,
     }))
+}
+
+#[derive(serde::Deserialize)]
+struct UserIn {
+    #[serde(default)]
+    id: i64,
+    #[serde(default)]
+    password: String,
+    #[serde(default)]
+    name: String,
+    #[serde(default, rename = "headImage")]
+    head_image: String,
+    #[serde(default)]
+    status: i64,
+    #[serde(default)]
+    role: i64,
+    #[serde(default)]
+    mail: String,
+}
+
+/// `UserService.CreateUser`: the account, its personal pair, both memberships
+/// and the default group in one transaction.
+async fn create_user(headers: HeaderMap, request: Request) -> Response {
+    let user = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    if user.role != 1 {
+        return error_code(1005);
+    }
+    let body = match axum::body::to_bytes(request.into_body(), 1 << 20).await {
+        Ok(body) => body,
+        Err(_) => return envelope::error("invalid request body"),
+    };
+    let input: UserIn = match serde_json::from_slice(&body) {
+        Ok(input) => input,
+        Err(error) => return envelope::error(&format!(" [{}]", error)),
+    };
+    let mail = input.mail.trim().to_lowercase();
+    if mail.len() < 5 {
+        return envelope::error(" [The account must be no less than 5 characters long]");
+    }
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool.clone(),
+        Err(error) => return envelope::error(&error),
+    };
+    let exists: Option<(i64,)> =
+        sqlx::query_as(r#"SELECT id FROM "user" WHERE mail = ?"#)
+            .bind(&mail)
+            .fetch_optional(&pool)
+            .await
+            .unwrap_or(None);
+    if exists.is_some() {
+        return error_code(1008);
+    }
+    let now = now_like_go();
+    let mut tx = match pool.begin().await {
+        Ok(tx) => tx,
+        Err(error) => return envelope::error(&error.to_string()),
+    };
+    let inserted = sqlx::query(
+        r#"INSERT INTO "user" (created_at, updated_at, password, name, head_image, status, role, mail, token_version) VALUES (?, ?, ?, ?, ?, 1, ?, ?, 0)"#,
+    )
+    .bind(&now)
+    .bind(&now)
+    .bind(password_encryption(&input.password))
+    .bind(&input.name)
+    .bind(&input.head_image)
+    .bind(input.role)
+    .bind(&mail)
+    .execute(&mut *tx)
+    .await;
+    let id = match inserted {
+        Ok(result) => result.last_insert_rowid(),
+        Err(error) => return envelope::error(&error.to_string()),
+    };
+    let yin = sqlx::query(
+        r#"INSERT INTO "space" (created_at, updated_at, type, name, owner_user_id, pair_id, side, public_enabled, public_mode) VALUES (?, ?, 'personal', ?, ?, 0, 'yin', 0, 'direct')"#,
+    )
+    .bind(&now)
+    .bind(&now)
+    .bind(&input.name)
+    .bind(id)
+    .execute(&mut *tx)
+    .await;
+    let yin_id = match yin {
+        Ok(result) => result.last_insert_rowid(),
+        Err(error) => return envelope::error(&error.to_string()),
+    };
+    let _ = sqlx::query(r#"UPDATE "space" SET pair_id = ? WHERE id = ?"#)
+        .bind(yin_id)
+        .bind(yin_id)
+        .execute(&mut *tx)
+        .await;
+    let yang = sqlx::query(
+        r#"INSERT INTO "space" (created_at, updated_at, type, name, owner_user_id, pair_id, side, public_enabled, public_mode) VALUES (?, ?, 'personal', ?, ?, ?, 'yang', 0, 'direct')"#,
+    )
+    .bind(&now)
+    .bind(&now)
+    .bind(format!("{}-B", input.name))
+    .bind(id)
+    .bind(yin_id)
+    .execute(&mut *tx)
+    .await;
+    let yang_id = match yang {
+        Ok(result) => result.last_insert_rowid(),
+        Err(error) => return envelope::error(&error.to_string()),
+    };
+    for sid in [yin_id, yang_id] {
+        if sqlx::query(
+            "INSERT INTO space_member (created_at, updated_at, space_id, user_id, role, source, joined_at) VALUES (?, ?, ?, ?, 'admin', 'manual', ?)",
+        )
+        .bind(&now)
+        .bind(&now)
+        .bind(sid)
+        .bind(id)
+        .bind(&now)
+        .execute(&mut *tx)
+        .await
+        .is_err()
+        {
+            return envelope::error("create user");
+        }
+        if sqlx::query(
+            "INSERT INTO item_icon_group (created_at, updated_at, icon, title, description, sort, user_id, space_id) VALUES (?, ?, 'material-symbols:ad-group-outline', 'APP', '', 0, ?, ?)",
+        )
+        .bind(&now)
+        .bind(&now)
+        .bind(id)
+        .bind(sid)
+        .execute(&mut *tx)
+        .await
+        .is_err()
+        {
+            return envelope::error("create user");
+        }
+    }
+    if let Err(error) = tx.commit().await {
+        return envelope::error(&error.to_string());
+    }
+    success_data(json!({"userId": id}))
+}
+
+/// `UsersRouter.Update`: an empty password keeps the stored one, a new one is
+/// hashed, and a renamed account renames its personal pair.
+async fn update_user(headers: HeaderMap, request: Request) -> Response {
+    let actor = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    if actor.role != 1 {
+        return error_code(1005);
+    }
+    let body = match axum::body::to_bytes(request.into_body(), 1 << 20).await {
+        Ok(body) => body,
+        Err(_) => return envelope::error("invalid request body"),
+    };
+    let input: UserIn = match serde_json::from_slice(&body) {
+        Ok(input) => input,
+        Err(error) => return envelope::error(&format!(" [{}]", error)),
+    };
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool.clone(),
+        Err(error) => return envelope::error(&error),
+    };
+    let existing: Option<(String, String)> =
+        sqlx::query_as(r#"SELECT password, name FROM "user" WHERE id = ?"#)
+            .bind(input.id)
+            .fetch_optional(&pool)
+            .await
+            .unwrap_or(None);
+    let Some((existing_password, existing_name)) = existing else {
+        return envelope::error(" [record not found]");
+    };
+    let mut password = input.password.clone();
+    if password.is_empty() {
+        password = existing_password.clone();
+    }
+    let mail = input.mail.trim().to_lowercase();
+    if mail.len() < 3 {
+        return envelope::error(" [The account must be no less than 3 characters long]");
+    }
+    let clash: Option<(i64,)> =
+        sqlx::query_as(r#"SELECT id FROM "user" WHERE mail = ? AND id <> ?"#)
+            .bind(&mail)
+            .bind(input.id)
+            .fetch_optional(&pool)
+            .await
+            .unwrap_or(None);
+    if clash.is_some() {
+        return error_code(1008);
+    }
+    if password != existing_password {
+        password = password_encryption(&password);
+    }
+    // GORM's `Updates` with a struct writes only non-zero fields.
+    let mut set = vec!["mail = ?".to_string()];
+    if !input.name.is_empty() {
+        set.push("name = ?".to_string());
+    }
+    if !input.head_image.is_empty() {
+        set.push("head_image = ?".to_string());
+    }
+    if input.status != 0 {
+        set.push("status = ?".to_string());
+    }
+    if input.role != 0 {
+        set.push("role = ?".to_string());
+    }
+    if password != existing_password {
+        set.push("password = ?".to_string());
+    }
+    set.push("updated_at = ?".to_string());
+    let sql = format!(r#"UPDATE "user" SET {} WHERE id = ?"#, set.join(", "));
+    let mut statement = sqlx::query(&sql).bind(&mail);
+    if !input.name.is_empty() {
+        statement = statement.bind(&input.name);
+    }
+    if !input.head_image.is_empty() {
+        statement = statement.bind(&input.head_image);
+    }
+    if input.status != 0 {
+        statement = statement.bind(input.status);
+    }
+    if input.role != 0 {
+        statement = statement.bind(input.role);
+    }
+    if password != existing_password {
+        statement = statement.bind(&password);
+    }
+    statement = statement.bind(now_like_go()).bind(input.id);
+    if statement.execute(&pool).await.is_err() {
+        return envelope::error("update failed");
+    }
+    if !input.name.is_empty() && input.name != existing_name {
+        let now = now_like_go();
+        let _ = sqlx::query(
+            r#"UPDATE "space" SET name = ?, updated_at = ? WHERE owner_user_id = ? AND side = 'yin' AND type = 'personal'"#,
+        )
+        .bind(&input.name)
+        .bind(&now)
+        .bind(input.id)
+        .execute(&pool)
+        .await;
+        let _ = sqlx::query(
+            r#"UPDATE "space" SET name = ?, updated_at = ? WHERE owner_user_id = ? AND side = 'yang' AND type = 'personal'"#,
+        )
+        .bind(format!("{}-B", input.name))
+        .bind(&now)
+        .bind(input.id)
+        .execute(&pool)
+        .await;
+    }
+    let stored: Option<(String, String, String, String, String, i64, i64)> = sqlx::query_as(
+        r#"SELECT created_at, updated_at, password, name, head_image, status, role FROM "user" WHERE id = ?"#,
+    )
+    .bind(input.id)
+    .fetch_optional(&pool)
+    .await
+    .unwrap_or(None);
+    let Some((created_at, updated_at, password, name, head_image, status, role)) = stored else {
+        return envelope::database_error();
+    };
+    let _ = existing_name;
+    envelope::success_struct(AdminUser {
+        id: input.id,
+        create_time: rfc3339(&created_at),
+        update_time: rfc3339(&updated_at),
+        password,
+        name,
+        head_image,
+        status,
+        role,
+        mail: sqlx::query_as::<_, (String,)>(r#"SELECT mail FROM "user" WHERE id = ?"#)
+            .bind(input.id)
+            .fetch_one(&pool)
+            .await
+            .map(|value| value.0)
+            .unwrap_or_default(),
+        token: String::new(),
+    })
+}
+
+#[derive(serde::Deserialize)]
+struct UserDeleteRequest {
+    #[serde(default, rename = "userId")]
+    user_id: i64,
+    #[serde(default)]
+    force: bool,
+}
+
+/// `UserRepo.DeleteWithSpaces`.
+async fn delete_user(headers: HeaderMap, request: Request) -> Response {
+    let actor = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    if actor.role != 1 {
+        return error_code(1005);
+    }
+    let body = match axum::body::to_bytes(request.into_body(), 1 << 20).await {
+        Ok(body) => body,
+        Err(_) => return envelope::error("invalid request body"),
+    };
+    let req: UserDeleteRequest = match serde_json::from_slice(&body) {
+        Ok(req) => req,
+        Err(error) => return envelope::error(&format!(" [{}]", error)),
+    };
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool.clone(),
+        Err(error) => return envelope::error(&error),
+    };
+    let owned: Vec<(i64, String)> =
+        sqlx::query_as(r#"SELECT id, type FROM "space" WHERE owner_user_id = ?"#)
+            .bind(req.user_id)
+            .fetch_all(&pool)
+            .await
+            .unwrap_or_default();
+    if !req.force && owned.iter().any(|(_, kind)| kind == "shared") {
+        return envelope::error("user owns shared spaces; transfer them before deletion");
+    }
+    let mut ids: Vec<i64> = owned.iter().map(|(id, _)| *id).collect();
+    if !ids.is_empty() {
+        let placeholders = vec!["?"; ids.len()].join(",");
+        let sql = format!(r#"SELECT id FROM "space" WHERE pair_id IN ({placeholders})"#);
+        let mut query = sqlx::query_as::<_, (i64,)>(&sql);
+        for id in &ids {
+            query = query.bind(id);
+        }
+        for (paired,) in query.fetch_all(&pool).await.unwrap_or_default() {
+            ids.push(paired);
+        }
+    }
+    let mut tx = match pool.begin().await {
+        Ok(tx) => tx,
+        Err(error) => return envelope::error(&error.to_string()),
+    };
+    if !ids.is_empty() {
+        let placeholders = vec!["?"; ids.len()].join(",");
+        for table in ["item_icon", "item_icon_group", "space_member", "space_o_id_c_group"] {
+            let sql = format!("DELETE FROM {table} WHERE space_id IN ({placeholders})");
+            let mut statement = sqlx::query(&sql);
+            for id in &ids {
+                statement = statement.bind(id);
+            }
+            if statement.execute(&mut *tx).await.is_err() {
+                return envelope::error("delete failed");
+            }
+        }
+        let sql = format!(r#"DELETE FROM "space" WHERE id IN ({placeholders})"#);
+        let mut statement = sqlx::query(&sql);
+        for id in &ids {
+            statement = statement.bind(id);
+        }
+        if statement.execute(&mut *tx).await.is_err() {
+            return envelope::error("delete failed");
+        }
+    }
+    for table in ["o_auth_identity", "item_icon", "item_icon_group", "module_config", "file"] {
+        let sql = format!("DELETE FROM {table} WHERE user_id = ?");
+        if sqlx::query(&sql)
+            .bind(req.user_id)
+            .execute(&mut *tx)
+            .await
+            .is_err()
+        {
+            return envelope::error("delete failed");
+        }
+    }
+    if sqlx::query(r#"DELETE FROM "user" WHERE id = ?"#)
+        .bind(req.user_id)
+        .execute(&mut *tx)
+        .await
+        .is_err()
+    {
+        return envelope::error("delete failed");
+    }
+    if let Err(error) = tx.commit().await {
+        return envelope::error(&error.to_string());
+    }
+    success()
+}
+
+#[derive(serde::Deserialize)]
+struct FileDeleteRequest {
+    #[serde(default)]
+    id: i64,
+}
+
+/// `FileRouter.Delete`: the row and the stored bytes.
+async fn delete_file(headers: HeaderMap, request: Request) -> Response {
+    let actor = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    if actor.role != 1 {
+        return error_code(1005);
+    }
+    let body = match axum::body::to_bytes(request.into_body(), 1 << 20).await {
+        Ok(body) => body,
+        Err(_) => return envelope::error("invalid request body"),
+    };
+    let req: FileDeleteRequest = match serde_json::from_slice(&body) {
+        Ok(req) => req,
+        Err(error) => return envelope::error(&format!(" [{}]", error)),
+    };
+    if req.id == 0 {
+        return envelope::error(" [Key: 'RequestDeleteId.Id' Error:Field validation for 'Id' failed on the 'required' tag]");
+    }
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool,
+        Err(error) => return envelope::error(&error),
+    };
+    let row: Option<(String,)> = sqlx::query_as("SELECT file_name FROM file WHERE id = ?")
+        .bind(req.id)
+        .fetch_optional(pool)
+        .await
+        .unwrap_or(None);
+    let Some((file_name,)) = row else {
+        return envelope::database_error();
+    };
+    let _ = std::fs::remove_file(storage_dir().join(&file_name));
+    match sqlx::query("DELETE FROM file WHERE id = ?")
+        .bind(req.id)
+        .execute(pool)
+        .await
+    {
+        Ok(_) => success(),
+        Err(_) => envelope::database_error(),
+    }
+}
+
+/// `repository.User` as the API returns it.
+#[derive(Serialize)]
+struct AdminUser {
+    id: i64,
+    #[serde(rename = "createTime")]
+    create_time: String,
+    #[serde(rename = "updateTime")]
+    update_time: String,
+    password: String,
+    name: String,
+    #[serde(rename = "headImage")]
+    head_image: String,
+    status: i64,
+    role: i64,
+    mail: String,
+    token: String,
 }

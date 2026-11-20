@@ -115,6 +115,11 @@ pub fn error_code(code: i64) -> Response {
     (StatusCode::OK, headers(), body(code, msg, None)).into_response()
 }
 
+/// `response.ErrorDatabase`: code 1200 with the mapped text.
+pub fn database_error() -> Response {
+    (StatusCode::OK, headers(), body(1200, "Server error[Database error]", None)).into_response()
+}
+
 pub fn error(msg: &str) -> Response {
     (StatusCode::OK, headers(), body(-1, msg, None)).into_response()
 }

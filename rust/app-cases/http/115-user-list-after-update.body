@@ -1,0 +1,1 @@
+{"code":0,"data":{"count":2,"list":[{"id":1,"createTime":"[..]","updateTime":"[..]","password":"","name":"admin@yiniot.com","headImage":"","status":1,"role":1,"mail":"admin@yiniot.com","token":""},{"id":2,"createTime":"[..]","updateTime":"[..]","password":"","name":"Member Two","headImage":"","status":1,"role":2,"mail":"member@local.test","token":""}]},"msg":"OK"}
