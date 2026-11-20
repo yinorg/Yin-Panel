@@ -1234,10 +1234,13 @@ async fn monitor_disabled(headers: HeaderMap) -> Response {
     if !appcfg::ctx().conf.base.enable_monitor {
         return envelope::error("system monitor is disabled");
     }
-    // A live snapshot needs the monitor port (B8); until then the honest answer
-    // is the same failure the Go service gives when the monitor is enabled but
-    // the cache is empty.
-    envelope::error("failed")
+    // The Go service answers from a snapshot refreshed every three seconds; the
+    // port collects one per request, which is slower but always current.
+    let snapshot = crate::monitor::snapshot().await;
+    if snapshot.is_empty() {
+        return envelope::error("failed");
+    }
+    success_data(serde_json::Value::Object(snapshot.into_iter().collect()))
 }
 
 /// `ThemeRouter.Preference`: the stored mode, or `auto` / `follow-space`.
