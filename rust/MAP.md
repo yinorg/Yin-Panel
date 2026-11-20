@@ -129,3 +129,14 @@ rust-anything analyze backend --lang go --whole-app
   SQLite, MySQL and PostgreSQL, with tests. The PostgreSQL path was verified
   against a real server (24 tables, row counts matched, re-runnable). MySQL is
   covered by DDL unit tests only.
+
+## Static site
+
+`rust/app/src/site.rs` serves the built frontend when `enable_static_server` is
+on: `/assets/*` and `/workbox-*.js` immutable for 30 days, `/custom/*` for one
+day, the entry documents, PWA control files and SPA fallbacks (`/`, `/login`,
+`/oauth/callback`, `/theme/:view`, `/:publicId`) uncached, and `/clear.html`
+also expiring the session cookie. Compared against the running Go service on
+the same build output: identical bytes for `/`, `/sw.js` and a hashed asset,
+identical cache/type/length/last-modified headers, and identical empty 404s
+with the group's cache policy for a missing asset.

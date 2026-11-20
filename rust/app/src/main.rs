@@ -6,6 +6,7 @@ mod envelope;
 mod monitor;
 mod packages;
 mod routes;
+mod site;
 mod units;
 
 use std::net::SocketAddr;
@@ -85,6 +86,8 @@ async fn serve() {
     // and no proxy: the fallback is Gin's own 404/301 behaviour.
     let app = units::router()
         .merge(routes::router())
+        // The built frontend, when the configuration serves it.
+        .merge(site::router())
         .fallback(routes::go_fallback);
     let port = std::env::var("PORT")
         .ok()

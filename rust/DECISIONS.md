@@ -116,7 +116,7 @@ access needs nothing.
 
 ## ADR-009: `repository` and `database` are not unit-ported
 
-**Status:** accepted, with a consequence for `app lift`
+**Status:** accepted by the user on 2026-11-20, with a consequence for `app lift`
 
 `internal/biz/repository` and `internal/infra/database` expose methods on types
 that hold a package-level `*gorm.DB`; the bridge sees only constructors and
@@ -217,7 +217,7 @@ but has no case.
 
 ## ADR-014: wallpaperpack's `error cases` check is a recorded exception
 
-**Status:** accepted, with a consequence for `app lift`
+**Status:** accepted by the user on 2026-11-20, with a consequence for `app lift`
 
 `wallpaperpack-rs` passes every gate check except `error cases`, which asks for
 a recorded case where `Catalogue` fails. Its only error path is a failed read of
@@ -226,5 +226,7 @@ produced by any input. The check is a false positive: it infers "this function
 can fail" from the `(Pack, error)` signature and a `return ..., loadErr` line.
 
 The port matches all 212 recorded cases. Fabricating a case would be worse than
-recording the exception, so the exception stands and `app lift` will keep
-refusing until the gate check or the accepted definition changes.
+recording the exception, so the exception stands. The user accepted it on
+2026-11-20; `rust-anything app lift` therefore still refuses, and the lift is
+performed by hand with the same end state (no fallback, no kill switches, units
+called as plain libraries).
