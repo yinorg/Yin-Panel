@@ -49,9 +49,9 @@ route (compared with `cmp`). The Rust route answers directly; it does not proxy.
 
 | Build | `c` | RPS | p50 | p99 | CPU/req | Cores | RSS |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Go (as shipped) | 1 | 388 | 2.29 ms | 4.59 ms | 4,025 µs | 1.55 | 53 MiB |
-| Rust, as ported | 1 | 275 | 3.44 ms | 6.09 ms | 3,562 µs | 0.98 | 9 MiB |
-| Rust, cached body | 1 | 3,500 | 0.28 ms | 0.69 ms | 80 µs | 0.24 | 9 MiB |
+| Go (as shipped) | 1 | 391 | 2.28 ms | 4.40 ms | 3,940 µs | 1.54 | 61 MiB |
+| Rust, as ported | 1 | 279 | 3.52 ms | 4.15 ms | 3,562 µs | 0.98 | 9 MiB |
+| Rust, cached body | 1 | 3,077 | 0.27 ms | 0.69 ms | 80 µs | 0.25 | 9 MiB |
 | Go (as shipped) | 16 | 2,145 | 7.16 ms | 13.15 ms | 5,667 µs | 12.2 | 69 MiB |
 | Rust, as ported | 16 | 2,396 | 6.36 ms | 11.95 ms | 5,552 µs | 13.3 | 36 MiB |
 | Rust, cached body | 16 | 3,861 | 3.73 ms | 8.93 ms | 109 µs | 0.42 | 10 MiB |
@@ -59,6 +59,9 @@ route (compared with `cmp`). The Rust route answers directly; it does not proxy.
 Same-work comparison (both rebuild the response per request, `c=16`): Rust is
 about 12% ahead on throughput and latency with the same CPU per request and
 roughly half the resident memory. Single-request latency favours Go.
+
+The `as ported` row is a single 600-request run of the build before the body
+cache; the other rows are 1,000 (`c=1`) and 4,000 (`c=16`) request runs.
 
 The cached-body row is not a language result: the payload is fully determined by
 the catalogue compiled into the binary, so the Rust handler serialises it once.
