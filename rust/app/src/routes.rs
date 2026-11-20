@@ -3,8 +3,8 @@
 //! `backend/internal/web/router/system`.
 
 use axum::Router;
-use axum::extract::{Multipart, Path, Query, Request};
-use axum::http::{HeaderMap, HeaderValue, header};
+use axum::extract::{Multipart, Path, Query, Request, State};
+use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::response::IntoResponse;
 use axum::response::Response;
 use axum::routing::{get, post};
@@ -6504,4 +6504,87 @@ async fn wallpaper_library_asset(
         Some((content, media_type)) => serve_bytes(&media_type, &content),
         None => envelope::empty_not_found(),
     }
+}
+
+// ------------------------------------------------------- Go router fallback
+
+fn path_segments(path: &str) -> Vec<&str> {
+    path.split('/').filter(|segment| !segment.is_empty()).collect()
+}
+
+/// Gin's tree: static segments, `:param` for one segment and `*name` for the
+/// rest of the path.
+pub fn pattern_matches(pattern: &str, path: &str) -> bool {
+    let expected = path_segments(pattern);
+    let actual = path_segments(path);
+    let mut index = 0;
+    for segment in &expected {
+        if segment.starts_with('*') {
+            return true;
+        }
+        if segment.starts_with(':') {
+            if index >= actual.len() || actual[index].is_empty() {
+                return false;
+            }
+            index += 1;
+            continue;
+        }
+        if index >= actual.len() || actual[index] != *segment {
+            return false;
+        }
+        index += 1;
+    }
+    index == actual.len()
+}
+
+/// The fallback behind every Rust route. A path the Go build registers is
+/// proxied, because that route is not ported yet. A path it does not register
+/// answers exactly what Gin's NoRoute answers, and a trailing slash on a path
+/// whose trimmed form would match a `:param` route answers Gin's redirect.
+pub async fn go_fallback(
+    State(original): State<Original>,
+    req: Request,
+) -> Response {
+    let method = req.method().as_str().to_string();
+    let path = req.uri().path().to_string();
+    if crate::go_routes::GO_ROUTES
+        .iter()
+        .any(|(route_method, pattern)| *route_method == method && pattern_matches(pattern, &path))
+    {
+        return crate::original::proxy(State(original), req).await;
+    }
+    if path.len() > 1 && path.ends_with('/') {
+        let trimmed = &path[..path.len() - 1];
+        let candidate = format!("{trimmed}/x");
+        let redirects = crate::go_routes::GO_ROUTES.iter().any(|(route_method, pattern)| {
+            *route_method == method
+                && pattern
+                    .rsplit('/')
+                    .next()
+                    .is_some_and(|segment| segment.starts_with(':'))
+                && pattern_matches(pattern, &candidate)
+        });
+        if redirects {
+            let body = format!("<a href=\"{trimmed}\">Moved Permanently</a>.\n\n");
+            return (
+                StatusCode::MOVED_PERMANENTLY,
+                [
+                    (header::CONTENT_TYPE, HeaderValue::from_static("text/html; charset=utf-8")),
+                    (
+                        header::LOCATION,
+                        HeaderValue::from_str(trimmed).unwrap_or(HeaderValue::from_static("/")),
+                    ),
+                ],
+                body,
+            )
+                .into_response();
+        }
+    }
+    // `gin.Engine`'s default NoRoute: no middleware, no security headers.
+    (
+        StatusCode::NOT_FOUND,
+        [(header::CONTENT_TYPE, HeaderValue::from_static("text/plain"))],
+        "404 page not found",
+    )
+        .into_response()
 }

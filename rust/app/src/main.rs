@@ -1,4 +1,5 @@
 mod appcfg;
+mod go_routes;
 mod auth;
 mod envelope;
 mod original;
@@ -20,6 +21,9 @@ async fn main() {
     // hand-ported routes are merged here so a wire cannot drop them.
     let app = units::router()
         .merge(routes::router())
+        // Anything the merged router does not answer goes here: a path the Go
+        // build registers is proxied, anything else gets Gin's own 404.
+        .fallback(routes::go_fallback)
         .with_state(original.clone());
     let port = std::env::var("PORT")
         .ok()
