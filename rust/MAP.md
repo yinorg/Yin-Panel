@@ -46,8 +46,8 @@ rust-anything analyze backend --lang go --whole-app
 - Original recorded: 299 HTTP cases in `rust/app-cases/` (35 named inputs, 264
   traps), `299/299` passing against the Go baseline.
 - Front door: `rust/app` (axum), `299/299`, fallback `99.7%` (298/299).
-- Recorded cases: 346 (82 named inputs + 264 traps); original 346/346, front
-  door 346/346.
+- Recorded cases: 353 (89 named inputs + 264 traps); original 353/353, front
+  door 353/353.
 - Rust answers directly (43 route registrations):
   - `GET /api/theme/v2/wallpaper/library` -> `rust/wallpaperpack-rs`
   - `GET /api/about`, `GET /api/system/capabilities`, `GET /api/oauth/config`,
@@ -62,7 +62,7 @@ rust-anything analyze backend --lang go --whole-app
     the theme reads (`current`, `packages`, `package/{id}`, `mine`, `effective`)
     -> `rust/app`
 - Ported library units not yet wired to a route: `rust/util-rs`.
-- Fallback rate: 73.4% (254/346). Everything else is still proxied to Go.
+- Fallback rate: 72.0% (254/353). Everything else is still proxied to Go.
 - `rust/db-tool`: SQLite schema upgrade (all steps) and `migrate-db` into
   SQLite, MySQL and PostgreSQL, with tests. The PostgreSQL path was verified
   against a real server (24 tables, row counts matched, re-runnable). MySQL is
