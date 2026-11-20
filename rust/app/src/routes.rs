@@ -5,6 +5,7 @@
 use axum::Router;
 use axum::extract::{Path, Query, Request};
 use axum::http::{HeaderMap, HeaderValue, header};
+use axum::response::IntoResponse;
 use axum::response::Response;
 use axum::routing::{get, post};
 use md5::{Digest, Md5};
@@ -29,6 +30,9 @@ pub fn router() -> Router<Original> {
         .route("/api/spaces/{space_id}/groups", get(groups))
         .route("/api/spaces/{space_id}/items", get(items))
         .route("/api/spaces/{space_id}/members", get(members))
+        .route("/api/spaces/{space_id}/public", get(space_public))
+        .route("/api/system/moduleConfig/getByName", get(module_config))
+        .route("/api/file/getList", get(file_list))
 }
 
 /// `AboutRouter.Get`.
@@ -719,4 +723,167 @@ struct ItemOut {
     user_id: i64,
     #[serde(rename = "spaceId")]
     space_id: i64,
+}
+
+/// `canManageSpace`: the owner or a member whose role is `admin`.
+async fn can_manage(pool: &sqlx::SqlitePool, user_id: i64, space_id: i64) -> bool {
+    let owner: Option<(i64,)> = sqlx::query_as(r#"SELECT owner_user_id FROM "space" WHERE id = ?"#)
+        .bind(space_id)
+        .fetch_optional(pool)
+        .await
+        .unwrap_or(None);
+    match owner {
+        Some((owner_id,)) if owner_id == user_id => true,
+        Some(_) => sqlx::query_as::<_, (i64,)>(
+            r#"SELECT id FROM space_member WHERE space_id = ? AND user_id = ? AND role = 'admin' LIMIT 1"#,
+        )
+        .bind(space_id)
+        .bind(user_id)
+        .fetch_optional(pool)
+        .await
+        .unwrap_or(None)
+        .is_some(),
+        None => false,
+    }
+}
+
+/// `SpaceRouter.GetPublicConfig`.
+async fn space_public(headers: HeaderMap, Path(space_id): Path<i64>) -> Response {
+    let user = match auth::user(&headers).await {
+        Ok(user) => user,
+        Err(AuthError::NotLoggedIn) => return error_code(1000),
+        Err(AuthError::Disabled) => return error_code(1004),
+    };
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool.clone(),
+        Err(error) => return envelope::error(&error),
+    };
+    if !can_manage(&pool, user.id, space_id).await {
+        return error_code(1005);
+    }
+    let row: Option<(i64, Option<String>, String)> = sqlx::query_as(
+        r#"SELECT public_enabled, public_id, public_mode FROM "space" WHERE id = ?"#,
+    )
+    .bind(space_id)
+    .fetch_optional(&pool)
+    .await
+    .unwrap_or(None);
+    let Some((enabled, public_id, mode)) = row else {
+        return error_code(404);
+    };
+    success_data(json!({
+        "enabled": enabled != 0,
+        "publicId": public_id,
+        "mode": mode,
+    }))
+}
+
+/// `ModuleConfigRouter.GetByName`: a missing row answers `"data": null`, which
+/// Go produces by handing a nil map to a non-nil interface.
+async fn module_config(
+    headers: HeaderMap,
+    Query(query): Query<std::collections::HashMap<String, String>>,
+) -> Response {
+    let user = match auth::user(&headers).await {
+        Ok(user) => user,
+        Err(AuthError::NotLoggedIn) => return error_code(1000),
+        Err(AuthError::Disabled) => return error_code(1004),
+    };
+    let name = query.get("name").cloned().unwrap_or_default();
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool,
+        Err(error) => return envelope::error(&error),
+    };
+    let row: Option<(String,)> = sqlx::query_as(
+        r#"SELECT value_json FROM module_config WHERE user_id = ? AND name = ? LIMIT 1"#,
+    )
+    .bind(user.id)
+    .bind(&name)
+    .fetch_optional(pool)
+    .await
+    .unwrap_or(None);
+    match row {
+        None => (axum::http::StatusCode::OK, envelope::headers(), envelope::body(0, "OK", Some(serde_json::Value::Null))).into_response(),
+        Some((value_json,)) => {
+            let value: serde_json::Value =
+                serde_json::from_str(&value_json).unwrap_or(serde_json::Value::Null);
+            (axum::http::StatusCode::OK, envelope::headers(), envelope::body(0, "OK", Some(value))).into_response()
+        }
+    }
+}
+
+/// `FileRouter.GetList`, behind `AdminInterceptor`: optional `limit`/`page`,
+/// newest first, and `list` is `null` when there are no rows.
+async fn file_list(
+    headers: HeaderMap,
+    Query(query): Query<std::collections::HashMap<String, String>>,
+) -> Response {
+    let user = match auth::user(&headers).await {
+        Ok(user) => user,
+        Err(AuthError::NotLoggedIn) => return error_code(1000),
+        Err(AuthError::Disabled) => return error_code(1004),
+    };
+    if user.role != 1 {
+        return error_code(1005);
+    }
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool,
+        Err(error) => return envelope::error(&error),
+    };
+    let total: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM file")
+        .fetch_one(pool)
+        .await
+        .unwrap_or((0,));
+    let limit: i64 = query.get("limit").and_then(|value| value.parse().ok()).unwrap_or(0);
+    let rows: Vec<FileRow> = if limit > 0 {
+        let page: i64 = query.get("page").and_then(|value| value.parse().ok()).unwrap_or(1).max(1);
+        let limit = limit.min(200);
+        sqlx::query_as(
+            "SELECT id, created_at, updated_at, file_name FROM file ORDER BY created_at DESC LIMIT ? OFFSET ?",
+        )
+        .bind(limit)
+        .bind((page - 1) * limit)
+        .fetch_all(pool)
+        .await
+        .unwrap_or_default()
+    } else {
+        sqlx::query_as("SELECT id, created_at, updated_at, file_name FROM file ORDER BY created_at DESC")
+            .fetch_all(pool)
+            .await
+            .unwrap_or_default()
+    };
+    let prefix = if ctx.conf.base.url_prefix.is_empty() {
+        "/uploads/"
+    } else {
+        ctx.conf.base.url_prefix.as_str()
+    };
+    let list: Vec<serde_json::Value> = rows
+        .into_iter()
+        .map(|row| {
+            json!({
+                "src": format!("{prefix}{}", row.file_name),
+                "fileName": row.file_name,
+                "id": row.id,
+                "createTime": rfc3339(&row.created_at),
+                "updateTime": rfc3339(&row.updated_at),
+            })
+        })
+        .collect();
+    let list = if list.is_empty() {
+        serde_json::Value::Null
+    } else {
+        serde_json::Value::Array(list)
+    };
+    success_data(json!({"count": total.0, "list": list}))
+}
+
+#[derive(sqlx::FromRow)]
+struct FileRow {
+    id: i64,
+    created_at: String,
+    updated_at: String,
+    file_name: String,
 }

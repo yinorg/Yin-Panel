@@ -44,7 +44,7 @@ pub fn headers() -> [(header::HeaderName, HeaderValue); 5] {
 }
 
 /// `response.ApiReturn`: the envelope, with `data` present only when non-null.
-pub fn envelope(code: i64, msg: &str, data: Option<Value>) -> String {
+pub fn body(code: i64, msg: &str, data: Option<Value>) -> String {
     match data {
         Some(data) => json!({"code": code, "data": data, "msg": msg}).to_string(),
         None => json!({"code": code, "msg": msg}).to_string(),
@@ -67,25 +67,25 @@ pub fn success_struct<T: serde::Serialize>(data: T) -> Response {
         data,
         msg: "OK",
     })
-    .unwrap_or_else(|_| envelope(-1, "Server error", None));
+    .unwrap_or_else(|_| body(-1, "Server error", None));
     (StatusCode::OK, headers(), body).into_response()
 }
 
 pub fn success_data(data: Value) -> Response {
-    (StatusCode::OK, headers(), envelope(0, "OK", Some(data))).into_response()
+    (StatusCode::OK, headers(), body(0, "OK", Some(data))).into_response()
 }
 
 pub fn success() -> Response {
-    (StatusCode::OK, headers(), envelope(0, "OK", None)).into_response()
+    (StatusCode::OK, headers(), body(0, "OK", None)).into_response()
 }
 
 pub fn error_code(code: i64) -> Response {
     let msg = error_message(code).unwrap_or("Server error");
-    (StatusCode::OK, headers(), envelope(code, msg, None)).into_response()
+    (StatusCode::OK, headers(), body(code, msg, None)).into_response()
 }
 
 pub fn error(msg: &str) -> Response {
-    (StatusCode::OK, headers(), envelope(-1, msg, None)).into_response()
+    (StatusCode::OK, headers(), body(-1, msg, None)).into_response()
 }
 
 /// A response with an extra header, used where the Core sets a cookie.
