@@ -272,40 +272,39 @@ fn is_builtin_theme(id: &str) -> bool {
 
 /// `themeCoreRangeSupports`: enough of a semver range for the `>=x.y.z` forms
 /// packages declare.
+/// `themeCoreRangeSupports`: one to four space-separated comparators, each with
+/// a full version. A bare version, `^`, `*` and comma lists are not accepted —
+/// the Go validator rejects them.
 fn core_range_supports(expression: &str, version: &str) -> bool {
-    let current = match parse_version(version) {
-        Some(value) => value,
-        None => return false,
+    let Some(current) = parse_version(version) else {
+        return false;
     };
-    let expression = expression.trim();
-    if expression.is_empty() || expression == "*" {
-        return true;
+    let parts: Vec<&str> = expression.split_whitespace().collect();
+    if parts.is_empty() || parts.len() > 4 {
+        return false;
     }
-    for clause in expression.split(',') {
-        let clause = clause.trim();
-        let (operator, target) = if let Some(rest) = clause.strip_prefix(">=") {
+    for part in parts {
+        let (operator, target) = if let Some(rest) = part.strip_prefix(">=") {
             (">=", rest)
-        } else if let Some(rest) = clause.strip_prefix('>') {
-            (">", rest)
-        } else if let Some(rest) = clause.strip_prefix("<=") {
+        } else if let Some(rest) = part.strip_prefix("<=") {
             ("<=", rest)
-        } else if let Some(rest) = clause.strip_prefix('<') {
+        } else if let Some(rest) = part.strip_prefix('>') {
+            (">", rest)
+        } else if let Some(rest) = part.strip_prefix('<') {
             ("<", rest)
-        } else if let Some(rest) = clause.strip_prefix('^') {
-            ("^", rest)
+        } else if let Some(rest) = part.strip_prefix('=') {
+            ("=", rest)
         } else {
-            ("=", clause)
+            return false;
         };
-        let target = target.trim();
         let Some(expected) = parse_version(target) else {
             return false;
         };
         let holds = match operator {
-            ">=" => current >= expected,
             ">" => current > expected,
-            "<=" => current <= expected,
+            ">=" => current >= expected,
             "<" => current < expected,
-            "^" => current.0 == expected.0 && current >= expected,
+            "<=" => current <= expected,
             _ => current == expected,
         };
         if !holds {
@@ -462,13 +461,40 @@ pub fn validate_manifest(manifest: &Manifest, core_version: &str) -> Result<(), 
             );
         }
     }
-    for permission in manifest.permissions.required.iter().chain(&manifest.permissions.optional) {
-        if !permission_name_ok(&permission.name) {
-            return Err(format!("invalid theme permission {:?}", permission.name));
-        }
-        for origin in &permission.origins {
-            if !valid_origin(origin) {
-                return Err(format!("invalid theme permission origin {origin:?}"));
+    let allowed_names = [
+        "spaces.read",
+        "groups.read",
+        "items.read",
+        "items.write",
+        "groups.write",
+        "monitor.read",
+        "preferences.read",
+        "preferences.write",
+        "theme.storage",
+        "network.fetch",
+        "media.remote",
+    ];
+    let mut seen_permissions = std::collections::HashSet::new();
+    for (group, list) in [
+        ("required", &manifest.permissions.required),
+        ("optional", &manifest.permissions.optional),
+    ] {
+        for permission in list {
+            if !allowed_names.contains(&permission.name.as_str())
+                || !seen_permissions.insert(permission.name.clone())
+            {
+                return Err(format!(
+                    "unknown or duplicate {group} permission {:?}",
+                    permission.name
+                ));
+            }
+            for origin in &permission.origins {
+                if !valid_origin(origin) {
+                    return Err(format!(
+                        "invalid origin {origin:?} in permission {:?}",
+                        permission.name
+                    ));
+                }
             }
         }
     }
@@ -479,17 +505,6 @@ pub fn validate_manifest(manifest: &Manifest, core_version: &str) -> Result<(), 
     }
     validate_contributions(manifest)?;
     Ok(())
-}
-
-fn permission_name_ok(name: &str) -> bool {
-    let mut parts = name.split('.');
-    let (Some(first), Some(second)) = (parts.next(), parts.next()) else {
-        return false;
-    };
-    !first.is_empty()
-        && !second.is_empty()
-        && parts.next().is_none()
-        && name.chars().all(|ch| ch.is_ascii_lowercase() || matches!(ch, '.' | '-' | '_'))
 }
 
 fn valid_origin(value: &str) -> bool {
@@ -542,6 +557,15 @@ fn validate_contributions(manifest: &Manifest) -> Result<(), String> {
         if !matches!(layout.kind.as_str(), "standard" | "directory") {
             return Err(format!("unknown theme home layout {:?}", layout.kind));
         }
+    }
+    let contributions = manifest.contributes.views.len()
+        + manifest.contributes.regions.len()
+        + manifest.contributes.components.len();
+    if contributions > 0 && manifest.entrypoints.script.is_empty() {
+        return Err(
+            "theme view, region, and component contributions require a script entrypoint"
+                .to_string(),
+        );
     }
     Ok(())
 }

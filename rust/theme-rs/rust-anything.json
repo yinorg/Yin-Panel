@@ -1,0 +1,400 @@
+{
+  "schema": "rust-anything/bridge@1",
+  "root": "/home/hsy/project/Yin-Panel/backend",
+  "unit": "internal/biz/theme/",
+  "language": "go",
+  "kind": "ffi",
+  "crate_name": "theme-rs",
+  "exports": [
+    {
+      "name": "ValidatePackageManifestV2",
+      "file": "internal/biz/theme/package_v2.go",
+      "line": 324,
+      "params": [
+        {
+          "name": "m",
+          "ts_type": "unknown",
+          "optional": false,
+          "rest": false,
+          "native_type": "PackageManifestV2"
+        },
+        {
+          "name": "coreVersion",
+          "ts_type": "string",
+          "optional": false,
+          "rest": false,
+          "native_type": "string"
+        }
+      ],
+      "returns": "void",
+      "is_async": false,
+      "is_generator": false,
+      "type_params": [],
+      "uses_instanceof": false,
+      "native_return": "(error)",
+      "prototype": "func ValidatePackageManifestV2(m PackageManifestV2, coreVersion string) error"
+    },
+    {
+      "name": "ValidateThemeGrantV2",
+      "file": "internal/biz/theme/package_v2.go",
+      "line": 508,
+      "params": [
+        {
+          "name": "manifest",
+          "ts_type": "unknown",
+          "optional": false,
+          "rest": false,
+          "native_type": "PackageManifestV2"
+        },
+        {
+          "name": "executionMode",
+          "ts_type": "string",
+          "optional": false,
+          "rest": false,
+          "native_type": "string"
+        },
+        {
+          "name": "permissions",
+          "ts_type": "string[]",
+          "optional": false,
+          "rest": false,
+          "native_type": "[]string"
+        }
+      ],
+      "returns": "void",
+      "is_async": false,
+      "is_generator": false,
+      "type_params": [],
+      "uses_instanceof": false,
+      "native_return": "(error)",
+      "prototype": "func ValidateThemeGrantV2(manifest PackageManifestV2, executionMode string, permissions []string) error"
+    },
+    {
+      "name": "ActivationScopeForUserV2",
+      "file": "internal/biz/theme/revision_v2.go",
+      "line": 755,
+      "params": [
+        {
+          "name": "userID",
+          "ts_type": "int",
+          "optional": false,
+          "rest": false,
+          "native_type": "uint"
+        }
+      ],
+      "returns": "string",
+      "is_async": false,
+      "is_generator": false,
+      "type_params": [],
+      "uses_instanceof": false,
+      "native_return": "(string)",
+      "prototype": "func ActivationScopeForUserV2(userID uint) string"
+    },
+    {
+      "name": "ParseWebWallpaper",
+      "file": "internal/biz/theme/wallpaper.go",
+      "line": 29,
+      "params": [
+        {
+          "name": "data",
+          "ts_type": "int[]",
+          "optional": false,
+          "rest": false,
+          "native_type": "[]byte"
+        }
+      ],
+      "returns": "[int[], int[], string]",
+      "is_async": false,
+      "is_generator": false,
+      "type_params": [],
+      "uses_instanceof": false,
+      "native_return": "([]byte, []byte, string, error)",
+      "prototype": "func ParseWebWallpaper(data []byte) (html, poster []byte, posterType string, err error)"
+    }
+  ],
+  "classes": [],
+  "js_only": [
+    {
+      "name": "ParsePackageArchiveV2",
+      "file": "internal/biz/theme/package_v2.go",
+      "line": 137,
+      "reason": "takes or returns a pointer (`*PackageV2`)"
+    },
+    {
+      "name": "SavePackagePreviewV2",
+      "file": "internal/biz/theme/package_v2.go",
+      "line": 269,
+      "reason": "takes or returns a pointer (`*PackageV2`)"
+    },
+    {
+      "name": "GetPackagePreviewV2",
+      "file": "internal/biz/theme/package_v2.go",
+      "line": 300,
+      "reason": "takes or returns a pointer (`*PackageV2`)"
+    },
+    {
+      "name": "PackagePreviewPublicV2",
+      "file": "internal/biz/theme/package_v2.go",
+      "line": 311,
+      "reason": "takes or returns a pointer (`*PackageV2`)"
+    },
+    {
+      "name": "InstallPackageV2",
+      "file": "internal/biz/theme/revision_v2.go",
+      "line": 136,
+      "reason": "takes or returns a pointer (`*gorm.DB`)"
+    },
+    {
+      "name": "GetPackageRevisionV2",
+      "file": "internal/biz/theme/revision_v2.go",
+      "line": 195,
+      "reason": "takes or returns a pointer (`*gorm.DB`)"
+    },
+    {
+      "name": "PackageRevisionPublicV2",
+      "file": "internal/biz/theme/revision_v2.go",
+      "line": 208,
+      "reason": "takes or returns a pointer (`*gorm.DB`)"
+    },
+    {
+      "name": "ListPackageRevisionsV2",
+      "file": "internal/biz/theme/revision_v2.go",
+      "line": 237,
+      "reason": "takes or returns a pointer (`*gorm.DB`)"
+    },
+    {
+      "name": "ListPackagesV2",
+      "file": "internal/biz/theme/revision_v2.go",
+      "line": 252,
+      "reason": "takes or returns a pointer (`*gorm.DB`)"
+    },
+    {
+      "name": "LatestPackageRevisionV2",
+      "file": "internal/biz/theme/revision_v2.go",
+      "line": 268,
+      "reason": "takes or returns a pointer (`*gorm.DB`)"
+    },
+    {
+      "name": "ActivePackageRevisionV2",
+      "file": "internal/biz/theme/revision_v2.go",
+      "line": 276,
+      "reason": "takes or returns a pointer (`*gorm.DB`)"
+    },
+    {
+      "name": "InstanceDefaultRevisionV2",
+      "file": "internal/biz/theme/revision_v2.go",
+      "line": 322,
+      "reason": "takes or returns a pointer (`*gorm.DB`)"
+    },
+    {
+      "name": "ActivatePackageV2",
+      "file": "internal/biz/theme/revision_v2.go",
+      "line": 330,
+      "reason": "takes or returns a pointer (`*gorm.DB`)"
+    },
+    {
+      "name": "SetUserThemeSelectionV2",
+      "file": "internal/biz/theme/revision_v2.go",
+      "line": 362,
+      "reason": "takes or returns a pointer (`*gorm.DB`)"
+    },
+    {
+      "name": "UserThemeModeV2",
+      "file": "internal/biz/theme/revision_v2.go",
+      "line": 404,
+      "reason": "takes or returns a pointer (`*gorm.DB`)"
+    },
+    {
+      "name": "ResolveThemeV2",
+      "file": "internal/biz/theme/revision_v2.go",
+      "line": 431,
+      "reason": "takes or returns a pointer (`*gorm.DB`)"
+    },
+    {
+      "name": "UserThemeChoiceModeV2",
+      "file": "internal/biz/theme/revision_v2.go",
+      "line": 524,
+      "reason": "takes or returns a pointer (`*gorm.DB`)"
+    },
+    {
+      "name": "SetUserThemeChoiceV2",
+      "file": "internal/biz/theme/revision_v2.go",
+      "line": 541,
+      "reason": "takes or returns a pointer (`*gorm.DB`)"
+    },
+    {
+      "name": "SetSpaceThemeV2",
+      "file": "internal/biz/theme/revision_v2.go",
+      "line": 571,
+      "reason": "takes or returns a pointer (`*gorm.DB`)"
+    },
+    {
+      "name": "ClearSpaceThemeV2",
+      "file": "internal/biz/theme/revision_v2.go",
+      "line": 582,
+      "reason": "takes or returns a pointer (`*gorm.DB`)"
+    },
+    {
+      "name": "SpaceThemePreferenceForV2",
+      "file": "internal/biz/theme/revision_v2.go",
+      "line": 586,
+      "reason": "takes or returns a pointer (`*gorm.DB`)"
+    },
+    {
+      "name": "SetUserSpaceThemeV2",
+      "file": "internal/biz/theme/revision_v2.go",
+      "line": 593,
+      "reason": "takes or returns a pointer (`*gorm.DB`)"
+    },
+    {
+      "name": "ClearUserSpaceThemeV2",
+      "file": "internal/biz/theme/revision_v2.go",
+      "line": 604,
+      "reason": "takes or returns a pointer (`*gorm.DB`)"
+    },
+    {
+      "name": "UserSpaceThemePreferenceForV2",
+      "file": "internal/biz/theme/revision_v2.go",
+      "line": 608,
+      "reason": "takes or returns a pointer (`*gorm.DB`)"
+    },
+    {
+      "name": "ActiveRevisionIDV2",
+      "file": "internal/biz/theme/revision_v2.go",
+      "line": 618,
+      "reason": "takes or returns a pointer (`*gorm.DB`)"
+    },
+    {
+      "name": "GetActivationV2",
+      "file": "internal/biz/theme/revision_v2.go",
+      "line": 626,
+      "reason": "takes or returns a pointer (`*gorm.DB`)"
+    },
+    {
+      "name": "GrantForRevisionV2",
+      "file": "internal/biz/theme/revision_v2.go",
+      "line": 632,
+      "reason": "takes or returns a pointer (`*gorm.DB`)"
+    },
+    {
+      "name": "GetPackageAssetV2",
+      "file": "internal/biz/theme/revision_v2.go",
+      "line": 638,
+      "reason": "takes or returns a pointer (`*gorm.DB`)"
+    },
+    {
+      "name": "ImplicitBuiltinPermissionsV2",
+      "file": "internal/biz/theme/revision_v2.go",
+      "line": 644,
+      "reason": "takes or returns a pointer (`*gorm.DB`)"
+    },
+    {
+      "name": "InitializeActivationV2",
+      "file": "internal/biz/theme/revision_v2.go",
+      "line": 666,
+      "reason": "takes or returns a pointer (`*gorm.DB`)"
+    },
+    {
+      "name": "SetPendingActivationV2",
+      "file": "internal/biz/theme/revision_v2.go",
+      "line": 678,
+      "reason": "takes or returns a pointer (`*gorm.DB`)"
+    },
+    {
+      "name": "ConfirmActivationV2",
+      "file": "internal/biz/theme/revision_v2.go",
+      "line": 706,
+      "reason": "takes or returns a pointer (`*gorm.DB`)"
+    },
+    {
+      "name": "MarkActivationHealthyV2",
+      "file": "internal/biz/theme/revision_v2.go",
+      "line": 728,
+      "reason": "takes or returns a pointer (`*gorm.DB`)"
+    },
+    {
+      "name": "RollbackActivationV2",
+      "file": "internal/biz/theme/revision_v2.go",
+      "line": 732,
+      "reason": "takes or returns a pointer (`*gorm.DB`)"
+    },
+    {
+      "name": "SaveGrantV2",
+      "file": "internal/biz/theme/revision_v2.go",
+      "line": 759,
+      "reason": "takes or returns a pointer (`*gorm.DB`)"
+    },
+    {
+      "name": "SaveUserGrantV2",
+      "file": "internal/biz/theme/revision_v2.go",
+      "line": 767,
+      "reason": "takes or returns a pointer (`*gorm.DB`)"
+    },
+    {
+      "name": "GetGrantV2",
+      "file": "internal/biz/theme/revision_v2.go",
+      "line": 801,
+      "reason": "takes or returns a pointer (`*gorm.DB`)"
+    },
+    {
+      "name": "RevokeGrantV2",
+      "file": "internal/biz/theme/revision_v2.go",
+      "line": 807,
+      "reason": "takes or returns a pointer (`*gorm.DB`)"
+    },
+    {
+      "name": "GetTrustedRuntimePolicyV2",
+      "file": "internal/biz/theme/revision_v2.go",
+      "line": 811,
+      "reason": "takes or returns a pointer (`*gorm.DB`)"
+    },
+    {
+      "name": "SetTrustedRuntimePolicyV2",
+      "file": "internal/biz/theme/revision_v2.go",
+      "line": 817,
+      "reason": "takes or returns a pointer (`*gorm.DB`)"
+    },
+    {
+      "name": "TrustedRuntimeEnabledV2",
+      "file": "internal/biz/theme/revision_v2.go",
+      "line": 846,
+      "reason": "takes or returns a pointer (`*gorm.DB`)"
+    },
+    {
+      "name": "SaveThemeSettingsV2",
+      "file": "internal/biz/theme/revision_v2.go",
+      "line": 854,
+      "reason": "takes or returns a pointer (`*gorm.DB`)"
+    },
+    {
+      "name": "RemovePackageV2",
+      "file": "internal/biz/theme/revision_v2.go",
+      "line": 862,
+      "reason": "takes or returns a pointer (`*gorm.DB`)"
+    },
+    {
+      "name": "EnsureBuiltinV2",
+      "file": "internal/biz/theme/revision_v2.go",
+      "line": 889,
+      "reason": "takes or returns a pointer (`*gorm.DB`)"
+    },
+    {
+      "name": "Migrate",
+      "file": "internal/biz/theme/store.go",
+      "line": 17,
+      "reason": "takes or returns a pointer (`*gorm.DB`)"
+    },
+    {
+      "name": "SaveWebWallpaper",
+      "file": "internal/biz/theme/wallpaper.go",
+      "line": 72,
+      "reason": "takes or returns a pointer (`*gorm.DB`)"
+    },
+    {
+      "name": "WebWallpaperAsset",
+      "file": "internal/biz/theme/wallpaper.go",
+      "line": 85,
+      "reason": "takes or returns a pointer (`*gorm.DB`)"
+    }
+  ]
+}

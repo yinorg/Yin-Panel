@@ -172,3 +172,19 @@ identical row counts and identical `user`, `space` and `revision_record_v2` rows
 Two differences were found and fixed by that comparison: Go resolves the source
 path against the working directory (not the config file), and its target schema
 has no `schema_migration` table.
+
+## ADR-012: `internal/biz/theme` is ported as `theme-rs`
+
+**Status:** accepted
+
+`bridge` on `internal/biz/theme` yields the four functions that do not take a
+`*gorm.DB`: `ValidatePackageManifestV2`, `ValidateThemeGrantV2`,
+`ActivationScopeForUserV2` and `ParseWebWallpaper`. Everything else in the
+package is a database operation and stays in Go.
+
+The unit found two real divergences in the hand-written install path in
+`rust/app/src/packages.rs`, both fixed: Go's Core-range check accepts only
+space-separated comparators (`>=0.4.0`), never a bare version, `^` or `*`; and
+the permission check uses a fixed allow-list of eleven names, rejects
+duplicates, and requires a script entrypoint when a theme contributes views,
+regions or components.

@@ -57,8 +57,12 @@ rust-anything analyze backend --lang go --whole-app
   | `database-rs` (`MigrateDB`) | **pass** | 233/233 |
   | `response-rs` (`GetErrorMsgByCode`) | **pass** | 25/25 |
   | `storage-rs` (`ContentAddressedKey`) | **pass** | 100/100 |
+  | `theme-rs` (manifest/grant/scope/web-wallpaper) | **pass** | 111/111 |
   | `wallpaperpack-rs` | fails **only** `error cases` | 212/212 |
   | `internal/biz/service` | cannot be bridged: every export depends on a repository interface | — |
+  | `internal/web/model/base` | cannot be bridged: `interface{}` and `*gin.Context` | — |
+  | `pkg/app` | `Init` starts the server; nothing to record | — |
+  | `internal/infra/zaplog` | `InitLog` only fails when `./logs` cannot be created, which no input reaches | — |
 - Database unit: `rust/database-rs` is bridged from `internal/infra/database` and
   **passes gate** (233/233 recorded cases, error cases included). It ports
   `MigrateDB`; the rest of that package takes the package-level `*gorm.DB` and
