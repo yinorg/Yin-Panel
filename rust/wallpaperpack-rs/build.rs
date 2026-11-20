@@ -79,14 +79,18 @@ fn main() {
 
     let mut entries = String::new();
     for (name, media_type) in &index {
+        // The artwork is compiled in, as Go's `embed.FS` does: the asset route
+        // then needs no runtime directory next to the binary.
+        let absolute = assets.join(name);
         entries.push_str(&format!(
-            "    ({}, {}),\n",
+            "    ({}, {}, include_bytes!({})),\n",
             literal(name),
-            literal(media_type)
+            literal(media_type),
+            literal(&absolute.to_string_lossy())
         ));
     }
     generated.push_str(&format!(
-        "pub static ASSETS: &[(&str, &str)] = &[\n{entries}];\n"
+        "pub static ASSETS: &[(&str, &str, &[u8])] = &[\n{entries}];\n"
     ));
 
     fs::write(out.join("catalogue.rs"), generated).expect("writing the generated catalogue");

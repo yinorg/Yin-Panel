@@ -86,10 +86,11 @@ Consequence for `gate`: its `error cases` check still sees the Go signature's
 `diff` reached `212/212`; this exception applies only to units whose sole error
 path is a compile-time-invalid asset and must be listed in `MAP.md`.
 
-`Asset` (973 files, 132 MB) stays in Go: this crate must not embed the artwork
-to answer two metadata questions. The asset route stays proxied until storage
-is ported, and the Rust port then reads the pack from a directory shipped next
-to the binary.
+`Asset` was kept in Go at first, because the catalogue questions need only
+media types. The asset route is now ported too: `build.rs` embeds each packaged
+file with `include_bytes!`, exactly as Go's `embed.FS` does, which keeps the
+route free of a runtime directory and made the front door binary 142 MiB. The
+bytes and their headers were compared against the Go service (HTML and JPEG).
 
 ## ADR-007: JSON key order follows the Go encoder
 

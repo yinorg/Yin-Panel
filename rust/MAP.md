@@ -66,6 +66,8 @@ rust-anything analyze backend --lang go --whole-app
 - Monitor: the live snapshot (`CPU_INFO`, `MEMORY_INFO`, `NETWORK_INFO`) is
   collected in Rust; memory and CPU identity verified against Go on the same
   host.
+- Wallpaper library assets: the packaged artwork is embedded and served by Rust
+  (verified byte-identical against Go for HTML and JPEG, with the same 404s).
 - Favicon: `getSiteFavicon` ported and compared against Go through the fixture
   in `rust/record/favicon-fixture/` (not recordable, so verified by hand).
 - Theme package pipeline: archive parsing, manifest and resource validation,

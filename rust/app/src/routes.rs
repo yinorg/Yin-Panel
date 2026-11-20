@@ -73,6 +73,10 @@ pub fn router() -> Router<Original> {
         .route("/api/theme/v2/admin/trial", post(begin_trial))
         .route("/api/theme/v2/admin/confirm", post(confirm_trial))
         .route("/api/theme/v2/admin/rollback", post(rollback_theme))
+        .route(
+            "/api/theme/v2/wallpaper/library/assets/{version}/{*name}",
+            get(wallpaper_library_asset),
+        )
         .route("/api/theme/v2/preview/{token}", get(theme_preview_get))
         .route(
             "/api/theme/v2/preview/{token}/assets/{*name}",
@@ -6479,4 +6483,25 @@ async fn get_site_favicon(headers: HeaderMap, request: Request) -> Response {
         "iconUrl": format!("{}{}", upload_prefix(), file_name),
         "fileName": file_name,
     }))
+}
+
+/// `ThemeRouter.WallpaperLibraryAsset`: the packaged artwork, only under the
+/// catalogue's own version prefix.
+async fn wallpaper_library_asset(
+    Path((version, raw_name)): Path<(String, String)>,
+) -> Response {
+    let catalogue = wallpaperpack_rs::port::catalogue();
+    let expected = catalogue
+        .get("version")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("")
+        .to_string();
+    if version != expected {
+        return envelope::empty_not_found();
+    }
+    let name = raw_name.trim_start_matches('/').to_string();
+    match wallpaperpack_rs::port::asset(name) {
+        Some((content, media_type)) => serve_bytes(&media_type, &content),
+        None => envelope::empty_not_found(),
+    }
 }

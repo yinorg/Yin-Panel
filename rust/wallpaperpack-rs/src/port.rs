@@ -76,3 +76,20 @@ fn empty_entry() -> Value {
         "poster": "",
     })
 }
+
+/// `Asset(name)`: one packaged file and its media type, embedded at build time
+/// exactly like Go's `embed.FS`. The name is resolved against the packaged
+/// index, so a traversal or an unpackaged path is absent.
+pub fn asset(name: String) -> Option<(Vec<u8>, String)> {
+    let name = name.trim_start_matches('/').to_string();
+    if name.is_empty()
+        || name.contains('\\')
+        || name.split('/').any(|part| part.is_empty() || part == "." || part == "..")
+    {
+        return None;
+    }
+    ASSETS
+        .iter()
+        .find(|(asset, _, _)| *asset == name)
+        .map(|(_, media_type, content)| (content.to_vec(), media_type.to_string()))
+}
