@@ -63,6 +63,9 @@ rust-anything analyze backend --lang go --whole-app
     -> `rust/app`
 - Ported library units not yet wired to a route: `rust/util-rs`.
 - Fallback rate: 68.6% (254/370). Everything else is still proxied to Go.
+- Monitor: the live snapshot (`CPU_INFO`, `MEMORY_INFO`, `NETWORK_INFO`) is
+  collected in Rust; memory and CPU identity verified against Go on the same
+  host.
 - Favicon: `getSiteFavicon` ported and compared against Go through the fixture
   in `rust/record/favicon-fixture/` (not recordable, so verified by hand).
 - Theme package pipeline: archive parsing, manifest and resource validation,
