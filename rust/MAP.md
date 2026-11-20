@@ -47,7 +47,7 @@ rust-anything analyze backend --lang go --whole-app
   traps), `299/299` passing against the Go baseline.
 - Front door: `rust/app` (axum), `299/299`, fallback `99.7%` (298/299).
 - Recorded cases: 384 (120 named inputs + 264 traps); original 384/384, front
-  door 384/384.
+  door 384/384, fallback 0.0%.
 - Rust answers directly (43 route registrations):
   - `GET /api/theme/v2/wallpaper/library` -> `rust/wallpaperpack-rs`
   - `GET /api/about`, `GET /api/system/capabilities`, `GET /api/oauth/config`,
@@ -65,8 +65,8 @@ rust-anything analyze backend --lang go --whole-app
 - Fallback rate: **0.0% (0/370)** over the recorded contract. The front door now
   recognises the Go route table: a registered path is proxied, anything else
   answers Gin's 404, so the 264 trap cases are Rust's.
-- Only one Go route is still unported: `POST /api/theme/v2/wallpaper/web`, the
-  multipart web-wallpaper upload (its asset and catalogue routes are ported).
+- Every one of the 104 routes the Go build registers now has a Rust
+  implementation. The recorded contract (384 cases) is answered entirely by Rust.
 - Monitor: the live snapshot (`CPU_INFO`, `MEMORY_INFO`, `NETWORK_INFO`) is
   collected in Rust; memory and CPU identity verified against Go on the same
   host.

@@ -113,3 +113,21 @@ response instead of choosing one global order:
 `~/.cargo/config.toml` replaces the registry with the USTC mirror. That file is
 machine-local and is not committed; a checkout on a host with normal network
 access needs nothing.
+
+## ADR-009: `repository` and `database` are not unit-ported
+
+**Status:** accepted, with a consequence for `app lift`
+
+`internal/biz/repository` and `internal/infra/database` expose methods on types
+that hold a package-level `*gorm.DB`; the bridge sees only constructors and
+`CalcOffset`. Bridging them would produce a crate that proves nothing: the
+behaviour under test is SQL against a live database, and the Go functions cannot
+run without their global handle.
+
+Those units are therefore not ported as crates. Their behaviour is proven at the
+HTTP contract level (384 recorded cases, fallback 0.0%) and, for the schema, by
+`rust/db-tool`'s upgrade and copy tests. The consequence is real: `app lift`
+refuses to run while a unit has not passed `gate`, so the lift itself is blocked
+until either the gate's unit model is satisfied by hand-written crates with
+their own golden tests, or the team accepts route-level parity as the port's
+definition of done for these two units.
