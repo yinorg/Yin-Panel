@@ -61,6 +61,19 @@ pub fn router() -> Router<Original> {
             "/api/spaces/{space_id}/groups/{group_id}",
             post(update_group).delete(delete_group).put(update_group),
         )
+        .route(
+            "/api/spaces/{space_id}/members",
+            post(add_member),
+        )
+        .route(
+            "/api/spaces/{space_id}/members/{user_id}",
+            axum::routing::put(update_member).delete(remove_member),
+        )
+        .route(
+            "/api/spaces/{space_id}/members/{user_id}/delete",
+            post(remove_member),
+        )
+        .route("/api/spaces/{space_id}", post(rename_space))
         .route("/api/spaces/{space_id}/items", post(create_item))
         .route(
             "/api/spaces/{space_id}/items/{item_id}",
@@ -2426,6 +2439,320 @@ async fn delete_item(
         .execute(&pool)
         .await
     {
+        Ok(_) => success(),
+        Err(error) => envelope::error(&error.to_string()),
+    }
+}
+
+/// `pairedIDs`: the Space itself plus its Yang twin, resolved through pair_id.
+async fn paired_ids(pool: &sqlx::SqlitePool, space_id: i64) -> Vec<i64> {
+    let row: Option<(i64,)> = sqlx::query_as(r#"SELECT pair_id FROM "space" WHERE id = ?"#)
+        .bind(space_id)
+        .fetch_optional(pool)
+        .await
+        .unwrap_or(None);
+    let pair_id = row.map(|value| value.0).unwrap_or(0);
+    if pair_id == 0 {
+        return vec![space_id];
+    }
+    let yang: Option<(i64,)> = sqlx::query_as(
+        r#"SELECT id FROM "space" WHERE pair_id = ? AND side = 'yang' LIMIT 1"#,
+    )
+    .bind(pair_id)
+    .fetch_optional(pool)
+    .await
+    .unwrap_or(None);
+    match yang {
+        Some((id,)) => vec![pair_id, id],
+        None => vec![pair_id],
+    }
+}
+
+fn valid_space_role(role: &str) -> bool {
+    matches!(role, "admin" | "editor" | "viewer")
+}
+
+#[derive(serde::Deserialize)]
+struct MemberAddRequest {
+    #[serde(default)]
+    email: String,
+    #[serde(default)]
+    role: String,
+}
+
+#[derive(serde::Deserialize)]
+struct MemberRoleRequest {
+    #[serde(default)]
+    role: String,
+}
+
+/// `SpaceRouter.AddMember`: the member row exists in both paired Spaces.
+async fn add_member(
+    headers: HeaderMap,
+    Path(space_id): Path<i64>,
+    request: Request,
+) -> Response {
+    let user = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool.clone(),
+        Err(error) => return envelope::error(&error),
+    };
+    if !can_manage(&pool, user.id, space_id).await {
+        return error_code(1005);
+    }
+    let body = match axum::body::to_bytes(request.into_body(), 1 << 20).await {
+        Ok(body) => body,
+        Err(_) => return envelope::error("invalid request body"),
+    };
+    let req: MemberAddRequest = match serde_json::from_slice(&body) {
+        Ok(req) => req,
+        Err(_) => return envelope::error(" [ invalid member request]"),
+    };
+    if !valid_space_role(&req.role) {
+        return envelope::error(" [ invalid member request]");
+    }
+    let email = req.email.trim().to_lowercase();
+    let target: Option<(i64,)> =
+        sqlx::query_as(r#"SELECT id FROM "user" WHERE mail = ?"#)
+            .bind(&email)
+            .fetch_optional(&pool)
+            .await
+            .unwrap_or(None);
+    let Some((target_id,)) = target else {
+        return error_code(404);
+    };
+    let exists: Option<(i64,)> = sqlx::query_as(r#"SELECT id FROM "space" WHERE id = ?"#)
+        .bind(space_id)
+        .fetch_optional(&pool)
+        .await
+        .unwrap_or(None);
+    if exists.is_none() {
+        return error_code(404);
+    }
+    let now = now_like_go();
+    for sid in paired_ids(&pool, space_id).await {
+        let found: Option<(i64,)> = sqlx::query_as(
+            "SELECT id FROM space_member WHERE space_id = ? AND user_id = ? LIMIT 1",
+        )
+        .bind(sid)
+        .bind(target_id)
+        .fetch_optional(&pool)
+        .await
+        .unwrap_or(None);
+        let result = match found {
+            Some((id,)) => {
+                sqlx::query("UPDATE space_member SET role = ? WHERE id = ?")
+                    .bind(&req.role)
+                    .bind(id)
+                    .execute(&pool)
+                    .await
+            }
+            None => {
+                sqlx::query(
+                    "INSERT INTO space_member (created_at, updated_at, space_id, user_id, role, source, joined_at) VALUES (?, ?, ?, ?, ?, 'manual', ?)",
+                )
+                .bind(&now)
+                .bind(&now)
+                .bind(sid)
+                .bind(target_id)
+                .bind(&req.role)
+                .bind(&now)
+                .execute(&pool)
+                .await
+            }
+        };
+        if let Err(error) = result {
+            return envelope::error(&error.to_string());
+        }
+    }
+    success()
+}
+
+/// `SpaceRouter.UpdateMember`.
+async fn update_member(
+    headers: HeaderMap,
+    Path((space_id, user_id)): Path<(i64, String)>,
+    request: Request,
+) -> Response {
+    let user = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    let target: i64 = match user_id.parse() {
+        Ok(value) => value,
+        Err(_) => return envelope::error(" [ invalid userId]"),
+    };
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool.clone(),
+        Err(error) => return envelope::error(&error),
+    };
+    if !can_manage(&pool, user.id, space_id).await {
+        return error_code(1005);
+    }
+    let body = match axum::body::to_bytes(request.into_body(), 1 << 20).await {
+        Ok(body) => body,
+        Err(_) => return envelope::error("invalid request body"),
+    };
+    let req: MemberRoleRequest = match serde_json::from_slice(&body) {
+        Ok(req) => req,
+        Err(_) => return envelope::error(" [ invalid role]"),
+    };
+    if !valid_space_role(&req.role) {
+        return envelope::error(" [ invalid role]");
+    }
+    let exists: Option<(i64,)> = sqlx::query_as(r#"SELECT id FROM "space" WHERE id = ?"#)
+        .bind(space_id)
+        .fetch_optional(&pool)
+        .await
+        .unwrap_or(None);
+    if exists.is_none() {
+        return error_code(404);
+    }
+    let placeholders = {
+        let ids = paired_ids(&pool, space_id).await;
+        vec!["?"; ids.len()].join(",")
+    };
+    let sql = format!(
+        "UPDATE space_member SET role = ? WHERE space_id IN ({placeholders}) AND user_id = ?"
+    );
+    let mut statement = sqlx::query(&sql).bind(&req.role);
+    for sid in paired_ids(&pool, space_id).await {
+        statement = statement.bind(sid);
+    }
+    match statement.bind(target).execute(&pool).await {
+        Ok(_) => success(),
+        Err(error) => envelope::error(&error.to_string()),
+    }
+}
+
+/// `SpaceRouter.RemoveMember`: the owner cannot be removed.
+async fn remove_member(
+    headers: HeaderMap,
+    Path((space_id, user_id)): Path<(i64, String)>,
+) -> Response {
+    let user = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    let target: i64 = match user_id.parse() {
+        Ok(value) => value,
+        Err(_) => return envelope::error(" [ invalid userId]"),
+    };
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool.clone(),
+        Err(error) => return envelope::error(&error),
+    };
+    if !can_manage(&pool, user.id, space_id).await {
+        return error_code(1005);
+    }
+    let space: Option<(i64,)> = sqlx::query_as(r#"SELECT owner_user_id FROM "space" WHERE id = ?"#)
+        .bind(space_id)
+        .fetch_optional(&pool)
+        .await
+        .unwrap_or(None);
+    let Some((owner,)) = space else {
+        return error_code(404);
+    };
+    if target == owner {
+        return envelope::error("the space owner cannot be removed; leave the space to delete it");
+    }
+    let placeholders = {
+        let ids = paired_ids(&pool, space_id).await;
+        vec!["?"; ids.len()].join(",")
+    };
+    let sql = format!("DELETE FROM space_member WHERE space_id IN ({placeholders}) AND user_id = ?");
+    let mut statement = sqlx::query(&sql);
+    for sid in paired_ids(&pool, space_id).await {
+        statement = statement.bind(sid);
+    }
+    match statement.bind(target).execute(&pool).await {
+        Ok(_) => success(),
+        Err(error) => envelope::error(&error.to_string()),
+    }
+}
+
+#[derive(serde::Deserialize)]
+struct RenameRequest {
+    #[serde(default)]
+    name: String,
+}
+
+/// `SpaceRouter.Rename`: the Yang twin becomes `<name>-B`.
+async fn rename_space(
+    headers: HeaderMap,
+    Path(space_id): Path<i64>,
+    request: Request,
+) -> Response {
+    let user = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool.clone(),
+        Err(error) => return envelope::error(&error),
+    };
+    if !can_manage(&pool, user.id, space_id).await {
+        return error_code(1005);
+    }
+    let body = match axum::body::to_bytes(request.into_body(), 1 << 20).await {
+        Ok(body) => body,
+        Err(_) => return envelope::error("invalid request body"),
+    };
+    let req: RenameRequest = match serde_json::from_slice(&body) {
+        Ok(req) => req,
+        Err(_) => return envelope::error(" [ invalid name]"),
+    };
+    if req.name.is_empty() {
+        return envelope::error(" [ Name为必填字段]");
+    }
+    if req.name.chars().count() > 100 {
+        return envelope::error(" [ Name长度不能超过100个字符]");
+    }
+    let exists: Option<(i64,)> = sqlx::query_as(r#"SELECT id FROM "space" WHERE id = ?"#)
+        .bind(space_id)
+        .fetch_optional(&pool)
+        .await
+        .unwrap_or(None);
+    if exists.is_none() {
+        return error_code(404);
+    }
+    let mut tx = match pool.begin().await {
+        Ok(tx) => tx,
+        Err(error) => return envelope::error(&error.to_string()),
+    };
+    if sqlx::query(r#"UPDATE "space" SET name = ?, updated_at = ? WHERE id = ?"#)
+        .bind(&req.name)
+        .bind(now_like_go())
+        .bind(space_id)
+        .execute(&mut *tx)
+        .await
+        .is_err()
+    {
+        return envelope::error("rename failed");
+    }
+    for sid in paired_ids(&pool, space_id).await {
+        if sid == space_id {
+            continue;
+        }
+        if sqlx::query(r#"UPDATE "space" SET name = ?, updated_at = ? WHERE id = ?"#)
+            .bind(format!("{}-B", req.name))
+            .bind(now_like_go())
+            .bind(sid)
+            .execute(&mut *tx)
+            .await
+            .is_err()
+        {
+            return envelope::error("rename failed");
+        }
+    }
+    match tx.commit().await {
         Ok(_) => success(),
         Err(error) => envelope::error(&error.to_string()),
     }
