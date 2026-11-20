@@ -140,3 +140,20 @@ also expiring the session cookie. Compared against the running Go service on
 the same build output: identical bytes for `/`, `/sw.js` and a hashed asset,
 identical cache/type/length/last-modified headers, and identical empty 404s
 with the group's cache policy for a missing asset.
+
+## Cutover
+
+`scripts/deploy-rust.sh` builds `rust/app` in release mode, stops only the
+Yin-Panel listener, installs the binary as `backend/yin-panel` and starts it,
+keeping `web/`, the database, `uploads/` and `conf.yaml`. The build metadata is
+read from the environment at start, so the same binary serves a deployment (with
+`YIN_PANEL_VERSION` and friends) and a replay (without them, which must see the
+recorded defaults).
+
+Two differences were found by comparing the running services and fixed: Gin
+answers a method mismatch with its NoRoute (404 `text/plain`), not 405 with an
+`Allow` header; and Gin registers `HEAD` only for the static files, while axum
+answers `HEAD` from every `GET` handler.
+
+Rollback is `cp build-output/yin-panel-go backend/yin-panel` and restart, or
+`cd backend && go build -o ../build-output/yin-panel-go .` first if it is stale.

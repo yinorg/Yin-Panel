@@ -73,11 +73,7 @@ commit="$(git -C "$repo_root" rev-parse --short=8 HEAD 2>/dev/null || echo unkno
 build_time="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 printf 'Building the Rust binary...\n'
-(cd "$repo_root/rust/app" && \
-    YIN_PANEL_VERSION="$version" \
-    YIN_PANEL_COMMIT="$commit" \
-    YIN_PANEL_BUILD_TIME="$build_time" \
-    cargo build --release)
+(cd "$repo_root/rust/app" && cargo build --release)
 
 binary="$repo_root/rust/app/target/release/run-original"
 [[ -x "$binary" ]] || die "cargo build did not produce $binary"
@@ -103,6 +99,9 @@ privileged rm -f "$run_dir/yin-panel"
 privileged cp -a "$binary" "$run_dir/yin-panel"
 
 printf 'Starting Yin-Panel from %s...\n' "$run_dir"
+# The build metadata is read at start, so one binary serves both a deployment
+# and a replay (which must see the recording's defaults).
+export YIN_PANEL_VERSION="$version" YIN_PANEL_COMMIT="$commit" YIN_PANEL_BUILD_TIME="$build_time"
 if command -v setsid >/dev/null 2>&1; then
     (cd "$run_dir" && exec setsid ./yin-panel) > "$run_dir/yin-panel.log" 2>&1 < /dev/null &
 else
@@ -122,7 +121,7 @@ about_status="$(curl --noproxy '*' --silent --output /tmp/yin-panel-about.json -
 python3 - "/tmp/yin-panel-about.json" <<'PY' || die "/api/about did not answer the version envelope"
 import json, sys
 body = json.load(open(sys.argv[1]))
-assert body.get("code") == 0 and body.get("data", {}).get("version"), body
+assert body.get("code") == 0 and body.get("data", {}).get("versionName"), body
 PY
 
 printf 'Yin-Panel (Rust) is running on port %s. /api/about: %s\n' "$port" "$about_status"

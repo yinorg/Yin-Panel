@@ -88,11 +88,12 @@ async fn serve() {
         .merge(routes::router())
         // The built frontend, when the configuration serves it.
         .merge(site::router())
-        .fallback(routes::go_fallback);
-    let port = std::env::var("PORT")
-        .ok()
-        .and_then(|p| p.parse().ok())
-        .unwrap_or(8080);
+        .fallback(routes::go_fallback)
+        // Gin answers a method mismatch with the same NoRoute as an unknown
+        // path; axum would answer 405 with an `Allow` header.
+        .method_not_allowed_fallback(routes::go_fallback)
+        .layer(axum::middleware::from_fn(routes::head_gate));
+    let port = appcfg::ctx().listen_port();
     let listener = tokio::net::TcpListener::bind(SocketAddr::from(([0, 0, 0, 0], port)))
         .await
         .expect("binding the port");

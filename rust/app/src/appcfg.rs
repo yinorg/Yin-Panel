@@ -173,6 +173,17 @@ impl Ctx {
         }
     }
 
+    /// The port to listen on: `PORT` wins (the replay harness sets it), then the
+    /// configuration's `base.http_port`, then 8080.
+    pub fn listen_port(&self) -> u16 {
+        if let Ok(value) = std::env::var("PORT")
+            && let Ok(port) = value.parse()
+        {
+            return port;
+        }
+        self.conf.base.http_port.parse().unwrap_or(8080)
+    }
+
     pub fn jwt_secret(&self) -> &[u8] {
         self.conf.jwt.secret.as_bytes()
     }
@@ -188,14 +199,31 @@ impl Ctx {
 
 /// The version strings the Go build reports. CI injects them with `-ldflags`;
 /// the Rust build reads the same values from the environment at compile time.
+/// Build metadata. Go bakes these in with `-ldflags` at build time; reading the
+/// environment at start instead keeps one binary valid for both a deployment
+/// (which exports them) and a replay (which does not, and must see the defaults
+/// the recordings were made with).
+fn build_value(key: &str, default: &str) -> &'static str {
+    static VERSION: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    static COMMIT: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    static TIME: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    let slot = match key {
+        "YIN_PANEL_VERSION" => &VERSION,
+        "YIN_PANEL_COMMIT" => &COMMIT,
+        _ => &TIME,
+    };
+    slot.get_or_init(|| std::env::var(key).unwrap_or_else(|_| default.to_string()))
+        .as_str()
+}
+
 pub fn version_name() -> &'static str {
-    option_env!("YIN_PANEL_VERSION").unwrap_or("v0.8.2-dev")
+    build_value("YIN_PANEL_VERSION", "v0.8.2-dev")
 }
 
 pub fn build_commit() -> &'static str {
-    option_env!("YIN_PANEL_COMMIT").unwrap_or("unknown")
+    build_value("YIN_PANEL_COMMIT", "unknown")
 }
 
 pub fn build_time() -> &'static str {
-    option_env!("YIN_PANEL_BUILD_TIME").unwrap_or("unknown")
+    build_value("YIN_PANEL_BUILD_TIME", "unknown")
 }

@@ -377,6 +377,38 @@ async fn drop_legacy_schema(pool: &SqlitePool) -> Result<Vec<String>, String> {
         if !column_exists(pool, table, column).await {
             continue;
         }
+        // SQLite refuses to drop a column an index still names, so the indexes
+        // that reference it go first; `gorm.Migrator().DropColumn` rebuilds the
+        // table and does the same.
+        let indexes: Vec<(String,)> = sqlx::query_as(
+            "SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = ? AND sql IS NOT NULL",
+        )
+        .bind(table)
+        .fetch_all(pool)
+        .await
+        .unwrap_or_default();
+        for (index,) in indexes {
+            let definition: Option<(String,)> =
+                sqlx::query_as("SELECT sql FROM sqlite_master WHERE name = ?")
+                    .bind(&index)
+                    .fetch_optional(pool)
+                    .await
+                    .unwrap_or(None);
+            let names_column = definition
+                .map(|(sql,)| {
+                    sql.contains(&format!("\"{column}\""))
+                        || sql.contains(&format!("`{column}`"))
+                        || sql.contains(&format!("({column})"))
+                        || sql.contains(&format!(",{column}"))
+                })
+                .unwrap_or(false);
+            if names_column {
+                let drop = format!("DROP INDEX IF EXISTS \"{index}\"");
+                if pool.execute(drop.as_str()).await.is_ok() {
+                    applied.push(format!("dropped index {index}"));
+                }
+            }
+        }
         let sql = format!("ALTER TABLE \"{table}\" DROP COLUMN \"{column}\"");
         match pool.execute(sql.as_str()).await {
             Ok(_) => applied.push(format!("dropped {table}.{column}")),

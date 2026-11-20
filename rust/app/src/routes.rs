@@ -7144,3 +7144,33 @@ async fn upload_web_wallpaper(headers: HeaderMap, mut multipart: Multipart) -> R
         "source": format!("{root}index.html"),
     }))
 }
+
+/// Gin registers `HEAD` only where it also registers `GET` for a *file*: the
+/// static routes. Everywhere else a `HEAD` request hits NoRoute, while axum
+/// would answer it from the `GET` handler. This restores Gin's answer.
+pub async fn head_gate(req: Request, next: axum::middleware::Next) -> Response {
+    if req.method() == axum::http::Method::HEAD {
+        let path = req.uri().path();
+        let served = matches!(
+            path,
+            "/"
+                | "/index.html"
+                | "/login"
+                | "/oauth/callback"
+                | "/clear.html"
+                | "/registerSW.js"
+                | "/sw.js"
+                | "/manifest.webmanifest"
+        ) || path.starts_with("/assets/")
+            || path.starts_with("/custom/");
+        if !served {
+            return (
+                StatusCode::NOT_FOUND,
+                [(header::CONTENT_TYPE, HeaderValue::from_static("text/plain"))],
+                "404 page not found",
+            )
+                .into_response();
+        }
+    }
+    next.run(req).await
+}
