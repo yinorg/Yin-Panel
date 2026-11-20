@@ -1,0 +1,101 @@
+{
+  "schema": "rust-anything/bridge@1",
+  "root": "/home/hsy/project/Yin-Panel/backend",
+  "unit": "internal/infra/database/",
+  "language": "go",
+  "kind": "ffi",
+  "crate_name": "database-rs",
+  "exports": [
+    {
+      "name": "MigrateDB",
+      "file": "internal/infra/database/copydb.go",
+      "line": 34,
+      "params": [
+        {
+          "name": "sourceConfigPath",
+          "ts_type": "string",
+          "optional": false,
+          "rest": false,
+          "native_type": "string"
+        },
+        {
+          "name": "targetConfigPath",
+          "ts_type": "string",
+          "optional": false,
+          "rest": false,
+          "native_type": "string"
+        }
+      ],
+      "returns": "void",
+      "is_async": false,
+      "is_generator": false,
+      "type_params": [],
+      "uses_instanceof": false,
+      "native_return": "(error)",
+      "prototype": "func MigrateDB(sourceConfigPath, targetConfigPath string) error"
+    }
+  ],
+  "classes": [],
+  "js_only": [
+    {
+      "name": "SchemaModels",
+      "file": "internal/infra/database/copydb.go",
+      "line": 16,
+      "reason": "`any`: values of any type"
+    },
+    {
+      "name": "CopyDatabase",
+      "file": "internal/infra/database/copydb.go",
+      "line": 81,
+      "reason": "takes or returns a pointer (`*gorm.DB`)"
+    },
+    {
+      "name": "DbInit",
+      "file": "internal/infra/database/database.go",
+      "line": 31,
+      "reason": "takes or returns a pointer (`*gorm.DB`)"
+    },
+    {
+      "name": "EnsurePersonalSpaces",
+      "file": "internal/infra/database/database.go",
+      "line": 373,
+      "reason": "takes or returns a pointer (`*gorm.DB`)"
+    },
+    {
+      "name": "CreateDefaultUser",
+      "file": "internal/infra/database/database.go",
+      "line": 437,
+      "reason": "needs the global repositories, which only app.Init sets up"
+    },
+    {
+      "name": "GetLogger",
+      "file": "internal/infra/database/database.go",
+      "line": 459,
+      "reason": "uses `logger.Interface` from another package"
+    },
+    {
+      "name": "PrepareMigrationBackup",
+      "file": "internal/infra/database/migration.go",
+      "line": 29,
+      "reason": "takes or returns a pointer (`*gorm.DB`)"
+    },
+    {
+      "name": "RunMigration",
+      "file": "internal/infra/database/migration.go",
+      "line": 43,
+      "reason": "takes or returns a pointer (`*gorm.DB`)"
+    },
+    {
+      "name": "SQLiteReadPool",
+      "file": "internal/infra/database/read_pool.go",
+      "line": 19,
+      "reason": "takes or returns a pointer (`*gorm.DB`)"
+    },
+    {
+      "name": "EnableSQLiteReadPool",
+      "file": "internal/infra/database/read_pool.go",
+      "line": 25,
+      "reason": "takes or returns a pointer (`*gorm.DB`)"
+    }
+  ]
+}

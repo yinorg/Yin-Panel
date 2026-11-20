@@ -50,6 +50,14 @@ rust-anything analyze backend --lang go --whole-app
   pure Rust binary 384/384 with fallback 0.0% (run it with
   `--build "sh rust/record/run-rust.sh"`, which puts it in the recording working
   directory).
+- Database unit: `rust/database-rs` is bridged from `internal/infra/database` and
+  **passes gate** (233/233 recorded cases, error cases included). It ports
+  `MigrateDB`; the rest of that package takes the package-level `*gorm.DB` and
+  stays in Go, with the reason recorded per export in its manifest. The binary's
+  `migrate-db` command calls the same function.
+- `repository` still has no unit crate: `bridge` on `internal/biz/repository`
+  yields only the constructors and `CalcOffset`, because every repository method
+  hangs off a receiver that holds the package-level `*gorm.DB` (ADR-009).
 - `app lift` replays the binary directly, against the same recording working
   directory. The recorded cases are a sequence, so clear it first:
   `rm -rf /tmp/yin-panel-record && rust-anything app lift .`. With that, the lift

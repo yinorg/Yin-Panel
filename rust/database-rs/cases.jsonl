@@ -1,0 +1,233 @@
+{"args":["./x/**/*.json","hello worldabc"],"error":"read source config: 配置文件不存在: ./x/**/*.json","fn":"MigrateDB"}
+{"args":["a.b.c","src/a/b.ts"],"error":"read source config: 配置文件不存在: a.b.c","fn":"MigrateDB"}
+{"args":["ΣΊΣΥΦΟΣ","{name} has {count} items"],"error":"read source config: 配置文件不存在: ΣΊΣΥΦΟΣ","fn":"MigrateDB"}
+{"args":[".leading","﻿bom"],"error":"read source config: 配置文件不存在: .leading","fn":"MigrateDB"}
+{"args":["ΣΊΣΥΦΟΣ","a😀b😀c"],"error":"read source config: 配置文件不存在: ΣΊΣΥΦΟΣ","fn":"MigrateDB"}
+{"args":["sta","İstanbul"],"error":"read source config: 配置文件不存在: sta","fn":"MigrateDB"}
+{"args":["hello./x/**/*.json","hello"],"error":"read source config: 配置文件不存在: hello./x/**/*.json","fn":"MigrateDB"}
+{"args":["trailing.","ns:key.path"],"error":"read source config: 配置文件不存在: trailing.","fn":"MigrateDB"}
+{"args":["é","Hello World"],"error":"read source config: 配置文件不存在: é","fn":"MigrateDB"}
+{"args":["ΣΊΣΥΦΟΣ","ab"],"error":"read source config: 配置文件不存在: ΣΊΣΥΦΟΣ","fn":"MigrateDB"}
+{"args":["hello world{name} has {count} items","} it"],"error":"read source config: 配置文件不存在: hello world{name} has {count} items","fn":"MigrateDB"}
+{"args":["src/a/b.ts","./x/**/*.jsona.b.c"],"error":"read source config: 配置文件不存在: src/a/b.ts","fn":"MigrateDB"}
+{"args":["src/a/b.ts","trailing."],"error":"read source config: 配置文件不存在: src/a/b.ts","fn":"MigrateDB"}
+{"args":["trailing.ab","😀a"],"error":"read source config: 配置文件不存在: trailing.ab","fn":"MigrateDB"}
+{"args":["ab","a..b😀"],"error":"read source config: 配置文件不存在: ab","fn":"MigrateDB"}
+{"args":["emoji 👍🏽 mix","👍🏽 mi"],"error":"read source config: 配置文件不存在: emoji 👍🏽 mix","fn":"MigrateDB"}
+{"args":["key_name-1","_name-"],"error":"read source config: 配置文件不存在: key_name-1","fn":"MigrateDB"}
+{"args":["a..b","İstanbul"],"error":"read source config: 配置文件不存在: a..b","fn":"MigrateDB"}
+{"args":["straße","{name} has {count} items"],"error":"read source config: 配置文件不存在: straße","fn":"MigrateDB"}
+{"args":["ns:key.path","a:b:c"],"error":"read source config: 配置文件不存在: ns:key.path","fn":"MigrateDB"}
+{"args":["","hello world"],"error":"read source config: 配置文件不存在: ","fn":"MigrateDB"}
+{"args":["","ünïcödé"],"error":"read source config: 配置文件不存在: ","fn":"MigrateDB"}
+{"args":["  padded  ","HELLO"],"error":"read source config: 配置文件不存在:   padded  ","fn":"MigrateDB"}
+{"args":["hello world","hello"],"error":"read source config: 配置文件不存在: hello world","fn":"MigrateDB"}
+{"args":["tab\tseparated","tab\tseparated"],"error":"read source config: 配置文件不存在: tab\tseparated","fn":"MigrateDB"}
+{"args":["😀","é"],"error":"read source config: 配置文件不存在: 😀","fn":"MigrateDB"}
+{"args":["./x/**/*.json",""],"error":"read source config: 配置文件不存在: ./x/**/*.json","fn":"MigrateDB"}
+{"args":["HELLO.leading","ns:key.path"],"error":"read source config: 配置文件不存在: HELLO.leading","fn":"MigrateDB"}
+{"args":["İstanbul","./x/**/*.json"],"error":"read source config: 配置文件不存在: İstanbul","fn":"MigrateDB"}
+{"args":["trailing.é","ns:key.path"],"error":"read source config: 配置文件不存在: trailing.é","fn":"MigrateDB"}
+{"args":[".leading","DIN"],"error":"read source config: 配置文件不存在: .leading","fn":"MigrateDB"}
+{"args":["﻿bo","﻿bom"],"error":"read source config: 配置文件不存在: ﻿bo","fn":"MigrateDB"}
+{"args":["a:b:c",".leadinghello world"],"error":"read source config: 配置文件不存在: a:b:c","fn":"MigrateDB"}
+{"args":[":",""],"error":"read source config: 配置文件不存在: :","fn":"MigrateDB"}
+{"args":["./x/**/*.jsonsrc/a/b.ts","a..b"],"error":"read source config: 配置文件不存在: ./x/**/*.jsonsrc/a/b.ts","fn":"MigrateDB"}
+{"args":["﻿bom",":"],"error":"read source config: 配置文件不存在: ﻿bom","fn":"MigrateDB"}
+{"args":["a","a"],"error":"read source config: 配置文件不存在: a","fn":"MigrateDB"}
+{"args":["😀","😀"],"error":"read source config: 配置文件不存在: 😀","fn":"MigrateDB"}
+{"args":["  padded  ","ded "],"error":"read source config: 配置文件不存在:   padded  ","fn":"MigrateDB"}
+{"args":["trailing.","a:b:c"],"error":"read source config: 配置文件不存在: trailing.","fn":"MigrateDB"}
+{"args":["key_name-1{name} has {count} items","s"],"error":"read source config: 配置文件不存在: key_name-1{name} has {count} items","fn":"MigrateDB"}
+{"args":["./x/**/*.json","ab"],"error":"read source config: 配置文件不存在: ./x/**/*.json","fn":"MigrateDB"}
+{"args":["HELLO","日本語のテキスト"],"error":"read source config: 配置文件不存在: HELLO","fn":"MigrateDB"}
+{"args":["é","İstanbula:b:c"],"error":"read source config: 配置文件不存在: é","fn":"MigrateDB"}
+{"args":["","é"],"error":"read source config: 配置文件不存在: ","fn":"MigrateDB"}
+{"args":[":","ns:key.path"],"error":"read source config: 配置文件不存在: :","fn":"MigrateDB"}
+{"args":["abc","a.b.c./x/**/*.json"],"error":"read source config: 配置文件不存在: abc","fn":"MigrateDB"}
+{"args":["key_name-1","1"],"error":"read source config: 配置文件不存在: key_name-1","fn":"MigrateDB"}
+{"args":["ili","trailing."],"error":"read source config: 配置文件不存在: ili","fn":"MigrateDB"}
+{"args":["é","a:b:ca"],"error":"read source config: 配置文件不存在: é","fn":"MigrateDB"}
+{"args":["ns:key.path","a..b"],"error":"read source config: 配置文件不存在: ns:key.path","fn":"MigrateDB"}
+{"args":["HELLO","Hello World"],"error":"read source config: 配置文件不存在: HELLO","fn":"MigrateDB"}
+{"args":["a.b.c","line1\nline2"],"error":"read source config: 配置文件不存在: a.b.c","fn":"MigrateDB"}
+{"args":["😀","key_name-1"],"error":"read source config: 配置文件不存在: 😀","fn":"MigrateDB"}
+{"args":["cöd","ünïcödé"],"error":"read source config: 配置文件不存在: cöd","fn":"MigrateDB"}
+{"args":["tab\tseparated","{name} has {count} items"],"error":"read source config: 配置文件不存在: tab\tseparated","fn":"MigrateDB"}
+{"args":["ab","trailing."],"error":"read source config: 配置文件不存在: ab","fn":"MigrateDB"}
+{"args":["aa😀b😀c",".leading"],"error":"read source config: 配置文件不存在: aa😀b😀c","fn":"MigrateDB"}
+{"args":["ab","😀😀"],"error":"read source config: 配置文件不存在: ab","fn":"MigrateDB"}
+{"args":["İstanbul","﻿bom"],"error":"read source config: 配置文件不存在: İstanbul","fn":"MigrateDB"}
+{"args":["a.","a.b.c"],"error":"read source config: 配置文件不存在: a.","fn":"MigrateDB"}
+{"args":["a","HELLOa..b"],"error":"read source config: 配置文件不存在: a","fn":"MigrateDB"}
+{"args":[":",":"],"error":"read source config: 配置文件不存在: :","fn":"MigrateDB"}
+{"args":["ab","{name} has {count} itemsa.b.c"],"error":"read source config: 配置文件不存在: ab","fn":"MigrateDB"}
+{"args":["HELLO","a😀b😀c./x/**/*.json"],"error":"read source config: 配置文件不存在: HELLO","fn":"MigrateDB"}
+{"args":["","trailing."],"error":"read source config: 配置文件不存在: ","fn":"MigrateDB"}
+{"args":["a😀b😀c","B"],"error":"read source config: 配置文件不存在: a😀b😀c","fn":"MigrateDB"}
+{"args":["hello world","key_name-1a:b:c"],"error":"read source config: 配置文件不存在: hello world","fn":"MigrateDB"}
+{"args":["","a..b"],"error":"read source config: 配置文件不存在: ","fn":"MigrateDB"}
+{"args":["ns:key.path","a😀b😀c"],"error":"read source config: 配置文件不存在: ns:key.path","fn":"MigrateDB"}
+{"args":["abc","a..b"],"error":"read source config: 配置文件不存在: abc","fn":"MigrateDB"}
+{"args":["tab\tseparated","\tsep"],"error":"read source config: 配置文件不存在: tab\tseparated","fn":"MigrateDB"}
+{"args":["hello world","key_name-1"],"error":"read source config: 配置文件不存在: hello world","fn":"MigrateDB"}
+{"args":["straße日本語のテキスト","本語のテキ"],"error":"read source config: 配置文件不存在: straße日本語のテキスト","fn":"MigrateDB"}
+{"args":["﻿bom","abc"],"error":"read source config: 配置文件不存在: ﻿bom","fn":"MigrateDB"}
+{"args":["line1\nline2.leading","D"],"error":"read source config: 配置文件不存在: line1\nline2.leading","fn":"MigrateDB"}
+{"args":["é","straße"],"error":"read source config: 配置文件不存在: é","fn":"MigrateDB"}
+{"args":["a.b.c","HELLO"],"error":"read source config: 配置文件不存在: a.b.c","fn":"MigrateDB"}
+{"args":["abc","abc"],"error":"read source config: 配置文件不存在: abc","fn":"MigrateDB"}
+{"args":["﻿bom","Hello World"],"error":"read source config: 配置文件不存在: ﻿bom","fn":"MigrateDB"}
+{"args":["B.TS","ésrc/a/b.ts"],"error":"read source config: 配置文件不存在: B.TS","fn":"MigrateDB"}
+{"args":["emoji 👍🏽 mix","./x/**/*.json"],"error":"read source config: 配置文件不存在: emoji 👍🏽 mix","fn":"MigrateDB"}
+{"args":["İstanbul","ΣΊΣΥΦΟΣ"],"error":"read source config: 配置文件不存在: İstanbul","fn":"MigrateDB"}
+{"args":["Hello World","O WORL"],"error":"read source config: 配置文件不存在: Hello World","fn":"MigrateDB"}
+{"args":["ns:key.pathhello","pathh"],"error":"read source config: 配置文件不存在: ns:key.pathhello","fn":"MigrateDB"}
+{"args":["Hello World","src/a/b.ts"],"error":"read source config: 配置文件不存在: Hello World","fn":"MigrateDB"}
+{"args":["HELLOa..b","hello world"],"error":"read source config: 配置文件不存在: HELLOa..b","fn":"MigrateDB"}
+{"args":["key_name-1","trailing."],"error":"read source config: 配置文件不存在: key_name-1","fn":"MigrateDB"}
+{"args":["emoji 👍🏽 mix","j"],"error":"read source config: 配置文件不存在: emoji 👍🏽 mix","fn":"MigrateDB"}
+{"args":["hello worldabc","a"],"error":"read source config: 配置文件不存在: hello worldabc","fn":"MigrateDB"}
+{"args":["a:b:chello","./x/**/*.jsonsrc/a/b.ts"],"error":"read source config: 配置文件不存在: a:b:chello","fn":"MigrateDB"}
+{"args":["a:b:c","src/a/b.tsa.b.c"],"error":"read source config: 配置文件不存在: a:b:c","fn":"MigrateDB"}
+{"args":["trailing.","a"],"error":"read source config: 配置文件不存在: trailing.","fn":"MigrateDB"}
+{"args":["r","tab\tseparatedtrailing."],"error":"read source config: 配置文件不存在: r","fn":"MigrateDB"}
+{"args":["a:b:c",""],"error":"read source config: 配置文件不存在: a:b:c","fn":"MigrateDB"}
+{"args":["😀","trailing.:"],"error":"read source config: 配置文件不存在: 😀","fn":"MigrateDB"}
+{"args":["abc","İstanbul"],"error":"read source config: 配置文件不存在: abc","fn":"MigrateDB"}
+{"args":["é","́"],"error":"read source config: 配置文件不存在: é","fn":"MigrateDB"}
+{"args":["*/*.","./x/**/*.json"],"error":"read source config: 配置文件不存在: */*.","fn":"MigrateDB"}
+{"args":["{name} has {count} items﻿bom","hello world"],"error":"read source config: 配置文件不存在: {name} has {count} items﻿bom","fn":"MigrateDB"}
+{"args":["","日本語のテキスト"],"error":"read source config: 配置文件不存在: ","fn":"MigrateDB"}
+{"args":["HELLO","İstanbul"],"error":"read source config: 配置文件不存在: HELLO","fn":"MigrateDB"}
+{"args":["hello./x/**/*.json","ΣΊΣΥΦΟΣ"],"error":"read source config: 配置文件不存在: hello./x/**/*.json","fn":"MigrateDB"}
+{"args":["_n","key_name-1"],"error":"read source config: 配置文件不存在: _n","fn":"MigrateDB"}
+{"args":["ΥΦΟΣ","ΣΊΣΥΦΟΣ"],"error":"read source config: 配置文件不存在: ΥΦΟΣ","fn":"MigrateDB"}
+{"args":[".leading","ab"],"error":"read source config: 配置文件不存在: .leading","fn":"MigrateDB"}
+{"args":["ünïcödé","trailing."],"error":"read source config: 配置文件不存在: ünïcödé","fn":"MigrateDB"}
+{"args":["key_name-1a:b:c","line1\nline2"],"error":"read source config: 配置文件不存在: key_name-1a:b:c","fn":"MigrateDB"}
+{"args":["ünïcödé","ün"],"error":"read source config: 配置文件不存在: ünïcödé","fn":"MigrateDB"}
+{"args":["﻿bom","M"],"error":"read source config: 配置文件不存在: ﻿bom","fn":"MigrateDB"}
+{"args":["emoji 👍🏽 mix","I 👍🏽 M"],"error":"read source config: 配置文件不存在: emoji 👍🏽 mix","fn":"MigrateDB"}
+{"args":["hello","tab\tseparated"],"error":"read source config: 配置文件不存在: hello","fn":"MigrateDB"}
+{"args":["  padded  ","a..b"],"error":"read source config: 配置文件不存在:   padded  ","fn":"MigrateDB"}
+{"args":["😀","日本語のテキスト"],"error":"read source config: 配置文件不存在: 😀","fn":"MigrateDB"}
+{"args":["日本語のテキスト","{name} has {count} items"],"error":"read source config: 配置文件不存在: 日本語のテキスト","fn":"MigrateDB"}
+{"args":["src/a/b.ts  padded  ",".leading"],"error":"read source config: 配置文件不存在: src/a/b.ts  padded  ","fn":"MigrateDB"}
+{"args":["straße","T"],"error":"read source config: 配置文件不存在: straße","fn":"MigrateDB"}
+{"args":["日本語のテキスト","ト"],"error":"read source config: 配置文件不存在: 日本語のテキスト","fn":"MigrateDB"}
+{"args":["straßens:key.path","{name} has {count} items"],"error":"read source config: 配置文件不存在: straßens:key.path","fn":"MigrateDB"}
+{"args":["a😀b😀chello world","﻿bomİstanbul"],"error":"read source config: 配置文件不存在: a😀b😀chello world","fn":"MigrateDB"}
+{"args":["./x/**/*.json","N"],"error":"read source config: 配置文件不存在: ./x/**/*.json","fn":"MigrateDB"}
+{"args":["Hello World","İstanbul"],"error":"read source config: 配置文件不存在: Hello World","fn":"MigrateDB"}
+{"args":["tab\tseparated","B\tSE"],"error":"read source config: 配置文件不存在: tab\tseparated","fn":"MigrateDB"}
+{"args":[".","a..b"],"error":"read source config: read .: is a directory","fn":"MigrateDB"}
+{"args":["line1\nline2","ab"],"error":"read source config: 配置文件不存在: line1\nline2","fn":"MigrateDB"}
+{"args":["ns:key.path","ns:key.path./x/**/*.json"],"error":"read source config: 配置文件不存在: ns:key.path","fn":"MigrateDB"}
+{"args":["HELLO",":"],"error":"read source config: 配置文件不存在: HELLO","fn":"MigrateDB"}
+{"args":["a😀b😀c","{name} has {count} items"],"error":"read source config: 配置文件不存在: a😀b😀c","fn":"MigrateDB"}
+{"args":["./x/**/*.json","emoji 👍🏽 mix"],"error":"read source config: 配置文件不存在: ./x/**/*.json","fn":"MigrateDB"}
+{"args":["ns:key.path","line1\nline2"],"error":"read source config: 配置文件不存在: ns:key.path","fn":"MigrateDB"}
+{"args":["src/a/b.ts","é"],"error":"read source config: 配置文件不存在: src/a/b.ts","fn":"MigrateDB"}
+{"args":["./x/**/*.json","éhello world"],"error":"read source config: 配置文件不存在: ./x/**/*.json","fn":"MigrateDB"}
+{"args":["é","a"],"error":"read source config: 配置文件不存在: é","fn":"MigrateDB"}
+{"args":["abc","a.b.c"],"error":"read source config: 配置文件不存在: abc","fn":"MigrateDB"}
+{"args":[".leading","key_name-1"],"error":"read source config: 配置文件不存在: .leading","fn":"MigrateDB"}
+{"args":["./x/**/*.json","İstanbul"],"error":"read source config: 配置文件不存在: ./x/**/*.json","fn":"MigrateDB"}
+{"args":["trailing.",""],"error":"read source config: 配置文件不存在: trailing.","fn":"MigrateDB"}
+{"args":["ns:key.path","éünïcödé"],"error":"read source config: 配置文件不存在: ns:key.path","fn":"MigrateDB"}
+{"args":["ab",":"],"error":"read source config: 配置文件不存在: ab","fn":"MigrateDB"}
+{"args":["tab\tseparated","ns:key.patha"],"error":"read source config: 配置文件不存在: tab\tseparated","fn":"MigrateDB"}
+{"args":["trailing.","  padded  "],"error":"read source config: 配置文件不存在: trailing.","fn":"MigrateDB"}
+{"args":["","line1\nline2key_name-1"],"error":"read source config: 配置文件不存在: ","fn":"MigrateDB"}
+{"args":["Hello World","a😀b😀c"],"error":"read source config: 配置文件不存在: Hello World","fn":"MigrateDB"}
+{"args":["ld","a.b.chello world"],"error":"read source config: 配置文件不存在: ld","fn":"MigrateDB"}
+{"args":["ns:key.pathünïcödé","é"],"error":"read source config: 配置文件不存在: ns:key.pathünïcödé","fn":"MigrateDB"}
+{"args":["",""],"error":"read source config: 配置文件不存在: ","fn":"MigrateDB"}
+{"args":["src/a/b.tsΣΊΣΥΦΟΣ","a😀b😀c"],"error":"read source config: 配置文件不存在: src/a/b.tsΣΊΣΥΦΟΣ","fn":"MigrateDB"}
+{"args":["İstanbul","Hello World"],"error":"read source config: 配置文件不存在: İstanbul","fn":"MigrateDB"}
+{"args":["ünïcödéé","abns:key.path"],"error":"read source config: 配置文件不存在: ünïcödéé","fn":"MigrateDB"}
+{"args":["","a.b.c"],"error":"read source config: 配置文件不存在: ","fn":"MigrateDB"}
+{"args":["a","./x/**/*.json"],"error":"read source config: 配置文件不存在: a","fn":"MigrateDB"}
+{"args":["😀emoji 👍🏽 mix",":"],"error":"read source config: 配置文件不存在: 😀emoji 👍🏽 mix","fn":"MigrateDB"}
+{"args":["😀","hello"],"error":"read source config: 配置文件不存在: 😀","fn":"MigrateDB"}
+{"args":["straßeHello World","trailing."],"error":"read source config: 配置文件不存在: straßeHello World","fn":"MigrateDB"}
+{"args":["日本語のテキスト","日本語のテキスト"],"error":"read source config: 配置文件不存在: 日本語のテキスト","fn":"MigrateDB"}
+{"args":["  padded  "," "],"error":"read source config: 配置文件不存在:   padded  ","fn":"MigrateDB"}
+{"args":["AME} HAS {COUNT} ITE","straße{name} has {count} items"],"error":"read source config: 配置文件不存在: AME} HAS {COUNT} ITE","fn":"MigrateDB"}
+{"args":["a..bstraße","Hello World"],"error":"read source config: 配置文件不存在: a..bstraße","fn":"MigrateDB"}
+{"args":["trailing.﻿bom","  padded  "],"error":"read source config: 配置文件不存在: trailing.﻿bom","fn":"MigrateDB"}
+{"args":["ns:key.pathstraße","日本語のテキスト"],"error":"read source config: 配置文件不存在: ns:key.pathstraße","fn":"MigrateDB"}
+{"args":["tab\tseparated","﻿bom"],"error":"read source config: 配置文件不存在: tab\tseparated","fn":"MigrateDB"}
+{"args":["ünïcödé","ΣΊΣΥΦΟΣ"],"error":"read source config: 配置文件不存在: ünïcödé","fn":"MigrateDB"}
+{"args":["World","Hello World"],"error":"read source config: 配置文件不存在: World","fn":"MigrateDB"}
+{"args":["key_name-1","é"],"error":"read source config: 配置文件不存在: key_name-1","fn":"MigrateDB"}
+{"args":["a..b","HELLO"],"error":"read source config: 配置文件不存在: a..b","fn":"MigrateDB"}
+{"args":["İstanbul日本語のテキスト","a.b.c"],"error":"read source config: 配置文件不存在: İstanbul日本語のテキスト","fn":"MigrateDB"}
+{"args":[":","ΣΊΣΥΦΟΣa"],"error":"read source config: 配置文件不存在: :","fn":"MigrateDB"}
+{"args":["ab","a"],"error":"read source config: 配置文件不存在: ab","fn":"MigrateDB"}
+{"args":["ns:key.path","tab\tseparated"],"error":"read source config: 配置文件不存在: ns:key.path","fn":"MigrateDB"}
+{"args":["{name} has {count} items","HELLO"],"error":"read source config: 配置文件不存在: {name} has {count} items","fn":"MigrateDB"}
+{"args":["a:b:c","a.b.c"],"error":"read source config: 配置文件不存在: a:b:c","fn":"MigrateDB"}
+{"args":["trailing.","key_name-1"],"error":"read source config: 配置文件不存在: trailing.","fn":"MigrateDB"}
+{"args":["x","emoji 👍🏽 mix"],"error":"read source config: 配置文件不存在: x","fn":"MigrateDB"}
+{"args":[".leading","tab\tseparated"],"error":"read source config: 配置文件不存在: .leading","fn":"MigrateDB"}
+{"args":["ababc",""],"error":"read source config: 配置文件不存在: ababc","fn":"MigrateDB"}
+{"args":["./x/**/*.json","﻿bom"],"error":"read source config: 配置文件不存在: ./x/**/*.json","fn":"MigrateDB"}
+{"args":["hello","  padded  "],"error":"read source config: 配置文件不存在: hello","fn":"MigrateDB"}
+{"args":["日本語のテキスト",""],"error":"read source config: 配置文件不存在: 日本語のテキスト","fn":"MigrateDB"}
+{"args":["abline1\nline2","ns:key.path"],"error":"read source config: 配置文件不存在: abline1\nline2","fn":"MigrateDB"}
+{"args":["  padded  ","a😀b😀c﻿bom"],"error":"read source config: 配置文件不存在:   padded  ","fn":"MigrateDB"}
+{"args":["hello","é"],"error":"read source config: 配置文件不存在: hello","fn":"MigrateDB"}
+{"args":[":","emoji 👍🏽 mixab"],"error":"read source config: 配置文件不存在: :","fn":"MigrateDB"}
+{"args":["line1\nline2","ab.leading"],"error":"read source config: 配置文件不存在: line1\nline2","fn":"MigrateDB"}
+{"args":["orl","Hello World"],"error":"read source config: 配置文件不存在: orl","fn":"MigrateDB"}
+{"args":["hello","ns:key.path"],"error":"read source config: 配置文件不存在: hello","fn":"MigrateDB"}
+{"args":["Hello World",""],"error":"read source config: 配置文件不存在: Hello World","fn":"MigrateDB"}
+{"args":["HELLO",""],"error":"read source config: 配置文件不存在: HELLO","fn":"MigrateDB"}
+{"args":["ns:key.path","﻿bom"],"error":"read source config: 配置文件不存在: ns:key.path","fn":"MigrateDB"}
+{"args":["a..b","Hello World"],"error":"read source config: 配置文件不存在: a..b","fn":"MigrateDB"}
+{"args":["src/a/b.ts",":"],"error":"read source config: 配置文件不存在: src/a/b.ts","fn":"MigrateDB"}
+{"args":[".leading",""],"error":"read source config: 配置文件不存在: .leading","fn":"MigrateDB"}
+{"args":["a.b.cns:key.path","tab\tseparatedsrc/a/b.ts"],"error":"read source config: 配置文件不存在: a.b.cns:key.path","fn":"MigrateDB"}
+{"args":["ns:key.pathline1\nline2","s:ke"],"error":"read source config: 配置文件不存在: ns:key.pathline1\nline2","fn":"MigrateDB"}
+{"args":["  padded  ","Hello World"],"error":"read source config: 配置文件不存在:   padded  ","fn":"MigrateDB"}
+{"args":["./x/**/*.json","é"],"error":"read source config: 配置文件不存在: ./x/**/*.json","fn":"MigrateDB"}
+{"args":["a😀b😀c",".leading"],"error":"read source config: 配置文件不存在: a😀b😀c","fn":"MigrateDB"}
+{"args":["a:b:c","{name} has {count} items"],"error":"read source config: 配置文件不存在: a:b:c","fn":"MigrateDB"}
+{"args":["😀","abc"],"error":"read source config: 配置文件不存在: 😀","fn":"MigrateDB"}
+{"args":["ne1\nlin","line1\nline2"],"error":"read source config: 配置文件不存在: ne1\nlin","fn":"MigrateDB"}
+{"args":["trailing.","helloünïcödé"],"error":"read source config: 配置文件不存在: trailing.","fn":"MigrateDB"}
+{"args":["héllo wörld","hello worldabc"],"error":"read source config: 配置文件不存在: héllo wörld","fn":"MigrateDB"}
+{"args":["👍🏽 thumbs","hello worldabc"],"error":"read source config: 配置文件不存在: 👍🏽 thumbs","fn":"MigrateDB"}
+{"args":["日本語","hello worldabc"],"error":"read source config: 配置文件不存在: 日本語","fn":"MigrateDB"}
+{"args":["","hello worldabc"],"error":"read source config: 配置文件不存在: ","fn":"MigrateDB"}
+{"args":["é","hello worldabc"],"error":"read source config: 配置文件不存在: é","fn":"MigrateDB"}
+{"args":["İstanbul","hello worldabc"],"error":"read source config: 配置文件不存在: İstanbul","fn":"MigrateDB"}
+{"args":["straße","hello worldabc"],"error":"read source config: 配置文件不存在: straße","fn":"MigrateDB"}
+{"args":["ılık ırmak","hello worldabc"],"error":"read source config: 配置文件不存在: ılık ırmak","fn":"MigrateDB"}
+{"args":["👨‍👩‍👧 family","hello worldabc"],"error":"read source config: 配置文件不存在: 👨‍👩‍👧 family","fn":"MigrateDB"}
+{"args":["a b","hello worldabc"],"error":"read source config: 配置文件不存在: a b","fn":"MigrateDB"}
+{"args":["ΣΊΣΥΦΟΣ","hello worldabc"],"error":"read source config: 配置文件不存在: ΣΊΣΥΦΟΣ","fn":"MigrateDB"}
+{"args":["a😀b","hello worldabc"],"error":"read source config: 配置文件不存在: a😀b","fn":"MigrateDB"}
+{"args":["﻿bom","hello worldabc"],"error":"read source config: 配置文件不存在: ﻿bom","fn":"MigrateDB"}
+{"args":["a²b x½ y①","hello worldabc"],"error":"read source config: 配置文件不存在: a²b x½ y①","fn":"MigrateDB"}
+{"args":["aⅠb Ⅻ","hello worldabc"],"error":"read source config: 配置文件不存在: aⅠb Ⅻ","fn":"MigrateDB"}
+{"args":["a𐐀b 𝐀bc","hello worldabc"],"error":"read source config: 配置文件不存在: a𐐀b 𝐀bc","fn":"MigrateDB"}
+{"args":["कि ٣٤","hello worldabc"],"error":"read source config: 配置文件不存在: कि ٣٤","fn":"MigrateDB"}
+{"args":["./x/**/*.json","héllo wörld"],"error":"read source config: 配置文件不存在: ./x/**/*.json","fn":"MigrateDB"}
+{"args":["./x/**/*.json","👍🏽 thumbs"],"error":"read source config: 配置文件不存在: ./x/**/*.json","fn":"MigrateDB"}
+{"args":["./x/**/*.json","日本語"],"error":"read source config: 配置文件不存在: ./x/**/*.json","fn":"MigrateDB"}
+{"args":["./x/**/*.json","straße"],"error":"read source config: 配置文件不存在: ./x/**/*.json","fn":"MigrateDB"}
+{"args":["./x/**/*.json","ılık ırmak"],"error":"read source config: 配置文件不存在: ./x/**/*.json","fn":"MigrateDB"}
+{"args":["./x/**/*.json","👨‍👩‍👧 family"],"error":"read source config: 配置文件不存在: ./x/**/*.json","fn":"MigrateDB"}
+{"args":["./x/**/*.json","a b"],"error":"read source config: 配置文件不存在: ./x/**/*.json","fn":"MigrateDB"}
+{"args":["./x/**/*.json","ΣΊΣΥΦΟΣ"],"error":"read source config: 配置文件不存在: ./x/**/*.json","fn":"MigrateDB"}
+{"args":["./x/**/*.json","a😀b"],"error":"read source config: 配置文件不存在: ./x/**/*.json","fn":"MigrateDB"}
+{"args":["./x/**/*.json","a²b x½ y①"],"error":"read source config: 配置文件不存在: ./x/**/*.json","fn":"MigrateDB"}
+{"args":["./x/**/*.json","aⅠb Ⅻ"],"error":"read source config: 配置文件不存在: ./x/**/*.json","fn":"MigrateDB"}
+{"args":["./x/**/*.json","a𐐀b 𝐀bc"],"error":"read source config: 配置文件不存在: ./x/**/*.json","fn":"MigrateDB"}
+{"args":["./x/**/*.json","कि ٣٤"],"error":"read source config: 配置文件不存在: ./x/**/*.json","fn":"MigrateDB"}
+{"args":["/tmp/opencode/mdb/nope.yaml","/tmp/opencode/mdb/target-sqlite.yaml"],"error":"read source config: 配置文件不存在: /tmp/opencode/mdb/nope.yaml","fn":"MigrateDB"}
+{"args":["/tmp/opencode/mdb/target-mysql.yaml","/tmp/opencode/mdb/target-sqlite.yaml"],"error":"source must be sqlite, got \"mysql\"","fn":"MigrateDB"}
+{"args":["/tmp/opencode/mdb/source.yaml","/tmp/opencode/mdb/target-sqlite.yaml"],"error":"target must be mysql or postgres, got \"sqlite\"","fn":"MigrateDB"}

@@ -150,3 +150,25 @@ counts, and identical `revision_record_v2` JSON and `asset_record_v2` bytes.
 The alternative — shipping a prebuilt `.db` template — was rejected: a template
 drifts from the schema the code expects, and every upgrade would have to patch
 two shapes.
+
+## ADR-011: `internal/infra/database` is one bridged unit (`MigrateDB`)
+
+**Status:** accepted
+
+`bridge` on `internal/infra/database` yields two exports: `MigrateDB`, which takes
+the two configuration paths, and `CreateDefaultUser`, which needs the global
+repositories that only `app.Init` sets up. Everything else takes or returns a
+`*gorm.DB` and stays in Go with that reason recorded in
+`rust/database-rs/rust-anything.json`.
+
+`rust/database-rs` ports `MigrateDB` by delegating to `rust/db-tool`, so the copy
+implementation is single-sourced, and it passes `rust-anything gate`
+(233/233 recorded cases, including the failing configuration paths). The Go
+binary's `migrate-db` subcommand now exists in the Rust binary too, with the same
+flags, messages and exit codes.
+
+Verified against Go on a live PostgreSQL 16: both produce the same 23 tables with
+identical row counts and identical `user`, `space` and `revision_record_v2` rows.
+Two differences were found and fixed by that comparison: Go resolves the source
+path against the working directory (not the config file), and its target schema
+has no `schema_migration` table.

@@ -263,6 +263,18 @@ pub async fn run(
     target: &ConfigFile,
     driver: &str,
 ) -> Result<(), String> {
+    run_with(source, source_file, target, driver, false).await
+}
+
+/// `quiet` keeps the per-table lines out: `migrate-db` prints only its own two
+/// messages, as the Go command does.
+pub async fn run_with(
+    source: &ConfigFile,
+    source_file: &Path,
+    target: &ConfigFile,
+    driver: &str,
+    quiet: bool,
+) -> Result<(), String> {
     let dialect = match driver {
         "mysql" => Dialect::MySql,
         "postgres" => Dialect::Postgres,
@@ -271,7 +283,7 @@ pub async fn run(
 
     // The source is upgraded first so the copy carries the current shape.
     let applied = upgrade::upgrade(source_file).await?;
-    if !applied.is_empty() {
+    if !applied.is_empty() && !quiet {
         println!("Source upgraded before the copy:");
         for step in applied {
             println!("  {step}");
@@ -301,7 +313,7 @@ pub async fn run(
                 .connect(&target.mysql_url())
                 .await
                 .map_err(|error| format!("connecting to MySQL: {error}"))?;
-            create_and_copy_mysql(&sqlite, &pool, &tables).await?;
+            create_and_copy_mysql(&sqlite, &pool, &tables, quiet).await?;
             pool.close().await;
         }
         Dialect::Postgres => {
@@ -310,12 +322,14 @@ pub async fn run(
                 .connect(&target.postgres_url())
                 .await
                 .map_err(|error| format!("connecting to PostgreSQL: {error}"))?;
-            create_and_copy_postgres(&sqlite, &pool, &tables).await?;
+            create_and_copy_postgres(&sqlite, &pool, &tables, quiet).await?;
             pool.close().await;
         }
     }
     sqlite.close().await;
-    println!("Migration complete.");
+    if !quiet {
+        println!("Migration complete.");
+    }
     Ok(())
 }
 
@@ -323,6 +337,7 @@ async fn create_and_copy_mysql(
     sqlite: &SqlitePool,
     target: &MySqlPool,
     tables: &[Table],
+    quiet: bool,
 ) -> Result<(), String> {
     for table in tables {
         target
@@ -340,7 +355,9 @@ async fn create_and_copy_mysql(
     }
     for table in tables {
         let copied = copy_mysql(sqlite, target, table).await?;
-        println!("  {}: {copied} rows", table.name);
+        if !quiet {
+            println!("  {}: {copied} rows", table.name);
+        }
     }
     Ok(())
 }
@@ -349,6 +366,7 @@ async fn create_and_copy_postgres(
     sqlite: &SqlitePool,
     target: &PgPool,
     tables: &[Table],
+    quiet: bool,
 ) -> Result<(), String> {
     for table in tables {
         target
@@ -364,7 +382,9 @@ async fn create_and_copy_postgres(
     }
     for table in tables {
         let copied = copy_postgres(sqlite, target, table).await?;
-        println!("  {}: {copied} rows", table.name);
+        if !quiet {
+            println!("  {}: {copied} rows", table.name);
+        }
     }
     Ok(())
 }

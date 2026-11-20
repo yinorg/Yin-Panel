@@ -23,8 +23,54 @@ fn report_fallbacks() {
     }
 }
 
-#[tokio::main]
-async fn main() {
+fn main() -> std::process::ExitCode {
+    // `migrate-db` copies a SQLite deployment into MySQL/PostgreSQL and exits,
+    // exactly as the Go binary's subcommand does; it never starts the server.
+    if std::env::args().nth(1).as_deref() == Some("migrate-db") {
+        return migrate_db();
+    }
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .expect("a tokio runtime");
+    runtime.block_on(serve());
+    std::process::ExitCode::SUCCESS
+}
+
+/// `runMigrateDB`: `-source`/`-target`, the same messages and exit codes.
+fn migrate_db() -> std::process::ExitCode {
+    let mut source = "conf.yaml".to_string();
+    let mut target = None;
+    let mut args = std::env::args().skip(2);
+    while let Some(arg) = args.next() {
+        match arg.as_str() {
+            "-source" | "--source" => {
+                if let Some(value) = args.next() {
+                    source = value;
+                }
+            }
+            "-target" | "--target" => target = args.next(),
+            _ => {}
+        }
+    }
+    let Some(target) = target else {
+        println!("usage: yin-panel migrate-db -source conf.yaml -target conf.target.yaml");
+        return std::process::ExitCode::from(2);
+    };
+    println!("Migrating from {source} to {target} ...");
+    match yin_db_tool::migrate_db(&source, &target) {
+        Ok(()) => {
+            println!("Migration complete.");
+            std::process::ExitCode::SUCCESS
+        }
+        Err(error) => {
+            eprintln!("migrate-db failed: {error}");
+            std::process::ExitCode::FAILURE
+        }
+    }
+}
+
+async fn serve() {
     report_fallbacks();
     // The Go build created and seeded the database at startup; this binary does
     // the same, so an empty directory is a working installation.

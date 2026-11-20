@@ -13,6 +13,7 @@ Where the port stands. Read this first, then `MAP.md` and the ADRs that matter.
 | Wave | 0 — leaf units |
 | Runtime | pure Rust: no Go child, no proxy; `src/bootstrap.rs` migrates and seeds a new install |
 | Database tooling | `rust/db-tool` upgrade + copy to SQLite/MySQL/PostgreSQL; PostgreSQL verified live, MySQL DDL-tested |
+| Database unit | `rust/database-rs` (`MigrateDB`) gate **passed**, 233/233; `migrate-db` is a command in the binary |
 | Monitor | live snapshot ported (CPU/memory/net); verified against Go on the same host |
 | Favicon | `getSiteFavicon` ported; manual comparison via a local fixture (no recorded cases) |
 | Theme packages | parse/validate/install/preview ported; multipart verified manually, DTCG check narrower than Go |
