@@ -46,8 +46,8 @@ rust-anything analyze backend --lang go --whole-app
 - Original recorded: 299 HTTP cases in `rust/app-cases/` (35 named inputs, 264
   traps), `299/299` passing against the Go baseline.
 - Front door: `rust/app` (axum), `299/299`, fallback `99.7%` (298/299).
-- Recorded cases: 319 (55 named inputs + 264 traps), original and front door
-  both pass 319/319.
+- Recorded cases: 325 (60 named inputs + 264 traps), original and front door
+  both pass 325/325.
 - Rust answers directly (43 route registrations):
   - `GET /api/theme/v2/wallpaper/library` -> `rust/wallpaperpack-rs`
   - `GET /api/about`, `GET /api/system/capabilities`, `GET /api/oauth/config`,
@@ -62,4 +62,4 @@ rust-anything analyze backend --lang go --whole-app
     the theme reads (`current`, `packages`, `package/{id}`, `mine`, `effective`)
     -> `rust/app`
 - Ported library units not yet wired to a route: `rust/util-rs`.
-- Fallback rate: 79.9% (255/319). Everything else is still proxied to Go.
+- Fallback rate: 78.5% (255/325). Everything else is still proxied to Go.
