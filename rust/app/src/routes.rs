@@ -3059,11 +3059,14 @@ async fn transfer_space(
         Err(response) => return response,
     };
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool.clone(),
         Err(error) => return envelope::error(&error),
     };
-    if !can_manage(&pool, user.id, space_id).await {
+    if !crate::repository::can_manage_space(&pool, ctx.sqlx_driver(), user.id, space_id)
+        .await
+        .unwrap_or(false)
+    {
         return error_code(1005);
     }
     let body = match axum::body::to_bytes(request.into_body(), 1 << 20).await {
@@ -3075,75 +3078,23 @@ async fn transfer_space(
         Err(_) => return envelope::error(" [invalid userId]"),
     };
     let email = req.email.trim().to_lowercase();
-    let target: Option<(i64,)> = sqlx::query_as(r#"SELECT id FROM "user" WHERE mail = ?"#)
-        .bind(&email)
-        .fetch_optional(&pool)
-        .await
-        .unwrap_or(None);
-    let Some((target_id,)) = target else {
-        return error_code(404);
-    };
-    let mut tx = match pool.begin().await {
-        Ok(tx) => tx,
-        Err(error) => return envelope::error(&error.to_string()),
-    };
-    let now = now_like_go();
-    let steps =
-        [
-            sqlx::query(r#"UPDATE "space" SET owner_user_id = ?, updated_at = ? WHERE id = ?"#)
-                .bind(target_id)
-                .bind(&now)
-                .bind(space_id)
-                .execute(&mut *tx),
-        ];
-    for step in steps {
-        if step.await.is_err() {
-            return envelope::error("transfer failed");
-        }
-    }
-    if sqlx::query("UPDATE space_member SET role = 'editor' WHERE space_id = ? AND user_id = ?")
-        .bind(space_id)
-        .bind(user.id)
-        .execute(&mut *tx)
-        .await
-        .is_err()
+    let target_id = match crate::repository::user_id_by_mail(&pool, ctx.sqlx_driver(), &email).await
     {
-        return envelope::error("transfer failed");
-    }
-    // The target may not have a row yet; make one, or promote the existing one.
-    let existing: Option<(i64,)> =
-        sqlx::query_as("SELECT id FROM space_member WHERE space_id = ? AND user_id = ? LIMIT 1")
-            .bind(space_id)
-            .bind(target_id)
-            .fetch_optional(&mut *tx)
-            .await
-            .unwrap_or(None);
-    let result = match existing {
-        Some((id,)) => {
-            sqlx::query("UPDATE space_member SET role = 'admin' WHERE id = ?")
-                .bind(id)
-                .execute(&mut *tx)
-                .await
-        }
-        None => {
-            sqlx::query(
-                "INSERT INTO space_member (created_at, updated_at, space_id, user_id, role, source, joined_at) VALUES (?, ?, ?, ?, 'admin', 'manual', ?)",
-            )
-            .bind(&now)
-            .bind(&now)
-            .bind(space_id)
-            .bind(target_id)
-            .bind(&now)
-            .execute(&mut *tx)
-            .await
-        }
+        Ok(Some(id)) => id,
+        Ok(None) | Err(_) => return error_code(404),
     };
-    if result.is_err() {
-        return envelope::error("transfer failed");
-    }
-    match tx.commit().await {
-        Ok(_) => success(),
-        Err(error) => envelope::error(&error.to_string()),
+    match crate::repository::transfer_space(
+        &pool,
+        ctx.sqlx_driver(),
+        space_id,
+        user.id,
+        target_id,
+        &now_like_go(),
+    )
+    .await
+    {
+        Ok(()) => success(),
+        Err(_) => envelope::error("transfer failed"),
     }
 }
 
@@ -3154,36 +3105,19 @@ async fn clear_space(headers: HeaderMap, Path(space_id): Path<i64>) -> Response 
         Err(response) => return response,
     };
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool.clone(),
         Err(error) => return envelope::error(&error),
     };
-    if !can_manage(&pool, user.id, space_id).await {
+    if !crate::repository::can_manage_space(&pool, ctx.sqlx_driver(), user.id, space_id)
+        .await
+        .unwrap_or(false)
+    {
         return error_code(1005);
     }
-    let mut tx = match pool.begin().await {
-        Ok(tx) => tx,
-        Err(error) => return envelope::error(&error.to_string()),
-    };
-    if sqlx::query("DELETE FROM item_icon WHERE space_id = ?")
-        .bind(space_id)
-        .execute(&mut *tx)
-        .await
-        .is_err()
-    {
-        return envelope::error("clear failed");
-    }
-    if sqlx::query("DELETE FROM item_icon_group WHERE space_id = ?")
-        .bind(space_id)
-        .execute(&mut *tx)
-        .await
-        .is_err()
-    {
-        return envelope::error("clear failed");
-    }
-    match tx.commit().await {
-        Ok(_) => success(),
-        Err(error) => envelope::error(&error.to_string()),
+    match crate::repository::clear_space(&pool, ctx.sqlx_driver(), space_id).await {
+        Ok(()) => success(),
+        Err(_) => envelope::error("clear failed"),
     }
 }
 
@@ -3518,93 +3452,30 @@ async fn delete_space(headers: HeaderMap, Path(space_id): Path<i64>) -> Response
         Err(response) => return response,
     };
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool.clone(),
         Err(error) => return envelope::error(&error),
     };
-    let space: Option<(i64, String)> =
-        sqlx::query_as(r#"SELECT owner_user_id, type FROM "space" WHERE id = ?"#)
-            .bind(space_id)
-            .fetch_optional(&pool)
-            .await
-            .unwrap_or(None);
-    let Some((owner, kind)) = space else {
-        return error_code(404);
-    };
+    let (owner, kind) =
+        match crate::repository::space_owner_and_type(&pool, ctx.sqlx_driver(), space_id).await {
+            Ok(Some(space)) => space,
+            Ok(None) | Err(_) => return error_code(404),
+        };
     if owner != user.id {
         return error_code(1005);
     }
     if kind == "personal" {
         return envelope::error("a personal space cannot be deleted");
     }
-    let ids = paired_ids(&pool, space_id).await;
-    let placeholders = vec!["?"; ids.len()].join(",");
-
-    let mut tx = match pool.begin().await {
-        Ok(tx) => tx,
+    let ids = match crate::repository::paired_space_ids(&pool, ctx.sqlx_driver(), space_id).await {
+        Ok(ids) => ids,
         Err(error) => return envelope::error(&error.to_string()),
     };
-
-    // Files named by this Space's item icons, kept only if nothing else uses them.
-    let item_sql = format!("SELECT icon_json FROM item_icon WHERE space_id IN ({placeholders})");
-    let mut query = sqlx::query_as::<_, (String,)>(&item_sql);
-    for id in &ids {
-        query = query.bind(id);
-    }
-    let icons = query.fetch_all(&mut *tx).await.unwrap_or_default();
-    let mut referenced: std::collections::HashSet<String> = std::collections::HashSet::new();
-    for (icon_json,) in icons {
-        if let Ok(info) = serde_json::from_str::<IconInfo>(&icon_json) {
-            if !info.file_name.is_empty() {
-                referenced.insert(info.file_name);
-            }
-        }
-    }
-    let mut removed: Vec<String> = Vec::new();
-    for name in &referenced {
-        let used: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM item_icon WHERE icon_json LIKE ?")
-            .bind(format!("%\"{name}\"%"))
-            .fetch_one(&mut *tx)
-            .await
-            .unwrap_or((0,));
-        if used.0 > 0 {
-            continue;
-        }
-        let deleted = sqlx::query("DELETE FROM file WHERE file_name = ?")
-            .bind(name)
-            .execute(&mut *tx)
-            .await;
-        if deleted.is_ok() {
-            removed.push(name.clone());
-        }
-    }
-
-    for table in [
-        "item_icon",
-        "item_icon_group",
-        "space_member",
-        "space_o_id_c_group",
-    ] {
-        let sql = format!("DELETE FROM {table} WHERE space_id IN ({placeholders})");
-        let mut statement = sqlx::query(&sql);
-        for id in &ids {
-            statement = statement.bind(id);
-        }
-        if statement.execute(&mut *tx).await.is_err() {
-            return envelope::error("delete failed");
-        }
-    }
-    let sql = format!(r#"DELETE FROM "space" WHERE id IN ({placeholders})"#);
-    let mut statement = sqlx::query(&sql);
-    for id in &ids {
-        statement = statement.bind(id);
-    }
-    if statement.execute(&mut *tx).await.is_err() {
-        return envelope::error("delete failed");
-    }
-    if let Err(error) = tx.commit().await {
-        return envelope::error(&error.to_string());
-    }
+    let removed = match crate::repository::delete_paired_space(&pool, ctx.sqlx_driver(), &ids).await
+    {
+        Ok(removed) => removed,
+        Err(_) => return envelope::error("delete failed"),
+    };
 
     let bucket = if ctx.conf.rclone.bucket.is_empty() {
         "uploads".to_string()

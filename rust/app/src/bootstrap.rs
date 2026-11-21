@@ -96,6 +96,42 @@ pub async fn prepare_shared(pool: &sqlx::AnyPool, driver: Driver) -> Result<(), 
         seed_shared(pool, driver).await?;
         println!("seeded the initial installation");
     }
+    // Seeded rows carry explicit ids, which PostgreSQL does not fold into the
+    // sequence; without this the first auto-increment insert would collide.
+    reset_sequences(pool, driver).await?;
+    Ok(())
+}
+
+/// Moves every `BIGSERIAL` sequence past the largest existing id. MySQL adjusts
+/// its counter when an explicit id is inserted, so only PostgreSQL needs it.
+pub async fn reset_sequences(pool: &sqlx::AnyPool, driver: Driver) -> Result<(), String> {
+    if driver != Driver::Postgres {
+        return Ok(());
+    }
+    for table in schema_shared::serial_tables() {
+        use sqlx::Row;
+        let exists = sqlx::query(&query(
+            Driver::Postgres,
+            "SELECT CAST(to_regclass(?) AS TEXT) AS relation",
+        ))
+        .bind(format!("\"{table}\""))
+        .fetch_one(pool)
+        .await
+        .map_err(|error| format!("inspect {table}: {error}"))?;
+        let relation: Option<String> = exists
+            .try_get("relation")
+            .map_err(|error| format!("inspect {table}: {error}"))?;
+        if relation.is_none() {
+            continue;
+        }
+        let sql = format!(
+            "SELECT setval(pg_get_serial_sequence('{table}', 'id'), GREATEST(COALESCE((SELECT MAX(id) FROM \"{table}\"), 0), 1))"
+        );
+        sqlx::query(&sql)
+            .execute(pool)
+            .await
+            .map_err(|error| format!("reset {table} sequence: {error}"))?;
+    }
     Ok(())
 }
 

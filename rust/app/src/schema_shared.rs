@@ -117,6 +117,18 @@ pub fn seed_statement(driver: Driver, statement: &str) -> String {
     }
 }
 
+/// Tables that carry an auto-increment `id` column on PostgreSQL.
+pub fn serial_tables() -> Vec<String> {
+    tables(Driver::Postgres)
+        .iter()
+        .filter(|statement| statement.contains("BIGSERIAL PRIMARY KEY"))
+        .filter_map(|statement| {
+            let rest = statement.split_once("EXISTS \"")?.1;
+            rest.split('"').next().map(str::to_string)
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::{index_statement, seed_statement, table_statement};
