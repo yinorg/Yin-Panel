@@ -224,7 +224,7 @@ command that proves it).
 | 1. Runtime database parity | `rust/check/db-smoke.sh` passes on SQLite, MySQL 8.4 and PostgreSQL 17 |
 | 2. Route parity | `rust/check/route-parity.py`: 103 inventoried, 0 unimplemented |
 | 3. Behaviour parity | `rust-anything app replay . --build 'sh rust/record/run-rust.sh'`: 665/665, fallback 0% |
-| 4. No Go build | `backend/` removed; `grep -r 'go build' scripts .github distribution` is empty |
+| 4. No Go build | `backend/` removed; no `go build/test/mod/vet` in scripts, `.github` or `distribution` |
 | 5. Upgrade parity | Go→Rust→Go upgrade run preserved 24 tables/43 rows/1 upload; `migrate-db` copied 24 tables/839 rows into MySQL and PostgreSQL and booted on both |
 | 6. Docs parity | `AGENTS.md`, `rust/README.md`, `rust/PLAN.md`, `frontend/THEME_SYSTEM.md` describe the Rust runtime |
 
@@ -254,12 +254,12 @@ command that proves it).
 | 3 | T3.1–T3.3 route parity | done — 103 routes served, 0 unimplemented, recorded coverage `routes missing a pair: 0` |
 | 4 | T4.1 deploy-local.sh builds Rust | done — `cargo test` + `cargo build`, deploys `yin-panel`; local cutover verified on :3002 |
 | 4 | T4.2 CI builds Rust | done — `ci-docker.yml`, `cache-warm.yml`, `visual-regression.yml` |
-| 4 | T4.3 Docker runtime | done — glibc base + `curl` healthcheck, binary path unchanged |
+| 4 | T4.3 Docker runtime | done — glibc base, `bash /dev/tcp` healthcheck; image built, started and reported `healthy` |
 | 4 | T4.4 delete `backend/` | done — runtime moved to `runtime/`, Go tree, `backend-check.yml`, Go recorder and the Go arm of the upgrade check removed |
 | 4 | T4.5 docs | done — AGENTS.md, rust/README.md, rust/PLAN.md, frontend/THEME_SYSTEM.md describe the Rust runtime |
 | 5 | T5.1 three-driver HTTP acceptance | done — `rust/check/db-smoke.sh` passes on SQLite, MySQL 8.4 and PostgreSQL 17 |
 | 5 | T5.1 upgrade verification | done — `scripts/verify-upgrade.sh 3040`: Go→Rust→Go, 24 tables/43 rows/1 upload preserved |
-| 5 | T5.1 migrate-db verification | done — `rust/check/migrate-db-verify.sh`: 24 tables / 839 rows copied and compared, login+spaces on both copies |
+| 5 | T5.1 migrate-db verification | done and re-run after the runtime move — 24 tables / 839 rows, login+spaces on both copies |
 | 5 | T5.2 six-condition sign-off | done — see the sign-off table below |
 
 Already landed before this plan (kept for context): shared `Any` layer, auth,
