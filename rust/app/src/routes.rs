@@ -1241,16 +1241,13 @@ async fn theme_preference(headers: HeaderMap) -> Response {
         Err(response) => return response,
     };
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool,
         Err(error) => return envelope::error(&error),
     };
-    let row: Option<(String, String)> =
-        sqlx::query_as("SELECT mode, theme_mode FROM user_theme_preference_v2 WHERE user_id = ?")
-            .bind(user.id)
-            .fetch_optional(pool)
-            .await
-            .unwrap_or(None);
+    let row = crate::repository::user_theme_preference(pool, ctx.sqlx_driver(), user.id)
+        .await
+        .unwrap_or(None);
     let (mode, theme_mode) =
         row.unwrap_or_else(|| ("auto".to_string(), "follow-space".to_string()));
     let mode = if mode.is_empty() {
@@ -4488,7 +4485,7 @@ async fn set_theme_preference(headers: HeaderMap, request: Request) -> Response 
         Err(error) => return envelope::error(&format!(" [{}]", error)),
     };
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool.clone(),
         Err(error) => return envelope::error(&error),
     };
@@ -4504,30 +4501,55 @@ async fn set_theme_preference(headers: HeaderMap, request: Request) -> Response 
         let revision_id = if !req.revision.is_empty() {
             req.revision.clone()
         } else if !req.package_id.is_empty() {
-            match latest_revision_of(&pool, &req.package_id).await {
-                Ok(id) => id,
-                Err(_) => return error_code(404),
+            match crate::repository::latest_revision(
+                &pool,
+                ctx.sqlx_driver(),
+                &req.package_id,
+            )
+            .await
+            {
+                Ok(Some(id)) => id,
+                _ => return error_code(404),
             }
         } else {
-            let instance = match instance_default_revision(&pool).await {
-                Ok(id) => id,
-                Err(error) => return envelope::error(&error),
+            let instance = match crate::repository::latest_revision(
+                &pool,
+                ctx.sqlx_driver(),
+                "org.yin.default",
+            )
+            .await
+            {
+                Ok(Some(id)) => id,
+                _ => return envelope::error("package not found"),
             };
-            activation_revision(&pool, "instance")
-                .await
-                .unwrap_or(instance)
+            match crate::repository::activation_revision(
+                &pool,
+                ctx.sqlx_driver(),
+                "instance",
+            )
+            .await
+            {
+                Ok(Some(active)) => active,
+                _ => instance,
+            }
         };
-        let revision: Option<(String,)> =
-            sqlx::query_as("SELECT package_id FROM revision_record_v2 WHERE id = ?")
-                .bind(&revision_id)
-                .fetch_optional(&pool)
+        let package_id =
+            match crate::repository::package_id_for_revision(&pool, ctx.sqlx_driver(), &revision_id)
                 .await
-                .unwrap_or(None);
-        let Some((package_id,)) = revision else {
-            return error_code(404);
-        };
-        if let Err(error) =
-            select_user_theme(&pool, user.id, &package_id, &revision_id, &mode).await
+            {
+                Ok(Some(id)) => id,
+                _ => return error_code(404),
+            };
+        if let Err(error) = crate::repository::select_user_theme(
+            &pool,
+            ctx.sqlx_driver(),
+            user.id,
+            &package_id,
+            &revision_id,
+            &mode,
+            &now_like_go(),
+        )
+        .await
         {
             if error == "record not found" {
                 return error_code(404);
@@ -4539,26 +4561,21 @@ async fn set_theme_preference(headers: HeaderMap, request: Request) -> Response 
         if !matches!(req.theme_mode.as_str(), "custom" | "follow-space") {
             return envelope::error(" [themeMode must be custom or follow-space]");
         }
-        let now = now_like_go();
-        let existing: Option<(String,)> =
-            sqlx::query_as("SELECT mode FROM user_theme_preference_v2 WHERE user_id = ?")
-                .bind(user.id)
-                .fetch_optional(&pool)
-                .await
-                .unwrap_or(None);
-        let mode = existing
-            .map(|value| value.0)
+        let mode = crate::repository::user_theme_preference(&pool, ctx.sqlx_driver(), user.id)
+            .await
+            .ok()
+            .flatten()
+            .map(|(mode, _)| mode)
+            .filter(|mode| !mode.is_empty())
             .unwrap_or_else(|| "auto".to_string());
-        if let Err(error) = sqlx::query(
-            "INSERT INTO user_theme_preference_v2 (user_id, mode, theme_mode, updated_at)
-             VALUES (?, ?, ?, ?)
-             ON CONFLICT(user_id) DO UPDATE SET theme_mode = excluded.theme_mode, updated_at = excluded.updated_at",
+        if let Err(error) = crate::repository::save_theme_preference(
+            &pool,
+            ctx.sqlx_driver(),
+            user.id,
+            &mode,
+            &req.theme_mode,
+            &now_like_go(),
         )
-        .bind(user.id)
-        .bind(&mode)
-        .bind(&req.theme_mode)
-        .bind(&now)
-        .execute(&pool)
         .await
         {
             return envelope::error(&error.to_string());
@@ -4577,80 +4594,49 @@ async fn admin_revisions(headers: HeaderMap) -> Response {
         return error_code(1005);
     }
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool,
         Err(error) => return envelope::error(&error),
     };
-    let packages: Vec<(String, String, String)> = sqlx::query_as(
-        "SELECT id, name, latest_revision FROM package_record_v2 WHERE removed = 0 ORDER BY id",
-    )
-    .fetch_all(pool)
-    .await
-    .unwrap_or_default();
-    let mut package_list = Vec::with_capacity(packages.len());
-    for (id, name, revision_id) in packages {
-        let revision: Option<(String, i64, String)> = sqlx::query_as(
-            "SELECT version, verified, created_at FROM revision_record_v2 WHERE id = ?",
-        )
-        .bind(&revision_id)
-        .fetch_optional(pool)
-        .await
-        .unwrap_or(None);
-        let (version, verified, created_at) = revision.unwrap_or_default();
-        package_list.push(json!({
-            "id": id,
-            "name": name,
-            "version": version,
-            "revision": revision_id,
-            "verified": verified != 0,
-            "createdAt": rfc3339(&created_at),
-        }));
-    }
-    let revisions: Vec<(String, String, String, i64, String)> = sqlx::query_as(
-        "SELECT id, package_id, version, verified, created_at FROM revision_record_v2 ORDER BY package_id, created_at DESC",
-    )
-    .fetch_all(pool)
-    .await
-    .unwrap_or_default();
-    let revision_list: Vec<serde_json::Value> = revisions
+    let state = match crate::repository::theme_admin_state(pool, ctx.sqlx_driver()).await {
+        Ok(state) => state,
+        Err(error) => return envelope::error(&error.to_string()),
+    };
+    let package_list: Vec<serde_json::Value> = state
+        .packages
         .into_iter()
-        .map(|(id, package_id, version, verified, created_at)| {
-            // `gin.H`, so the keys come out sorted.
+        .map(|package| {
             json!({
-                "createdAt": rfc3339(&created_at),
-                "id": id,
-                "packageId": package_id,
-                "verified": verified != 0,
-                "version": version,
+                "id": package.id,
+                "name": package.name,
+                "version": package.version,
+                "revision": package.latest_revision,
+                "verified": package.verified != 0,
+                "createdAt": rfc3339(&package.created_at),
             })
         })
         .collect();
-    let instance = instance_default_revision(pool).await.unwrap_or_default();
-    let default_revision = activation_revision(pool, "instance")
-        .await
-        .unwrap_or(instance);
-    let default_package: (String,) =
-        sqlx::query_as("SELECT package_id FROM revision_record_v2 WHERE id = ?")
-            .bind(&default_revision)
-            .fetch_optional(pool)
-            .await
-            .unwrap_or(None)
-            .unwrap_or_default();
-    let activation: Option<(String, String, String, Option<String>)> = sqlx::query_as(
-        "SELECT active_revision_id, last_good_revision_id, pending_revision_id, trial_started_at FROM activation_record_v2 WHERE scope = 'instance'",
-    )
-    .fetch_optional(pool)
-    .await
-    .unwrap_or(None);
-    let (active, last_good, pending, trial) = activation.unwrap_or_default();
+    let revision_list: Vec<serde_json::Value> = state
+        .revisions
+        .into_iter()
+        .map(|revision| {
+            json!({
+                "createdAt": rfc3339(&revision.created_at),
+                "id": revision.id,
+                "packageId": revision.package_id,
+                "verified": revision.verified != 0,
+                "version": revision.version,
+            })
+        })
+        .collect();
     success_data(json!({
-        "activeRevision": active,
-        "defaultPackage": default_package.0,
-        "lastGoodRevision": last_good,
+        "activeRevision": state.active_revision,
+        "defaultPackage": state.default_package,
+        "lastGoodRevision": state.last_good_revision,
         "packages": package_list,
-        "pendingRevision": pending,
+        "pendingRevision": state.pending_revision,
         "revisions": revision_list,
-        "trialStartedAt": trial.map(|value| rfc3339(&value)),
+        "trialStartedAt": state.trial_started_at.as_deref().map(rfc3339),
     }))
 }
 
@@ -4664,28 +4650,23 @@ async fn admin_audit(headers: HeaderMap) -> Response {
         return error_code(1005);
     }
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool,
         Err(error) => return envelope::error(&error),
     };
-    let rows: Vec<(i64, i64, String, String, String)> = match sqlx::query_as(
-        "SELECT id, actor_id, action, package_id, created_at FROM audit_record ORDER BY created_at DESC LIMIT 200",
-    )
-    .fetch_all(pool)
-    .await
-    {
+    let rows = match crate::repository::audit_entries(pool, ctx.sqlx_driver()).await {
         Ok(rows) => rows,
         Err(error) => return envelope::error(&error.to_string()),
     };
     let list: Vec<serde_json::Value> = rows
         .into_iter()
-        .map(|(id, actor, action, package, created_at)| {
+        .map(|row| {
             json!({
-                "id": id,
-                "actorId": actor,
-                "action": action,
-                "packageId": package,
-                "createdAt": rfc3339(&created_at),
+                "id": row.id,
+                "actorId": row.actor_id,
+                "action": row.action,
+                "packageId": row.package_id,
+                "createdAt": rfc3339(&row.created_at),
             })
         })
         .collect();
@@ -4702,31 +4683,33 @@ async fn admin_trusted(headers: HeaderMap, Path(revision): Path<String>) -> Resp
         return error_code(1005);
     }
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool,
         Err(error) => return envelope::error(&error),
     };
-    let exists: Option<(i64,)> = sqlx::query_as("SELECT 1 FROM revision_record_v2 WHERE id = ?")
-        .bind(&revision)
-        .fetch_optional(pool)
-        .await
-        .unwrap_or(None);
-    if exists.is_none() {
+    let exists = match crate::repository::package_id_for_revision(
+        pool,
+        ctx.sqlx_driver(),
+        &revision,
+    )
+    .await
+    {
+        Ok(Some(_)) => true,
+        _ => false,
+    };
+    if !exists {
         return error_code(404);
     }
-    let row: Option<(i64,)> =
-        sqlx::query_as("SELECT enabled FROM trusted_runtime_policy_v2 WHERE revision_id = ?")
-            .bind(&revision)
-            .fetch_optional(pool)
-            .await
-            .unwrap_or(None);
+    let enabled = crate::repository::trusted_enabled(pool, ctx.sqlx_driver(), &revision)
+        .await
+        .unwrap_or(None)
+        .unwrap_or(false);
     success_data(json!({
-        "enabled": row.map(|value| value.0 != 0).unwrap_or(false),
+        "enabled": enabled,
         "revision": revision,
     }))
 }
 
-/// `ThemeRouter.WebWallpaperAsset`: `index.html` or the poster file.
 async fn web_wallpaper_asset(
     headers: HeaderMap,
     Path((id, name)): Path<(String, String)>,
@@ -4806,19 +4789,15 @@ async fn set_trusted(
         Err(error) => return envelope::error(&format!(" [{}]", error)),
     };
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool,
         Err(error) => return envelope::error(&error),
     };
-    let manifest_row: Option<(String,)> =
-        sqlx::query_as("SELECT manifest_json FROM revision_record_v2 WHERE id = ?")
-            .bind(&revision)
-            .fetch_optional(pool)
-            .await
-            .unwrap_or(None);
-    let Some((manifest_json,)) = manifest_row else {
-        return error_code(404);
-    };
+    let manifest_json =
+        match crate::repository::revision_manifest(pool, ctx.sqlx_driver(), &revision).await {
+            Ok(Some(manifest)) => manifest,
+            Ok(None) | Err(_) => return error_code(404),
+        };
     if req.enabled {
         let manifest: serde_json::Value = serde_json::from_str(&manifest_json).unwrap_or_default();
         if !supported_modes(&manifest)
@@ -4828,27 +4807,23 @@ async fn set_trusted(
             return envelope::error(" [theme does not declare support for the trusted runtime]");
         }
     }
-    let now = now_like_go();
-    match sqlx::query(
-        "INSERT INTO trusted_runtime_policy_v2 (revision_id, enabled, updated_by, updated_at)
-         VALUES (?, ?, ?, ?)
-         ON CONFLICT(revision_id) DO UPDATE SET enabled = excluded.enabled, updated_by = excluded.updated_by, updated_at = excluded.updated_at",
+    match crate::repository::save_trusted_policy(
+        pool,
+        ctx.sqlx_driver(),
+        &revision,
+        req.enabled,
+        user.id,
+        &now_like_go(),
     )
-    .bind(&revision)
-    .bind(req.enabled as i64)
-    .bind(user.id)
-    .bind(&now)
-    .execute(pool)
     .await
     {
-        Ok(_) => {
+        Ok(()) => {
             if !req.enabled {
-                // Disabling the runtime also withdraws every trusted grant.
-                let _ = sqlx::query(
-                    "DELETE FROM grant_record_v2 WHERE revision_id = ? AND execution_mode = 'trusted'",
+                let _ = crate::repository::withdraw_trusted_grants(
+                    pool,
+                    ctx.sqlx_driver(),
+                    &revision,
                 )
-                .bind(&revision)
-                .execute(pool)
                 .await;
             }
             success()

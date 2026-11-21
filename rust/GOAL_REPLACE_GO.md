@@ -236,7 +236,7 @@ command that proves it).
 | 2 | T2.5 files | done — upload row, delete row and stored-file reads on the shared pool |
 | 2 | T2.6 users | done — create/update/delete, updateInfo and updatePassword on the shared pool |
 | 2 | T2.7 configs | done — `save_module_config`, `save_user_config` on the shared pool |
-| 2 | T2.8 theme reads | not started |
+| 2 | T2.8 theme reads | done — preference, admin revisions/packages, audit and trusted policy on the shared pool |
 | 2 | T2.9 theme writes | not started |
 | 2 | T2.10 wallpaper | not started |
 | 2 | T2.11 icons/favicon | not started |
