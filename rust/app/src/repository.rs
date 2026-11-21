@@ -1329,6 +1329,116 @@ pub async fn remove_space_member(
     Ok(())
 }
 
+pub async fn save_module_config(
+    pool: &AnyPool,
+    driver: Driver,
+    user_id: i64,
+    name: &str,
+    value_json: &str,
+    now: &str,
+) -> Result<(), sqlx::Error> {
+    use sqlx::Row;
+    let timestamp = timestamp_bind(driver);
+    let select = query(
+        driver,
+        "SELECT id FROM module_config WHERE user_id = ? AND name = ? LIMIT 1",
+    );
+    let existing = sqlx::query(&select)
+        .bind(user_id)
+        .bind(name)
+        .fetch_optional(pool)
+        .await?;
+    match existing {
+        Some(row) => {
+            let id: i64 = row.try_get("id")?;
+            let update = query(
+                driver,
+                &format!("UPDATE module_config SET value_json = ?, updated_at = {timestamp} WHERE id = ?"),
+            );
+            sqlx::query(&update)
+                .bind(value_json)
+                .bind(now)
+                .bind(id)
+                .execute(pool)
+                .await?;
+        }
+        None => {
+            let insert = query(
+                driver,
+                &format!(
+                    "INSERT INTO module_config (created_at, updated_at, user_id, name, value_json) VALUES ({timestamp}, {timestamp}, ?, ?, ?)"
+                ),
+            );
+            sqlx::query(&insert)
+                .bind(now)
+                .bind(now)
+                .bind(user_id)
+                .bind(name)
+                .bind(value_json)
+                .execute(pool)
+                .await?;
+        }
+    }
+    Ok(())
+}
+
+pub async fn save_user_config(
+    pool: &AnyPool,
+    driver: Driver,
+    user_id: i64,
+    panel_json: Option<&str>,
+    language: &str,
+) -> Result<(), sqlx::Error> {
+    let select = query(
+        driver,
+        "SELECT 1 AS found FROM user_config WHERE user_id = ? LIMIT 1",
+    );
+    let existing = sqlx::query(&select)
+        .bind(user_id)
+        .fetch_optional(pool)
+        .await?;
+    let found = existing.is_some();
+    if found {
+        match panel_json {
+            Some(panel) => {
+                let update = query(
+                    driver,
+                    "UPDATE user_config SET panel_json = ?, language = ? WHERE user_id = ?",
+                );
+                sqlx::query(&update)
+                    .bind(panel)
+                    .bind(language)
+                    .bind(user_id)
+                    .execute(pool)
+                    .await?;
+            }
+            None => {
+                let update = query(
+                    driver,
+                    "UPDATE user_config SET language = ? WHERE user_id = ?",
+                );
+                sqlx::query(&update)
+                    .bind(language)
+                    .bind(user_id)
+                    .execute(pool)
+                    .await?;
+            }
+        }
+    } else {
+        let insert = query(
+            driver,
+            "INSERT INTO user_config (user_id, panel_json, language) VALUES (?, ?, ?)",
+        );
+        sqlx::query(&insert)
+            .bind(user_id)
+            .bind(panel_json.unwrap_or(""))
+            .bind(language)
+            .execute(pool)
+            .await?;
+    }
+    Ok(())
+}
+
 pub async fn groups_for_space(
     pool: &AnyPool,
     driver: Driver,
@@ -1694,8 +1804,9 @@ mod tests {
         create_item, delete_group_tree, delete_item, file_list, group_belongs, group_by_id,
         group_has_descendant, group_siblings, groups_for_space, item_by_id, items_for_space,
         module_config_value, oidc_groups, paired_space_ids, remove_space_member,
-        revoke_user_sessions, set_member_role, sort_groups, sort_items, space_list, space_members,
-        space_owner, space_public_config, space_search_config, space_wallpaper_json,
+        revoke_user_sessions, save_module_config, save_user_config, set_member_role,
+        sort_groups, sort_items, space_list, space_members, space_owner, space_public_config,
+        space_search_config, space_wallpaper_json,
         update_group, update_item, update_space_public_config, update_space_search_config,
         update_space_wallpaper, upsert_space_member, user_access, user_by_credentials, user_by_id,
         user_config, user_id_by_mail, user_list,
@@ -1826,6 +1937,7 @@ mod tests {
         verify_item_writes(&pool, driver).await;
         verify_sort_writes(&pool, driver).await;
         verify_member_writes(&pool, driver).await;
+        verify_config_writes(&pool, driver).await;
         pool.close().await;
     }
 
@@ -2226,6 +2338,105 @@ mod tests {
             .execute(pool)
             .await
             .expect("drop item list fixture");
+    }
+
+    async fn verify_config_writes(pool: &sqlx::AnyPool, driver: Driver) {
+        let timestamp_type = match driver {
+            Driver::MySql => "DATETIME(6)",
+            Driver::Sqlite => "TEXT",
+            Driver::Postgres => "TIMESTAMPTZ",
+        };
+        let id_type = match driver {
+            Driver::MySql => "BIGINT AUTO_INCREMENT PRIMARY KEY",
+            Driver::Sqlite => "INTEGER PRIMARY KEY AUTOINCREMENT",
+            Driver::Postgres => "BIGSERIAL PRIMARY KEY",
+        };
+        sqlx::query(&format!(
+            "CREATE TABLE module_config (id {id_type}, created_at {timestamp_type} NOT NULL, updated_at {timestamp_type} NOT NULL, user_id BIGINT NOT NULL, name VARCHAR(255) NOT NULL, value_json TEXT NOT NULL)"
+        ))
+        .execute(pool)
+        .await
+        .expect("create module config write fixture");
+        sqlx::query("CREATE TABLE user_config (user_id BIGINT PRIMARY KEY, panel_json TEXT NOT NULL, language VARCHAR(16) NOT NULL)")
+            .execute(pool)
+            .await
+            .expect("create user config write fixture");
+
+        save_module_config(
+            pool,
+            driver,
+            91,
+            "home",
+            r#"{"layout":"grid"}"#,
+            "2024-12-01 00:00:00",
+        )
+        .await
+        .expect("insert module config");
+        assert_eq!(
+            module_config_value(pool, driver, 91, "home")
+                .await
+                .expect("read inserted module config"),
+            Some(r#"{"layout":"grid"}"#.to_string())
+        );
+        save_module_config(
+            pool,
+            driver,
+            91,
+            "home",
+            r#"{"layout":"list"}"#,
+            "2024-12-02 00:00:00",
+        )
+        .await
+        .expect("update module config");
+        assert_eq!(
+            module_config_value(pool, driver, 91, "home")
+                .await
+                .expect("read updated module config"),
+            Some(r#"{"layout":"list"}"#.to_string())
+        );
+        let rows: i64 = sqlx::query(&query(
+            driver,
+            "SELECT COUNT(*) AS total FROM module_config WHERE user_id = ?",
+        ))
+        .bind(91_i64)
+        .fetch_one(pool)
+        .await
+        .expect("count module config rows")
+        .try_get("total")
+        .expect("total");
+        assert_eq!(rows, 1, "the update must not insert a second row");
+
+        save_user_config(
+            pool,
+            driver,
+            91,
+            Some(r#"{"theme":"dark"}"#),
+            "zh-CN",
+        )
+        .await
+        .expect("insert user config");
+        let config = user_config(pool, driver, 91)
+            .await
+            .expect("read inserted user config")
+            .expect("user config exists");
+        assert_eq!(config.panel_json, r#"{"theme":"dark"}"#);
+        assert_eq!(config.language, "zh-CN");
+        save_user_config(pool, driver, 91, None, "en-US")
+            .await
+            .expect("update language only");
+        let config = user_config(pool, driver, 91)
+            .await
+            .expect("read updated user config")
+            .expect("user config remains");
+        assert_eq!(config.panel_json, r#"{"theme":"dark"}"#);
+        assert_eq!(config.language, "en-US");
+
+        for table in ["user_config", "module_config"] {
+            sqlx::query(&format!("DROP TABLE {table}"))
+                .execute(pool)
+                .await
+                .expect("drop config fixture");
+        }
     }
 
     async fn verify_member_writes(pool: &sqlx::AnyPool, driver: Driver) {

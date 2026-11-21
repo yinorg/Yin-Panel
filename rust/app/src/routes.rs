@@ -1808,42 +1808,21 @@ async fn module_config_save(headers: HeaderMap, request: Request) -> Response {
         value.to_string()
     };
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool,
         Err(error) => return envelope::error(&error),
     };
-    let now = now_like_go();
-    let existing: Option<(i64,)> =
-        sqlx::query_as("SELECT id FROM module_config WHERE user_id = ? AND name = ? LIMIT 1")
-            .bind(user.id)
-            .bind(&name)
-            .fetch_optional(pool)
-            .await
-            .unwrap_or(None);
-    let result = match existing {
-        Some((id,)) => {
-            sqlx::query("UPDATE module_config SET value_json = ?, updated_at = ? WHERE id = ?")
-                .bind(&stored)
-                .bind(&now)
-                .bind(id)
-                .execute(pool)
-                .await
-        }
-        None => {
-            sqlx::query(
-                "INSERT INTO module_config (created_at, updated_at, user_id, name, value_json) VALUES (?, ?, ?, ?, ?)",
-            )
-            .bind(&now)
-            .bind(&now)
-            .bind(user.id)
-            .bind(&name)
-            .bind(&stored)
-            .execute(pool)
-            .await
-        }
-    };
-    match result {
-        Ok(_) => success(),
+    match crate::repository::save_module_config(
+        pool,
+        ctx.sqlx_driver(),
+        user.id,
+        &name,
+        &stored,
+        &now_like_go(),
+    )
+    .await
+    {
+        Ok(()) => success(),
         Err(error) => envelope::error(&error.to_string()),
     }
 }
@@ -1898,50 +1877,21 @@ async fn user_config_save(headers: HeaderMap, request: Request) -> Response {
         }
     }
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool,
         Err(error) => return envelope::error(&error),
     };
-    let existing: Option<(i64,)> =
-        sqlx::query_as("SELECT 1 FROM user_config WHERE user_id = ? LIMIT 1")
-            .bind(user.id)
-            .fetch_optional(pool)
-            .await
-            .unwrap_or(None);
-    let result = match existing {
-        Some(_) => match &panel {
-            Some(panel) => {
-                sqlx::query("UPDATE user_config SET panel_json = ?, language = ? WHERE user_id = ?")
-                    .bind(panel.to_string())
-                    .bind(&language)
-                    .bind(user.id)
-                    .execute(pool)
-                    .await
-            }
-            None => {
-                sqlx::query("UPDATE user_config SET language = ? WHERE user_id = ?")
-                    .bind(&language)
-                    .bind(user.id)
-                    .execute(pool)
-                    .await
-            }
-        },
-        None => {
-            sqlx::query("INSERT INTO user_config (user_id, panel_json, language) VALUES (?, ?, ?)")
-                .bind(user.id)
-                .bind(
-                    panel
-                        .as_ref()
-                        .map(|value| value.to_string())
-                        .unwrap_or_default(),
-                )
-                .bind(&language)
-                .execute(pool)
-                .await
-        }
-    };
-    match result {
-        Ok(_) => success(),
+    let panel_json = panel.as_ref().map(|value| value.to_string());
+    match crate::repository::save_user_config(
+        pool,
+        ctx.sqlx_driver(),
+        user.id,
+        panel_json.as_deref(),
+        &language,
+    )
+    .await
+    {
+        Ok(()) => success(),
         Err(error) => envelope::error(&error.to_string()),
     }
 }
