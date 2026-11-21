@@ -4167,103 +4167,30 @@ async fn create_user(headers: HeaderMap, request: Request) -> Response {
         return envelope::error(" [The account must be no less than 5 characters long]");
     }
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool.clone(),
         Err(error) => return envelope::error(&error),
     };
-    let exists: Option<(i64,)> = sqlx::query_as(r#"SELECT id FROM "user" WHERE mail = ?"#)
-        .bind(&mail)
-        .fetch_optional(&pool)
-        .await
-        .unwrap_or(None);
-    if exists.is_some() {
-        return error_code(1008);
+    match crate::repository::user_mail_exists(&pool, ctx.sqlx_driver(), &mail, None).await {
+        Ok(true) => return error_code(1008),
+        Ok(false) => {}
+        Err(error) => return envelope::error(&error.to_string()),
     }
-    let now = now_like_go();
-    let mut tx = match pool.begin().await {
-        Ok(tx) => tx,
-        Err(error) => return envelope::error(&error.to_string()),
-    };
-    let inserted = sqlx::query(
-        r#"INSERT INTO "user" (created_at, updated_at, password, name, head_image, status, role, mail, token_version) VALUES (?, ?, ?, ?, ?, 1, ?, ?, 0)"#,
+    let id = match crate::repository::create_user(
+        &pool,
+        ctx.sqlx_driver(),
+        &mail,
+        &password_encryption(&input.password),
+        &input.name,
+        &input.head_image,
+        input.role,
+        &now_like_go(),
     )
-    .bind(&now)
-    .bind(&now)
-    .bind(password_encryption(&input.password))
-    .bind(&input.name)
-    .bind(&input.head_image)
-    .bind(input.role)
-    .bind(&mail)
-    .execute(&mut *tx)
-    .await;
-    let id = match inserted {
-        Ok(result) => result.last_insert_rowid(),
+    .await
+    {
+        Ok(id) => id,
         Err(error) => return envelope::error(&error.to_string()),
     };
-    let yin = sqlx::query(
-        r#"INSERT INTO "space" (created_at, updated_at, type, name, owner_user_id, pair_id, side, public_enabled, public_mode) VALUES (?, ?, 'personal', ?, ?, 0, 'yin', 0, 'direct')"#,
-    )
-    .bind(&now)
-    .bind(&now)
-    .bind(&input.name)
-    .bind(id)
-    .execute(&mut *tx)
-    .await;
-    let yin_id = match yin {
-        Ok(result) => result.last_insert_rowid(),
-        Err(error) => return envelope::error(&error.to_string()),
-    };
-    let _ = sqlx::query(r#"UPDATE "space" SET pair_id = ? WHERE id = ?"#)
-        .bind(yin_id)
-        .bind(yin_id)
-        .execute(&mut *tx)
-        .await;
-    let yang = sqlx::query(
-        r#"INSERT INTO "space" (created_at, updated_at, type, name, owner_user_id, pair_id, side, public_enabled, public_mode) VALUES (?, ?, 'personal', ?, ?, ?, 'yang', 0, 'direct')"#,
-    )
-    .bind(&now)
-    .bind(&now)
-    .bind(format!("{}-B", input.name))
-    .bind(id)
-    .bind(yin_id)
-    .execute(&mut *tx)
-    .await;
-    let yang_id = match yang {
-        Ok(result) => result.last_insert_rowid(),
-        Err(error) => return envelope::error(&error.to_string()),
-    };
-    for sid in [yin_id, yang_id] {
-        if sqlx::query(
-            "INSERT INTO space_member (created_at, updated_at, space_id, user_id, role, source, joined_at) VALUES (?, ?, ?, ?, 'admin', 'manual', ?)",
-        )
-        .bind(&now)
-        .bind(&now)
-        .bind(sid)
-        .bind(id)
-        .bind(&now)
-        .execute(&mut *tx)
-        .await
-        .is_err()
-        {
-            return envelope::error("create user");
-        }
-        if sqlx::query(
-            "INSERT INTO item_icon_group (created_at, updated_at, icon, title, description, sort, user_id, space_id) VALUES (?, ?, 'material-symbols:ad-group-outline', 'APP', '', 0, ?, ?)",
-        )
-        .bind(&now)
-        .bind(&now)
-        .bind(id)
-        .bind(sid)
-        .execute(&mut *tx)
-        .await
-        .is_err()
-        {
-            return envelope::error("create user");
-        }
-    }
-    if let Err(error) = tx.commit().await {
-        return envelope::error(&error.to_string());
-    }
     success_data(json!({"userId": id}))
 }
 
@@ -4286,19 +4213,15 @@ async fn update_user(headers: HeaderMap, request: Request) -> Response {
         Err(error) => return envelope::error(&format!(" [{}]", go_json_error(&error))),
     };
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool.clone(),
         Err(error) => return envelope::error(&error),
     };
-    let existing: Option<(String, String)> =
-        sqlx::query_as(r#"SELECT password, name FROM "user" WHERE id = ?"#)
-            .bind(input.id)
-            .fetch_optional(&pool)
-            .await
-            .unwrap_or(None);
-    let Some((existing_password, existing_name)) = existing else {
-        return envelope::error(" [record not found]");
-    };
+    let (existing_password, existing_name) =
+        match crate::repository::user_password_and_name(&pool, ctx.sqlx_driver(), input.id).await {
+            Ok(Some(pair)) => pair,
+            Ok(None) | Err(_) => return envelope::error(" [record not found]"),
+        };
     let mut password = input.password.clone();
     if password.is_empty() {
         password = existing_password.clone();
@@ -4307,103 +4230,53 @@ async fn update_user(headers: HeaderMap, request: Request) -> Response {
     if mail.len() < 3 {
         return envelope::error(" [The account must be no less than 3 characters long]");
     }
-    let clash: Option<(i64,)> =
-        sqlx::query_as(r#"SELECT id FROM "user" WHERE mail = ? AND id <> ?"#)
-            .bind(&mail)
-            .bind(input.id)
-            .fetch_optional(&pool)
-            .await
-            .unwrap_or(None);
-    if clash.is_some() {
-        return error_code(1008);
+    match crate::repository::user_mail_exists(&pool, ctx.sqlx_driver(), &mail, Some(input.id)).await
+    {
+        Ok(true) => return error_code(1008),
+        Ok(false) => {}
+        Err(error) => return envelope::error(&error.to_string()),
     }
-    if password != existing_password {
+    let password_changed = password != existing_password;
+    if password_changed {
         password = password_encryption(&password);
     }
-    // GORM's `Updates` with a struct writes only non-zero fields.
-    let mut set = vec!["mail = ?".to_string()];
-    if !input.name.is_empty() {
-        set.push("name = ?".to_string());
-    }
-    if !input.head_image.is_empty() {
-        set.push("head_image = ?".to_string());
-    }
-    if input.status != 0 {
-        set.push("status = ?".to_string());
-    }
-    if input.role != 0 {
-        set.push("role = ?".to_string());
-    }
-    if password != existing_password {
-        set.push("password = ?".to_string());
-    }
-    set.push("updated_at = ?".to_string());
-    let sql = format!(r#"UPDATE "user" SET {} WHERE id = ?"#, set.join(", "));
-    let mut statement = sqlx::query(&sql).bind(&mail);
-    if !input.name.is_empty() {
-        statement = statement.bind(&input.name);
-    }
-    if !input.head_image.is_empty() {
-        statement = statement.bind(&input.head_image);
-    }
-    if input.status != 0 {
-        statement = statement.bind(input.status);
-    }
-    if input.role != 0 {
-        statement = statement.bind(input.role);
-    }
-    if password != existing_password {
-        statement = statement.bind(&password);
-    }
-    statement = statement.bind(now_like_go()).bind(input.id);
-    if statement.execute(&pool).await.is_err() {
-        return envelope::error("update failed");
-    }
-    if !input.name.is_empty() && input.name != existing_name {
-        let now = now_like_go();
-        let _ = sqlx::query(
-            r#"UPDATE "space" SET name = ?, updated_at = ? WHERE owner_user_id = ? AND side = 'yin' AND type = 'personal'"#,
-        )
-        .bind(&input.name)
-        .bind(&now)
-        .bind(input.id)
-        .execute(&pool)
-        .await;
-        let _ = sqlx::query(
-            r#"UPDATE "space" SET name = ?, updated_at = ? WHERE owner_user_id = ? AND side = 'yang' AND type = 'personal'"#,
-        )
-        .bind(format!("{}-B", input.name))
-        .bind(&now)
-        .bind(input.id)
-        .execute(&pool)
-        .await;
-    }
-    let stored: Option<(String, String, String, String, String, i64, i64)> = sqlx::query_as(
-        r#"SELECT created_at, updated_at, password, name, head_image, status, role FROM "user" WHERE id = ?"#,
+    let rename = (!input.name.is_empty() && input.name != existing_name).then(|| {
+        (input.name.clone(), format!("{}-B", input.name))
+    });
+    let renamed = rename.as_ref().map(|(yin, yang)| (yin.as_str(), yang.as_str()));
+    match crate::repository::update_user_admin(
+        &pool,
+        ctx.sqlx_driver(),
+        input.id,
+        &mail,
+        (!input.name.is_empty()).then_some(input.name.as_str()),
+        (!input.head_image.is_empty()).then_some(input.head_image.as_str()),
+        (input.status != 0).then_some(input.status),
+        (input.role != 0).then_some(input.role),
+        password_changed.then_some(password.as_str()),
+        &now_like_go(),
+        renamed,
     )
-    .bind(input.id)
-    .fetch_optional(&pool)
     .await
-    .unwrap_or(None);
-    let Some((created_at, updated_at, password, name, head_image, status, role)) = stored else {
-        return envelope::database_error();
+    {
+        Ok(()) => {}
+        Err(_) => return envelope::error("update failed"),
+    }
+    let stored = match crate::repository::admin_user_view(&pool, ctx.sqlx_driver(), input.id).await
+    {
+        Ok(Some(user)) => user,
+        _ => return envelope::database_error(),
     };
-    let _ = existing_name;
     envelope::success_struct(AdminUser {
-        id: input.id,
-        create_time: rfc3339(&created_at),
-        update_time: rfc3339(&updated_at),
-        password,
-        name,
-        head_image,
-        status,
-        role,
-        mail: sqlx::query_as::<_, (String,)>(r#"SELECT mail FROM "user" WHERE id = ?"#)
-            .bind(input.id)
-            .fetch_one(&pool)
-            .await
-            .map(|value| value.0)
-            .unwrap_or_default(),
+        id: stored.id,
+        create_time: rfc3339(&stored.created_at),
+        update_time: rfc3339(&stored.updated_at),
+        password: stored.password,
+        name: stored.name,
+        head_image: stored.head_image,
+        status: stored.status,
+        role: stored.role,
+        mail: stored.mail,
         token: String::new(),
     })
 }
@@ -4434,90 +4307,30 @@ async fn delete_user(headers: HeaderMap, request: Request) -> Response {
         Err(error) => return envelope::error(&format!(" [{}]", go_json_error(&error))),
     };
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool.clone(),
         Err(error) => return envelope::error(&error),
     };
-    let owned: Vec<(i64, String)> =
-        sqlx::query_as(r#"SELECT id, type FROM "space" WHERE owner_user_id = ?"#)
-            .bind(req.user_id)
-            .fetch_all(&pool)
-            .await
-            .unwrap_or_default();
+    let owned = match crate::repository::spaces_owned_by(&pool, ctx.sqlx_driver(), req.user_id)
+        .await
+    {
+        Ok(owned) => owned,
+        Err(error) => return envelope::error(&error.to_string()),
+    };
     if !req.force && owned.iter().any(|(_, kind)| kind == "shared") {
         return envelope::error("user owns shared spaces; transfer them before deletion");
     }
     let mut ids: Vec<i64> = owned.iter().map(|(id, _)| *id).collect();
     if !ids.is_empty() {
-        let placeholders = vec!["?"; ids.len()].join(",");
-        let sql = format!(r#"SELECT id FROM "space" WHERE pair_id IN ({placeholders})"#);
-        let mut query = sqlx::query_as::<_, (i64,)>(&sql);
-        for id in &ids {
-            query = query.bind(id);
-        }
-        for (paired,) in query.fetch_all(&pool).await.unwrap_or_default() {
-            ids.push(paired);
+        match crate::repository::paired_ids_of(&pool, ctx.sqlx_driver(), &ids).await {
+            Ok(paired) => ids.extend(paired),
+            Err(error) => return envelope::error(&error.to_string()),
         }
     }
-    let mut tx = match pool.begin().await {
-        Ok(tx) => tx,
-        Err(error) => return envelope::error(&error.to_string()),
-    };
-    if !ids.is_empty() {
-        let placeholders = vec!["?"; ids.len()].join(",");
-        for table in [
-            "item_icon",
-            "item_icon_group",
-            "space_member",
-            "space_o_id_c_group",
-        ] {
-            let sql = format!("DELETE FROM {table} WHERE space_id IN ({placeholders})");
-            let mut statement = sqlx::query(&sql);
-            for id in &ids {
-                statement = statement.bind(id);
-            }
-            if statement.execute(&mut *tx).await.is_err() {
-                return envelope::error("delete failed");
-            }
-        }
-        let sql = format!(r#"DELETE FROM "space" WHERE id IN ({placeholders})"#);
-        let mut statement = sqlx::query(&sql);
-        for id in &ids {
-            statement = statement.bind(id);
-        }
-        if statement.execute(&mut *tx).await.is_err() {
-            return envelope::error("delete failed");
-        }
+    match crate::repository::delete_user(&pool, ctx.sqlx_driver(), req.user_id, &ids).await {
+        Ok(()) => success(),
+        Err(_) => envelope::error("delete failed"),
     }
-    for table in [
-        "o_auth_identity",
-        "item_icon",
-        "item_icon_group",
-        "module_config",
-        "file",
-    ] {
-        let sql = format!("DELETE FROM {table} WHERE user_id = ?");
-        if sqlx::query(&sql)
-            .bind(req.user_id)
-            .execute(&mut *tx)
-            .await
-            .is_err()
-        {
-            return envelope::error("delete failed");
-        }
-    }
-    if sqlx::query(r#"DELETE FROM "user" WHERE id = ?"#)
-        .bind(req.user_id)
-        .execute(&mut *tx)
-        .await
-        .is_err()
-    {
-        return envelope::error("delete failed");
-    }
-    if let Err(error) = tx.commit().await {
-        return envelope::error(&error.to_string());
-    }
-    success()
 }
 
 #[derive(serde::Deserialize)]
@@ -6466,55 +6279,29 @@ async fn update_user_info(headers: HeaderMap, request: Request) -> Response {
         return envelope::error(" [ Name长度不能超过15个字符]");
     }
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool.clone(),
         Err(error) => return envelope::error(&error),
     };
-    let existing: Option<(String,)> = sqlx::query_as(r#"SELECT name FROM "user" WHERE id = ?"#)
-        .bind(user.id)
-        .fetch_optional(&pool)
+    if crate::repository::user_password_and_name(&pool, ctx.sqlx_driver(), user.id)
         .await
-        .unwrap_or(None);
-    let Some((existing_name,)) = existing else {
-        return envelope::database_error();
-    };
-    let now = now_like_go();
-    let mut tx = match pool.begin().await {
-        Ok(tx) => tx,
-        Err(error) => return envelope::error(&error.to_string()),
-    };
-    if sqlx::query(r#"UPDATE "user" SET name = ?, head_image = ?, updated_at = ? WHERE id = ?"#)
-        .bind(&req.name)
-        .bind(&req.head_image)
-        .bind(&now)
-        .bind(user.id)
-        .execute(&mut *tx)
-        .await
-        .is_err()
+        .map(|pair| pair.is_none())
+        .unwrap_or(true)
     {
         return envelope::database_error();
     }
-    if req.name != existing_name {
-        let _ = sqlx::query(
-            r#"UPDATE "space" SET name = ?, updated_at = ? WHERE type = 'personal' AND owner_user_id = ? AND (side = 'yin' OR side = '' OR side IS NULL)"#,
-        )
-        .bind(&req.name)
-        .bind(&now)
-        .bind(user.id)
-        .execute(&mut *tx)
-        .await;
-        let _ = sqlx::query(
-            r#"UPDATE "space" SET name = ?, updated_at = ? WHERE type = 'personal' AND owner_user_id = ? AND side = 'yang'"#,
-        )
-        .bind(format!("{}-B", req.name))
-        .bind(&now)
-        .bind(user.id)
-        .execute(&mut *tx)
-        .await;
-    }
-    match tx.commit().await {
-        Ok(_) => success(),
-        Err(error) => envelope::error(&error.to_string()),
+    match crate::repository::update_user_profile(
+        &pool,
+        ctx.sqlx_driver(),
+        user.id,
+        &req.name,
+        &req.head_image,
+        &now_like_go(),
+    )
+    .await
+    {
+        Ok(()) => success(),
+        Err(_) => envelope::database_error(),
     }
 }
 
@@ -6542,42 +6329,34 @@ async fn update_password(headers: HeaderMap, request: Request) -> Response {
         Err(error) => return envelope::error(&format!(" [{}]", error)),
     };
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
-        Ok(pool) => pool,
+    let pool = match ctx.shared_pool().await {
+        Ok(pool) => pool.clone(),
         Err(error) => return envelope::error(&error),
     };
-    let stored: Option<(String,)> = sqlx::query_as(r#"SELECT password FROM "user" WHERE id = ?"#)
-        .bind(user.id)
-        .fetch_optional(pool)
+    let stored = match crate::repository::user_password_and_name(&pool, ctx.sqlx_driver(), user.id)
         .await
-        .unwrap_or(None);
-    let Some((stored,)) = stored else {
-        return envelope::error(" [record not found]");
+        .unwrap_or(None)
+    {
+        Some((password, _)) => password,
+        None => return envelope::error(" [record not found]"),
     };
     if stored != password_encryption(&req.old_password) {
         return error_code(1007);
     }
-    let now = now_like_go();
-    let mut tx = match pool.begin().await {
-        Ok(tx) => tx,
-        Err(error) => return envelope::error(&error.to_string()),
-    };
-    if sqlx::query(
-        r#"UPDATE "user" SET password = ?, token_version = token_version + 1, updated_at = ? WHERE id = ?"#,
+    match crate::repository::update_user_password(
+        &pool,
+        ctx.sqlx_driver(),
+        user.id,
+        &stored,
+        &password_encryption(&req.new_password),
+        &now_like_go(),
     )
-    .bind(password_encryption(&req.new_password))
-    .bind(&now)
-    .bind(user.id)
-    .execute(&mut *tx)
     .await
-    .is_err()
     {
-        return envelope::database_error();
+        Ok(true) => success(),
+        Ok(false) => error_code(1007),
+        Err(_) => envelope::database_error(),
     }
-    if tx.commit().await.is_err() {
-        return envelope::database_error();
-    }
-    success()
 }
 
 /// `FileRouter.GetS3File`: an uploaded file from local storage, with the cache

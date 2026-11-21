@@ -1958,6 +1958,449 @@ pub async fn delete_file_row(
     Ok(())
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AdminUserRecord {
+    pub id: i64,
+    pub created_at: String,
+    pub updated_at: String,
+    pub password: String,
+    pub name: String,
+    pub head_image: String,
+    pub status: i64,
+    pub role: i64,
+    pub mail: String,
+}
+
+pub async fn user_mail_exists(
+    pool: &AnyPool,
+    driver: Driver,
+    mail: &str,
+    exclude_id: Option<i64>,
+) -> Result<bool, sqlx::Error> {
+    let user_table = crate::schema_shared::quote(driver, "user");
+    let sql = match exclude_id {
+        None => query(driver, &format!("SELECT 1 FROM {user_table} WHERE mail = ? LIMIT 1")),
+        Some(_) => query(
+            driver,
+            &format!("SELECT 1 FROM {user_table} WHERE mail = ? AND id <> ? LIMIT 1"),
+        ),
+    };
+    let mut statement = sqlx::query(&sql).bind(mail);
+    if let Some(id) = exclude_id {
+        statement = statement.bind(id);
+    }
+    Ok(statement.fetch_optional(pool).await?.is_some())
+}
+
+/// `UsersRouter.Create`: the account, its personal Yin/Yang pair, both admin
+/// rows and both default groups in one transaction.
+pub async fn create_user(
+    pool: &AnyPool,
+    driver: Driver,
+    mail: &str,
+    password_hash: &str,
+    name: &str,
+    head_image: &str,
+    role: i64,
+    now: &str,
+) -> Result<i64, sqlx::Error> {
+    let user_table = crate::schema_shared::quote(driver, "user");
+    let space_table = crate::schema_shared::quote(driver, "space");
+    let timestamp = timestamp_bind(driver);
+    let enabled = if driver == Driver::Postgres { "FALSE" } else { "0" };
+    let pair_update = query(
+        driver,
+        &format!("UPDATE {space_table} SET pair_id = ? WHERE id = ?"),
+    );
+    let insert_member = query(
+        driver,
+        &format!(
+            "INSERT INTO space_member (created_at, updated_at, space_id, user_id, role, source, joined_at) VALUES ({timestamp}, {timestamp}, ?, ?, 'admin', 'manual', {timestamp})"
+        ),
+    );
+    let insert_group = query(
+        driver,
+        &format!(
+            "INSERT INTO item_icon_group (created_at, updated_at, icon, title, description, sort, user_id, space_id) VALUES ({timestamp}, {timestamp}, 'material-symbols:ad-group-outline', 'APP', '', 0, ?, ?)"
+        ),
+    );
+
+    let mut tx = pool.begin().await?;
+    let id = insert_returning_id!(
+        driver,
+        &format!(
+            "INSERT INTO {user_table} (created_at, updated_at, password, name, head_image, status, role, mail, token_version) VALUES ({timestamp}, {timestamp}, ?, ?, ?, 1, ?, ?, 0)"
+        ),
+        [now, now, password_hash, name, head_image, role, mail],
+        &mut *tx
+    );
+    let yin_id = insert_returning_id!(
+        driver,
+        &format!(
+            "INSERT INTO {space_table} (created_at, updated_at, type, name, owner_user_id, pair_id, side, public_enabled, public_mode) VALUES ({timestamp}, {timestamp}, 'personal', ?, ?, 0, 'yin', {enabled}, 'direct')"
+        ),
+        [now, now, name, id],
+        &mut *tx
+    );
+    sqlx::query(&pair_update)
+        .bind(yin_id)
+        .bind(yin_id)
+        .execute(&mut *tx)
+        .await?;
+    let yang_name = format!("{name}-B");
+    let yang_id = insert_returning_id!(
+        driver,
+        &format!(
+            "INSERT INTO {space_table} (created_at, updated_at, type, name, owner_user_id, pair_id, side, public_enabled, public_mode) VALUES ({timestamp}, {timestamp}, 'personal', ?, ?, ?, 'yang', {enabled}, 'direct')"
+        ),
+        [now, now, yang_name, id, yin_id],
+        &mut *tx
+    );
+    let _ = &insert_group;
+    for space_id in [yin_id, yang_id] {
+        sqlx::query(&insert_member)
+            .bind(now)
+            .bind(now)
+            .bind(space_id)
+            .bind(id)
+            .bind(now)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query(&insert_group)
+            .bind(now)
+            .bind(now)
+            .bind(id)
+            .bind(space_id)
+            .execute(&mut *tx)
+            .await?;
+    }
+    tx.commit().await?;
+    Ok(id)
+}
+
+pub async fn user_password_and_name(
+    pool: &AnyPool,
+    driver: Driver,
+    user_id: i64,
+) -> Result<Option<(String, String)>, sqlx::Error> {
+    let user_table = crate::schema_shared::quote(driver, "user");
+    let text_type = if driver == Driver::MySql { "CHAR" } else { "TEXT" };
+    let sql = query(
+        driver,
+        &format!(
+            "SELECT CAST(password AS {text_type}) AS password, CAST(name AS {text_type}) AS name FROM {user_table} WHERE id = ?"
+        ),
+    );
+    let row = sqlx::query(&sql)
+        .bind(user_id)
+        .fetch_optional(pool)
+        .await?;
+    row.map(|row| Ok((text(&row, "password")?, text(&row, "name")?)))
+        .transpose()
+}
+
+/// `UsersRouter.Update`: GORM writes only the non-zero fields, so the SET list
+/// follows the submitted values.
+#[allow(clippy::too_many_arguments)]
+pub async fn update_user_admin(
+    pool: &AnyPool,
+    driver: Driver,
+    user_id: i64,
+    mail: &str,
+    name: Option<&str>,
+    head_image: Option<&str>,
+    status: Option<i64>,
+    role: Option<i64>,
+    password_hash: Option<&str>,
+    now: &str,
+    rename_pair: Option<(&str, &str)>,
+) -> Result<(), sqlx::Error> {
+    let user_table = crate::schema_shared::quote(driver, "user");
+    let timestamp = timestamp_bind(driver);
+    let mut columns = vec!["mail = ?".to_string()];
+    if name.is_some() {
+        columns.push("name = ?".to_string());
+    }
+    if head_image.is_some() {
+        columns.push("head_image = ?".to_string());
+    }
+    if status.is_some() {
+        columns.push("status = ?".to_string());
+    }
+    if role.is_some() {
+        columns.push("role = ?".to_string());
+    }
+    if password_hash.is_some() {
+        columns.push("password = ?".to_string());
+    }
+    columns.push(format!("updated_at = {timestamp}"));
+    let sql = query(
+        driver,
+        &format!(
+            "UPDATE {user_table} SET {} WHERE id = ?",
+            columns.join(", ")
+        ),
+    );
+    let mut statement = sqlx::query(&sql).bind(mail);
+    if let Some(value) = name {
+        statement = statement.bind(value);
+    }
+    if let Some(value) = head_image {
+        statement = statement.bind(value);
+    }
+    if let Some(value) = status {
+        statement = statement.bind(value);
+    }
+    if let Some(value) = role {
+        statement = statement.bind(value);
+    }
+    if let Some(value) = password_hash {
+        statement = statement.bind(value);
+    }
+    statement.bind(now).bind(user_id).execute(pool).await?;
+
+    if let Some((yin, yang)) = rename_pair {
+        let space_table = crate::schema_shared::quote(driver, "space");
+        let rename = query(
+            driver,
+            &format!(
+                "UPDATE {space_table} SET name = ?, updated_at = {timestamp} WHERE owner_user_id = ? AND type = 'personal' AND side = ?"
+            ),
+        );
+        sqlx::query(&rename)
+            .bind(yin)
+            .bind(now)
+            .bind(user_id)
+            .bind("yin")
+            .execute(pool)
+            .await?;
+        sqlx::query(&rename)
+            .bind(yang)
+            .bind(now)
+            .bind(user_id)
+            .bind("yang")
+            .execute(pool)
+            .await?;
+    }
+    Ok(())
+}
+
+pub async fn admin_user_view(
+    pool: &AnyPool,
+    driver: Driver,
+    user_id: i64,
+) -> Result<Option<AdminUserRecord>, sqlx::Error> {
+    let user_table = crate::schema_shared::quote(driver, "user");
+    let text_type = if driver == Driver::MySql { "CHAR" } else { "TEXT" };
+    let sql = query(
+        driver,
+        &format!(
+            "SELECT id, CAST(created_at AS {text_type}) AS created_at, CAST(updated_at AS {text_type}) AS updated_at, CAST(password AS {text_type}) AS password, CAST(name AS {text_type}) AS name, CAST(head_image AS {text_type}) AS head_image, status, role, CAST(mail AS {text_type}) AS mail FROM {user_table} WHERE id = ?"
+        ),
+    );
+    let row = sqlx::query(&sql)
+        .bind(user_id)
+        .fetch_optional(pool)
+        .await?;
+    row.map(|row| {
+        Ok(AdminUserRecord {
+            id: row.try_get("id")?,
+            created_at: text(&row, "created_at")?,
+            updated_at: text(&row, "updated_at")?,
+            password: text(&row, "password")?,
+            name: text(&row, "name")?,
+            head_image: text(&row, "head_image")?,
+            status: row.try_get("status")?,
+            role: row.try_get("role")?,
+            mail: text(&row, "mail")?,
+        })
+    })
+    .transpose()
+}
+
+pub async fn spaces_owned_by(
+    pool: &AnyPool,
+    driver: Driver,
+    user_id: i64,
+) -> Result<Vec<(i64, String)>, sqlx::Error> {
+    let space_table = crate::schema_shared::quote(driver, "space");
+    let text_type = if driver == Driver::MySql { "CHAR" } else { "TEXT" };
+    let sql = query(
+        driver,
+        &format!(
+            "SELECT id, CAST(type AS {text_type}) AS kind FROM {space_table} WHERE owner_user_id = ?"
+        ),
+    );
+    let rows = sqlx::query(&sql).bind(user_id).fetch_all(pool).await?;
+    rows.into_iter()
+        .map(|row| Ok((row.try_get("id")?, text(&row, "kind")?)))
+        .collect()
+}
+
+pub async fn paired_ids_of(
+    pool: &AnyPool,
+    driver: Driver,
+    ids: &[i64],
+) -> Result<Vec<i64>, sqlx::Error> {
+    if ids.is_empty() {
+        return Ok(Vec::new());
+    }
+    let space_table = crate::schema_shared::quote(driver, "space");
+    let placeholders = vec!["?"; ids.len()].join(",");
+    let sql = query(
+        driver,
+        &format!("SELECT id FROM {space_table} WHERE pair_id IN ({placeholders})"),
+    );
+    let mut statement = sqlx::query(&sql);
+    for id in ids {
+        statement = statement.bind(*id);
+    }
+    let rows = statement.fetch_all(pool).await?;
+    rows.into_iter().map(|row| row.try_get("id")).collect()
+}
+
+/// `UserRepo.DeleteWithSpaces`: the owned Spaces, the user rows that carry its
+/// ownership, then the account, in one transaction.
+pub async fn delete_user(
+    pool: &AnyPool,
+    driver: Driver,
+    user_id: i64,
+    space_ids: &[i64],
+) -> Result<(), sqlx::Error> {
+    let mut tx = pool.begin().await?;
+    if !space_ids.is_empty() {
+        let placeholders = vec!["?"; space_ids.len()].join(",");
+        for table in [
+            "item_icon",
+            "item_icon_group",
+            "space_member",
+            "space_o_id_c_group",
+        ] {
+            let sql = query(
+                driver,
+                &format!("DELETE FROM {table} WHERE space_id IN ({placeholders})"),
+            );
+            let mut statement = sqlx::query(&sql);
+            for id in space_ids {
+                statement = statement.bind(*id);
+            }
+            statement.execute(&mut *tx).await?;
+        }
+        let space_table = crate::schema_shared::quote(driver, "space");
+        let sql = query(
+            driver,
+            &format!("DELETE FROM {space_table} WHERE id IN ({placeholders})"),
+        );
+        let mut statement = sqlx::query(&sql);
+        for id in space_ids {
+            statement = statement.bind(*id);
+        }
+        statement.execute(&mut *tx).await?;
+    }
+    for table in [
+        "o_auth_identity",
+        "item_icon",
+        "item_icon_group",
+        "module_config",
+        "file",
+    ] {
+        let sql = query(driver, &format!("DELETE FROM {table} WHERE user_id = ?"));
+        sqlx::query(&sql)
+            .bind(user_id)
+            .execute(&mut *tx)
+            .await?;
+    }
+    let user_table = crate::schema_shared::quote(driver, "user");
+    let sql = query(driver, &format!("DELETE FROM {user_table} WHERE id = ?"));
+    sqlx::query(&sql)
+        .bind(user_id)
+        .execute(&mut *tx)
+        .await?;
+    tx.commit().await?;
+    Ok(())
+}
+
+/// `UserRouter.UpdateInfo`: the profile and, when the nickname changed, the
+/// personal pair that carries it.
+pub async fn update_user_profile(
+    pool: &AnyPool,
+    driver: Driver,
+    user_id: i64,
+    name: &str,
+    head_image: &str,
+    now: &str,
+) -> Result<(), sqlx::Error> {
+    let user_table = crate::schema_shared::quote(driver, "user");
+    let timestamp = timestamp_bind(driver);
+    let update = query(
+        driver,
+        &format!(
+            "UPDATE {user_table} SET name = ?, head_image = ?, updated_at = {timestamp} WHERE id = ?"
+        ),
+    );
+    let mut tx = pool.begin().await?;
+    sqlx::query(&update)
+        .bind(name)
+        .bind(head_image)
+        .bind(now)
+        .bind(user_id)
+        .execute(&mut *tx)
+        .await?;
+    let space_table = crate::schema_shared::quote(driver, "space");
+    let rename = query(
+        driver,
+        &format!(
+            "UPDATE {space_table} SET name = ?, updated_at = {timestamp} WHERE type = 'personal' AND owner_user_id = ? AND side = ?"
+        ),
+    );
+    sqlx::query(&rename)
+        .bind(name)
+        .bind(now)
+        .bind(user_id)
+        .bind("yin")
+        .execute(&mut *tx)
+        .await?;
+    let yang_name = format!("{name}-B");
+    sqlx::query(&rename)
+        .bind(yang_name)
+        .bind(now)
+        .bind(user_id)
+        .bind("yang")
+        .execute(&mut *tx)
+        .await?;
+    tx.commit().await?;
+    Ok(())
+}
+
+/// `UserRouter.UpdatePasssword`: verify the old hash, store the new one and
+/// bump `token_version` so every issued token is revoked.
+pub async fn update_user_password(
+    pool: &AnyPool,
+    driver: Driver,
+    user_id: i64,
+    old_hash: &str,
+    new_hash: &str,
+    now: &str,
+) -> Result<bool, sqlx::Error> {
+    let user_table = crate::schema_shared::quote(driver, "user");
+    let timestamp = timestamp_bind(driver);
+    let text_type = if driver == Driver::MySql { "CHAR" } else { "TEXT" };
+    let sql = query(
+        driver,
+        &format!(
+            "UPDATE {user_table} SET password = ?, token_version = token_version + 1, updated_at = {timestamp} WHERE id = ? AND CAST(password AS {text_type}) = ?"
+        ),
+    );
+    let result = sqlx::query(&sql)
+        .bind(new_hash)
+        .bind(now)
+        .bind(user_id)
+        .bind(old_hash)
+        .execute(pool)
+        .await?;
+    Ok(result.rows_affected() > 0)
+}
+
 pub async fn groups_for_space(
     pool: &AnyPool,
     driver: Driver,
@@ -2319,21 +2762,24 @@ pub async fn user_access(
 #[cfg(test)]
 mod tests {
     use super::{
-        bookmark_tree, can_access_space, can_edit_space, can_manage_space, copy_space,
-        clear_space, create_group, create_item, create_paired_space, delete_group_tree,
-        delete_file_row, delete_item, delete_paired_space, file_list, file_name_by_id,
+        admin_user_view, bookmark_tree, can_access_space, can_edit_space, can_manage_space,
+        copy_space, clear_space, create_group, create_item, create_paired_space, create_user,
+        delete_group_tree,
+        delete_file_row, delete_item, delete_paired_space, delete_user, file_list,
+        file_name_by_id,
         group_belongs, group_by_id,
         group_has_descendant, group_siblings, groups_for_space, insert_file, item_by_id,
         items_for_space,
-        module_config_value, oidc_groups, paired_space_ids, remove_space_member,
+        module_config_value, oidc_groups, paired_ids_of, paired_space_ids, remove_space_member,
         rename_paired_space, revoke_user_sessions, save_module_config, save_user_config,
-        set_member_role,
+        set_member_role, spaces_owned_by,
         sort_groups, sort_items, space_list, space_members, space_name, space_owner,
         space_owner_and_type, space_public_config, space_search_config, space_wallpaper_json,
         transfer_space,
         update_group, update_item, update_space_public_config, update_space_search_config,
         update_space_wallpaper, upsert_space_member, user_access, user_by_credentials, user_by_id,
-        user_config, user_id_by_mail, user_list,
+        user_config, user_id_by_mail, user_list, user_mail_exists, user_password_and_name,
+        update_user_admin, update_user_password, update_user_profile,
     };
     use super::timestamp_bind;
     use crate::db::{Driver, connect, query};
@@ -2466,6 +2912,7 @@ mod tests {
         verify_space_writes(&pool, driver).await;
         verify_space_admin_writes(&pool, driver).await;
         verify_file_writes(&pool, driver).await;
+        verify_user_admin_writes(&pool, driver).await;
         pool.close().await;
     }
 
@@ -2866,6 +3313,236 @@ mod tests {
             .execute(pool)
             .await
             .expect("drop item list fixture");
+    }
+
+    async fn verify_user_admin_writes(pool: &sqlx::AnyPool, driver: Driver) {
+        let (user_table, space_table, timestamp_type, id_type) = match driver {
+            Driver::MySql => ("`user`", "`space`", "DATETIME(6)", "BIGINT AUTO_INCREMENT PRIMARY KEY"),
+            Driver::Sqlite => ("\"user\"", "\"space\"", "TEXT", "INTEGER PRIMARY KEY AUTOINCREMENT"),
+            Driver::Postgres => ("\"user\"", "\"space\"", "TIMESTAMPTZ", "BIGSERIAL PRIMARY KEY"),
+        };
+        let enabled_type = match driver {
+            Driver::MySql => "TINYINT NOT NULL DEFAULT 0",
+            Driver::Sqlite => "INTEGER NOT NULL DEFAULT 0",
+            Driver::Postgres => "BOOLEAN NOT NULL DEFAULT false",
+        };
+        sqlx::query(&format!(
+            "CREATE TABLE {user_table} (id {id_type}, created_at {timestamp_type} NOT NULL, updated_at {timestamp_type} NOT NULL, password VARCHAR(255) NOT NULL, name VARCHAR(100) NOT NULL, head_image VARCHAR(255) NOT NULL, status BIGINT NOT NULL, role BIGINT NOT NULL, mail VARCHAR(255) NOT NULL, token_version BIGINT NOT NULL DEFAULT 0)"
+        ))
+        .execute(pool)
+        .await
+        .expect("create user admin fixture");
+        sqlx::query(&format!(
+            "CREATE TABLE {space_table} (id {id_type}, created_at {timestamp_type} NOT NULL, updated_at {timestamp_type} NOT NULL, type VARCHAR(20) NOT NULL, name VARCHAR(100) NOT NULL, owner_user_id BIGINT NOT NULL, pair_id BIGINT NOT NULL DEFAULT 0, side VARCHAR(16) NOT NULL DEFAULT 'yin', public_enabled {enabled_type}, public_id VARCHAR(80), public_mode VARCHAR(32) NOT NULL DEFAULT 'direct', public_code_hash VARCHAR(128), search_config_json TEXT, wallpaper_json TEXT)"
+        ))
+        .execute(pool)
+        .await
+        .expect("create user space fixture");
+        sqlx::query(&format!(
+            "CREATE TABLE space_member (id {id_type}, created_at {timestamp_type} NOT NULL, updated_at {timestamp_type} NOT NULL, space_id BIGINT NOT NULL, user_id BIGINT NOT NULL, role VARCHAR(32) NOT NULL, source VARCHAR(32) NOT NULL, joined_at {timestamp_type} NOT NULL)"
+        ))
+        .execute(pool)
+        .await
+        .expect("create user member fixture");
+        sqlx::query(&format!(
+            "CREATE TABLE item_icon_group (id {id_type}, created_at {timestamp_type} NOT NULL, updated_at {timestamp_type} NOT NULL, icon VARCHAR(100) NOT NULL, title VARCHAR(100) NOT NULL, description TEXT NOT NULL, sort BIGINT NOT NULL, user_id BIGINT NOT NULL, space_id BIGINT NOT NULL, parent_id BIGINT)"
+        ))
+        .execute(pool)
+        .await
+        .expect("create user group fixture");
+        sqlx::query(&format!(
+            "CREATE TABLE item_icon (id {id_type}, created_at {timestamp_type} NOT NULL, updated_at {timestamp_type} NOT NULL, icon_json TEXT NOT NULL, title VARCHAR(50) NOT NULL, url TEXT NOT NULL, lan_url TEXT NOT NULL, mobile_url TEXT NOT NULL, description TEXT NOT NULL, open_method BIGINT NOT NULL, sort BIGINT NOT NULL, item_icon_group_id BIGINT NOT NULL, user_id BIGINT NOT NULL, space_id BIGINT NOT NULL)"
+        ))
+        .execute(pool)
+        .await
+        .expect("create user item fixture");
+        sqlx::query(&format!(
+            "CREATE TABLE space_o_id_c_group (id {id_type}, space_id BIGINT NOT NULL, provider VARCHAR(50) NOT NULL, group_name VARCHAR(100) NOT NULL, role VARCHAR(32) NOT NULL)"
+        ))
+        .execute(pool)
+        .await
+        .expect("create user oidc fixture");
+        for table in ["o_auth_identity", "module_config", "file"] {
+            sqlx::query(&format!(
+                "CREATE TABLE {table} (id {id_type}, user_id BIGINT NOT NULL)"
+            ))
+            .execute(pool)
+            .await
+            .expect("create user child fixture");
+        }
+
+        let created = create_user(
+            pool,
+            driver,
+            "new@example.test",
+            "hash-one",
+            "New User",
+            "/uploads/head.png",
+            2,
+            "2025-04-01 00:00:00",
+        )
+        .await
+        .expect("create user");
+        assert!(created > 0);
+        let view = admin_user_view(pool, driver, created)
+            .await
+            .expect("read created user")
+            .expect("user exists");
+        assert_eq!(view.mail, "new@example.test");
+        assert_eq!(view.name, "New User");
+        assert_eq!(view.status, 1);
+        assert_eq!(view.role, 2);
+        assert_eq!(view.password, "hash-one");
+        assert_eq!(
+            user_password_and_name(pool, driver, created)
+                .await
+                .expect("password and name"),
+            Some(("hash-one".to_string(), "New User".to_string()))
+        );
+        assert!(user_mail_exists(pool, driver, "new@example.test", None)
+            .await
+            .expect("mail exists"));
+        assert!(!user_mail_exists(pool, driver, "new@example.test", Some(created))
+            .await
+            .expect("own mail excluded"));
+        let paired = paired_space_ids(pool, driver, 1)
+            .await
+            .expect("personal pair lookup");
+        assert_eq!(paired.len(), 2, "personal space has a Yang twin");
+
+        update_user_admin(
+            pool,
+            driver,
+            created,
+            "renamed@example.test",
+            Some("Renamed"),
+            Some("/uploads/new.png"),
+            Some(2),
+            Some(3),
+            Some("hash-two"),
+            "2025-04-02 00:00:00",
+            Some(("Renamed", "Renamed-B")),
+        )
+        .await
+        .expect("update user");
+        let view = admin_user_view(pool, driver, created)
+            .await
+            .expect("read updated user")
+            .expect("user remains");
+        assert_eq!(view.mail, "renamed@example.test");
+        assert_eq!(view.name, "Renamed");
+        assert_eq!(view.status, 2);
+        assert_eq!(view.role, 3);
+        assert_eq!(view.password, "hash-two");
+        assert_eq!(
+            space_name(pool, driver, paired[0])
+                .await
+                .expect("renamed yin space"),
+            Some("Renamed".to_string())
+        );
+        assert_eq!(
+            space_name(pool, driver, paired[1])
+                .await
+                .expect("renamed yang space"),
+            Some("Renamed-B".to_string())
+        );
+
+        update_user_profile(
+            pool,
+            driver,
+            created,
+            "Profile",
+            "/uploads/profile.png",
+            "2025-04-03 00:00:00",
+        )
+        .await
+        .expect("update profile");
+        assert_eq!(
+            admin_user_view(pool, driver, created)
+                .await
+                .expect("read profile")
+                .expect("user remains")
+                .name,
+            "Profile"
+        );
+
+        assert!(
+            update_user_password(
+                pool,
+                driver,
+                created,
+                "hash-two",
+                "hash-three",
+                "2025-04-04 00:00:00",
+            )
+            .await
+            .expect("change password")
+        );
+        let view = admin_user_view(pool, driver, created)
+            .await
+            .expect("read password change")
+            .expect("user remains");
+        assert_eq!(view.password, "hash-three");
+        assert!(
+            !update_user_password(
+                pool,
+                driver,
+                created,
+                "hash-two",
+                "hash-four",
+                "2025-04-05 00:00:00",
+            )
+            .await
+            .expect("stale password is rejected")
+        );
+
+        let owned = spaces_owned_by(pool, driver, created)
+            .await
+            .expect("owned spaces");
+        let required = !owned.iter().any(|(_, kind)| kind == "shared");
+        assert!(required, "personal spaces only");
+        let mut ids: Vec<i64> = owned.iter().map(|(id, _)| *id).collect();
+        ids.extend(
+            paired_ids_of(pool, driver, &ids)
+                .await
+                .expect("paired ids of owned"),
+        );
+        delete_user(pool, driver, created, &ids)
+            .await
+            .expect("delete user with spaces");
+        assert_eq!(
+            admin_user_view(pool, driver, created)
+                .await
+                .expect("deleted user"),
+            None
+        );
+        let remaining_spaces: i64 = sqlx::query(&query(
+            driver,
+            &format!("SELECT COUNT(*) AS total FROM {space_table}"),
+        ))
+        .fetch_one(pool)
+        .await
+        .expect("count spaces")
+        .try_get("total")
+        .expect("total");
+        assert_eq!(remaining_spaces, 0);
+
+        for table in [
+            "file",
+            "module_config",
+            "o_auth_identity",
+            "space_o_id_c_group",
+            "item_icon",
+            "item_icon_group",
+            "space_member",
+            space_table,
+            user_table,
+        ] {
+            sqlx::query(&format!("DROP TABLE {table}"))
+                .execute(pool)
+                .await
+                .expect("drop user admin fixture");
+        }
     }
 
     async fn verify_file_writes(pool: &sqlx::AnyPool, driver: Driver) {
