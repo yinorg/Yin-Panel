@@ -30,14 +30,6 @@ pub(crate) fn text_opt(
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct UserAccess {
-    pub id: i64,
-    pub status: i64,
-    pub role: i64,
-    pub token_version: i64,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UserRecord {
     pub id: i64,
     pub password: String,
@@ -729,6 +721,24 @@ pub(crate) fn timestamp_bind(driver: Driver) -> &'static str {
         Driver::Sqlite => "?",
         Driver::Postgres => "CAST(? AS TIMESTAMP WITH TIME ZONE)",
     }
+}
+
+pub async fn item_belongs(
+    pool: &AnyPool,
+    driver: Driver,
+    space_id: i64,
+    item_id: i64,
+) -> Result<bool, sqlx::Error> {
+    let sql = query(
+        driver,
+        "SELECT 1 FROM item_icon WHERE id = ? AND space_id = ?",
+    );
+    Ok(sqlx::query(&sql)
+        .bind(item_id)
+        .bind(space_id)
+        .fetch_optional(pool)
+        .await?
+        .is_some())
 }
 
 pub async fn group_belongs(
@@ -3579,6 +3589,398 @@ pub async fn insert_imported_item_in_tx(
     Ok(())
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RevisionParts {
+    pub manifest_json: String,
+    pub tokens_json: String,
+    pub verified: i64,
+}
+
+pub async fn revision_parts(
+    pool: &AnyPool,
+    driver: Driver,
+    revision: &str,
+) -> Result<Option<RevisionParts>, sqlx::Error> {
+    let text_type = if driver == Driver::MySql { "CHAR" } else { "TEXT" };
+    let sql = query(
+        driver,
+        &format!(
+            "SELECT CAST(manifest_json AS {text_type}) AS manifest_json, CAST(tokens_json AS {text_type}) AS tokens_json, {} AS verified FROM revision_record_v2 WHERE id = ?",
+            bool_expression(driver, "verified")
+        ),
+    );
+    let row = sqlx::query(&sql)
+        .bind(revision)
+        .fetch_optional(pool)
+        .await?;
+    row.map(|row| {
+        Ok(RevisionParts {
+            manifest_json: text(&row, "manifest_json")?,
+            tokens_json: text(&row, "tokens_json")?,
+            verified: row.try_get("verified")?,
+        })
+    })
+    .transpose()
+}
+
+pub async fn activation_package(
+    pool: &AnyPool,
+    driver: Driver,
+    scope: &str,
+) -> Result<Option<String>, sqlx::Error> {
+    let text_type = if driver == Driver::MySql { "CHAR" } else { "TEXT" };
+    let sql = query(
+        driver,
+        &format!(
+            "SELECT CAST(package_id AS {text_type}) AS package_id FROM activation_record_v2 WHERE scope = ?"
+        ),
+    );
+    let row = sqlx::query(&sql).bind(scope).fetch_optional(pool).await?;
+    row.map(|row| text(&row, "package_id")).transpose()
+}
+
+pub async fn user_space_theme_revision(
+    pool: &AnyPool,
+    driver: Driver,
+    user_id: i64,
+    space_id: i64,
+) -> Result<Option<String>, sqlx::Error> {
+    let text_type = if driver == Driver::MySql { "CHAR" } else { "TEXT" };
+    let sql = query(
+        driver,
+        &format!(
+            "SELECT CAST(revision_id AS {text_type}) AS revision_id FROM user_space_theme_preference_v2 WHERE user_id = ? AND space_id = ?"
+        ),
+    );
+    let row = sqlx::query(&sql)
+        .bind(user_id)
+        .bind(space_id)
+        .fetch_optional(pool)
+        .await?;
+    row.map(|row| text(&row, "revision_id")).transpose()
+}
+
+pub async fn space_theme_revision(
+    pool: &AnyPool,
+    driver: Driver,
+    space_id: i64,
+) -> Result<Option<String>, sqlx::Error> {
+    let text_type = if driver == Driver::MySql { "CHAR" } else { "TEXT" };
+    let sql = query(
+        driver,
+        &format!(
+            "SELECT CAST(revision_id AS {text_type}) AS revision_id FROM space_theme_preference_v2 WHERE space_id = ?"
+        ),
+    );
+    let row = sqlx::query(&sql).bind(space_id).fetch_optional(pool).await?;
+    row.map(|row| text(&row, "revision_id")).transpose()
+}
+
+pub async fn space_theme_pair(
+    pool: &AnyPool,
+    driver: Driver,
+    space_id: i64,
+) -> Result<Option<(String, String)>, sqlx::Error> {
+    let text_type = if driver == Driver::MySql { "CHAR" } else { "TEXT" };
+    let sql = query(
+        driver,
+        &format!(
+            "SELECT CAST(package_id AS {text_type}) AS package_id, CAST(revision_id AS {text_type}) AS revision_id FROM space_theme_preference_v2 WHERE space_id = ?"
+        ),
+    );
+    let row = sqlx::query(&sql).bind(space_id).fetch_optional(pool).await?;
+    row.map(|row| Ok((text(&row, "package_id")?, text(&row, "revision_id")?)))
+        .transpose()
+}
+
+pub async fn user_space_theme_pair(
+    pool: &AnyPool,
+    driver: Driver,
+    user_id: i64,
+    space_id: i64,
+) -> Result<Option<(String, String)>, sqlx::Error> {
+    let text_type = if driver == Driver::MySql { "CHAR" } else { "TEXT" };
+    let sql = query(
+        driver,
+        &format!(
+            "SELECT CAST(package_id AS {text_type}) AS package_id, CAST(revision_id AS {text_type}) AS revision_id FROM user_space_theme_preference_v2 WHERE user_id = ? AND space_id = ?"
+        ),
+    );
+    let row = sqlx::query(&sql)
+        .bind(user_id)
+        .bind(space_id)
+        .fetch_optional(pool)
+        .await?;
+    row.map(|row| Ok((text(&row, "package_id")?, text(&row, "revision_id")?)))
+        .transpose()
+}
+
+pub async fn theme_asset_content(
+    pool: &AnyPool,
+    driver: Driver,
+    revision: &str,
+    path: &str,
+) -> Result<Option<(String, Vec<u8>)>, sqlx::Error> {
+    let text_type = if driver == Driver::MySql { "CHAR" } else { "TEXT" };
+    let sql = query(
+        driver,
+        &format!(
+            "SELECT CAST(media_type AS {text_type}) AS media_type, content FROM asset_record_v2 WHERE revision_id = ? AND path = ?"
+        ),
+    );
+    let row = sqlx::query(&sql)
+        .bind(revision)
+        .bind(path)
+        .fetch_optional(pool)
+        .await?;
+    row.map(|row| Ok((text(&row, "media_type")?, row.try_get("content")?)))
+        .transpose()
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GrantRow {
+    pub revision_id: String,
+    pub execution_mode: String,
+    pub permissions_json: String,
+}
+
+pub async fn grant_row(
+    pool: &AnyPool,
+    driver: Driver,
+    user_id: i64,
+    revision: &str,
+    execution_mode: &str,
+) -> Result<Option<GrantRow>, sqlx::Error> {
+    let text_type = if driver == Driver::MySql { "CHAR" } else { "TEXT" };
+    let sql = query(
+        driver,
+        &format!(
+            "SELECT CAST(revision_id AS {text_type}) AS revision_id, CAST(execution_mode AS {text_type}) AS execution_mode, CAST(permissions_json AS {text_type}) AS permissions_json FROM grant_record_v2 WHERE user_id = ? AND revision_id = ? AND execution_mode = ?"
+        ),
+    );
+    let row = sqlx::query(&sql)
+        .bind(user_id)
+        .bind(revision)
+        .bind(execution_mode)
+        .fetch_optional(pool)
+        .await?;
+    row.map(|row| {
+        Ok(GrantRow {
+            revision_id: text(&row, "revision_id")?,
+            execution_mode: text(&row, "execution_mode")?,
+            permissions_json: text(&row, "permissions_json")?,
+        })
+    })
+    .transpose()
+}
+
+pub async fn save_grant(
+    pool: &AnyPool,
+    driver: Driver,
+    user_id: i64,
+    revision: &str,
+    execution_mode: &str,
+    permissions_json: &str,
+    now: &str,
+) -> Result<(), sqlx::Error> {
+    let timestamp = timestamp_bind(driver);
+    let sql = match driver {
+        Driver::MySql => format!(
+            "INSERT INTO grant_record_v2 (user_id, revision_id, execution_mode, permissions_json, updated_at) VALUES (?, ?, ?, ?, {timestamp}) ON DUPLICATE KEY UPDATE permissions_json = VALUES(permissions_json), updated_at = VALUES(updated_at)"
+        ),
+        _ => format!(
+            "INSERT INTO grant_record_v2 (user_id, revision_id, execution_mode, permissions_json, updated_at) VALUES (?, ?, ?, ?, {timestamp}) ON CONFLICT(user_id, revision_id, execution_mode) DO UPDATE SET permissions_json = excluded.permissions_json, updated_at = excluded.updated_at"
+        ),
+    };
+    let sql = query(driver, &sql);
+    sqlx::query(&sql)
+        .bind(user_id)
+        .bind(revision)
+        .bind(execution_mode)
+        .bind(permissions_json)
+        .bind(now)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+pub async fn delete_grant(
+    pool: &AnyPool,
+    driver: Driver,
+    user_id: i64,
+    revision: &str,
+    execution_mode: &str,
+) -> Result<(), sqlx::Error> {
+    let sql = query(
+        driver,
+        "DELETE FROM grant_record_v2 WHERE user_id = ? AND revision_id = ? AND execution_mode = ?",
+    );
+    sqlx::query(&sql)
+        .bind(user_id)
+        .bind(revision)
+        .bind(execution_mode)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+pub async fn revision_verified_manifest(
+    pool: &AnyPool,
+    driver: Driver,
+    revision: &str,
+) -> Result<Option<(String, i64)>, sqlx::Error> {
+    let text_type = if driver == Driver::MySql { "CHAR" } else { "TEXT" };
+    let sql = query(
+        driver,
+        &format!(
+            "SELECT CAST(manifest_json AS {text_type}) AS manifest_json, {} AS verified FROM revision_record_v2 WHERE id = ?",
+            bool_expression(driver, "verified")
+        ),
+    );
+    let row = sqlx::query(&sql)
+        .bind(revision)
+        .fetch_optional(pool)
+        .await?;
+    row.map(|row| Ok((text(&row, "manifest_json")?, row.try_get("verified")?)))
+        .transpose()
+}
+
+pub async fn save_space_theme(
+    pool: &AnyPool,
+    driver: Driver,
+    space_id: i64,
+    package_id: &str,
+    revision_id: &str,
+    now: &str,
+) -> Result<(), sqlx::Error> {
+    let timestamp = timestamp_bind(driver);
+    let sql = match driver {
+        Driver::MySql => format!(
+            "INSERT INTO space_theme_preference_v2 (space_id, package_id, revision_id, updated_by, updated_at) VALUES (?, ?, ?, 0, {timestamp}) ON DUPLICATE KEY UPDATE package_id = VALUES(package_id), revision_id = VALUES(revision_id), updated_at = VALUES(updated_at)"
+        ),
+        _ => format!(
+            "INSERT INTO space_theme_preference_v2 (space_id, package_id, revision_id, updated_by, updated_at) VALUES (?, ?, ?, 0, {timestamp}) ON CONFLICT(space_id) DO UPDATE SET package_id = excluded.package_id, revision_id = excluded.revision_id, updated_at = excluded.updated_at"
+        ),
+    };
+    let sql = query(driver, &sql);
+    sqlx::query(&sql)
+        .bind(space_id)
+        .bind(package_id)
+        .bind(revision_id)
+        .bind(now)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+pub async fn save_user_space_theme(
+    pool: &AnyPool,
+    driver: Driver,
+    user_id: i64,
+    space_id: i64,
+    package_id: &str,
+    revision_id: &str,
+    now: &str,
+) -> Result<(), sqlx::Error> {
+    let timestamp = timestamp_bind(driver);
+    let sql = match driver {
+        Driver::MySql => format!(
+            "INSERT INTO user_space_theme_preference_v2 (user_id, space_id, package_id, revision_id, updated_at) VALUES (?, ?, ?, ?, {timestamp}) ON DUPLICATE KEY UPDATE package_id = VALUES(package_id), revision_id = VALUES(revision_id), updated_at = VALUES(updated_at)"
+        ),
+        _ => format!(
+            "INSERT INTO user_space_theme_preference_v2 (user_id, space_id, package_id, revision_id, updated_at) VALUES (?, ?, ?, ?, {timestamp}) ON CONFLICT(user_id, space_id) DO UPDATE SET package_id = excluded.package_id, revision_id = excluded.revision_id, updated_at = excluded.updated_at"
+        ),
+    };
+    let sql = query(driver, &sql);
+    sqlx::query(&sql)
+        .bind(user_id)
+        .bind(space_id)
+        .bind(package_id)
+        .bind(revision_id)
+        .bind(now)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+pub async fn clear_space_theme_row(
+    pool: &AnyPool,
+    driver: Driver,
+    space_id: i64,
+) -> Result<(), sqlx::Error> {
+    let sql = query(
+        driver,
+        "DELETE FROM space_theme_preference_v2 WHERE space_id = ?",
+    );
+    sqlx::query(&sql).bind(space_id).execute(pool).await?;
+    Ok(())
+}
+
+pub async fn clear_user_space_theme_row(
+    pool: &AnyPool,
+    driver: Driver,
+    user_id: i64,
+    space_id: i64,
+) -> Result<(), sqlx::Error> {
+    let sql = query(
+        driver,
+        "DELETE FROM user_space_theme_preference_v2 WHERE user_id = ? AND space_id = ?",
+    );
+    sqlx::query(&sql)
+        .bind(user_id)
+        .bind(space_id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+/// `ArrangeLayout`: items may change group and sort, groups sort, one
+/// transaction.
+pub async fn arrange_layout(
+    pool: &AnyPool,
+    driver: Driver,
+    space_id: i64,
+    items: &[(i64, i64, i64)],
+    groups: &[(i64, i64)],
+    now: &str,
+) -> Result<(), sqlx::Error> {
+    let timestamp = timestamp_bind(driver);
+    let update_item = query(
+        driver,
+        &format!(
+            "UPDATE item_icon SET item_icon_group_id = ?, sort = ?, updated_at = {timestamp} WHERE id = ? AND space_id = ?"
+        ),
+    );
+    let update_group = query(
+        driver,
+        &format!(
+            "UPDATE item_icon_group SET sort = ?, updated_at = {timestamp} WHERE id = ? AND space_id = ?"
+        ),
+    );
+    let mut tx = pool.begin().await?;
+    for (id, group_id, sort) in items {
+        sqlx::query(&update_item)
+            .bind(*group_id)
+            .bind(*sort)
+            .bind(now)
+            .bind(*id)
+            .bind(space_id)
+            .execute(&mut *tx)
+            .await?;
+    }
+    for (id, sort) in groups {
+        sqlx::query(&update_group)
+            .bind(*sort)
+            .bind(now)
+            .bind(*id)
+            .bind(space_id)
+            .execute(&mut *tx)
+            .await?;
+    }
+    tx.commit().await?;
+    Ok(())
+}
+
 pub async fn groups_for_space(
     pool: &AnyPool,
     driver: Driver,
@@ -3911,56 +4313,36 @@ pub async fn revoke_user_sessions(
     Ok(())
 }
 
-/// Loads the authorization/session columns used to validate an account.
-pub async fn user_access(
-    pool: &AnyPool,
-    driver: Driver,
-    user_id: i64,
-) -> Result<Option<UserAccess>, sqlx::Error> {
-    let table = match driver {
-        Driver::MySql => "`user`",
-        Driver::Sqlite | Driver::Postgres => "\"user\"",
-    };
-    let sql = query(
-        driver,
-        &format!("SELECT id, status, role, token_version FROM {table} WHERE id = ?"),
-    );
-    let row = sqlx::query(&sql).bind(user_id).fetch_optional(pool).await?;
-    row.map(|row| {
-        Ok(UserAccess {
-            id: row.try_get("id")?,
-            status: row.try_get("status")?,
-            role: row.try_get("role")?,
-            token_version: row.try_get("token_version")?,
-        })
-    })
-    .transpose()
-}
 
 #[cfg(test)]
 mod tests {
     use super::{
         activation_revision, add_oidc_group, admin_user_view, audit_entries, begin_theme_trial,
         bookmark_tree,
-        can_access_space, can_edit_space, can_manage_space, confirm_theme_trial,
+        arrange_layout, can_access_space, can_edit_space, can_manage_space,
+        clear_space_theme_row, clear_user_space_theme_row, confirm_theme_trial,
         create_item_with_icon, delete_oidc_group,
         copy_space, clear_space, create_group, create_item, create_paired_space, create_user,
+        delete_grant,
         delete_group_tree,
         delete_file_row, delete_item, delete_paired_space, delete_user, file_list,
         file_name_by_id,
         group_belongs, group_by_id,
-        group_has_descendant, group_siblings, groups_for_space, insert_file, item_by_id,
-        items_for_space,
+        grant_row, group_has_descendant, group_siblings, groups_for_space, insert_file,
+        item_belongs, item_by_id, items_for_space,
         module_config_value, oidc_groups, paired_ids_of, paired_space_ids, remove_space_member,
         rename_paired_space, revoke_user_sessions, save_module_config, save_user_config,
         set_member_role, spaces_owned_by,
-        sort_groups, sort_items, space_list, space_members, space_name, space_owner,
+        save_space_theme, save_user_space_theme, sort_groups, sort_items, space_list,
+        space_members, space_name, space_owner, space_theme_pair, space_theme_revision,
         space_owner_and_type, space_public_config, space_search_config, space_wallpaper_json,
         transfer_space,
         update_group, update_item, update_space_public_config, update_space_search_config,
-        update_space_wallpaper, upsert_space_member, user_access, user_by_credentials, user_by_id,
+        update_space_wallpaper, upsert_space_member, user_by_credentials, user_by_id,
+        user_space_theme_pair, user_space_theme_revision,
         user_config, user_id_by_mail, user_list, user_mail_exists, user_password_and_name,
         install_package, instance_last_good, instance_pending, latest_revision,
+        revision_verified_manifest, save_grant,
         package_id_for_revision, package_removed, remove_theme_package, revision_manifest,
         revision_package_id, rollback_theme, save_theme_preference,
         insert_web_wallpaper, save_trusted_policy, select_user_theme, set_default_theme,
@@ -4004,19 +4386,6 @@ mod tests {
             .await
             .expect("insert user fixture");
 
-        assert_eq!(
-            user_access(&pool, driver, 17).await.expect("read user"),
-            Some(super::UserAccess {
-                id: 17,
-                status: 1,
-                role: 2,
-                token_version: 9,
-            })
-        );
-        assert_eq!(
-            user_access(&pool, driver, 18).await.expect("missing user"),
-            None
-        );
         assert_eq!(
             user_by_id(&pool, driver, 17).await.expect("read full user"),
             Some(super::UserRecord {
@@ -4104,6 +4473,7 @@ mod tests {
         verify_theme_package_writes(&pool, driver).await;
         verify_wallpaper_writes(&pool, driver).await;
         verify_icon_writes(&pool, driver).await;
+        verify_theme_selection_writes(&pool, driver).await;
         pool.close().await;
     }
 
@@ -4504,6 +4874,255 @@ mod tests {
             .execute(pool)
             .await
             .expect("drop item list fixture");
+    }
+
+    async fn verify_theme_selection_writes(pool: &sqlx::AnyPool, driver: Driver) {
+        let timestamp_type = match driver {
+            Driver::MySql => "DATETIME(6)",
+            Driver::Sqlite => "TEXT",
+            Driver::Postgres => "TIMESTAMPTZ",
+        };
+        let id_type = match driver {
+            Driver::MySql => "BIGINT AUTO_INCREMENT PRIMARY KEY",
+            Driver::Sqlite => "INTEGER PRIMARY KEY AUTOINCREMENT",
+            Driver::Postgres => "BIGSERIAL PRIMARY KEY",
+        };
+        let bool_type = match driver {
+            Driver::MySql => "TINYINT NOT NULL",
+            Driver::Sqlite => "INTEGER NOT NULL",
+            Driver::Postgres => "BOOLEAN NOT NULL",
+        };
+        sqlx::query(&format!(
+            "CREATE TABLE revision_record_v2 (id VARCHAR(191) PRIMARY KEY, package_id VARCHAR(191) NOT NULL, version VARCHAR(191) NOT NULL, manifest_json TEXT NOT NULL, tokens_json TEXT NOT NULL, verified {bool_type}, created_at {timestamp_type})"
+        ))
+        .execute(pool)
+        .await
+        .expect("create selection revision fixture");
+        sqlx::query(&format!(
+            "CREATE TABLE trusted_runtime_policy_v2 (revision_id VARCHAR(191) PRIMARY KEY, enabled {bool_type}, updated_by BIGINT NOT NULL, updated_at VARCHAR(64))"
+        ))
+        .execute(pool)
+        .await
+        .expect("create selection trusted fixture");
+        sqlx::query("CREATE TABLE grant_record_v2 (user_id BIGINT NOT NULL, revision_id VARCHAR(191) NOT NULL, execution_mode VARCHAR(32) NOT NULL, permissions_json TEXT NOT NULL, updated_at VARCHAR(64), PRIMARY KEY (user_id, revision_id, execution_mode))")
+            .execute(pool)
+            .await
+            .expect("create grant fixture");
+        sqlx::query("CREATE TABLE space_theme_preference_v2 (space_id BIGINT PRIMARY KEY, package_id VARCHAR(191) NOT NULL, revision_id VARCHAR(191) NOT NULL, updated_by BIGINT NOT NULL, updated_at VARCHAR(64))")
+            .execute(pool)
+            .await
+            .expect("create space theme fixture");
+        sqlx::query("CREATE TABLE user_space_theme_preference_v2 (user_id BIGINT NOT NULL, space_id BIGINT NOT NULL, package_id VARCHAR(191) NOT NULL, revision_id VARCHAR(191) NOT NULL, updated_at VARCHAR(64), PRIMARY KEY (user_id, space_id))")
+            .execute(pool)
+            .await
+            .expect("create user space theme fixture");
+        sqlx::query(&format!(
+            "CREATE TABLE item_icon (id {id_type}, created_at {timestamp_type} NOT NULL, updated_at {timestamp_type} NOT NULL, icon_json TEXT NOT NULL, title VARCHAR(50) NOT NULL, url TEXT NOT NULL, lan_url TEXT NOT NULL, mobile_url TEXT NOT NULL, description TEXT NOT NULL, open_method BIGINT NOT NULL, sort BIGINT NOT NULL, item_icon_group_id BIGINT NOT NULL, user_id BIGINT NOT NULL, space_id BIGINT NOT NULL)"
+        ))
+        .execute(pool)
+        .await
+        .expect("create selection item fixture");
+        sqlx::query(&format!(
+            "CREATE TABLE item_icon_group (id {id_type}, created_at {timestamp_type} NOT NULL, updated_at {timestamp_type} NOT NULL, icon VARCHAR(100) NOT NULL, title VARCHAR(100) NOT NULL, description TEXT NOT NULL, sort BIGINT NOT NULL, user_id BIGINT NOT NULL, space_id BIGINT NOT NULL, parent_id BIGINT)"
+        ))
+        .execute(pool)
+        .await
+        .expect("create selection group fixture");
+
+        let insert_revision = query(
+            driver,
+            &format!(
+                "INSERT INTO revision_record_v2 (id, package_id, version, manifest_json, tokens_json, verified, created_at) VALUES (?, ?, ?, ?, '{{}}', ?, {})",
+                timestamp_bind(driver)
+            ),
+        );
+        let mut statement = sqlx::query(&insert_revision)
+            .bind("rev-a")
+            .bind("community.a")
+            .bind("1.0.0")
+            .bind(r#"{"runtime":{"supportedModes":["sandbox","trusted"]}}"#);
+        statement = if driver == Driver::Postgres {
+            statement.bind(true)
+        } else {
+            statement.bind(1_i64)
+        };
+        statement
+            .bind("2025-09-01 00:00:00")
+            .execute(pool)
+            .await
+            .expect("insert selection revision");
+
+        save_grant(
+            pool,
+            driver,
+            7,
+            "rev-a",
+            "sandbox",
+            r#"["spaces.read"]"#,
+            "2025-09-02 00:00:00",
+        )
+        .await
+        .expect("save grant");
+        let grant = grant_row(pool, driver, 7, "rev-a", "sandbox")
+            .await
+            .expect("read grant")
+            .expect("grant exists");
+        assert_eq!(grant.permissions_json, r#"["spaces.read"]"#);
+        save_grant(
+            pool,
+            driver,
+            7,
+            "rev-a",
+            "sandbox",
+            r#"["items.read"]"#,
+            "2025-09-03 00:00:00",
+        )
+        .await
+        .expect("update grant");
+        assert_eq!(
+            grant_row(pool, driver, 7, "rev-a", "sandbox")
+                .await
+                .expect("updated grant")
+                .expect("grant remains")
+                .permissions_json,
+            r#"["items.read"]"#
+        );
+        delete_grant(pool, driver, 7, "rev-a", "sandbox")
+            .await
+            .expect("delete grant");
+        assert_eq!(
+            grant_row(pool, driver, 7, "rev-a", "sandbox")
+                .await
+                .expect("missing grant"),
+            None
+        );
+        assert_eq!(
+            revision_verified_manifest(pool, driver, "rev-a")
+                .await
+                .expect("verified manifest")
+                .expect("revision exists")
+                .1,
+            1
+        );
+
+        save_space_theme(pool, driver, 78, "community.a", "rev-a", "2025-09-04 00:00:00")
+            .await
+            .expect("save space theme");
+        assert_eq!(
+            space_theme_pair(pool, driver, 78)
+                .await
+                .expect("read space theme"),
+            Some(("community.a".to_string(), "rev-a".to_string()))
+        );
+        save_user_space_theme(
+            pool,
+            driver,
+            7,
+            78,
+            "community.a",
+            "rev-a",
+            "2025-09-05 00:00:00",
+        )
+        .await
+        .expect("save user space theme");
+        assert_eq!(
+            user_space_theme_pair(pool, driver, 7, 78)
+                .await
+                .expect("read user space theme"),
+            Some(("community.a".to_string(), "rev-a".to_string()))
+        );
+        clear_user_space_theme_row(pool, driver, 7, 78)
+            .await
+            .expect("clear user space theme");
+        assert_eq!(
+            user_space_theme_revision(pool, driver, 7, 78)
+                .await
+                .expect("cleared user space theme"),
+            None
+        );
+        clear_space_theme_row(pool, driver, 78)
+            .await
+            .expect("clear space theme");
+        assert_eq!(
+            space_theme_revision(pool, driver, 78)
+                .await
+                .expect("cleared space theme"),
+            None
+        );
+
+        let insert_group = query(
+            driver,
+            &format!(
+                "INSERT INTO item_icon_group (id, created_at, updated_at, icon, title, description, sort, user_id, space_id, parent_id) VALUES (?, {}, {}, 'folder', ?, '', 0, 7, 78, NULL)",
+                timestamp_bind(driver),
+                timestamp_bind(driver)
+            ),
+        );
+        for (id, title) in [(41_i64, "One"), (42, "Two")] {
+            sqlx::query(&insert_group)
+                .bind(id)
+                .bind("2025-09-06 00:00:00")
+                .bind("2025-09-06 00:00:00")
+                .bind(title)
+                .execute(pool)
+                .await
+                .expect("insert selection group");
+        }
+        let insert_item = query(
+            driver,
+            &format!(
+                "INSERT INTO item_icon (id, created_at, updated_at, icon_json, title, url, lan_url, mobile_url, description, open_method, sort, item_icon_group_id, user_id, space_id) VALUES (?, {}, {}, '{{}}', ?, 'https://example.test', '', '', '', 2, 0, 41, 7, 78)",
+                timestamp_bind(driver),
+                timestamp_bind(driver)
+            ),
+        );
+        sqlx::query(&insert_item)
+            .bind(51_i64)
+            .bind("2025-09-06 00:00:00")
+            .bind("2025-09-06 00:00:00")
+            .bind("Link")
+            .execute(pool)
+            .await
+            .expect("insert selection item");
+
+        arrange_layout(
+            pool,
+            driver,
+            78,
+            &[(51, 42, 5)],
+            &[(41, 2), (42, 1)],
+            "2025-09-07 00:00:00",
+        )
+        .await
+        .expect("arrange layout");
+        let item = item_by_id(pool, driver, 78, 51)
+            .await
+            .expect("read arranged item")
+            .expect("item exists");
+        assert_eq!(item.item_icon_group_id, 42);
+        assert_eq!(item.sort, 5);
+        let groups = groups_for_space(pool, driver, 78)
+            .await
+            .expect("read arranged groups");
+        assert_eq!(
+            groups.iter().map(|group| group.id).collect::<Vec<_>>(),
+            vec![42, 41]
+        );
+
+        for table in [
+            "item_icon",
+            "item_icon_group",
+            "user_space_theme_preference_v2",
+            "space_theme_preference_v2",
+            "grant_record_v2",
+            "trusted_runtime_policy_v2",
+            "revision_record_v2",
+        ] {
+            sqlx::query(&format!("DROP TABLE {table}"))
+                .execute(pool)
+                .await
+                .expect("drop selection fixture");
+        }
     }
 
     async fn verify_icon_writes(pool: &sqlx::AnyPool, driver: Driver) {

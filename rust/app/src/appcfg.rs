@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
 use serde::Deserialize;
-use sqlx::{AnyPool, SqlitePool};
+use sqlx::AnyPool;
 
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct Conf {
@@ -121,7 +121,6 @@ pub struct Ctx {
     /// Directory the configuration was read from; relative paths resolve here,
     /// exactly as the Go binary resolves them from its working directory.
     pub dir: PathBuf,
-    pool: tokio::sync::OnceCell<SqlitePool>,
     shared_pool: tokio::sync::OnceCell<AnyPool>,
 }
 
@@ -168,7 +167,6 @@ pub fn ctx() -> &'static Ctx {
         Ctx {
             conf,
             dir,
-            pool: tokio::sync::OnceCell::new(),
             shared_pool: tokio::sync::OnceCell::new(),
         }
     })
@@ -182,25 +180,6 @@ fn load_conf(path: &Path, port: &str) -> Result<Conf, String> {
 }
 
 impl Ctx {
-    /// The pool is created on first use: during a recording the Go child
-    /// creates the database before the first request arrives.
-    pub async fn pool(&self) -> Result<&SqlitePool, String> {
-        self.pool
-            .get_or_try_init(|| async {
-                let file = self.database_file();
-                let options = sqlx::sqlite::SqliteConnectOptions::new()
-                    .filename(&file)
-                    .create_if_missing(false)
-                    .read_only(false);
-                sqlx::sqlite::SqlitePoolOptions::new()
-                    .max_connections(4)
-                    .connect_with(options)
-                    .await
-                    .map_err(|error| format!("opening {}: {error}", file.display()))
-            })
-            .await
-    }
-
     pub async fn shared_pool(&self) -> Result<&AnyPool, String> {
         self.shared_pool
             .get_or_try_init(|| async {
@@ -354,7 +333,6 @@ mod tests {
         let ctx = super::Ctx {
             conf: config,
             dir: std::env::temp_dir(),
-            pool: tokio::sync::OnceCell::new(),
             shared_pool: tokio::sync::OnceCell::new(),
         };
         assert_eq!(ctx.driver(), DatabaseDriver::Sqlite);
@@ -410,8 +388,7 @@ mod tests {
             let ctx = super::Ctx {
                 conf: config,
                 dir: path,
-                pool: tokio::sync::OnceCell::new(),
-                shared_pool: tokio::sync::OnceCell::new(),
+                    shared_pool: tokio::sync::OnceCell::new(),
             };
             assert_eq!(ctx.driver(), expected);
         }

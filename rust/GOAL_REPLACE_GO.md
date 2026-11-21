@@ -229,7 +229,7 @@ command that proves it).
 | 1 | T1.2 driver bootstrap | done — `schema_shared.rs` translates DDL, seed runs on all three |
 | 1 | T1.3 three-driver HTTP smoke | done — `rust/check/db-smoke.sh` passes on MySQL 8.4 and PostgreSQL 17 |
 | 1 | T1.4 config docs | done — `rust/CONFIG.md` |
-| 2 | T2.1 sorting | done — `sort_items`, `group_siblings`, `sort_groups` on the shared pool |
+| 2 | T2.1–T2.11 (Phase 2) | done — every handler runs on the shared AnyPool; `ctx.pool()` and `last_insert_rowid` are 0 |
 | 2 | T2.2 members | done — paired-space upsert, role update and removal on the shared pool |
 | 2 | T2.3 space create/rename/copy | done — `create_paired_space`, `rename_paired_space`, `copy_space` |
 | 2 | T2.4 space transfer/share/team/delete/clear | done — transfer, clear, cascading delete on the shared pool; `shared`/`teams` reuse the T2.3 creator |
