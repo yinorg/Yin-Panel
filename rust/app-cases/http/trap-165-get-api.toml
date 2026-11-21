@@ -1,9 +1,12 @@
 [request]
 method = "GET"
-path = "/api/h%C3%A9llo%20w%C3%B6rld/v2/wallpaper/library"
+path = "/api/theme/v2/package/h%C3%A9llo%20w%C3%B6rld"
 
 [response]
 status = 404
 
 [response.headers]
-content-type = "text/plain"
+cache-control = "no-store"
+referrer-policy = "strict-origin-when-cross-origin"
+x-content-type-options = "nosniff"
+x-frame-options = "SAMEORIGIN"

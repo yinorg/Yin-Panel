@@ -1,6 +1,6 @@
 [request]
 method = "GET"
-path = "/api/theme/stra%C3%9Fe/effective"
+path = "/api/stra%C3%9Fe/v2/effective"
 
 [response]
 status = 404

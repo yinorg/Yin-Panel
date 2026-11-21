@@ -1,5 +1,5 @@
 go_routes=103
-rust_routes=87
+rust_routes=88
 wire_routes=1
 sqlite_pool_handlers=0
 shared_pool_handlers=74

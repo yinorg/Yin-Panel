@@ -1,17 +1,13 @@
 [request]
 method = "POST"
-path = "/api/login"
-body = '{"n":9007199254740993,"f":1e21,"t":0.1,"neg":-7}'
+path = "/api/%F0%9F%91%8D%F0%9F%8F%BD%20thumbs"
+body = '{"mail":"admin@yiniot.com"}'
 
 [request.headers]
 Content-Type = "application/json"
 
 [response]
-status = 200
+status = 404
 
 [response.headers]
-cache-control = "no-store"
-content-type = "application/json; charset=utf-8"
-referrer-policy = "strict-origin-when-cross-origin"
-x-content-type-options = "nosniff"
-x-frame-options = "SAMEORIGIN"
+content-type = "text/plain"

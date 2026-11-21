@@ -78,7 +78,15 @@ def require_success(label, response):
     return value["data"]
 
 
+# Kernel-assigned interface names, MACs, PIDs and free-space counters differ
+# between two runs of the same build; only their shape is contractual.
+VOLATILE = {"name", "mac", "macAddress", "pid", "free", "available", "used", "usage"}
+
+
 def same_shape(left, right, path="data"):
+    leaf = path.rsplit(".", 1)[-1]
+    if leaf in VOLATILE:
+        return
     if isinstance(left, dict) and isinstance(right, dict):
         if left.keys() != right.keys():
             raise AssertionError(f"{path}: keys differ: {left.keys()} != {right.keys()}")

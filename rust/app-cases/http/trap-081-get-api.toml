@@ -1,6 +1,6 @@
 [request]
 method = "GET"
-path = "/api/stra%C3%9Fe/v2/current"
+path = "/api/oauth/stra%C3%9Fe"
 
 [response]
 status = 404

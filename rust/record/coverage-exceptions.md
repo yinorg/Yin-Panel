@@ -18,3 +18,18 @@ does not produce a meaningful route-level failure. Infrastructure failures
 These routes remain covered by successful replay cases. This exception does not
 apply to asset routes, where missing content is a meaningful 404, or to
 authenticated admin/read routes.
+
+## Runtime-dependent success paths
+
+These routes have a recorded failure case but no static success case, because a
+successful response cannot be produced from a fixed recorded request: the value
+it needs is generated at runtime. A dedicated sequence script compares the Go
+build with the Rust binary live instead.
+
+| Method | Route | Evidence |
+| --- | --- | --- |
+| GET | `/api/theme/v2/preview/:token` | The token is 24 random bytes minted by the preview upload; `rust/record/replay-preview-sequence.py` uploads a package, then compares the token GET and asset GET between Go and Rust. |
+| GET | `/api/theme/v2/preview/:token/assets/*name` | Same sequence script; it reports `asset bytes=… content-type=…` for both builds. |
+| POST | `/api/system/monitor/getSnapshot` | Success needs `enable_monitor: true`; `rust/record/replay-monitor-sequence.py` boots both builds with monitoring enabled and compares the response shape. |
+| POST | `/api/system/monitor/getDiskMountpoints` | Same monitor sequence; it reports the mountpoint entry count for both builds. |
+| POST | `/api/system/monitor/getDiskStateByPath` | Same monitor sequence; it reports the disk-state entry count for both builds. |

@@ -1,6 +1,6 @@
 [request]
 method = "GET"
-path = "/api/system/stra%C3%9Fe"
+path = "/api/stra%C3%9Fe/capabilities"
 
 [response]
 status = 404

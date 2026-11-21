@@ -48,6 +48,7 @@ pub fn router() -> Router<()> {
         .route("/api/user/updateInfo", post(update_user_info))
         .route("/api/user/updatePassword", post(update_password))
         .route("/api/file/s3/{*filepath}", get(serve_stored_file_api))
+        .route("/uploads/", get(serve_stored_file_empty))
         .route("/uploads/{*filepath}", get(serve_stored_file))
         .route("/api/spaces/{space_id}/bookmarks/tree", get(bookmarks_tree))
         .route("/api/panel/users/getList", get(users_list))
@@ -5805,6 +5806,16 @@ async fn update_password(headers: HeaderMap, request: Request) -> Response {
         Ok(false) => error_code(1007),
         Err(_) => envelope::database_error(),
     }
+}
+
+/// Go matches `/uploads/` against the wildcard route with an empty path, so the
+/// handler answers the same 404 instead of Gin's NoRoute.
+async fn serve_stored_file_empty() -> Response {
+    static_error(
+        StatusCode::NOT_FOUND,
+        "{\"error\":\"failed to get file\"}",
+        false,
+    )
 }
 
 /// `FileRouter.GetS3File`: an uploaded file from local storage, with the cache

@@ -1,17 +1,13 @@
 [request]
 method = "POST"
-path = "/api/login"
-body = '{"zebra":1,"apple":2,"10":3,"2":4,"é":5,"Apple":6}'
+path = "/api/h%C3%A9llo%20w%C3%B6rld"
+body = '{"mail":"admin@yiniot.com"}'
 
 [request.headers]
 Content-Type = "application/json"
 
 [response]
-status = 200
+status = 404
 
 [response.headers]
-cache-control = "no-store"
-content-type = "application/json; charset=utf-8"
-referrer-policy = "strict-origin-when-cross-origin"
-x-content-type-options = "nosniff"
-x-frame-options = "SAMEORIGIN"
+content-type = "text/plain"

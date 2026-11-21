@@ -1,6 +1,6 @@
 [request]
 method = "GET"
-path = "/api/stra%C3%9Fe/v2/package/org.yin.default"
+path = "/api/theme/stra%C3%9Fe/packages"
 
 [response]
 status = 404

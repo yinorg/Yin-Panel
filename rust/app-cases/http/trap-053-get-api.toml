@@ -1,6 +1,6 @@
 [request]
 method = "GET"
-path = "/api/system/%F0%9F%91%A8%E2%80%8D%F0%9F%91%A9%E2%80%8D%F0%9F%91%A7%20family"
+path = "/api/%F0%9F%91%A8%E2%80%8D%F0%9F%91%A9%E2%80%8D%F0%9F%91%A7%20family/capabilities"
 
 [response]
 status = 404

@@ -1,6 +1,6 @@
 [request]
 method = "GET"
-path = "/api/e%CC%81/v2/package/org.yin.default"
+path = "/api/theme/e%CC%81/packages"
 
 [response]
 status = 404

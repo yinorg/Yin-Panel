@@ -1,6 +1,6 @@
 [request]
 method = "GET"
-path = "/api/oauth/a%C2%A0b"
+path = "/api/a%C2%A0b/config"
 
 [response]
 status = 404

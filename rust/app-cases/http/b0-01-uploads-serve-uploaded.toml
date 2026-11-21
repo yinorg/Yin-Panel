@@ -1,0 +1,14 @@
+[request]
+method = "GET"
+path = "/uploads/b6229967372e473079438136d6e7f144.svg"
+
+[response]
+status = 200
+
+[response.headers]
+cache-control = "public, max-age=31536000, immutable"
+content-disposition = "inline; filename=b6229967372e473079438136d6e7f144.svg"
+content-type = "image/svg+xml"
+referrer-policy = "strict-origin-when-cross-origin"
+x-content-type-options = "nosniff"
+x-frame-options = "SAMEORIGIN"

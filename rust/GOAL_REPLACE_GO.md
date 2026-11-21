@@ -240,7 +240,7 @@ command that proves it).
 | 2 | T2.9 theme writes | done — install, remove, default, trial, confirm, rollback on the shared pool |
 | 2 | T2.10 wallpaper | done — web wallpaper upload/asset on the shared pool; library assets are in-memory |
 | 2 | T2.11 icons/favicon | done — OIDC rules, item-with-icon and bookmark import; no `last_insert_rowid` left |
-| 3 | T3.1–T3.3 route parity | not started |
+| 3 | T3.1–T3.3 route parity | done — 103 routes served, 0 unimplemented, recorded coverage `routes missing a pair: 0` |
 | 4 | T4.1–T4.5 remove Go | not started |
 | 5 | T5.1–T5.2 acceptance | not started |
 

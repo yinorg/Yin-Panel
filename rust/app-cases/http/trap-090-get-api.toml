@@ -1,6 +1,6 @@
 [request]
 method = "GET"
-path = "/api/theme/%C4%B0stanbul/current"
+path = "/api/%C4%B0stanbul/v2/current"
 
 [response]
 status = 404

@@ -1,6 +1,6 @@
 [request]
 method = "GET"
-path = "/api/user/h%C3%A9llo%20w%C3%B6rld"
+path = "/api/h%C3%A9llo%20w%C3%B6rld/getUser"
 
 [response]
 status = 404
