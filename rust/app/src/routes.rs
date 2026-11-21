@@ -3390,11 +3390,14 @@ async fn sort_items(headers: HeaderMap, Path(space_id): Path<i64>, request: Requ
         Err(response) => return response,
     };
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool.clone(),
         Err(error) => return envelope::error(&error),
     };
-    if !can_edit(&pool, user.id, space_id).await {
+    if !crate::repository::can_edit_space(&pool, ctx.sqlx_driver(), user.id, space_id)
+        .await
+        .unwrap_or(false)
+    {
         return error_code(1005);
     }
     let body = match axum::body::to_bytes(request.into_body(), 1 << 20).await {
@@ -3408,29 +3411,23 @@ async fn sort_items(headers: HeaderMap, Path(space_id): Path<i64>, request: Requ
     if req.group_id == 0 {
         return envelope::error(" [invalid sort request]");
     }
-    let mut tx = match pool.begin().await {
-        Ok(tx) => tx,
-        Err(error) => return envelope::error(&error.to_string()),
-    };
-    for entry in &req.sort_items {
-        if sqlx::query(
-            "UPDATE item_icon SET sort = ?, updated_at = ? WHERE id = ? AND space_id = ? AND item_icon_group_id = ?",
-        )
-        .bind(entry.sort)
-        .bind(now_like_go())
-        .bind(entry.id)
-        .bind(space_id)
-        .bind(req.group_id)
-        .execute(&mut *tx)
-        .await
-        .is_err()
-        {
-            return envelope::error("sort failed");
-        }
-    }
-    match tx.commit().await {
-        Ok(_) => success(),
-        Err(error) => envelope::error(&error.to_string()),
+    let entries: Vec<(i64, i64)> = req
+        .sort_items
+        .iter()
+        .map(|entry| (entry.id, entry.sort))
+        .collect();
+    match crate::repository::sort_items(
+        &pool,
+        ctx.sqlx_driver(),
+        space_id,
+        req.group_id,
+        &entries,
+        &now_like_go(),
+    )
+    .await
+    {
+        Ok(()) => success(),
+        Err(_) => envelope::error("sort failed"),
     }
 }
 
@@ -3450,11 +3447,14 @@ async fn sort_groups(headers: HeaderMap, Path(space_id): Path<i64>, request: Req
         Err(response) => return response,
     };
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool.clone(),
         Err(error) => return envelope::error(&error),
     };
-    if !can_edit(&pool, user.id, space_id).await {
+    if !crate::repository::can_edit_space(&pool, ctx.sqlx_driver(), user.id, space_id)
+        .await
+        .unwrap_or(false)
+    {
         return error_code(1005);
     }
     let body = match axum::body::to_bytes(request.into_body(), 1 << 20).await {
@@ -3469,31 +3469,20 @@ async fn sort_groups(headers: HeaderMap, Path(space_id): Path<i64>, request: Req
         return envelope::error(" [invalid group sort request]");
     }
     if let Some(parent) = req.parent_id {
-        if !group_belongs(&pool, parent, space_id).await {
+        let belongs = crate::repository::group_belongs(&pool, ctx.sqlx_driver(), space_id, parent)
+            .await
+            .unwrap_or(false);
+        if !belongs {
             return envelope::error(" [invalid parent group]");
         }
     }
-    let siblings: Vec<i64> = match req.parent_id {
-        None => sqlx::query_as(
-            "SELECT id FROM item_icon_group WHERE space_id = ? AND parent_id IS NULL",
-        )
-        .bind(space_id)
-        .fetch_all(&pool)
-        .await
-        .unwrap_or_default()
-        .into_iter(),
-        Some(parent) => {
-            sqlx::query_as("SELECT id FROM item_icon_group WHERE space_id = ? AND parent_id = ?")
-                .bind(space_id)
-                .bind(parent)
-                .fetch_all(&pool)
-                .await
-                .unwrap_or_default()
-                .into_iter()
-        }
-    }
-    .map(|(id,)| id)
-    .collect();
+    let siblings =
+        match crate::repository::group_siblings(&pool, ctx.sqlx_driver(), space_id, req.parent_id)
+            .await
+        {
+            Ok(siblings) => siblings,
+            Err(error) => return envelope::error(&error.to_string()),
+        };
     if siblings.is_empty() || siblings.len() != req.sort_groups.len() {
         return envelope::error(" [group sort must include every sibling]");
     }
@@ -3509,29 +3498,22 @@ async fn sort_groups(headers: HeaderMap, Path(space_id): Path<i64>, request: Req
             return envelope::error(" [group sort must include every sibling]");
         }
     }
-    let mut tx = match pool.begin().await {
-        Ok(tx) => tx,
-        Err(error) => return envelope::error(&error.to_string()),
-    };
-    for entry in &req.sort_groups {
-        // The parent scope is enforced by the sibling check above.
-        if sqlx::query(
-            "UPDATE item_icon_group SET sort = ?, updated_at = ? WHERE id = ? AND space_id = ?",
-        )
-        .bind(entry.sort)
-        .bind(now_like_go())
-        .bind(entry.id)
-        .bind(space_id)
-        .execute(&mut *tx)
-        .await
-        .is_err()
-        {
-            return envelope::error("sort failed");
-        }
-    }
-    match tx.commit().await {
-        Ok(_) => success(),
-        Err(error) => envelope::error(&error.to_string()),
+    let entries: Vec<(i64, i64)> = req
+        .sort_groups
+        .iter()
+        .map(|entry| (entry.id, entry.sort))
+        .collect();
+    match crate::repository::sort_groups(
+        &pool,
+        ctx.sqlx_driver(),
+        space_id,
+        &entries,
+        &now_like_go(),
+    )
+    .await
+    {
+        Ok(()) => success(),
+        Err(_) => envelope::error("sort failed"),
     }
 }
 

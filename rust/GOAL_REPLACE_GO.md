@@ -229,7 +229,7 @@ command that proves it).
 | 1 | T1.2 driver bootstrap | done — `schema_shared.rs` translates DDL, seed runs on all three |
 | 1 | T1.3 three-driver HTTP smoke | done — `rust/check/db-smoke.sh` passes on MySQL 8.4 and PostgreSQL 17 |
 | 1 | T1.4 config docs | done — `rust/CONFIG.md` |
-| 2 | T2.1 sorting | not started |
+| 2 | T2.1 sorting | done — `sort_items`, `group_siblings`, `sort_groups` on the shared pool |
 | 2 | T2.2 members | not started |
 | 2 | T2.3 space create/rename/copy | not started |
 | 2 | T2.4 space transfer/share/team/delete/clear | not started |

@@ -69,6 +69,18 @@ declare -A current_values=(
     [sqlite_pool_params]="$sqlite_params"
 )
 
+# Migration metrics only move one way: SQLite-only usage must shrink, shared
+# usage must grow, and the Go inventory must stay untouched.
+declare -A direction=(
+    [go_routes]=equal
+    [rust_routes]=grow
+    [wire_routes]=grow
+    [sqlite_pool_handlers]=shrink
+    [shared_pool_handlers]=grow
+    [last_insert_rowid]=shrink
+    [sqlite_pool_params]=shrink
+)
+
 status=0
 while IFS='=' read -r key value; do
     [[ -z "$key" ]] && continue
@@ -78,10 +90,26 @@ while IFS='=' read -r key value; do
         status=1
         continue
     fi
-    if [[ "$current" -gt "$value" ]]; then
-        echo "regression: $key is $current (baseline $value)" >&2
-        status=1
-    fi
+    case "${direction[$key]-equal}" in
+    shrink)
+        if [[ "$current" -gt "$value" ]]; then
+            echo "regression: $key is $current (baseline $value)" >&2
+            status=1
+        fi
+        ;;
+    grow)
+        if [[ "$current" -lt "$value" ]]; then
+            echo "regression: $key fell to $current (baseline $value)" >&2
+            status=1
+        fi
+        ;;
+    *)
+        if [[ "$current" -ne "$value" ]]; then
+            echo "regression: $key is $current (baseline $value)" >&2
+            status=1
+        fi
+        ;;
+    esac
 done <"$baseline"
 
 if [[ "$status" -ne 0 ]]; then

@@ -1079,6 +1079,92 @@ pub async fn delete_item(
     Ok(())
 }
 
+/// `SpaceRouter.SortItems`: every entry updates one row of the same group in
+/// one transaction.
+pub async fn sort_items(
+    pool: &AnyPool,
+    driver: Driver,
+    space_id: i64,
+    group_id: i64,
+    entries: &[(i64, i64)],
+    now: &str,
+) -> Result<(), sqlx::Error> {
+    let timestamp = timestamp_bind(driver);
+    let sql = query(
+        driver,
+        &format!(
+            "UPDATE item_icon SET sort = ?, updated_at = {timestamp} WHERE id = ? AND space_id = ? AND item_icon_group_id = ?"
+        ),
+    );
+    let mut tx = pool.begin().await?;
+    for (id, sort) in entries {
+        sqlx::query(&sql)
+            .bind(*sort)
+            .bind(now)
+            .bind(*id)
+            .bind(space_id)
+            .bind(group_id)
+            .execute(&mut *tx)
+            .await?;
+    }
+    tx.commit().await?;
+    Ok(())
+}
+
+/// The siblings a group sort must cover: roots or the children of one parent.
+pub async fn group_siblings(
+    pool: &AnyPool,
+    driver: Driver,
+    space_id: i64,
+    parent_id: Option<i64>,
+) -> Result<Vec<i64>, sqlx::Error> {
+    let (sql, binds_parent) = match parent_id {
+        None => (
+            "SELECT id FROM item_icon_group WHERE space_id = ? AND parent_id IS NULL".to_string(),
+            false,
+        ),
+        Some(_) => (
+            "SELECT id FROM item_icon_group WHERE space_id = ? AND parent_id = ?".to_string(),
+            true,
+        ),
+    };
+    let sql = query(driver, &sql);
+    let mut statement = sqlx::query(&sql).bind(space_id);
+    if binds_parent {
+        statement = statement.bind(parent_id);
+    }
+    let rows = statement.fetch_all(pool).await?;
+    rows.into_iter().map(|row| row.try_get("id")).collect()
+}
+
+pub async fn sort_groups(
+    pool: &AnyPool,
+    driver: Driver,
+    space_id: i64,
+    entries: &[(i64, i64)],
+    now: &str,
+) -> Result<(), sqlx::Error> {
+    let timestamp = timestamp_bind(driver);
+    let sql = query(
+        driver,
+        &format!(
+            "UPDATE item_icon_group SET sort = ?, updated_at = {timestamp} WHERE id = ? AND space_id = ?"
+        ),
+    );
+    let mut tx = pool.begin().await?;
+    for (id, sort) in entries {
+        sqlx::query(&sql)
+            .bind(*sort)
+            .bind(now)
+            .bind(*id)
+            .bind(space_id)
+            .execute(&mut *tx)
+            .await?;
+    }
+    tx.commit().await?;
+    Ok(())
+}
+
 pub async fn groups_for_space(
     pool: &AnyPool,
     driver: Driver,
@@ -1442,11 +1528,12 @@ mod tests {
     use super::{
         bookmark_tree, can_access_space, can_edit_space, can_manage_space, create_group,
         create_item, delete_group_tree, delete_item, file_list, group_belongs, group_by_id,
-        group_has_descendant, groups_for_space, item_by_id, items_for_space, module_config_value,
-        oidc_groups, revoke_user_sessions, space_list, space_members, space_public_config,
-        space_search_config, space_wallpaper_json, update_group, update_item,
-        update_space_public_config, update_space_search_config, update_space_wallpaper,
-        user_access, user_by_credentials, user_by_id, user_config, user_list,
+        group_has_descendant, group_siblings, groups_for_space, item_by_id, items_for_space,
+        module_config_value, oidc_groups, revoke_user_sessions, sort_groups, sort_items,
+        space_list, space_members, space_public_config, space_search_config, space_wallpaper_json,
+        update_group, update_item, update_space_public_config, update_space_search_config,
+        update_space_wallpaper, user_access, user_by_credentials, user_by_id, user_config,
+        user_list,
     };
     use crate::db::{Driver, connect, query};
     use sqlx::Row;
@@ -1572,6 +1659,7 @@ mod tests {
         verify_admin_and_config_reads(&pool, driver).await;
         verify_group_writes(&pool, driver).await;
         verify_item_writes(&pool, driver).await;
+        verify_sort_writes(&pool, driver).await;
         pool.close().await;
     }
 
@@ -1972,6 +2060,134 @@ mod tests {
             .execute(pool)
             .await
             .expect("drop item list fixture");
+    }
+
+    async fn verify_sort_writes(pool: &sqlx::AnyPool, driver: Driver) {
+        let (group_table, item_table, timestamp_type, id_type) = match driver {
+            Driver::MySql => (
+                "item_icon_group",
+                "item_icon",
+                "DATETIME(6)",
+                "BIGINT AUTO_INCREMENT PRIMARY KEY",
+            ),
+            Driver::Sqlite => (
+                "item_icon_group",
+                "item_icon",
+                "TEXT",
+                "INTEGER PRIMARY KEY AUTOINCREMENT",
+            ),
+            Driver::Postgres => (
+                "item_icon_group",
+                "item_icon",
+                "TIMESTAMPTZ",
+                "BIGSERIAL PRIMARY KEY",
+            ),
+        };
+        sqlx::query(&format!(
+            "CREATE TABLE {group_table} (id {id_type}, created_at {timestamp_type} NOT NULL, updated_at {timestamp_type} NOT NULL, icon VARCHAR(100) NOT NULL, title VARCHAR(100) NOT NULL, description TEXT NOT NULL, sort BIGINT NOT NULL, user_id BIGINT NOT NULL, space_id BIGINT NOT NULL, parent_id BIGINT)"
+        ))
+        .execute(pool)
+        .await
+        .expect("create sort group fixture");
+        sqlx::query(&format!(
+            "CREATE TABLE {item_table} (id {id_type}, created_at {timestamp_type} NOT NULL, updated_at {timestamp_type} NOT NULL, icon_json TEXT NOT NULL, title VARCHAR(50) NOT NULL, url TEXT NOT NULL, lan_url TEXT NOT NULL, mobile_url TEXT NOT NULL, description TEXT NOT NULL, open_method BIGINT NOT NULL, sort BIGINT NOT NULL, item_icon_group_id BIGINT NOT NULL, user_id BIGINT NOT NULL, space_id BIGINT NOT NULL)"
+        ))
+        .execute(pool)
+        .await
+        .expect("create sort item fixture");
+
+        let first = create_group(pool, driver, 78, 7, "folder", "First", None, "2024-10-01 00:00:00")
+            .await
+            .expect("create first group");
+        let second = create_group(pool, driver, 78, 7, "folder", "Second", None, "2024-10-01 00:00:00")
+            .await
+            .expect("create second group");
+        let siblings = group_siblings(pool, driver, 78, None)
+            .await
+            .expect("load root siblings");
+        assert_eq!(siblings, vec![first, second]);
+
+        sort_groups(
+            pool,
+            driver,
+            78,
+            &[(first, 2), (second, 1)],
+            "2024-10-02 00:00:00",
+        )
+        .await
+        .expect("sort groups");
+        let sorted = groups_for_space(pool, driver, 78)
+            .await
+            .expect("read sorted groups");
+        assert_eq!(
+            sorted.iter().map(|group| group.id).collect::<Vec<_>>(),
+            vec![second, first]
+        );
+
+        let item = create_item(
+            pool,
+            driver,
+            78,
+            7,
+            &super::ItemWriteRecord {
+                icon_json: "{}".to_string(),
+                title: "Item".to_string(),
+                url: "https://example.test".to_string(),
+                lan_url: String::new(),
+                mobile_url: String::new(),
+                description: String::new(),
+                open_method: 0,
+                sort: 5,
+                group_id: first,
+            },
+            "2024-10-03 00:00:00",
+        )
+        .await
+        .expect("create item for sort");
+        let other = create_item(
+            pool,
+            driver,
+            78,
+            7,
+            &super::ItemWriteRecord {
+                icon_json: "{}".to_string(),
+                title: "Other".to_string(),
+                url: "https://example.test".to_string(),
+                lan_url: String::new(),
+                mobile_url: String::new(),
+                description: String::new(),
+                open_method: 0,
+                sort: 1,
+                group_id: first,
+            },
+            "2024-10-03 00:00:00",
+        )
+        .await
+        .expect("create second item");
+        sort_items(
+            pool,
+            driver,
+            78,
+            first,
+            &[(item, 1), (other, 2)],
+            "2024-10-04 00:00:00",
+        )
+        .await
+        .expect("sort items");
+        let items = items_for_space(pool, driver, 78, Some(first), 0, 0)
+            .await
+            .expect("read sorted items");
+        assert_eq!(
+            items.iter().map(|item| item.id).collect::<Vec<_>>(),
+            vec![item, other]
+        );
+
+        for table in [item_table, group_table] {
+            sqlx::query(&format!("DROP TABLE {table}"))
+                .execute(pool)
+                .await
+                .expect("drop sort fixture");
+        }
     }
 
     async fn verify_item_writes(pool: &sqlx::AnyPool, driver: Driver) {
