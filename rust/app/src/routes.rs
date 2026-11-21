@@ -5274,11 +5274,14 @@ async fn theme_install(headers: HeaderMap, request: Request) -> Response {
         Err(error) => return envelope::error(&format!(" [{error}]")),
     };
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool.clone(),
         Err(error) => return envelope::error(&error),
     };
-    if install_package(&pool, user.id, &package).await.is_err() {
+    if crate::repository::install_package(&pool, ctx.sqlx_driver(), user.id, &package)
+        .await
+        .is_err()
+    {
         // `InstallPackageV2` failures go through `response.ErrorDatabase`, which
         // answers code 1200 and drops the underlying text.
         return envelope::database_error();
@@ -5289,120 +5292,6 @@ async fn theme_install(headers: HeaderMap, request: Request) -> Response {
         "revision": package.revision,
         "verified": package.verified,
     }))
-}
-
-/// `InstallPackageV2`.
-async fn install_package(
-    pool: &sqlx::SqlitePool,
-    actor_id: i64,
-    package: &crate::packages::Package,
-) -> Result<(), String> {
-    let manifest = &package.manifest;
-    let manifest_json = serde_json::to_string(manifest).map_err(|error| error.to_string())?;
-    let tokens_json = serde_json::to_string(&package.tokens).map_err(|error| error.to_string())?;
-    let now = now_like_go();
-    let mut tx = pool.begin().await.map_err(|error| error.to_string())?;
-    let existing: Option<(String,)> =
-        sqlx::query_as("SELECT id FROM revision_record_v2 WHERE package_id = ? AND version = ?")
-            .bind(&manifest.id)
-            .bind(&manifest.version)
-            .fetch_optional(&mut *tx)
-            .await
-            .unwrap_or(None);
-    if let Some((existing_id,)) = existing {
-        if existing_id != package.revision {
-            return Err("same theme package version has different content".to_string());
-        }
-        if sqlx::query(
-            "UPDATE package_record_v2 SET name = ?, latest_revision = ?, removed = 0 WHERE id = ?",
-        )
-        .bind(&manifest.name)
-        .bind(&package.revision)
-        .bind(&manifest.id)
-        .execute(&mut *tx)
-        .await
-        .is_err()
-        {
-            return Err("install failed".to_string());
-        }
-    } else {
-        let record: Option<(i64,)> =
-            sqlx::query_as("SELECT removed FROM package_record_v2 WHERE id = ?")
-                .bind(&manifest.id)
-                .fetch_optional(&mut *tx)
-                .await
-                .unwrap_or(None);
-        match record {
-            None => {
-                sqlx::query(
-                    "INSERT INTO package_record_v2 (id, name, latest_revision, removed, created_at, updated_at) VALUES (?, ?, '', 0, ?, ?)",
-                )
-                .bind(&manifest.id)
-                .bind(&manifest.name)
-                .bind(&now)
-                .bind(&now)
-                .execute(&mut *tx)
-                .await
-                .map_err(|error| error.to_string())?;
-            }
-            Some((removed,)) if removed != 0 => {
-                return Err(
-                    "removed theme packages must be explicitly restored before installation"
-                        .to_string(),
-                );
-            }
-            Some(_) => {}
-        }
-        sqlx::query(
-            "INSERT INTO revision_record_v2 (id, package_id, version, manifest_json, tokens_json, verified, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        )
-        .bind(&package.revision)
-        .bind(&manifest.id)
-        .bind(&manifest.version)
-        .bind(&manifest_json)
-        .bind(&tokens_json)
-        .bind(package.verified as i64)
-        .bind(&now)
-        .execute(&mut *tx)
-        .await
-        .map_err(|error| error.to_string())?;
-        for (name, (media_type, content)) in &package.files {
-            sqlx::query(
-                "INSERT INTO asset_record_v2 (revision_id, path, media_type, content) VALUES (?, ?, ?, ?)",
-            )
-            .bind(&package.revision)
-            .bind(name)
-            .bind(media_type)
-            .bind(content)
-            .execute(&mut *tx)
-            .await
-            .map_err(|error| error.to_string())?;
-        }
-        if sqlx::query(
-            "UPDATE package_record_v2 SET name = ?, latest_revision = ?, removed = 0 WHERE id = ?",
-        )
-        .bind(&manifest.name)
-        .bind(&package.revision)
-        .bind(&manifest.id)
-        .execute(&mut *tx)
-        .await
-        .is_err()
-        {
-            return Err("install failed".to_string());
-        }
-        // Only a new revision is an auditable install; re-installing the same
-        // version is a no-op that Go does not record.
-        sqlx::query(
-            "INSERT INTO audit_record (actor_id, action, package_id, created_at) VALUES (?, 'install-v2', ?, ?)",
-        )
-        .bind(actor_id)
-        .bind(&manifest.id)
-        .bind(&now)
-        .execute(&mut *tx)
-        .await
-        .map_err(|error| error.to_string())?;
-    }
-    tx.commit().await.map_err(|error| error.to_string())
 }
 
 /// `GET /api/theme/v2/preview/:token`.
@@ -5506,65 +5395,23 @@ async fn remove_package(headers: HeaderMap, Path(package_id): Path<String>) -> R
         return envelope::error(" [built-in themes cannot be removed]");
     }
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool.clone(),
         Err(error) => return envelope::error(&error),
     };
-    let record: Option<(i64,)> =
-        sqlx::query_as("SELECT removed FROM package_record_v2 WHERE id = ? AND removed = 0")
-            .bind(&package_id)
-            .fetch_optional(&pool)
-            .await
-            .unwrap_or(None);
-    if record.is_none() {
-        return error_code(404);
+    match crate::repository::package_removed(&pool, ctx.sqlx_driver(), &package_id).await {
+        Ok(Some(0)) => {}
+        Ok(_) | Err(_) => return error_code(404),
     }
-    let yin: Option<(String,)> = sqlx::query_as(
-        "SELECT latest_revision FROM package_record_v2 WHERE id = 'org.yin.default' AND removed = 0",
-    )
-    .fetch_optional(&pool)
-    .await
-    .unwrap_or(None);
-    let Some((yin_revision,)) = yin else {
-        return envelope::database_error();
-    };
-    let now = now_like_go();
-    let mut tx = match pool.begin().await {
-        Ok(tx) => tx,
-        Err(error) => return envelope::error(&error.to_string()),
-    };
-    let steps = [
-        sqlx::query("UPDATE package_record_v2 SET removed = 1, updated_at = ? WHERE id = ?")
-            .bind(&now)
-            .bind(&package_id)
-            .execute(&mut *tx)
-            .await,
-        sqlx::query(
-            "UPDATE activation_record_v2 SET package_id = 'org.yin.default', active_revision_id = ?, last_good_revision_id = ?, pending_revision_id = '', trial_started_at = NULL, updated_at = ? WHERE package_id = ?",
-        )
-        .bind(&yin_revision)
-        .bind(&yin_revision)
-        .bind(&now)
-        .bind(&package_id)
-        .execute(&mut *tx)
-        .await,
-        sqlx::query(
-            "INSERT INTO audit_record (actor_id, action, package_id, created_at) VALUES (?, 'remove-v2', ?, ?)",
-        )
-        .bind(user.id)
-        .bind(&package_id)
-        .bind(&now)
-        .execute(&mut *tx)
-        .await,
-    ];
-    for step in steps {
-        if step.is_err() {
-            return envelope::error("remove failed");
-        }
+    match crate::repository::latest_revision(&pool, ctx.sqlx_driver(), "org.yin.default").await {
+        Ok(Some(_)) => {}
+        _ => return envelope::database_error(),
     }
-    match tx.commit().await {
-        Ok(_) => success(),
-        Err(error) => envelope::error(&error.to_string()),
+    match crate::repository::remove_theme_package(&pool, ctx.sqlx_driver(), user.id, &package_id)
+        .await
+    {
+        Ok(()) => success(),
+        Err(_) => envelope::error("remove failed"),
     }
 }
 
@@ -5593,41 +5440,33 @@ async fn set_default_package(headers: HeaderMap, request: Request) -> Response {
         return envelope::error(" [revision or packageId is required]");
     }
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool.clone(),
         Err(error) => return envelope::error(&error),
     };
     let revision_id = if !req.revision.is_empty() {
         req.revision.clone()
     } else {
-        match latest_revision_of(&pool, &req.package_id).await {
-            Ok(id) => id,
-            Err(_) => return error_code(404),
+        match crate::repository::latest_revision(&pool, ctx.sqlx_driver(), &req.package_id).await {
+            Ok(Some(id)) => id,
+            _ => return error_code(404),
         }
     };
-    let revision: Option<(String,)> =
-        sqlx::query_as("SELECT package_id FROM revision_record_v2 WHERE id = ?")
-            .bind(&revision_id)
-            .fetch_optional(&pool)
-            .await
-            .unwrap_or(None);
-    let Some((package_id,)) = revision else {
-        return error_code(404);
-    };
-    let now = now_like_go();
-    match sqlx::query(
-        "INSERT INTO activation_record_v2 (scope, package_id, active_revision_id, last_good_revision_id, pending_revision_id, trial_started_at, updated_at)
-         VALUES ('instance', ?, ?, ?, '', NULL, ?)
-         ON CONFLICT(scope) DO UPDATE SET package_id = excluded.package_id, active_revision_id = excluded.active_revision_id, last_good_revision_id = excluded.last_good_revision_id, pending_revision_id = '', trial_started_at = NULL, updated_at = excluded.updated_at",
+    let package_id =
+        match crate::repository::revision_package_id(&pool, ctx.sqlx_driver(), &revision_id).await {
+            Ok(Some(id)) => id,
+            Ok(None) | Err(_) => return error_code(404),
+        };
+    match crate::repository::set_default_theme(
+        &pool,
+        ctx.sqlx_driver(),
+        &package_id,
+        &revision_id,
+        &now_like_go(),
     )
-    .bind(&package_id)
-    .bind(&revision_id)
-    .bind(&revision_id)
-    .bind(&now)
-    .execute(&pool)
     .await
     {
-        Ok(_) => success(),
+        Ok(()) => success(),
         Err(error) => envelope::error(&error.to_string()),
     }
 }
@@ -5657,42 +5496,31 @@ async fn begin_trial(headers: HeaderMap, request: Request) -> Response {
         return envelope::error(" [revision is required]");
     }
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool.clone(),
         Err(error) => return envelope::error(&error),
     };
-    let revision: Option<(String,)> =
-        sqlx::query_as("SELECT package_id FROM revision_record_v2 WHERE id = ?")
-            .bind(&req.revision)
-            .fetch_optional(&pool)
-            .await
-            .unwrap_or(None);
-    let Some((package_id,)) = revision else {
-        return error_code(404);
-    };
-    let removed: Option<(i64,)> =
-        sqlx::query_as("SELECT removed FROM package_record_v2 WHERE id = ?")
-            .bind(&package_id)
-            .fetch_optional(&pool)
-            .await
-            .unwrap_or(None);
-    if removed.map(|value| value.0).unwrap_or(1) != 0 {
-        return error_code(404);
+    let package_id =
+        match crate::repository::revision_package_id(&pool, ctx.sqlx_driver(), &req.revision).await
+        {
+            Ok(Some(id)) => id,
+            Ok(None) | Err(_) => return error_code(404),
+        };
+    match crate::repository::package_removed(&pool, ctx.sqlx_driver(), &package_id).await {
+        Ok(Some(0)) => {}
+        Ok(_) | Err(_) => return error_code(404),
     }
     let now = now_like_go();
-    match sqlx::query(
-        "INSERT INTO activation_record_v2 (scope, package_id, active_revision_id, last_good_revision_id, pending_revision_id, trial_started_at, updated_at)
-         VALUES ('instance', ?, '', '', ?, ?, ?)
-         ON CONFLICT(scope) DO UPDATE SET pending_revision_id = excluded.pending_revision_id, trial_started_at = excluded.trial_started_at, updated_at = excluded.updated_at",
+    match crate::repository::begin_theme_trial(
+        &pool,
+        ctx.sqlx_driver(),
+        &package_id,
+        &req.revision,
+        &now,
     )
-    .bind(&package_id)
-    .bind(&req.revision)
-    .bind(&now)
-    .bind(&now)
-    .execute(&pool)
     .await
     {
-        Ok(_) => success_data(json!({
+        Ok(()) => success_data(json!({
             "expiresInSeconds": 30,
             "revision": req.revision,
         })),
@@ -5725,62 +5553,33 @@ async fn confirm_trial(headers: HeaderMap, request: Request) -> Response {
         return envelope::error(" [revision is required]");
     }
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool.clone(),
         Err(error) => return envelope::error(&error),
     };
-    let activation: Option<(String,)> = sqlx::query_as(
-        "SELECT pending_revision_id FROM activation_record_v2 WHERE scope = 'instance'",
-    )
-    .fetch_optional(&pool)
-    .await
-    .unwrap_or(None);
-    let Some((pending,)) = activation else {
-        return envelope::error(" [record not found]");
+    let pending = match crate::repository::instance_pending(&pool, ctx.sqlx_driver()).await {
+        Ok(Some(pending)) => pending,
+        Ok(None) | Err(_) => return envelope::error(" [record not found]"),
     };
     if pending.is_empty() || pending != req.revision {
         return envelope::error(" [no matching theme activation trial]");
     }
-    let revision: Option<(String,)> =
-        sqlx::query_as("SELECT package_id FROM revision_record_v2 WHERE id = ?")
-            .bind(&req.revision)
-            .fetch_optional(&pool)
-            .await
-            .unwrap_or(None);
-    let Some((package_id,)) = revision else {
-        return envelope::error(" [record not found]");
-    };
-    let now = now_like_go();
-    let mut tx = match pool.begin().await {
-        Ok(tx) => tx,
-        Err(error) => return envelope::error(&error.to_string()),
-    };
-    if sqlx::query(
-        "UPDATE activation_record_v2 SET package_id = ?, active_revision_id = ?, pending_revision_id = '', trial_started_at = NULL, updated_at = ? WHERE scope = 'instance'",
+    let package_id =
+        match crate::repository::revision_package_id(&pool, ctx.sqlx_driver(), &req.revision).await
+        {
+            Ok(Some(id)) => id,
+            _ => return envelope::error(" [record not found]"),
+        };
+    match crate::repository::confirm_theme_trial(
+        &pool,
+        ctx.sqlx_driver(),
+        &package_id,
+        &req.revision,
+        &now_like_go(),
     )
-    .bind(&package_id)
-    .bind(&req.revision)
-    .bind(&now)
-    .execute(&mut *tx)
     .await
-    .is_err()
     {
-        return envelope::error("confirm failed");
-    }
-    if sqlx::query(
-        "UPDATE activation_record_v2 SET last_good_revision_id = ?, updated_at = ? WHERE scope = 'instance' AND active_revision_id = ? AND pending_revision_id = ''",
-    )
-    .bind(&req.revision)
-    .bind(&now)
-    .bind(&req.revision)
-    .execute(&mut *tx)
-    .await
-    .is_err()
-    {
-        return envelope::database_error();
-    }
-    match tx.commit().await {
-        Ok(_) => success(),
+        Ok(()) => success(),
         Err(error) => envelope::error(&error.to_string()),
     }
 }
@@ -5795,47 +5594,45 @@ async fn rollback_theme(headers: HeaderMap) -> Response {
         return error_code(1005);
     }
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool.clone(),
         Err(error) => return envelope::error(&error),
     };
-    let fallback = match instance_default_revision(&pool).await {
-        Ok(revision) => revision,
-        Err(_) => return envelope::database_error(),
-    };
-    let activation: Option<(String,)> = sqlx::query_as(
-        "SELECT last_good_revision_id FROM activation_record_v2 WHERE scope = 'instance'",
+    let fallback = match crate::repository::latest_revision(
+        &pool,
+        ctx.sqlx_driver(),
+        "org.yin.default",
     )
-    .fetch_optional(&pool)
     .await
-    .unwrap_or(None);
-    let Some((last_good,)) = activation else {
-        return envelope::database_error();
+    {
+        Ok(Some(revision)) => revision,
+        _ => return envelope::database_error(),
+    };
+    let last_good = match crate::repository::instance_last_good(&pool, ctx.sqlx_driver()).await {
+        Ok(Some(last_good)) => last_good,
+        Ok(None) | Err(_) => return envelope::database_error(),
     };
     let revision_id = if last_good.is_empty() {
         fallback
     } else {
         last_good
     };
-    let revision: Option<(String,)> =
-        sqlx::query_as("SELECT package_id FROM revision_record_v2 WHERE id = ?")
-            .bind(&revision_id)
-            .fetch_optional(&pool)
-            .await
-            .unwrap_or(None);
-    let Some((package_id,)) = revision else {
-        return envelope::database_error();
-    };
-    match sqlx::query(
-        "UPDATE activation_record_v2 SET package_id = ?, active_revision_id = ?, pending_revision_id = '', trial_started_at = NULL, updated_at = ? WHERE scope = 'instance'",
+    let package_id =
+        match crate::repository::revision_package_id(&pool, ctx.sqlx_driver(), &revision_id).await
+        {
+            Ok(Some(id)) => id,
+            _ => return envelope::database_error(),
+        };
+    match crate::repository::rollback_theme(
+        &pool,
+        ctx.sqlx_driver(),
+        &package_id,
+        &revision_id,
+        &now_like_go(),
     )
-    .bind(&package_id)
-    .bind(&revision_id)
-    .bind(now_like_go())
-    .execute(&pool)
     .await
     {
-        Ok(_) => success(),
+        Ok(()) => success(),
         Err(error) => envelope::error(&error.to_string()),
     }
 }

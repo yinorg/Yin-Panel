@@ -713,6 +713,16 @@ pub async fn oidc_groups(
 }
 
 /// The bind expression a driver needs to accept a Go-style timestamp string.
+/// The timestamp form GORM writes: local time, nanosecond fraction, offset.
+pub(crate) fn go_timestamp() -> String {
+    let offset = time::UtcOffset::current_local_offset().unwrap_or(time::UtcOffset::UTC);
+    let now = time::OffsetDateTime::now_utc().to_offset(offset);
+    let format = time::macros::format_description!(
+        "[year]-[month]-[day] [hour]:[minute]:[second].[subsecond digits:9][offset_hour sign:mandatory]:[offset_minute]"
+    );
+    now.format(&format).unwrap_or_default()
+}
+
 pub(crate) fn timestamp_bind(driver: Driver) -> &'static str {
     match driver {
         Driver::MySql => "CAST(LEFT(?, 26) AS DATETIME(6))",
@@ -2879,6 +2889,424 @@ pub async fn select_user_theme(
     Ok(())
 }
 
+fn removed_literal(driver: Driver) -> &'static str {
+    match driver {
+        Driver::Postgres => "false",
+        _ => "0",
+    }
+}
+
+fn removed_condition(driver: Driver) -> &'static str {
+    match driver {
+        Driver::Postgres => "NOT removed",
+        _ => "removed = 0",
+    }
+}
+
+pub async fn revision_package_id(
+    pool: &AnyPool,
+    driver: Driver,
+    revision: &str,
+) -> Result<Option<String>, sqlx::Error> {
+    package_id_for_revision(pool, driver, revision).await
+}
+
+pub async fn package_removed(
+    pool: &AnyPool,
+    driver: Driver,
+    package_id: &str,
+) -> Result<Option<i64>, sqlx::Error> {
+    use sqlx::Row;
+    let sql = query(
+        driver,
+        &format!(
+            "SELECT {} AS removed FROM package_record_v2 WHERE id = ?",
+            bool_expression(driver, "removed")
+        ),
+    );
+    let row = sqlx::query(&sql)
+        .bind(package_id)
+        .fetch_optional(pool)
+        .await?;
+    row.map(|row| row.try_get("removed")).transpose()
+}
+
+/// `InstallPackageV2`.
+pub async fn install_package(
+    pool: &AnyPool,
+    driver: Driver,
+    actor_id: i64,
+    package: &crate::packages::Package,
+) -> Result<(), String> {
+    let manifest = &package.manifest;
+    let manifest_json = serde_json::to_string(manifest).map_err(|error| error.to_string())?;
+    let tokens_json = serde_json::to_string(&package.tokens).map_err(|error| error.to_string())?;
+    let now = go_timestamp();
+    let removed = removed_literal(driver);
+    let timestamp = timestamp_bind(driver);
+    let mut tx = pool.begin().await.map_err(|error| error.to_string())?;
+
+    let text_type = if driver == Driver::MySql { "CHAR" } else { "TEXT" };
+    let existing_sql = query(
+        driver,
+        &format!(
+            "SELECT CAST(id AS {text_type}) AS id FROM revision_record_v2 WHERE package_id = ? AND version = ?"
+        ),
+    );
+    let existing = sqlx::query(&existing_sql)
+        .bind(&manifest.id)
+        .bind(&manifest.version)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(|error| error.to_string())?;
+    let existing_id: Option<String> = existing.map(|row| text(&row, "id").unwrap_or_default());
+
+    if let Some(existing_id) = existing_id {
+        if existing_id != package.revision {
+            return Err("same theme package version has different content".to_string());
+        }
+        let update = query(
+            driver,
+            &format!(
+                "UPDATE package_record_v2 SET name = ?, latest_revision = ?, removed = {removed} WHERE id = ?"
+            ),
+        );
+        sqlx::query(&update)
+            .bind(&manifest.name)
+            .bind(&package.revision)
+            .bind(&manifest.id)
+            .execute(&mut *tx)
+            .await
+            .map_err(|_| "install failed".to_string())?;
+    } else {
+        let record = package_removed_tx(&mut tx, driver, &manifest.id)
+            .await
+            .map_err(|error| error.to_string())?;
+        match record {
+            None => {
+                let insert = query(
+                    driver,
+                    &format!(
+                        "INSERT INTO package_record_v2 (id, name, latest_revision, removed, created_at, updated_at) VALUES (?, ?, '', {removed}, {timestamp}, {timestamp})"
+                    ),
+                );
+                sqlx::query(&insert)
+                    .bind(&manifest.id)
+                    .bind(&manifest.name)
+                    .bind(&now)
+                    .bind(&now)
+                    .execute(&mut *tx)
+                    .await
+                    .map_err(|error| error.to_string())?;
+            }
+            Some(removed_flag) if removed_flag != 0 => {
+                return Err(
+                    "removed theme packages must be explicitly restored before installation"
+                        .to_string(),
+                );
+            }
+            Some(_) => {}
+        }
+        let insert_revision = query(
+            driver,
+            &format!(
+                "INSERT INTO revision_record_v2 (id, package_id, version, manifest_json, tokens_json, verified, created_at) VALUES (?, ?, ?, ?, ?, ?, {timestamp})"
+            ),
+        );
+        let mut statement = sqlx::query(&insert_revision)
+            .bind(&package.revision)
+            .bind(&manifest.id)
+            .bind(&manifest.version)
+            .bind(&manifest_json)
+            .bind(&tokens_json);
+        statement = if driver == Driver::Postgres {
+            statement.bind(package.verified)
+        } else {
+            statement.bind(i64::from(package.verified))
+        };
+        statement
+            .bind(&now)
+            .execute(&mut *tx)
+            .await
+            .map_err(|error| error.to_string())?;
+        for (name, (media_type, content)) in &package.files {
+            let insert_asset = query(
+                driver,
+                "INSERT INTO asset_record_v2 (revision_id, path, media_type, content) VALUES (?, ?, ?, ?)",
+            );
+            sqlx::query(&insert_asset)
+                .bind(&package.revision)
+                .bind(name)
+                .bind(media_type)
+                .bind(content)
+                .execute(&mut *tx)
+                .await
+                .map_err(|error| error.to_string())?;
+        }
+        let update = query(
+            driver,
+            &format!(
+                "UPDATE package_record_v2 SET name = ?, latest_revision = ?, removed = {removed} WHERE id = ?"
+            ),
+        );
+        sqlx::query(&update)
+            .bind(&manifest.name)
+            .bind(&package.revision)
+            .bind(&manifest.id)
+            .execute(&mut *tx)
+            .await
+            .map_err(|_| "install failed".to_string())?;
+        let audit = query(
+            driver,
+            &format!(
+                "INSERT INTO audit_record (actor_id, action, package_id, created_at) VALUES (?, 'install-v2', ?, {timestamp})"
+            ),
+        );
+        sqlx::query(&audit)
+            .bind(actor_id)
+            .bind(&manifest.id)
+            .bind(&now)
+            .execute(&mut *tx)
+            .await
+            .map_err(|error| error.to_string())?;
+    }
+    tx.commit().await.map_err(|error| error.to_string())
+}
+
+async fn package_removed_tx(
+    tx: &mut sqlx::AnyConnection,
+    driver: Driver,
+    package_id: &str,
+) -> Result<Option<i64>, sqlx::Error> {
+    use sqlx::Row;
+    let sql = query(
+        driver,
+        &format!(
+            "SELECT {} AS removed FROM package_record_v2 WHERE id = ?",
+            bool_expression(driver, "removed")
+        ),
+    );
+    let row = sqlx::query(&sql)
+        .bind(package_id)
+        .fetch_optional(&mut *tx)
+        .await?;
+    row.map(|row| row.try_get("removed")).transpose()
+}
+
+pub async fn remove_theme_package(
+    pool: &AnyPool,
+    driver: Driver,
+    actor_id: i64,
+    package_id: &str,
+) -> Result<(), String> {
+    let now = go_timestamp();
+    let removed = removed_literal(driver);
+    let one = match driver {
+        Driver::Postgres => "true",
+        _ => "1",
+    };
+    let timestamp = timestamp_bind(driver);
+    let mut tx = pool.begin().await.map_err(|error| error.to_string())?;
+    let update_package = query(
+        driver,
+        &format!(
+            "UPDATE package_record_v2 SET removed = {one}, updated_at = {timestamp} WHERE id = ?"
+        ),
+    );
+    sqlx::query(&update_package)
+        .bind(&now)
+        .bind(package_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|_| "remove failed".to_string())?;
+    let reset = query(
+        driver,
+        &format!(
+            "UPDATE activation_record_v2 SET package_id = 'org.yin.default', active_revision_id = ?, last_good_revision_id = ?, pending_revision_id = '', trial_started_at = NULL, updated_at = {timestamp} WHERE package_id = ?"
+        ),
+    );
+    let yin = latest_revision(pool, driver, "org.yin.default")
+        .await
+        .map_err(|error| error.to_string())?
+        .ok_or_else(|| "default package missing".to_string())?;
+    sqlx::query(&reset)
+        .bind(&yin)
+        .bind(&yin)
+        .bind(&now)
+        .bind(package_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|_| "remove failed".to_string())?;
+    let audit = query(
+        driver,
+        &format!(
+            "INSERT INTO audit_record (actor_id, action, package_id, created_at) VALUES (?, 'remove-v2', ?, {timestamp})"
+        ),
+    );
+    sqlx::query(&audit)
+        .bind(actor_id)
+        .bind(package_id)
+        .bind(&now)
+        .execute(&mut *tx)
+        .await
+        .map_err(|_| "remove failed".to_string())?;
+    let _ = removed;
+    tx.commit().await.map_err(|error| error.to_string())
+}
+
+/// `SetDefaultV2` and `BeginTrialV2` share the activation upsert; MySQL spells
+/// it `ON DUPLICATE KEY UPDATE`.
+fn activation_upsert(driver: Driver, set: &str, values: &str, conflict: &str) -> String {
+    match driver {
+        Driver::MySql => format!(
+            "INSERT INTO activation_record_v2 (scope, package_id, active_revision_id, last_good_revision_id, pending_revision_id, trial_started_at, updated_at) VALUES ({values}) ON DUPLICATE KEY UPDATE {set}"
+        ),
+        _ => format!(
+            "INSERT INTO activation_record_v2 (scope, package_id, active_revision_id, last_good_revision_id, pending_revision_id, trial_started_at, updated_at) VALUES ({values}) ON CONFLICT(scope) DO UPDATE SET {conflict}"
+        ),
+    }
+}
+
+pub async fn set_default_theme(
+    pool: &AnyPool,
+    driver: Driver,
+    package_id: &str,
+    revision_id: &str,
+    now: &str,
+) -> Result<(), sqlx::Error> {
+    let timestamp = timestamp_bind(driver);
+    let sql = activation_upsert(
+        driver,
+        "package_id = VALUES(package_id), active_revision_id = VALUES(active_revision_id), last_good_revision_id = VALUES(last_good_revision_id), pending_revision_id = '', trial_started_at = NULL, updated_at = VALUES(updated_at)",
+        &format!("'instance', ?, ?, ?, '', NULL, {timestamp}"),
+        "package_id = excluded.package_id, active_revision_id = excluded.active_revision_id, last_good_revision_id = excluded.last_good_revision_id, pending_revision_id = '', trial_started_at = NULL, updated_at = excluded.updated_at",
+    );
+    let sql = query(driver, &sql);
+    sqlx::query(&sql)
+        .bind(package_id)
+        .bind(revision_id)
+        .bind(revision_id)
+        .bind(now)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+pub async fn begin_theme_trial(
+    pool: &AnyPool,
+    driver: Driver,
+    package_id: &str,
+    revision_id: &str,
+    now: &str,
+) -> Result<(), sqlx::Error> {
+    let timestamp = timestamp_bind(driver);
+    let sql = activation_upsert(
+        driver,
+        "pending_revision_id = VALUES(pending_revision_id), trial_started_at = VALUES(trial_started_at), updated_at = VALUES(updated_at)",
+        &format!("'instance', ?, '', '', ?, ?, {timestamp}"),
+        "pending_revision_id = excluded.pending_revision_id, trial_started_at = excluded.trial_started_at, updated_at = excluded.updated_at",
+    );
+    let sql = query(driver, &sql);
+    sqlx::query(&sql)
+        .bind(package_id)
+        .bind(revision_id)
+        .bind(now)
+        .bind(now)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+pub async fn confirm_theme_trial(
+    pool: &AnyPool,
+    driver: Driver,
+    package_id: &str,
+    revision_id: &str,
+    now: &str,
+) -> Result<(), sqlx::Error> {
+    let timestamp = timestamp_bind(driver);
+    let activate = query(
+        driver,
+        &format!(
+            "UPDATE activation_record_v2 SET package_id = ?, active_revision_id = ?, pending_revision_id = '', trial_started_at = NULL, updated_at = {timestamp} WHERE scope = 'instance'"
+        ),
+    );
+    let healthy = query(
+        driver,
+        &format!(
+            "UPDATE activation_record_v2 SET last_good_revision_id = ?, updated_at = {timestamp} WHERE scope = 'instance' AND active_revision_id = ? AND pending_revision_id = ''"
+        ),
+    );
+    let mut tx = pool.begin().await?;
+    sqlx::query(&activate)
+        .bind(package_id)
+        .bind(revision_id)
+        .bind(now)
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query(&healthy)
+        .bind(revision_id)
+        .bind(now)
+        .bind(revision_id)
+        .execute(&mut *tx)
+        .await?;
+    tx.commit().await?;
+    Ok(())
+}
+
+pub async fn rollback_theme(
+    pool: &AnyPool,
+    driver: Driver,
+    package_id: &str,
+    revision_id: &str,
+    now: &str,
+) -> Result<(), sqlx::Error> {
+    let timestamp = timestamp_bind(driver);
+    let sql = query(
+        driver,
+        &format!(
+            "UPDATE activation_record_v2 SET package_id = ?, active_revision_id = ?, pending_revision_id = '', trial_started_at = NULL, updated_at = {timestamp} WHERE scope = 'instance'"
+        ),
+    );
+    sqlx::query(&sql)
+        .bind(package_id)
+        .bind(revision_id)
+        .bind(now)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+pub async fn instance_last_good(
+    pool: &AnyPool,
+    driver: Driver,
+) -> Result<Option<String>, sqlx::Error> {
+    let text_type = if driver == Driver::MySql { "CHAR" } else { "TEXT" };
+    let sql = query(
+        driver,
+        &format!(
+            "SELECT CAST(last_good_revision_id AS {text_type}) AS last_good_revision_id FROM activation_record_v2 WHERE scope = 'instance'"
+        ),
+    );
+    let row = sqlx::query(&sql).fetch_optional(pool).await?;
+    row.map(|row| text(&row, "last_good_revision_id")).transpose()
+}
+
+pub async fn instance_pending(
+    pool: &AnyPool,
+    driver: Driver,
+) -> Result<Option<String>, sqlx::Error> {
+    let text_type = if driver == Driver::MySql { "CHAR" } else { "TEXT" };
+    let sql = query(
+        driver,
+        &format!(
+            "SELECT CAST(pending_revision_id AS {text_type}) AS pending_revision_id FROM activation_record_v2 WHERE scope = 'instance'"
+        ),
+    );
+    let row = sqlx::query(&sql).fetch_optional(pool).await?;
+    row.map(|row| text(&row, "pending_revision_id")).transpose()
+}
+
 pub async fn groups_for_space(
     pool: &AnyPool,
     driver: Driver,
@@ -3240,8 +3668,8 @@ pub async fn user_access(
 #[cfg(test)]
 mod tests {
     use super::{
-        activation_revision, admin_user_view, audit_entries, bookmark_tree, can_access_space,
-        can_edit_space, can_manage_space,
+        activation_revision, admin_user_view, audit_entries, begin_theme_trial, bookmark_tree,
+        can_access_space, can_edit_space, can_manage_space, confirm_theme_trial,
         copy_space, clear_space, create_group, create_item, create_paired_space, create_user,
         delete_group_tree,
         delete_file_row, delete_item, delete_paired_space, delete_user, file_list,
@@ -3258,8 +3686,11 @@ mod tests {
         update_group, update_item, update_space_public_config, update_space_search_config,
         update_space_wallpaper, upsert_space_member, user_access, user_by_credentials, user_by_id,
         user_config, user_id_by_mail, user_list, user_mail_exists, user_password_and_name,
-        latest_revision, package_id_for_revision, revision_manifest, save_theme_preference,
-        save_trusted_policy, select_user_theme, theme_admin_state, trusted_enabled,
+        install_package, instance_last_good, instance_pending, latest_revision,
+        package_id_for_revision, package_removed, remove_theme_package, revision_manifest,
+        revision_package_id, rollback_theme, save_theme_preference,
+        save_trusted_policy, select_user_theme, set_default_theme, theme_admin_state,
+        trusted_enabled,
         update_user_admin, update_user_password, update_user_profile, user_theme_preference,
         withdraw_trusted_grants,
     };
@@ -3396,6 +3827,7 @@ mod tests {
         verify_file_writes(&pool, driver).await;
         verify_user_admin_writes(&pool, driver).await;
         verify_theme_writes(&pool, driver).await;
+        verify_theme_package_writes(&pool, driver).await;
         pool.close().await;
     }
 
@@ -3796,6 +4228,193 @@ mod tests {
             .execute(pool)
             .await
             .expect("drop item list fixture");
+    }
+
+    async fn verify_theme_package_writes(pool: &sqlx::AnyPool, driver: Driver) {
+        use std::collections::BTreeMap;
+
+        let timestamp_type = match driver {
+            Driver::MySql => "DATETIME(6)",
+            Driver::Sqlite => "TEXT",
+            Driver::Postgres => "TIMESTAMPTZ",
+        };
+        let id_type = match driver {
+            Driver::MySql => "BIGINT AUTO_INCREMENT PRIMARY KEY",
+            Driver::Sqlite => "INTEGER PRIMARY KEY AUTOINCREMENT",
+            Driver::Postgres => "BIGSERIAL PRIMARY KEY",
+        };
+        let bool_type = match driver {
+            Driver::MySql => "TINYINT NOT NULL",
+            Driver::Sqlite => "INTEGER NOT NULL",
+            Driver::Postgres => "BOOLEAN NOT NULL",
+        };
+        sqlx::query(&format!(
+            "CREATE TABLE package_record_v2 (id VARCHAR(191) PRIMARY KEY, name VARCHAR(191) NOT NULL, latest_revision VARCHAR(191) NOT NULL, removed {bool_type}, created_at {timestamp_type}, updated_at {timestamp_type})"
+        ))
+        .execute(pool)
+        .await
+        .expect("create package fixture");
+        sqlx::query(&format!(
+            "CREATE TABLE revision_record_v2 (id VARCHAR(191) PRIMARY KEY, package_id VARCHAR(191) NOT NULL, version VARCHAR(191) NOT NULL, manifest_json TEXT NOT NULL, tokens_json TEXT NOT NULL, verified {bool_type}, created_at {timestamp_type})"
+        ))
+        .execute(pool)
+        .await
+        .expect("create revision fixture");
+        let blob_type = match driver {
+            Driver::MySql => "LONGBLOB",
+            Driver::Sqlite => "BLOB",
+            Driver::Postgres => "BYTEA",
+        };
+        sqlx::query(&format!(
+            "CREATE TABLE asset_record_v2 (revision_id VARCHAR(191) NOT NULL, path VARCHAR(191) NOT NULL, media_type VARCHAR(64) NOT NULL, content {blob_type} NOT NULL, PRIMARY KEY (revision_id, path))"
+        ))
+            .execute(pool)
+            .await
+            .expect("create asset fixture");
+        sqlx::query(&format!(
+            "CREATE TABLE audit_record (id {id_type}, actor_id BIGINT NOT NULL, action VARCHAR(64) NOT NULL, package_id VARCHAR(191) NOT NULL, created_at {timestamp_type})"
+        ))
+        .execute(pool)
+        .await
+        .expect("create audit fixture");
+        sqlx::query("CREATE TABLE activation_record_v2 (scope VARCHAR(191) PRIMARY KEY, package_id VARCHAR(191) NOT NULL, active_revision_id VARCHAR(191) NOT NULL, last_good_revision_id VARCHAR(191), pending_revision_id VARCHAR(191), trial_started_at VARCHAR(64), updated_at VARCHAR(64))")
+            .execute(pool)
+            .await
+            .expect("create activation fixture");
+
+        let yin_manifest: crate::packages::Manifest = serde_json::from_value(serde_json::json!({
+            "format": "yin-theme",
+            "formatVersion": 2,
+            "id": "org.yin.default",
+            "name": "Yin",
+            "version": "1.0.0",
+            "themeApi": "^1.0.0",
+            "core": ">=0.4.0",
+            "author": "Yin",
+            "license": "AGPL-3.0"
+        }))
+        .expect("default manifest");
+        let yin_package = crate::packages::Package {
+            manifest: yin_manifest,
+            tokens: BTreeMap::new(),
+            files: BTreeMap::new(),
+            verified: true,
+            revision: "rev-default".to_string(),
+        };
+        install_package(pool, driver, 7, &yin_package)
+            .await
+            .expect("install default package");
+
+        let test_package = crate::packages::Package {
+            manifest: serde_json::from_value(serde_json::json!({
+                "format": "yin-theme",
+                "formatVersion": 2,
+                "id": "community.test",
+                "name": "Test",
+                "version": "1.0.0",
+                "themeApi": "^1.0.0",
+                "core": ">=0.4.0",
+                "author": "Test",
+                "license": "MIT"
+            }))
+            .expect("test manifest"),
+            tokens: BTreeMap::new(),
+            files: BTreeMap::from([(
+                "views/home.mjs".to_string(),
+                ("text/javascript".to_string(), b"export {}".to_vec()),
+            )]),
+            verified: true,
+            revision: "rev-test".to_string(),
+        };
+        install_package(pool, driver, 7, &test_package)
+            .await
+            .expect("install test package");
+        let state = theme_admin_state(pool, driver).await.expect("state");
+        assert!(state.packages.iter().any(|package| package.id == "community.test"));
+        assert!(state.revisions.iter().any(|revision| revision.id == "rev-test"));
+        let assets: i64 = sqlx::query(&query(
+            driver,
+            "SELECT COUNT(*) AS total FROM asset_record_v2 WHERE revision_id = ?",
+        ))
+        .bind("rev-test")
+        .fetch_one(pool)
+        .await
+        .expect("count assets")
+        .try_get("total")
+        .expect("total");
+        assert_eq!(assets, 1);
+        // Re-installing the same revision is a no-op that Go does not audit.
+        install_package(pool, driver, 7, &test_package)
+            .await
+            .expect("reinstall");
+        let audits = audit_entries(pool, driver).await.expect("audit");
+        assert_eq!(
+            audits
+                .iter()
+                .filter(|row| row.action == "install-v2" && row.package_id == "community.test")
+                .count(),
+            1
+        );
+
+        set_default_theme(pool, driver, "community.test", "rev-test", "2025-06-01 00:00:00")
+            .await
+            .expect("set default");
+        let state = theme_admin_state(pool, driver).await.expect("state after default");
+        assert_eq!(state.active_revision, "rev-test");
+        assert_eq!(state.last_good_revision, "rev-test");
+        assert_eq!(state.default_package, "community.test");
+
+        begin_theme_trial(pool, driver, "community.test", "rev-test", "2025-06-02 00:00:00")
+            .await
+            .expect("begin trial twice-safe");
+        assert_eq!(
+            instance_pending(pool, driver).await.expect("pending"),
+            Some("rev-test".to_string())
+        );
+        confirm_theme_trial(pool, driver, "community.test", "rev-test", "2025-06-03 00:00:00")
+            .await
+            .expect("confirm trial");
+        assert_eq!(
+            instance_pending(pool, driver)
+                .await
+                .expect("pending cleared"),
+            Some(String::new())
+        );
+        assert_eq!(
+            instance_last_good(pool, driver).await.expect("last good"),
+            Some("rev-test".to_string())
+        );
+        rollback_theme(pool, driver, "org.yin.default", "rev-default", "2025-06-04 00:00:00")
+            .await
+            .expect("rollback");
+        let state = theme_admin_state(pool, driver).await.expect("state after rollback");
+        assert_eq!(state.active_revision, "rev-default");
+        assert_eq!(state.default_package, "org.yin.default");
+
+        remove_theme_package(pool, driver, 7, "community.test")
+            .await
+            .expect("remove package");
+        assert_eq!(
+            package_removed(pool, driver, "community.test")
+                .await
+                .expect("removed flag"),
+            Some(1)
+        );
+        let audits = audit_entries(pool, driver).await.expect("audit after remove");
+        assert!(audits.iter().any(|row| row.action == "remove-v2"));
+
+        for table in [
+            "activation_record_v2",
+            "audit_record",
+            "asset_record_v2",
+            "revision_record_v2",
+            "package_record_v2",
+        ] {
+            sqlx::query(&format!("DROP TABLE {table}"))
+                .execute(pool)
+                .await
+                .expect("drop theme package fixture");
+        }
     }
 
     async fn verify_theme_writes(pool: &sqlx::AnyPool, driver: Driver) {
