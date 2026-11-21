@@ -16,7 +16,7 @@ set -eu
 
 drive="${DB_SMOKE_DRIVE:-}"
 if [ -z "$drive" ]; then
-    echo "DB_SMOKE_DRIVE is required (mysql|postgres)" >&2
+    echo "DB_SMOKE_DRIVE is required (sqlite|mysql|postgres)" >&2
     exit 2
 fi
 
@@ -36,6 +36,10 @@ rm -rf "$work"
 mkdir -p "$work/uploads"
 
 case "$drive" in
+sqlite)
+    db_port=""
+    user=""
+    ;;
 mysql)
     db_port="${DB_SMOKE_PORT:-13306}"
     user="${DB_SMOKE_USER:-root}"
@@ -60,16 +64,16 @@ base:
   monitor_refresh_interval: 10
   url_prefix: /uploads/
 sqlite:
-  file_path: ./unused.db
+  file_path: ./smoke.db
 mysql:
   host: $host
-  port: $db_port
+  port: ${db_port:-3306}
   username: $user
   password: $password
   db_name: $name
 postgres:
   host: $host
-  port: $db_port
+  port: ${db_port:-5432}
   username: $user
   password: $password
   db_name: $name
