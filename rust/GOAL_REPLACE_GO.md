@@ -231,7 +231,7 @@ command that proves it).
 | 1 | T1.4 config docs | done — `rust/CONFIG.md` |
 | 2 | T2.1 sorting | done — `sort_items`, `group_siblings`, `sort_groups` on the shared pool |
 | 2 | T2.2 members | done — paired-space upsert, role update and removal on the shared pool |
-| 2 | T2.3 space create/rename/copy | not started |
+| 2 | T2.3 space create/rename/copy | done — `create_paired_space`, `rename_paired_space`, `copy_space` |
 | 2 | T2.4 space transfer/share/team/delete/clear | not started |
 | 2 | T2.5 files | not started |
 | 2 | T2.6 users | not started |

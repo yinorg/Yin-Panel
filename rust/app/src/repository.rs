@@ -1220,6 +1220,26 @@ pub async fn user_id_by_mail(
     row.map(|row| row.try_get("id")).transpose()
 }
 
+pub async fn space_name(
+    pool: &AnyPool,
+    driver: Driver,
+    space_id: i64,
+) -> Result<Option<String>, sqlx::Error> {
+    let space_table = crate::schema_shared::quote(driver, "space");
+    let text_type = if driver == Driver::MySql { "CHAR" } else { "TEXT" };
+    let sql = query(
+        driver,
+        &format!(
+            "SELECT CAST(name AS {text_type}) AS name FROM {space_table} WHERE id = ?"
+        ),
+    );
+    let row = sqlx::query(&sql)
+        .bind(space_id)
+        .fetch_optional(pool)
+        .await?;
+    row.map(|row| text(&row, "name")).transpose()
+}
+
 pub async fn space_owner(
     pool: &AnyPool,
     driver: Driver,
@@ -1436,6 +1456,257 @@ pub async fn save_user_config(
             .execute(pool)
             .await?;
     }
+    Ok(())
+}
+
+/// Inserts one row and returns its id on every driver. MySQL reports
+/// `last_insert_id`; SQLite and PostgreSQL use `RETURNING`.
+macro_rules! insert_returning_id {
+    ($driver:expr, $sql:expr, [$($bind:expr),*], $exec:expr) => {{
+        let suffix = if $driver == Driver::MySql {
+            ""
+        } else {
+            " RETURNING id"
+        };
+        let rendered = query($driver, &format!("{}{}", $sql, suffix));
+        let mut statement = sqlx::query(&rendered);
+        $( statement = statement.bind($bind); )*
+        if $driver == Driver::MySql {
+            let result = statement.execute($exec).await?;
+            result
+                .last_insert_id()
+                .ok_or(sqlx::Error::Protocol("driver did not report an insert id".into()))?
+        } else {
+            let row = statement.fetch_one($exec).await?;
+            sqlx::Row::try_get::<i64, _>(&row, "id")?
+        }
+    }};
+}
+
+/// `SpaceRouter.CreateSpace`: a shared Yin space and its Yang twin, each with
+/// the creator as an admin member and one default group.
+pub async fn create_paired_space(
+    pool: &AnyPool,
+    driver: Driver,
+    owner_id: i64,
+    name: &str,
+    now: &str,
+) -> Result<(), sqlx::Error> {
+    let enabled = if driver == Driver::Postgres { "FALSE" } else { "0" };
+    let space_table = crate::schema_shared::quote(driver, "space");
+    let space_insert = format!(
+        "INSERT INTO {space_table} (created_at, updated_at, type, name, owner_user_id, pair_id, side, public_enabled, public_mode) VALUES ({}, {}, 'shared', ?, ?, 0, 'yin', {enabled}, 'direct')",
+        timestamp_bind(driver),
+        timestamp_bind(driver)
+    );
+    let yang_insert = format!(
+        "INSERT INTO {space_table} (created_at, updated_at, type, name, owner_user_id, pair_id, side, public_enabled, public_mode) VALUES ({}, {}, 'shared', ?, ?, ?, 'yang', {enabled}, 'direct')",
+        timestamp_bind(driver),
+        timestamp_bind(driver)
+    );
+    let member_insert = format!(
+        "INSERT INTO space_member (created_at, updated_at, space_id, user_id, role, source, joined_at) VALUES ({}, {}, ?, ?, 'admin', 'manual', {})",
+        timestamp_bind(driver),
+        timestamp_bind(driver),
+        timestamp_bind(driver)
+    );
+    let group_insert = format!(
+        "INSERT INTO item_icon_group (created_at, updated_at, icon, title, description, sort, user_id, space_id) VALUES ({}, {}, 'material-symbols:apps', 'APP', '', 0, ?, ?)",
+        timestamp_bind(driver),
+        timestamp_bind(driver)
+    );
+    let pair_update = format!("UPDATE {space_table} SET pair_id = ? WHERE id = ?");
+
+    let mut tx = pool.begin().await?;
+    let yin_id = insert_returning_id!(
+        driver,
+        &space_insert,
+        [now, now, name, owner_id],
+        &mut *tx
+    );
+    sqlx::query(&query(driver, &pair_update))
+        .bind(yin_id)
+        .bind(yin_id)
+        .execute(&mut *tx)
+        .await?;
+    let yang_name = format!("{name}-B");
+    let yang_id = insert_returning_id!(
+        driver,
+        &yang_insert,
+        [now, now, yang_name, owner_id, yin_id],
+        &mut *tx
+    );
+    for space_id in [yin_id, yang_id] {
+        sqlx::query(&query(driver, &member_insert))
+            .bind(now)
+            .bind(now)
+            .bind(space_id)
+            .bind(owner_id)
+            .bind(now)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query(&query(driver, &group_insert))
+            .bind(now)
+            .bind(now)
+            .bind(owner_id)
+            .bind(space_id)
+            .execute(&mut *tx)
+            .await?;
+    }
+    tx.commit().await?;
+    Ok(())
+}
+
+/// `SpaceRouter.Rename`: the Yang twin becomes `<name>-B`.
+pub async fn rename_paired_space(
+    pool: &AnyPool,
+    driver: Driver,
+    space_id: i64,
+    name: &str,
+    now: &str,
+) -> Result<(), sqlx::Error> {
+    let space_table = crate::schema_shared::quote(driver, "space");
+    let update = format!(
+        "UPDATE {space_table} SET name = ?, updated_at = {} WHERE id = ?",
+        timestamp_bind(driver)
+    );
+    let paired = paired_space_ids(pool, driver, space_id).await?;
+    let mut tx = pool.begin().await?;
+    for sid in &paired {
+        let name = if *sid == space_id {
+            name.to_string()
+        } else {
+            format!("{name}-B")
+        };
+        sqlx::query(&query(driver, &update))
+            .bind(name)
+            .bind(now)
+            .bind(*sid)
+            .execute(&mut *tx)
+            .await?;
+    }
+    tx.commit().await?;
+    Ok(())
+}
+
+/// `SpaceRouter.Copy`: a new shared Space holding copies of every group and
+/// item of the source, in one transaction.
+pub async fn copy_space(
+    pool: &AnyPool,
+    driver: Driver,
+    source_id: i64,
+    owner_id: i64,
+    name: &str,
+    now: &str,
+) -> Result<(), sqlx::Error> {
+    use sqlx::Row;
+
+    let enabled = if driver == Driver::Postgres { "FALSE" } else { "0" };
+    let space_table = crate::schema_shared::quote(driver, "space");
+    let insert_space = format!(
+        "INSERT INTO {space_table} (created_at, updated_at, type, name, owner_user_id, pair_id, side, public_enabled, public_mode) VALUES ({}, {}, 'shared', ?, ?, 0, 'yin', {enabled}, 'direct')",
+        timestamp_bind(driver),
+        timestamp_bind(driver)
+    );
+    let insert_member = format!(
+        "INSERT INTO space_member (created_at, updated_at, space_id, user_id, role, source, joined_at) VALUES ({}, {}, ?, ?, 'admin', 'manual', {})",
+        timestamp_bind(driver),
+        timestamp_bind(driver),
+        timestamp_bind(driver)
+    );
+    let insert_group = format!(
+        "INSERT INTO item_icon_group (created_at, updated_at, icon, title, description, sort, user_id, space_id, parent_id) VALUES ({}, {}, ?, ?, ?, ?, ?, ?, ?)",
+        timestamp_bind(driver),
+        timestamp_bind(driver)
+    );
+    let copy_items = query(
+        driver,
+        &format!(
+            "INSERT INTO item_icon (created_at, updated_at, icon_json, title, url, lan_url, mobile_url, description, open_method, sort, item_icon_group_id, user_id, space_id) SELECT {}, {}, icon_json, title, url, lan_url, mobile_url, description, open_method, sort, ?, ?, ? FROM item_icon WHERE space_id = ? AND item_icon_group_id = ?",
+            timestamp_bind(driver),
+            timestamp_bind(driver)
+        ),
+    );
+
+    let mut tx = pool.begin().await?;
+    let destination = insert_returning_id!(
+        driver,
+        &insert_space,
+        [now, now, name, owner_id],
+        &mut *tx
+    );
+    sqlx::query(&query(driver, &insert_member))
+        .bind(now)
+        .bind(now)
+        .bind(destination)
+        .bind(owner_id)
+        .bind(now)
+        .execute(&mut *tx)
+        .await?;
+
+    let text_type = if driver == Driver::MySql { "CHAR" } else { "TEXT" };
+    let group_sql = query(
+        driver,
+        &format!(
+            "SELECT id, CAST(icon AS {text_type}) AS icon, CAST(title AS {text_type}) AS title, CAST(description AS {text_type}) AS description, sort, parent_id FROM item_icon_group WHERE space_id = ?"
+        ),
+    );
+    let groups = sqlx::query(&group_sql)
+        .bind(source_id)
+        .fetch_all(&mut *tx)
+        .await?;
+    for group in groups {
+        let old_id: i64 = group.try_get("id")?;
+        let icon: String = text(&group, "icon")?;
+        let title: String = text(&group, "title")?;
+        let description: String = text(&group, "description")?;
+        let sort: i64 = group.try_get("sort")?;
+        let parent_id: Option<i64> = group.try_get("parent_id")?;
+        let new_group = if driver == Driver::MySql {
+            let rendered = insert_group.clone();
+            let result = sqlx::query(&rendered)
+                .bind(now)
+                .bind(now)
+                .bind(&icon)
+                .bind(&title)
+                .bind(&description)
+                .bind(sort)
+                .bind(owner_id)
+                .bind(destination)
+                .bind(parent_id)
+                .execute(&mut *tx)
+                .await?;
+            result
+                .last_insert_id()
+                .ok_or(sqlx::Error::Protocol("driver did not report an insert id".into()))?
+        } else {
+            let rendered = query(driver, &format!("{insert_group} RETURNING id"));
+            let row = sqlx::query(&rendered)
+                .bind(now)
+                .bind(now)
+                .bind(&icon)
+                .bind(&title)
+                .bind(&description)
+                .bind(sort)
+                .bind(owner_id)
+                .bind(destination)
+                .bind(parent_id)
+                .fetch_one(&mut *tx)
+                .await?;
+            row.try_get("id")?
+        };
+        sqlx::query(&copy_items)
+            .bind(now)
+            .bind(now)
+            .bind(new_group)
+            .bind(owner_id)
+            .bind(destination)
+            .bind(source_id)
+            .bind(old_id)
+            .execute(&mut *tx)
+            .await?;
+    }
+    tx.commit().await?;
     Ok(())
 }
 
@@ -1800,17 +2071,20 @@ pub async fn user_access(
 #[cfg(test)]
 mod tests {
     use super::{
-        bookmark_tree, can_access_space, can_edit_space, can_manage_space, create_group,
-        create_item, delete_group_tree, delete_item, file_list, group_belongs, group_by_id,
+        bookmark_tree, can_access_space, can_edit_space, can_manage_space, copy_space,
+        create_group, create_item, create_paired_space, delete_group_tree, delete_item,
+        file_list, group_belongs, group_by_id,
         group_has_descendant, group_siblings, groups_for_space, item_by_id, items_for_space,
         module_config_value, oidc_groups, paired_space_ids, remove_space_member,
-        revoke_user_sessions, save_module_config, save_user_config, set_member_role,
-        sort_groups, sort_items, space_list, space_members, space_owner, space_public_config,
-        space_search_config, space_wallpaper_json,
+        rename_paired_space, revoke_user_sessions, save_module_config, save_user_config,
+        set_member_role,
+        sort_groups, sort_items, space_list, space_members, space_name, space_owner,
+        space_public_config, space_search_config, space_wallpaper_json,
         update_group, update_item, update_space_public_config, update_space_search_config,
         update_space_wallpaper, upsert_space_member, user_access, user_by_credentials, user_by_id,
         user_config, user_id_by_mail, user_list,
     };
+    use super::timestamp_bind;
     use crate::db::{Driver, connect, query};
     use sqlx::Row;
 
@@ -1938,6 +2212,7 @@ mod tests {
         verify_sort_writes(&pool, driver).await;
         verify_member_writes(&pool, driver).await;
         verify_config_writes(&pool, driver).await;
+        verify_space_writes(&pool, driver).await;
         pool.close().await;
     }
 
@@ -2338,6 +2613,211 @@ mod tests {
             .execute(pool)
             .await
             .expect("drop item list fixture");
+    }
+
+    async fn verify_space_writes(pool: &sqlx::AnyPool, driver: Driver) {
+        let (space_table, timestamp_type, id_type, enabled_type) = match driver {
+            Driver::MySql => (
+                "`space`",
+                "DATETIME(6)",
+                "BIGINT AUTO_INCREMENT PRIMARY KEY",
+                "TINYINT NOT NULL DEFAULT 0",
+            ),
+            Driver::Sqlite => (
+                "\"space\"",
+                "TEXT",
+                "INTEGER PRIMARY KEY AUTOINCREMENT",
+                "INTEGER NOT NULL DEFAULT 0",
+            ),
+            Driver::Postgres => (
+                "\"space\"",
+                "TIMESTAMPTZ",
+                "BIGSERIAL PRIMARY KEY",
+                "BOOLEAN NOT NULL DEFAULT false",
+            ),
+        };
+        sqlx::query(&format!(
+            "CREATE TABLE {space_table} (id {id_type}, created_at {timestamp_type} NOT NULL, updated_at {timestamp_type} NOT NULL, type VARCHAR(20) NOT NULL, name VARCHAR(100) NOT NULL, owner_user_id BIGINT NOT NULL, pair_id BIGINT NOT NULL DEFAULT 0, side VARCHAR(16) NOT NULL DEFAULT 'yin', public_enabled {enabled_type} NOT NULL, public_id VARCHAR(80), public_mode VARCHAR(32) NOT NULL DEFAULT 'direct', public_code_hash VARCHAR(128), search_config_json TEXT, wallpaper_json TEXT)"
+        ))
+        .execute(pool)
+        .await
+        .expect("create space write fixture");
+        sqlx::query(&format!(
+            "CREATE TABLE space_member (id {id_type}, created_at {timestamp_type} NOT NULL, updated_at {timestamp_type} NOT NULL, space_id BIGINT NOT NULL, user_id BIGINT NOT NULL, role VARCHAR(32) NOT NULL, source VARCHAR(32) NOT NULL, joined_at {timestamp_type} NOT NULL)"
+        ))
+        .execute(pool)
+        .await
+        .expect("create space member write fixture");
+        sqlx::query(&format!(
+            "CREATE TABLE item_icon_group (id {id_type}, created_at {timestamp_type} NOT NULL, updated_at {timestamp_type} NOT NULL, icon VARCHAR(100) NOT NULL, title VARCHAR(100) NOT NULL, description TEXT NOT NULL, sort BIGINT NOT NULL, user_id BIGINT NOT NULL, space_id BIGINT NOT NULL, parent_id BIGINT)"
+        ))
+        .execute(pool)
+        .await
+        .expect("create space group write fixture");
+        sqlx::query(&format!(
+            "CREATE TABLE item_icon (id {id_type}, created_at {timestamp_type} NOT NULL, updated_at {timestamp_type} NOT NULL, icon_json TEXT NOT NULL, title VARCHAR(50) NOT NULL, url TEXT NOT NULL, lan_url TEXT NOT NULL, mobile_url TEXT NOT NULL, description TEXT NOT NULL, open_method BIGINT NOT NULL, sort BIGINT NOT NULL, item_icon_group_id BIGINT NOT NULL, user_id BIGINT NOT NULL, space_id BIGINT NOT NULL)"
+        ))
+        .execute(pool)
+        .await
+        .expect("create space item write fixture");
+
+        create_paired_space(
+            pool,
+            driver,
+            7,
+            "Created",
+            "2025-01-01 00:00:00",
+        )
+        .await
+        .expect("create paired space");
+        let created = space_list(pool, driver, 7)
+            .await
+            .expect("list created spaces");
+        let yin = created
+            .iter()
+            .find(|space| space.kind == "shared" && space.side == "yin")
+            .expect("created yin space");
+        assert_eq!(yin.name, "Created");
+        assert_eq!(yin.pair_id, yin.id);
+        assert_eq!(yin.paired_space_id, Some(yin.pair_id + 1));
+        assert!(yin.can_edit);
+        let paired = paired_space_ids(pool, driver, yin.id)
+            .await
+            .expect("paired ids");
+        assert_eq!(paired, vec![yin.id, yin.id + 1]);
+        let yang_id = paired[1];
+        assert_eq!(
+            space_name(pool, driver, yang_id)
+                .await
+                .expect("read yang name"),
+            Some("Created-B".to_string())
+        );
+        let member_rows: i64 = sqlx::query(&query(
+            driver,
+            "SELECT COUNT(*) AS total FROM space_member WHERE space_id = ? AND role = 'admin'",
+        ))
+        .bind(yin.id)
+        .fetch_one(pool)
+        .await
+        .expect("count created members")
+        .try_get("total")
+        .expect("total");
+        assert_eq!(member_rows, 1);
+
+        rename_paired_space(pool, driver, yin.id, "Renamed", "2025-01-02 00:00:00")
+            .await
+            .expect("rename paired space");
+        assert_eq!(
+            space_name(pool, driver, yin.id)
+                .await
+                .expect("read renamed yin"),
+            Some("Renamed".to_string())
+        );
+        assert_eq!(
+            space_name(pool, driver, yang_id)
+                .await
+                .expect("read renamed yang"),
+            Some("Renamed-B".to_string())
+        );
+
+        let group_sql = query(
+            driver,
+            &format!(
+                "INSERT INTO item_icon_group (created_at, updated_at, icon, title, description, sort, user_id, space_id, parent_id) VALUES ({}, {}, 'folder', 'Links', '', 0, ?, ?, NULL)",
+                timestamp_bind(driver),
+                timestamp_bind(driver)
+            ),
+        );
+        sqlx::query(&group_sql)
+            .bind("2025-01-03 00:00:00")
+            .bind("2025-01-03 00:00:00")
+            .bind(7_i64)
+            .bind(yin.id)
+            .execute(pool)
+            .await
+            .expect("insert source group");
+        let group_id: i64 = {
+            use sqlx::Row;
+            sqlx::query(&query(
+                driver,
+                "SELECT id FROM item_icon_group WHERE space_id = ?",
+            ))
+            .bind(yin.id)
+            .fetch_one(pool)
+            .await
+            .expect("read source group")
+            .try_get("id")
+            .expect("group id")
+        };
+        let item_sql = query(
+            driver,
+            &format!(
+                "INSERT INTO item_icon (created_at, updated_at, icon_json, title, url, lan_url, mobile_url, description, open_method, sort, item_icon_group_id, user_id, space_id) VALUES ({}, {}, '{{}}', 'Link', 'https://example.test', '', '', '', 0, 1, ?, ?, ?)",
+                timestamp_bind(driver),
+                timestamp_bind(driver)
+            ),
+        );
+        sqlx::query(&item_sql)
+            .bind("2025-01-03 00:00:00")
+            .bind("2025-01-03 00:00:00")
+            .bind(group_id)
+            .bind(7_i64)
+            .bind(yin.id)
+            .execute(pool)
+            .await
+            .expect("insert source item");
+
+        copy_space(
+            pool,
+            driver,
+            yin.id,
+            7,
+            "Renamed Copy",
+            "2025-01-04 00:00:00",
+        )
+        .await
+        .expect("copy space");
+        let after_copy = space_list(pool, driver, 7)
+            .await
+            .expect("list after copy");
+        let copy = after_copy
+            .iter()
+            .find(|space| space.name == "Renamed Copy")
+            .expect("copied space");
+        assert_eq!(copy.pair_id, 0, "copy keeps the Go behaviour: no pair");
+        let copied_members: i64 = sqlx::query(&query(
+            driver,
+            "SELECT COUNT(*) AS total FROM space_member WHERE space_id = ?",
+        ))
+        .bind(copy.id)
+        .fetch_one(pool)
+        .await
+        .expect("count copied members")
+        .try_get("total")
+        .expect("total");
+        assert_eq!(copied_members, 1);
+        let copied_groups = groups_for_space(pool, driver, copy.id)
+            .await
+            .expect("copied groups");
+        // The created Yin space already had its default APP group.
+        assert_eq!(copied_groups.len(), 2);
+        assert!(
+            copied_groups.iter().any(|group| group.title == "Links"),
+            "the source group must be copied"
+        );
+        let copied_items = items_for_space(pool, driver, copy.id, None, 0, 0)
+            .await
+            .expect("copied items");
+        assert_eq!(copied_items.len(), 1);
+        assert_eq!(copied_items[0].title, "Link");
+        assert_eq!(copied_items[0].space_id, copy.id);
+
+        for table in ["item_icon", "item_icon_group", "space_member", space_table] {
+            sqlx::query(&format!("DROP TABLE {table}"))
+                .execute(pool)
+                .await
+                .expect("drop space write fixture");
+        }
     }
 
     async fn verify_config_writes(pool: &sqlx::AnyPool, driver: Driver) {

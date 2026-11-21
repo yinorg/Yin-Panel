@@ -2713,11 +2713,14 @@ async fn rename_space(headers: HeaderMap, Path(space_id): Path<i64>, request: Re
         Err(response) => return response,
     };
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool.clone(),
         Err(error) => return envelope::error(&error),
     };
-    if !can_manage(&pool, user.id, space_id).await {
+    if !crate::repository::can_manage_space(&pool, ctx.sqlx_driver(), user.id, space_id)
+        .await
+        .unwrap_or(false)
+    {
         return error_code(1005);
     }
     let body = match axum::body::to_bytes(request.into_body(), 1 << 20).await {
@@ -2734,45 +2737,23 @@ async fn rename_space(headers: HeaderMap, Path(space_id): Path<i64>, request: Re
     if req.name.chars().count() > 100 {
         return envelope::error(" [ Name长度不能超过100个字符]");
     }
-    let exists: Option<(i64,)> = sqlx::query_as(r#"SELECT id FROM "space" WHERE id = ?"#)
-        .bind(space_id)
-        .fetch_optional(&pool)
+    if crate::repository::space_owner(&pool, ctx.sqlx_driver(), space_id)
         .await
-        .unwrap_or(None);
-    if exists.is_none() {
+        .unwrap_or(None)
+        .is_none()
+    {
         return error_code(404);
     }
-    let mut tx = match pool.begin().await {
-        Ok(tx) => tx,
-        Err(error) => return envelope::error(&error.to_string()),
-    };
-    if sqlx::query(r#"UPDATE "space" SET name = ?, updated_at = ? WHERE id = ?"#)
-        .bind(&req.name)
-        .bind(now_like_go())
-        .bind(space_id)
-        .execute(&mut *tx)
-        .await
-        .is_err()
+    match crate::repository::rename_paired_space(
+        &pool,
+        ctx.sqlx_driver(),
+        space_id,
+        &req.name,
+        &now_like_go(),
+    )
+    .await
     {
-        return envelope::error("rename failed");
-    }
-    for sid in paired_ids(&pool, space_id).await {
-        if sid == space_id {
-            continue;
-        }
-        if sqlx::query(r#"UPDATE "space" SET name = ?, updated_at = ? WHERE id = ?"#)
-            .bind(format!("{}-B", req.name))
-            .bind(now_like_go())
-            .bind(sid)
-            .execute(&mut *tx)
-            .await
-            .is_err()
-        {
-            return envelope::error("rename failed");
-        }
-    }
-    match tx.commit().await {
-        Ok(_) => success(),
+        Ok(()) => success(),
         Err(error) => envelope::error(&error.to_string()),
     }
 }
@@ -3225,82 +3206,20 @@ async fn create_space(headers: HeaderMap, request: Request) -> Response {
         return envelope::error(" [ Name为必填字段]");
     }
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool.clone(),
         Err(error) => return envelope::error(&error),
     };
-    let now = now_like_go();
-    let mut tx = match pool.begin().await {
-        Ok(tx) => tx,
-        Err(error) => return envelope::error(&error.to_string()),
-    };
-    let created = sqlx::query(
-        r#"INSERT INTO "space" (created_at, updated_at, type, name, owner_user_id, pair_id, side, public_enabled, public_mode) VALUES (?, ?, 'shared', ?, ?, 0, 'yin', 0, 'direct')"#,
+    match crate::repository::create_paired_space(
+        &pool,
+        ctx.sqlx_driver(),
+        user.id,
+        &req.name,
+        &now_like_go(),
     )
-    .bind(&now)
-    .bind(&now)
-    .bind(&req.name)
-    .bind(user.id)
-    .execute(&mut *tx)
-    .await;
-    let yin_id = match created {
-        Ok(result) => result.last_insert_rowid(),
-        Err(error) => return envelope::error(&error.to_string()),
-    };
-    if sqlx::query(r#"UPDATE "space" SET pair_id = ? WHERE id = ?"#)
-        .bind(yin_id)
-        .bind(yin_id)
-        .execute(&mut *tx)
-        .await
-        .is_err()
+    .await
     {
-        return envelope::error("create failed");
-    }
-    let yang = sqlx::query(
-        r#"INSERT INTO "space" (created_at, updated_at, type, name, owner_user_id, pair_id, side, public_enabled, public_mode) VALUES (?, ?, 'shared', ?, ?, ?, 'yang', 0, 'direct')"#,
-    )
-    .bind(&now)
-    .bind(&now)
-    .bind(format!("{}-B", req.name))
-    .bind(user.id)
-    .bind(yin_id)
-    .execute(&mut *tx)
-    .await;
-    let yang_id = match yang {
-        Ok(result) => result.last_insert_rowid(),
-        Err(error) => return envelope::error(&error.to_string()),
-    };
-    for sid in [yin_id, yang_id] {
-        if sqlx::query(
-            "INSERT INTO space_member (created_at, updated_at, space_id, user_id, role, source, joined_at) VALUES (?, ?, ?, ?, 'admin', 'manual', ?)",
-        )
-        .bind(&now)
-        .bind(&now)
-        .bind(sid)
-        .bind(user.id)
-        .bind(&now)
-        .execute(&mut *tx)
-        .await
-        .is_err()
-        {
-            return envelope::error("create failed");
-        }
-        if sqlx::query(
-            "INSERT INTO item_icon_group (created_at, updated_at, icon, title, description, sort, user_id, space_id) VALUES (?, ?, 'material-symbols:apps', 'APP', '', 0, ?, ?)",
-        )
-        .bind(&now)
-        .bind(&now)
-        .bind(user.id)
-        .bind(sid)
-        .execute(&mut *tx)
-        .await
-        .is_err()
-        {
-            return envelope::error("create failed");
-        }
-    }
-    match tx.commit().await {
-        Ok(_) => success(),
+        Ok(()) => success(),
         Err(error) => envelope::error(&error.to_string()),
     }
 }
@@ -7137,20 +7056,20 @@ async fn copy_space(headers: HeaderMap, Path(space_id): Path<i64>, request: Requ
         Err(response) => return response,
     };
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool.clone(),
         Err(error) => return envelope::error(&error),
     };
-    if !can_access(&pool, user.id, space_id).await {
+    if !crate::repository::can_access_space(&pool, ctx.sqlx_driver(), user.id, space_id)
+        .await
+        .unwrap_or(false)
+    {
         return error_code(1005);
     }
-    let source: Option<(String,)> = sqlx::query_as(r#"SELECT name FROM "space" WHERE id = ?"#)
-        .bind(space_id)
-        .fetch_optional(&pool)
-        .await
-        .unwrap_or(None);
-    let Some((source_name,)) = source else {
-        return error_code(404);
+    let source_name = match crate::repository::space_name(&pool, ctx.sqlx_driver(), space_id).await
+    {
+        Ok(Some(name)) => name,
+        Ok(None) | Err(_) => return error_code(404),
     };
     let body = axum::body::to_bytes(request.into_body(), 1 << 20)
         .await
@@ -7163,84 +7082,17 @@ async fn copy_space(headers: HeaderMap, Path(space_id): Path<i64>, request: Requ
     } else {
         req.name
     };
-    let now = now_like_go();
-    let mut tx = match pool.begin().await {
-        Ok(tx) => tx,
-        Err(error) => return envelope::error(&error.to_string()),
-    };
-    let created = sqlx::query(
-        r#"INSERT INTO "space" (created_at, updated_at, type, name, owner_user_id, pair_id, side, public_enabled, public_mode) VALUES (?, ?, 'shared', ?, ?, 0, 'yin', 0, 'direct')"#,
+    match crate::repository::copy_space(
+        &pool,
+        ctx.sqlx_driver(),
+        space_id,
+        user.id,
+        &name,
+        &now_like_go(),
     )
-    .bind(&now)
-    .bind(&now)
-    .bind(&name)
-    .bind(user.id)
-    .execute(&mut *tx)
-    .await;
-    let dst = match created {
-        Ok(result) => result.last_insert_rowid(),
-        Err(_) => return envelope::database_error(),
-    };
-    if sqlx::query(
-        "INSERT INTO space_member (created_at, updated_at, space_id, user_id, role, source, joined_at) VALUES (?, ?, ?, ?, 'admin', 'manual', ?)",
-    )
-    .bind(&now)
-    .bind(&now)
-    .bind(dst)
-    .bind(user.id)
-    .bind(&now)
-    .execute(&mut *tx)
     .await
-    .is_err()
     {
-        return envelope::database_error();
-    }
-    let groups: Vec<(i64, String, String, String, i64, Option<i64>)> = sqlx::query_as(
-        "SELECT id, icon, title, description, sort, parent_id FROM item_icon_group WHERE space_id = ?",
-    )
-    .bind(space_id)
-    .fetch_all(&mut *tx)
-    .await
-    .unwrap_or_default();
-    for (old_id, icon, title, description, sort, parent_id) in groups {
-        let inserted = sqlx::query(
-            "INSERT INTO item_icon_group (created_at, updated_at, icon, title, description, sort, user_id, space_id, parent_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        )
-        .bind(&now)
-        .bind(&now)
-        .bind(&icon)
-        .bind(&title)
-        .bind(&description)
-        .bind(sort)
-        .bind(user.id)
-        .bind(dst)
-        .bind(parent_id)
-        .execute(&mut *tx)
-        .await;
-        let new_group = match inserted {
-            Ok(result) => result.last_insert_rowid(),
-            Err(_) => return envelope::database_error(),
-        };
-        if sqlx::query(
-            "INSERT INTO item_icon (created_at, updated_at, icon_json, title, url, lan_url, mobile_url, description, open_method, sort, item_icon_group_id, user_id, space_id)
-             SELECT ?, ?, icon_json, title, url, lan_url, mobile_url, description, open_method, sort, ?, ?, ? FROM item_icon WHERE space_id = ? AND item_icon_group_id = ?",
-        )
-        .bind(&now)
-        .bind(&now)
-        .bind(new_group)
-        .bind(user.id)
-        .bind(dst)
-        .bind(space_id)
-        .bind(old_id)
-        .execute(&mut *tx)
-        .await
-        .is_err()
-        {
-            return envelope::database_error();
-        }
-    }
-    match tx.commit().await {
-        Ok(_) => success(),
+        Ok(()) => success(),
         Err(_) => envelope::database_error(),
     }
 }
