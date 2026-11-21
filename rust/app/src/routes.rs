@@ -3609,19 +3609,17 @@ async fn upload_image(headers: HeaderMap, request: Request) -> Response {
         return error_code(1300);
     }
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool,
         Err(_) => return error_code(1300),
     };
-    let now = now_like_go();
-    if sqlx::query(
-        "INSERT INTO file (created_at, updated_at, user_id, file_name) VALUES (?, ?, ?, ?)",
+    if crate::repository::insert_file(
+        pool,
+        ctx.sqlx_driver(),
+        user.id,
+        &file_name,
+        &now_like_go(),
     )
-    .bind(&now)
-    .bind(&now)
-    .bind(user.id)
-    .bind(&file_name)
-    .execute(pool)
     .await
     .is_err()
     {
@@ -4551,25 +4549,18 @@ async fn delete_file(headers: HeaderMap, request: Request) -> Response {
         );
     }
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool,
         Err(error) => return envelope::error(&error),
     };
-    let row: Option<(String,)> = sqlx::query_as("SELECT file_name FROM file WHERE id = ?")
-        .bind(req.id)
-        .fetch_optional(pool)
-        .await
-        .unwrap_or(None);
-    let Some((file_name,)) = row else {
-        return envelope::database_error();
+    let file_name = match crate::repository::file_name_by_id(pool, ctx.sqlx_driver(), req.id).await
+    {
+        Ok(Some(name)) => name,
+        Ok(None) | Err(_) => return envelope::database_error(),
     };
     let _ = std::fs::remove_file(storage_dir().join(&file_name));
-    match sqlx::query("DELETE FROM file WHERE id = ?")
-        .bind(req.id)
-        .execute(pool)
-        .await
-    {
-        Ok(_) => success(),
+    match crate::repository::delete_file_row(pool, ctx.sqlx_driver(), req.id).await {
+        Ok(()) => success(),
         Err(_) => envelope::database_error(),
     }
 }

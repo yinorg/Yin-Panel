@@ -1910,6 +1910,54 @@ pub async fn delete_paired_space(
     Ok(removed)
 }
 
+pub async fn insert_file(
+    pool: &AnyPool,
+    driver: Driver,
+    user_id: i64,
+    file_name: &str,
+    now: &str,
+) -> Result<(), sqlx::Error> {
+    let timestamp = timestamp_bind(driver);
+    let sql = query(
+        driver,
+        &format!(
+            "INSERT INTO file (created_at, updated_at, user_id, file_name) VALUES ({timestamp}, {timestamp}, ?, ?)"
+        ),
+    );
+    sqlx::query(&sql)
+        .bind(now)
+        .bind(now)
+        .bind(user_id)
+        .bind(file_name)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+pub async fn file_name_by_id(
+    pool: &AnyPool,
+    driver: Driver,
+    id: i64,
+) -> Result<Option<String>, sqlx::Error> {
+    let text_type = if driver == Driver::MySql { "CHAR" } else { "TEXT" };
+    let sql = query(
+        driver,
+        &format!("SELECT CAST(file_name AS {text_type}) AS file_name FROM file WHERE id = ?"),
+    );
+    let row = sqlx::query(&sql).bind(id).fetch_optional(pool).await?;
+    row.map(|row| text(&row, "file_name")).transpose()
+}
+
+pub async fn delete_file_row(
+    pool: &AnyPool,
+    driver: Driver,
+    id: i64,
+) -> Result<(), sqlx::Error> {
+    let sql = query(driver, "DELETE FROM file WHERE id = ?");
+    sqlx::query(&sql).bind(id).execute(pool).await?;
+    Ok(())
+}
+
 pub async fn groups_for_space(
     pool: &AnyPool,
     driver: Driver,
@@ -2273,8 +2321,10 @@ mod tests {
     use super::{
         bookmark_tree, can_access_space, can_edit_space, can_manage_space, copy_space,
         clear_space, create_group, create_item, create_paired_space, delete_group_tree,
-        delete_item, delete_paired_space, file_list, group_belongs, group_by_id,
-        group_has_descendant, group_siblings, groups_for_space, item_by_id, items_for_space,
+        delete_file_row, delete_item, delete_paired_space, file_list, file_name_by_id,
+        group_belongs, group_by_id,
+        group_has_descendant, group_siblings, groups_for_space, insert_file, item_by_id,
+        items_for_space,
         module_config_value, oidc_groups, paired_space_ids, remove_space_member,
         rename_paired_space, revoke_user_sessions, save_module_config, save_user_config,
         set_member_role,
@@ -2415,6 +2465,7 @@ mod tests {
         verify_config_writes(&pool, driver).await;
         verify_space_writes(&pool, driver).await;
         verify_space_admin_writes(&pool, driver).await;
+        verify_file_writes(&pool, driver).await;
         pool.close().await;
     }
 
@@ -2815,6 +2866,60 @@ mod tests {
             .execute(pool)
             .await
             .expect("drop item list fixture");
+    }
+
+    async fn verify_file_writes(pool: &sqlx::AnyPool, driver: Driver) {
+        let timestamp_type = match driver {
+            Driver::MySql => "DATETIME(6)",
+            Driver::Sqlite => "TEXT",
+            Driver::Postgres => "TIMESTAMPTZ",
+        };
+        let id_type = match driver {
+            Driver::MySql => "BIGINT AUTO_INCREMENT PRIMARY KEY",
+            Driver::Sqlite => "INTEGER PRIMARY KEY AUTOINCREMENT",
+            Driver::Postgres => "BIGSERIAL PRIMARY KEY",
+        };
+        sqlx::query(&format!(
+            "CREATE TABLE file (id {id_type}, created_at {timestamp_type} NOT NULL, updated_at {timestamp_type} NOT NULL, user_id BIGINT NOT NULL, file_name VARCHAR(191) NOT NULL)"
+        ))
+        .execute(pool)
+        .await
+        .expect("create file write fixture");
+
+        insert_file(pool, driver, 7, "first.png", "2025-03-01 00:00:00")
+            .await
+            .expect("insert file");
+        insert_file(pool, driver, 7, "second.png", "2025-03-02 00:00:00")
+            .await
+            .expect("insert second file");
+        let (total, rows) = file_list(pool, driver, 0, 1)
+            .await
+            .expect("list files newest first");
+        assert_eq!(total, 2);
+        assert_eq!(rows[0].file_name, "second.png");
+        let id = rows[0].id;
+        assert_eq!(
+            file_name_by_id(pool, driver, id)
+                .await
+                .expect("read file name"),
+            Some("second.png".to_string())
+        );
+        delete_file_row(pool, driver, id)
+            .await
+            .expect("delete file row");
+        assert_eq!(
+            file_name_by_id(pool, driver, id).await.expect("deleted row"),
+            None
+        );
+        let (remaining, _) = file_list(pool, driver, 0, 1)
+            .await
+            .expect("list after delete");
+        assert_eq!(remaining, 1);
+
+        sqlx::query("DROP TABLE file")
+            .execute(pool)
+            .await
+            .expect("drop file fixture");
     }
 
     async fn verify_space_admin_writes(pool: &sqlx::AnyPool, driver: Driver) {
