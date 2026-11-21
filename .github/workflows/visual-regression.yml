@@ -55,7 +55,7 @@ jobs:
       - name: Build the backend
         run: cargo build --release --manifest-path rust/app/Cargo.toml
       - name: Stage the binary
-        run: cp -a rust/app/target/release/yin-panel backend/yin-panel
+        run: cp -a rust/app/target/release/yin-panel runtime/yin-panel
 
       - name: Capture the ruler from the published image
         env:
@@ -64,7 +64,7 @@ jobs:
 
       - name: Start the current build
         run: |
-          cd backend
+          cd runtime
           ./yin-panel > yin-panel.log 2>&1 &
           for i in $(seq 1 60); do
             if curl -sf -o /dev/null http://127.0.0.1:${YIN_PANEL_PORT:-3002}/; then

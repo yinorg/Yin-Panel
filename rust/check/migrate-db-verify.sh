@@ -38,8 +38,8 @@ cleanup() {
 }
 trap cleanup EXIT
 
-[[ -f "$repo_root/backend/conf.yaml" ]] || die "backend/conf.yaml is missing"
-[[ -f "$repo_root/backend/database/database.db" ]] || die "the deployment database is missing"
+[[ -f "$repo_root/runtime/conf.yaml" ]] || die "runtime/conf.yaml is missing"
+[[ -f "$repo_root/runtime/database/database.db" ]] || die "the deployment database is missing"
 
 printf 'Building yin-db and yin-panel...\n'
 cargo build --quiet --release --manifest-path "$repo_root/rust/db-tool/Cargo.toml"
@@ -63,7 +63,7 @@ rclone:
   bucket: $work/uploads
 CONF
 printf 'Snapshotting the SQLite deployment...\n'
-"$yin_db" copy --source "$repo_root/backend/conf.yaml" --target "$work/snapshot.yaml"
+"$yin_db" copy --source "$repo_root/runtime/conf.yaml" --target "$work/snapshot.yaml"
 
 mysql_conf="$work/mysql.yaml"
 cat >"$mysql_conf" <<CONF

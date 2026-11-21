@@ -29,7 +29,7 @@ rm -rf "$work"
 mkdir -p "$work/uploads"
 cp "$conf" "$work/conf.yaml"
 sed -i "s/__PORT__/$port/g" "$work/conf.yaml"
-cp -a "$root/backend/lang" "$work/lang"
+cp -a "$root/runtime/lang" "$work/lang"
 
 cd "$work"
 exec "$bin"

@@ -8,6 +8,9 @@ error responses.
 Measured on 2026-11-20, Intel Xeon D-1581 @ 1.80 GHz (28 threads), Linux,
 loopback HTTP, warm caches. Numbers are one run each; treat ±10% as noise.
 
+The Go backend has since been removed, so the pair scripts that compared the
+two builds no longer exist; these numbers are the historical record.
+
 Reproduce with:
 
 ```sh

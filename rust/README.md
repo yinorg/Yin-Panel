@@ -2,8 +2,7 @@
 
 The Core backend now runs on Rust: every registered route is served by the
 Rust binary (`rust/app`), the shared repository layer covers SQLite, MySQL and
-PostgreSQL, and recorded replay is green. The Go build in `backend/` remains
-only as the recording/rollback oracle until the approved removal commit.
+PostgreSQL, and recorded replay is green. The Go tree has been removed; recorded replay is the contract.
 
 Read `DECISIONS.md` first, then `MAP.md` (the queue) and `HANDOFF.md` (where the
 last session stopped).

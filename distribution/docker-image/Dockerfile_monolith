@@ -19,9 +19,9 @@ RUN apt-get update \
 # not executable"). Setting the mode at COPY time restores it without a
 # `RUN chmod` layer, which would duplicate the whole binary.
 COPY --chmod=755 build-output/yin-panel /app/yin-panel
-COPY backend/web /app/web
-COPY backend/lang /app/lang
-COPY backend/conf.yaml.example /app/conf.yaml
+COPY runtime/web /app/web
+COPY runtime/lang /app/lang
+COPY distribution/conf.yaml.example /app/conf.yaml
 
 # The license and the third-party notices travel with every distributed copy.
 # The MIT notice for the sun-panel-derived code is a condition of the MIT grant,
