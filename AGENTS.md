@@ -260,8 +260,8 @@ The script requires `backend/conf.yaml` before it stops any running process. It 
 
 ## Versioning and Tags
 
-The release version is the git tag, never a source edit. CI injects it with
-`-ldflags "-X .../global.VERSION=${VERSION}"` from `github.ref_name`, and
+The release version is the git tag, never a source edit. CI exports
+`YIN_PANEL_VERSION` from `github.ref_name`, and
 `scripts/deploy-local.sh` exports the same values as
 `YIN_PANEL_VERSION`, `YIN_PANEL_COMMIT` and `YIN_PANEL_BUILD_TIME` for the Rust
 binary at start; no source file is edited for a release.
