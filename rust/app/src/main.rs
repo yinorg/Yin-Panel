@@ -162,6 +162,8 @@ async fn serve() {
     let listener = listener.tap_io(|tcp| {
         let _ = tcp.set_nodelay(true);
     });
+    // The deployment script and operators both wait for this line.
+    println!("Listening and serving HTTP on :{port}");
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())
         .await

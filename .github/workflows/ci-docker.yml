@@ -69,29 +69,21 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
-      - name: Set up Go
-        uses: actions/setup-go@v7
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Cache cargo
+        uses: actions/cache@v4
         with:
-          go-version: '1.27.2'
-          cache: true
-          cache-dependency-path: backend/go.sum
-      - name: Install musl compiler
-        run: sudo apt-get update && sudo apt-get install -y musl-tools
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/app/target
+          key: yin-panel-release-${{ matrix.arch }}-${{ hashFiles('rust/app/Cargo.lock') }}
       - name: Build backend
-        working-directory: backend
-        env:
-          CGO_ENABLED: '1'
-          CC: musl-gcc
-          GOOS: linux
-          GOARCH: ${{ matrix.arch }}
-          VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
-          COMMIT: ${{ github.sha }}
         run: |
-          mkdir -p ../build-output
-          BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          go build -trimpath -buildvcs=true -tags timetzdata -o ../build-output/yin-panel \
-            -ldflags="-s -w -X github.com/yinorg/Yin-Panel/backend/internal/global.RUNCODE=release -X github.com/yinorg/Yin-Panel/backend/internal/global.VERSION=${VERSION} -X github.com/yinorg/Yin-Panel/backend/internal/global.COMMIT=${COMMIT} -X github.com/yinorg/Yin-Panel/backend/internal/global.BUILD_TIME=${BUILD_TIME}" \
-            main.go
+          mkdir -p build-output
+          cargo build --release --manifest-path rust/app/Cargo.toml
+          cp -a rust/app/target/release/yin-panel build-output/yin-panel
 
       - name: Upload backend build
         uses: actions/upload-artifact@v7

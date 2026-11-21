@@ -241,7 +241,11 @@ command that proves it).
 | 2 | T2.10 wallpaper | done — web wallpaper upload/asset on the shared pool; library assets are in-memory |
 | 2 | T2.11 icons/favicon | done — OIDC rules, item-with-icon and bookmark import; no `last_insert_rowid` left |
 | 3 | T3.1–T3.3 route parity | done — 103 routes served, 0 unimplemented, recorded coverage `routes missing a pair: 0` |
-| 4 | T4.1–T4.5 remove Go | not started |
+| 4 | T4.1 deploy-local.sh builds Rust | done — `cargo test` + `cargo build`, deploys `yin-panel`; local cutover verified on :3002 |
+| 4 | T4.2 CI builds Rust | done — `ci-docker.yml`, `cache-warm.yml`, `visual-regression.yml` |
+| 4 | T4.3 Docker runtime | done — glibc base + `curl` healthcheck, binary path unchanged |
+| 4 | T4.4 delete `backend/` | blocked — needs explicit user approval and the web/lang/conf paths moved |
+| 4 | T4.5 docs | pending |
 | 5 | T5.1–T5.2 acceptance | not started |
 
 Already landed before this plan (kept for context): shared `Any` layer, auth,

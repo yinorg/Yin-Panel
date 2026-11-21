@@ -1,4 +1,6 @@
-FROM alpine:3.22
+# The Rust binary is built on the Ubuntu runners, so the runtime image needs a
+# glibc base; Alpine's musl loader cannot start it.
+FROM debian:bookworm-slim
 
 WORKDIR /app
 
@@ -6,10 +8,10 @@ ARG VERSION
 ARG COMMIT
 
 # ca-certificates is required for outbound HTTPS (OAuth, favicon, theme
-# downloads). tzdata is embedded in the binary via `-tags timetzdata`, and
-# busybox wget (already in the base) powers the healthcheck, so neither the
-# tzdata package nor curl is needed.
-RUN apk add --no-cache ca-certificates
+# downloads) and curl powers the container healthcheck.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl \
+    && rm -rf /var/lib/apt/lists/*
 
 # The binary is built in one CI job and packaged in another, and it travels
 # through a GitHub Actions artifact. Artifacts do not preserve the executable
@@ -36,6 +38,6 @@ LABEL org.opencontainers.image.title="Yin-Panel" \
 EXPOSE 3002
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD wget -q -O /dev/null http://127.0.0.1:3002/ || exit 1
+    CMD curl -fsS -o /dev/null http://127.0.0.1:3002/ || exit 1
 
 CMD ["/app/yin-panel"]

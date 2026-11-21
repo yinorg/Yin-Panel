@@ -14,7 +14,7 @@ if [ -z "$port" ]; then
 fi
 
 root="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
-bin="${YIN_PANEL_RUST_BIN:-$root/rust/app/target/release/run-original}"
+bin="${YIN_PANEL_RUST_BIN:-$root/rust/app/target/release/yin-panel}"
 
 if [ ! -x "$bin" ]; then
     echo "build the front door first: cargo build --release --manifest-path rust/app/Cargo.toml" >&2

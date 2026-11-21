@@ -37,10 +37,8 @@ jobs:
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.27.1'
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Install dependencies
         run: npm ci
@@ -55,8 +53,9 @@ jobs:
         working-directory: frontend
 
       - name: Build the backend
-        run: go build -o yin-panel .
-        working-directory: backend
+        run: cargo build --release --manifest-path rust/app/Cargo.toml
+      - name: Stage the binary
+        run: cp -a rust/app/target/release/yin-panel backend/yin-panel
 
       - name: Capture the ruler from the published image
         env:

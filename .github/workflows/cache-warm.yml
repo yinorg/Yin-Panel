@@ -37,28 +37,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
       - name: Set up Go
-        uses: actions/setup-go@v7
-        with:
-          go-version: '1.27.2'
-          cache: true
-          cache-dependency-path: backend/go.sum
-      - name: Install musl compiler
-        run: sudo apt-get update && sudo apt-get install -y musl-tools
-      # This must mirror the release build exactly. The Go build cache key covers
-      # the CGO toolchain, the target platform and the build tags, so a plain
-      # `go build` here would warm nothing the release can use.
+        uses: dtolnay/rust-toolchain@stable
+      # Warm the same cargo target directory the release job uses.
       - name: Build backend
-        working-directory: backend
-        env:
-          CGO_ENABLED: '1'
-          CC: musl-gcc
-          GOOS: linux
-          GOARCH: ${{ matrix.arch }}
         run: |
-          mkdir -p ../build-output
-          go build -trimpath -buildvcs=true -tags timetzdata -o ../build-output/yin-panel \
-            -ldflags="-s -w" \
-            main.go
+          mkdir -p build-output
+          cargo build --release --manifest-path rust/app/Cargo.toml
+          cp -a rust/app/target/release/yin-panel build-output/yin-panel
 
   node:
     runs-on: ubuntu-24.04

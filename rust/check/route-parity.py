@@ -94,7 +94,7 @@ def main() -> int:
             print(f"{method:6} {pattern}")
         return 0
 
-    binary = Path(args.bin) if args.bin else REPO_ROOT / "rust/app/target/release/run-original"
+    binary = Path(args.bin) if args.bin else REPO_ROOT / "rust/app/target/release/yin-panel"
     if not os.access(binary, os.X_OK):
         print(
             f"missing binary {binary}; run: cargo build --release --manifest-path rust/app/Cargo.toml",

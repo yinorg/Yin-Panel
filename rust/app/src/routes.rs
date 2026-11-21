@@ -658,23 +658,6 @@ async fn members(headers: HeaderMap, Path(space_id): Path<i64>) -> Response {
     success_data(serde_json::Value::Array(out))
 }
 
-#[derive(sqlx::FromRow)]
-struct ItemRow {
-    id: i64,
-    created_at: String,
-    updated_at: String,
-    icon_json: String,
-    title: String,
-    url: String,
-    lan_url: String,
-    mobile_url: String,
-    description: String,
-    open_method: i64,
-    sort: i64,
-    item_icon_group_id: i64,
-    user_id: i64,
-    space_id: i64,
-}
 
 #[derive(Serialize)]
 struct GroupItem {

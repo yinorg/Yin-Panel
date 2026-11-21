@@ -75,7 +75,7 @@ build_time="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 printf 'Building the Rust binary...\n'
 (cd "$repo_root/rust/app" && cargo build --release)
 
-binary="$repo_root/rust/app/target/release/run-original"
+binary="$repo_root/rust/app/target/release/yin-panel"
 [[ -x "$binary" ]] || die "cargo build did not produce $binary"
 
 pid="$(listening_pid "$port")"

@@ -27,7 +27,7 @@ die() {
 
 command -v curl >/dev/null 2>&1 || die "curl is required"
 command -v npm >/dev/null 2>&1 || die "npm is required"
-command -v go >/dev/null 2>&1 || die "go is required"
+command -v cargo >/dev/null 2>&1 || die "cargo is required"
 
 # Port and process introspection. Linux provides `ss` plus /proc; macOS/BSD
 # provide neither, so `lsof` plus `ps` stand in. Both paths must agree, because
@@ -50,7 +50,7 @@ if ! command -v setsid >/dev/null 2>&1 && ! command -v nohup >/dev/null 2>&1; th
 fi
 
 [[ -f "$repo_root/frontend/package.json" ]] || die "frontend/package.json is missing"
-[[ -f "$repo_root/backend/go.mod" ]] || die "backend/go.mod is missing"
+[[ -f "$repo_root/rust/app/Cargo.toml" ]] || die "rust/app/Cargo.toml is missing"
 [[ -f "$run_dir/conf.yaml" ]] || die "runtime config is missing: $run_dir/conf.yaml"
 
 # Replacing the runtime artifacts normally needs root, because on a packaged
@@ -89,19 +89,16 @@ printf 'Building frontend...\n'
 cp -a "$repo_root/backend/web" "$build_dir/web"
 
 printf 'Testing backend...\n'
-(cd "$repo_root/backend" && go test ./...)
+(cd "$repo_root/rust/app" && cargo test --quiet)
 
 printf 'Building backend...\n'
-# Report the tag the local binary was built from, the same way CI does, so
-# global.VERSION no longer has to be edited by hand for a release.
-global_pkg="github.com/yinorg/Yin-Panel/backend/internal/global"
 version="$(git -C "$repo_root" describe --tags --always --dirty 2>/dev/null || printf 'dev')"
 commit="$(git -C "$repo_root" rev-parse --short HEAD 2>/dev/null || printf 'unknown')"
 build_time="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-(cd "$repo_root/backend" && go build -o "$build_dir/yin-panel" \
-    -ldflags="-X ${global_pkg}.VERSION=${version} -X ${global_pkg}.COMMIT=${commit} -X ${global_pkg}.BUILD_TIME=${build_time}" .)
+(cd "$repo_root/rust/app" && cargo build --release)
+cp -a "$repo_root/rust/app/target/release/yin-panel" "$build_dir/yin-panel"
 
-[[ -x "$build_dir/yin-panel" ]] || die "backend build did not produce an executable"
+[[ -x "$build_dir/yin-panel" ]] || die "cargo build did not produce an executable"
 
 pid="$(listening_pid "$port")"
 if [[ -n "$pid" ]]; then
@@ -128,6 +125,7 @@ privileged cp -a "$build_dir/yin-panel" "$run_dir/yin-panel"
 privileged cp -a "$build_dir/web" "$run_dir/web"
 
 printf 'Starting Yin-Panel from %s...\n' "$run_dir"
+export YIN_PANEL_VERSION="$version" YIN_PANEL_COMMIT="$commit" YIN_PANEL_BUILD_TIME="$build_time"
 # Start the daemon detached from this shell's stdio. The redirections belong on
 # the subshell invocation: if they sit on the inner command, the wrapper
 # subshell keeps this script's stdout/stderr open and can outlive it, so any
