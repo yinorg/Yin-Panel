@@ -2582,11 +2582,14 @@ async fn add_member(headers: HeaderMap, Path(space_id): Path<i64>, request: Requ
         Err(response) => return response,
     };
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool.clone(),
         Err(error) => return envelope::error(&error),
     };
-    if !can_manage(&pool, user.id, space_id).await {
+    if !crate::repository::can_manage_space(&pool, ctx.sqlx_driver(), user.id, space_id)
+        .await
+        .unwrap_or(false)
+    {
         return error_code(1005);
     }
     let body = match axum::body::to_bytes(request.into_body(), 1 << 20).await {
@@ -2601,59 +2604,37 @@ async fn add_member(headers: HeaderMap, Path(space_id): Path<i64>, request: Requ
         return envelope::error(" [invalid member request]");
     }
     let email = req.email.trim().to_lowercase();
-    let target: Option<(i64,)> = sqlx::query_as(r#"SELECT id FROM "user" WHERE mail = ?"#)
-        .bind(&email)
-        .fetch_optional(&pool)
-        .await
-        .unwrap_or(None);
-    let Some((target_id,)) = target else {
-        return error_code(404);
+    let target = match crate::repository::user_id_by_mail(&pool, ctx.sqlx_driver(), &email).await {
+        Ok(Some(target_id)) => target_id,
+        Ok(None) | Err(_) => return error_code(404),
     };
-    let exists: Option<(i64,)> = sqlx::query_as(r#"SELECT id FROM "space" WHERE id = ?"#)
-        .bind(space_id)
-        .fetch_optional(&pool)
+    if crate::repository::space_owner(&pool, ctx.sqlx_driver(), space_id)
         .await
-        .unwrap_or(None);
-    if exists.is_none() {
+        .unwrap_or(None)
+        .is_none()
+    {
         return error_code(404);
     }
-    let now = now_like_go();
-    for sid in paired_ids(&pool, space_id).await {
-        let found: Option<(i64,)> = sqlx::query_as(
-            "SELECT id FROM space_member WHERE space_id = ? AND user_id = ? LIMIT 1",
-        )
-        .bind(sid)
-        .bind(target_id)
-        .fetch_optional(&pool)
+    let space_ids = match crate::repository::paired_space_ids(&pool, ctx.sqlx_driver(), space_id)
         .await
-        .unwrap_or(None);
-        let result = match found {
-            Some((id,)) => {
-                sqlx::query("UPDATE space_member SET role = ? WHERE id = ?")
-                    .bind(&req.role)
-                    .bind(id)
-                    .execute(&pool)
-                    .await
-            }
-            None => {
-                sqlx::query(
-                    "INSERT INTO space_member (created_at, updated_at, space_id, user_id, role, source, joined_at) VALUES (?, ?, ?, ?, ?, 'manual', ?)",
-                )
-                .bind(&now)
-                .bind(&now)
-                .bind(sid)
-                .bind(target_id)
-                .bind(&req.role)
-                .bind(&now)
-                .execute(&pool)
-                .await
-            }
-        };
-        if let Err(error) = result {
-            return envelope::error(&error.to_string());
-        }
+    {
+        Ok(ids) => ids,
+        Err(error) => return envelope::error(&error.to_string()),
+    };
+    let now = now_like_go();
+    match crate::repository::upsert_space_member(
+        &pool,
+        ctx.sqlx_driver(),
+        &space_ids,
+        target,
+        &req.role,
+        &now,
+    )
+    .await
+    {
+        Ok(()) => success(),
+        Err(error) => envelope::error(&error.to_string()),
     }
-    success()
 }
 
 /// `SpaceRouter.UpdateMember`.
@@ -2671,11 +2652,14 @@ async fn update_member(
         Err(_) => return envelope::error(" [invalid userId]"),
     };
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool.clone(),
         Err(error) => return envelope::error(&error),
     };
-    if !can_manage(&pool, user.id, space_id).await {
+    if !crate::repository::can_manage_space(&pool, ctx.sqlx_driver(), user.id, space_id)
+        .await
+        .unwrap_or(false)
+    {
         return error_code(1005);
     }
     let body = match axum::body::to_bytes(request.into_body(), 1 << 20).await {
@@ -2689,27 +2673,29 @@ async fn update_member(
     if !valid_space_role(&req.role) {
         return envelope::error(" [invalid role]");
     }
-    let exists: Option<(i64,)> = sqlx::query_as(r#"SELECT id FROM "space" WHERE id = ?"#)
-        .bind(space_id)
-        .fetch_optional(&pool)
+    if crate::repository::space_owner(&pool, ctx.sqlx_driver(), space_id)
         .await
-        .unwrap_or(None);
-    if exists.is_none() {
+        .unwrap_or(None)
+        .is_none()
+    {
         return error_code(404);
     }
-    let placeholders = {
-        let ids = paired_ids(&pool, space_id).await;
-        vec!["?"; ids.len()].join(",")
+    let space_ids = match crate::repository::paired_space_ids(&pool, ctx.sqlx_driver(), space_id)
+        .await
+    {
+        Ok(ids) => ids,
+        Err(error) => return envelope::error(&error.to_string()),
     };
-    let sql = format!(
-        "UPDATE space_member SET role = ? WHERE space_id IN ({placeholders}) AND user_id = ?"
-    );
-    let mut statement = sqlx::query(&sql).bind(&req.role);
-    for sid in paired_ids(&pool, space_id).await {
-        statement = statement.bind(sid);
-    }
-    match statement.bind(target).execute(&pool).await {
-        Ok(_) => success(),
+    match crate::repository::set_member_role(
+        &pool,
+        ctx.sqlx_driver(),
+        &space_ids,
+        target,
+        &req.role,
+    )
+    .await
+    {
+        Ok(()) => success(),
         Err(error) => envelope::error(&error.to_string()),
     }
 }
@@ -2728,36 +2714,38 @@ async fn remove_member(
         Err(_) => return envelope::error(" [invalid userId]"),
     };
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool.clone(),
         Err(error) => return envelope::error(&error),
     };
-    if !can_manage(&pool, user.id, space_id).await {
+    if !crate::repository::can_manage_space(&pool, ctx.sqlx_driver(), user.id, space_id)
+        .await
+        .unwrap_or(false)
+    {
         return error_code(1005);
     }
-    let space: Option<(i64,)> = sqlx::query_as(r#"SELECT owner_user_id FROM "space" WHERE id = ?"#)
-        .bind(space_id)
-        .fetch_optional(&pool)
-        .await
-        .unwrap_or(None);
-    let Some((owner,)) = space else {
-        return error_code(404);
+    let owner = match crate::repository::space_owner(&pool, ctx.sqlx_driver(), space_id).await {
+        Ok(Some(owner)) => owner,
+        Ok(None) | Err(_) => return error_code(404),
     };
     if target == owner {
         return envelope::error("the space owner cannot be removed; leave the space to delete it");
     }
-    let placeholders = {
-        let ids = paired_ids(&pool, space_id).await;
-        vec!["?"; ids.len()].join(",")
+    let space_ids = match crate::repository::paired_space_ids(&pool, ctx.sqlx_driver(), space_id)
+        .await
+    {
+        Ok(ids) => ids,
+        Err(error) => return envelope::error(&error.to_string()),
     };
-    let sql =
-        format!("DELETE FROM space_member WHERE space_id IN ({placeholders}) AND user_id = ?");
-    let mut statement = sqlx::query(&sql);
-    for sid in paired_ids(&pool, space_id).await {
-        statement = statement.bind(sid);
-    }
-    match statement.bind(target).execute(&pool).await {
-        Ok(_) => success(),
+    match crate::repository::remove_space_member(
+        &pool,
+        ctx.sqlx_driver(),
+        &space_ids,
+        target,
+    )
+    .await
+    {
+        Ok(()) => success(),
         Err(error) => envelope::error(&error.to_string()),
     }
 }

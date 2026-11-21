@@ -1165,6 +1165,170 @@ pub async fn sort_groups(
     Ok(())
 }
 
+/// `pairedIDs`: the Space itself plus its Yang twin, resolved through pair_id.
+pub async fn paired_space_ids(
+    pool: &AnyPool,
+    driver: Driver,
+    space_id: i64,
+) -> Result<Vec<i64>, sqlx::Error> {
+    let (space_table, text_type) = if driver == Driver::MySql {
+        ("`space`", "CHAR")
+    } else {
+        ("\"space\"", "TEXT")
+    };
+    let _ = text_type;
+    let pair_sql = query(
+        driver,
+        &format!("SELECT pair_id FROM {space_table} WHERE id = ?"),
+    );
+    let row = sqlx::query(&pair_sql)
+        .bind(space_id)
+        .fetch_optional(pool)
+        .await?;
+    let pair_id = row
+        .map(|row| row.try_get::<i64, _>("pair_id"))
+        .transpose()?
+        .unwrap_or(0);
+    if pair_id == 0 {
+        return Ok(vec![space_id]);
+    }
+    let yang_sql = query(
+        driver,
+        &format!("SELECT id FROM {space_table} WHERE pair_id = ? AND side = 'yang' LIMIT 1"),
+    );
+    let yang = sqlx::query(&yang_sql)
+        .bind(pair_id)
+        .fetch_optional(pool)
+        .await?;
+    match yang {
+        Some(row) => Ok(vec![pair_id, row.try_get("id")?]),
+        None => Ok(vec![pair_id]),
+    }
+}
+
+pub async fn user_id_by_mail(
+    pool: &AnyPool,
+    driver: Driver,
+    mail: &str,
+) -> Result<Option<i64>, sqlx::Error> {
+    let user_table = crate::schema_shared::quote(driver, "user");
+    let sql = query(driver, &format!("SELECT id FROM {user_table} WHERE mail = ?"));
+    let row = sqlx::query(&sql)
+        .bind(mail)
+        .fetch_optional(pool)
+        .await?;
+    row.map(|row| row.try_get("id")).transpose()
+}
+
+pub async fn space_owner(
+    pool: &AnyPool,
+    driver: Driver,
+    space_id: i64,
+) -> Result<Option<i64>, sqlx::Error> {
+    let space_table = crate::schema_shared::quote(driver, "space");
+    let sql = query(
+        driver,
+        &format!("SELECT owner_user_id FROM {space_table} WHERE id = ?"),
+    );
+    let row = sqlx::query(&sql)
+        .bind(space_id)
+        .fetch_optional(pool)
+        .await?;
+    row.map(|row| row.try_get("owner_user_id")).transpose()
+}
+
+/// `AddMember`: the row is created in the Space and in its Yang twin, or its
+/// role is updated when it already exists.
+pub async fn upsert_space_member(
+    pool: &AnyPool,
+    driver: Driver,
+    space_ids: &[i64],
+    target_user_id: i64,
+    role: &str,
+    now: &str,
+) -> Result<(), sqlx::Error> {
+    let timestamp = timestamp_bind(driver);
+    let select = query(
+        driver,
+        "SELECT id FROM space_member WHERE space_id = ? AND user_id = ? LIMIT 1",
+    );
+    let update = query(driver, "UPDATE space_member SET role = ? WHERE id = ?");
+    let insert = query(
+        driver,
+        &format!(
+            "INSERT INTO space_member (created_at, updated_at, space_id, user_id, role, source, joined_at) VALUES ({timestamp}, {timestamp}, ?, ?, ?, 'manual', {timestamp})"
+        ),
+    );
+    for space_id in space_ids {
+        let found = sqlx::query(&select)
+            .bind(*space_id)
+            .bind(target_user_id)
+            .fetch_optional(pool)
+            .await?;
+        match found {
+            Some(row) => {
+                let id: i64 = row.try_get("id")?;
+                sqlx::query(&update)
+                    .bind(role)
+                    .bind(id)
+                    .execute(pool)
+                    .await?;
+            }
+            None => {
+                sqlx::query(&insert)
+                    .bind(now)
+                    .bind(now)
+                    .bind(*space_id)
+                    .bind(target_user_id)
+                    .bind(role)
+                    .bind(now)
+                    .execute(pool)
+                    .await?;
+            }
+        }
+    }
+    Ok(())
+}
+
+pub async fn set_member_role(
+    pool: &AnyPool,
+    driver: Driver,
+    space_ids: &[i64],
+    target_user_id: i64,
+    role: &str,
+) -> Result<(), sqlx::Error> {
+    let placeholders = vec!["?"; space_ids.len()].join(",");
+    let sql = query(
+        driver,
+        &format!("UPDATE space_member SET role = ? WHERE space_id IN ({placeholders}) AND user_id = ?"),
+    );
+    let mut statement = sqlx::query(&sql).bind(role);
+    for space_id in space_ids {
+        statement = statement.bind(*space_id);
+    }
+    statement.bind(target_user_id).execute(pool).await?;
+    Ok(())
+}
+
+pub async fn remove_space_member(
+    pool: &AnyPool,
+    driver: Driver,
+    space_ids: &[i64],
+    target_user_id: i64,
+) -> Result<(), sqlx::Error> {
+    let placeholders = vec!["?"; space_ids.len()].join(",");
+    let sql = query(
+        driver,
+        &format!("DELETE FROM space_member WHERE space_id IN ({placeholders}) AND user_id = ?"),
+    );
+    let mut statement = sqlx::query(&sql);
+    for space_id in space_ids {
+        statement = statement.bind(*space_id);
+    }
+    statement.bind(target_user_id).execute(pool).await?;
+    Ok(())
+}
+
 pub async fn groups_for_space(
     pool: &AnyPool,
     driver: Driver,
@@ -1529,11 +1693,12 @@ mod tests {
         bookmark_tree, can_access_space, can_edit_space, can_manage_space, create_group,
         create_item, delete_group_tree, delete_item, file_list, group_belongs, group_by_id,
         group_has_descendant, group_siblings, groups_for_space, item_by_id, items_for_space,
-        module_config_value, oidc_groups, revoke_user_sessions, sort_groups, sort_items,
-        space_list, space_members, space_public_config, space_search_config, space_wallpaper_json,
+        module_config_value, oidc_groups, paired_space_ids, remove_space_member,
+        revoke_user_sessions, set_member_role, sort_groups, sort_items, space_list, space_members,
+        space_owner, space_public_config, space_search_config, space_wallpaper_json,
         update_group, update_item, update_space_public_config, update_space_search_config,
-        update_space_wallpaper, user_access, user_by_credentials, user_by_id, user_config,
-        user_list,
+        update_space_wallpaper, upsert_space_member, user_access, user_by_credentials, user_by_id,
+        user_config, user_id_by_mail, user_list,
     };
     use crate::db::{Driver, connect, query};
     use sqlx::Row;
@@ -1660,6 +1825,7 @@ mod tests {
         verify_group_writes(&pool, driver).await;
         verify_item_writes(&pool, driver).await;
         verify_sort_writes(&pool, driver).await;
+        verify_member_writes(&pool, driver).await;
         pool.close().await;
     }
 
@@ -2060,6 +2226,163 @@ mod tests {
             .execute(pool)
             .await
             .expect("drop item list fixture");
+    }
+
+    async fn verify_member_writes(pool: &sqlx::AnyPool, driver: Driver) {
+        let (space_table, user_table, timestamp_type, id_type) = match driver {
+            Driver::MySql => (
+                "`space`",
+                "`user`",
+                "DATETIME(6)",
+                "BIGINT AUTO_INCREMENT PRIMARY KEY",
+            ),
+            Driver::Sqlite => (
+                "\"space\"",
+                "\"user\"",
+                "TEXT",
+                "INTEGER PRIMARY KEY AUTOINCREMENT",
+            ),
+            Driver::Postgres => (
+                "\"space\"",
+                "\"user\"",
+                "TIMESTAMPTZ",
+                "BIGSERIAL PRIMARY KEY",
+            ),
+        };
+        sqlx::query(&format!(
+            "CREATE TABLE {space_table} (id {id_type}, owner_user_id BIGINT NOT NULL, pair_id BIGINT NOT NULL DEFAULT 0, side VARCHAR(16) NOT NULL)"
+        ))
+        .execute(pool)
+        .await
+        .expect("create member space fixture");
+        sqlx::query(&format!(
+            "CREATE TABLE {user_table} (id {id_type}, mail VARCHAR(255) NOT NULL, name VARCHAR(100) NOT NULL)"
+        ))
+        .execute(pool)
+        .await
+        .expect("create member user fixture");
+        sqlx::query(&format!(
+            "CREATE TABLE space_member (id {id_type}, created_at {timestamp_type} NOT NULL, updated_at {timestamp_type} NOT NULL, space_id BIGINT NOT NULL, user_id BIGINT NOT NULL, role VARCHAR(32) NOT NULL, source VARCHAR(32) NOT NULL, joined_at {timestamp_type} NOT NULL)"
+        ))
+        .execute(pool)
+        .await
+        .expect("create member row fixture");
+
+        let insert_space = query(
+            driver,
+            &format!(
+                "INSERT INTO {space_table} (id, owner_user_id, pair_id, side) VALUES (?, ?, ?, ?)"
+            ),
+        );
+        for (id, owner, pair_id, side) in [
+            (1_i64, 1_i64, 1_i64, "yin"),
+            (2, 1, 1, "yang"),
+            (3, 9, 3, "yin"),
+        ] {
+            sqlx::query(&insert_space)
+                .bind(id)
+                .bind(owner)
+                .bind(pair_id)
+                .bind(side)
+                .execute(pool)
+                .await
+                .expect("insert member space");
+        }
+        sqlx::query(&query(
+            driver,
+            &format!("INSERT INTO {user_table} (id, mail, name) VALUES (?, ?, ?)"),
+        ))
+        .bind(5_i64)
+        .bind("member@example.test")
+        .bind("Member")
+        .execute(pool)
+        .await
+        .expect("insert member account");
+
+        assert_eq!(
+            paired_space_ids(pool, driver, 1).await.expect("pair"),
+            vec![1, 2]
+        );
+        assert_eq!(
+            paired_space_ids(pool, driver, 3).await.expect("unpaired"),
+            vec![3]
+        );
+        assert_eq!(
+            user_id_by_mail(pool, driver, "member@example.test")
+                .await
+                .expect("lookup mail"),
+            Some(5)
+        );
+        assert_eq!(
+            user_id_by_mail(pool, driver, "missing@example.test")
+                .await
+                .expect("missing mail"),
+            None
+        );
+        assert_eq!(
+            space_owner(pool, driver, 1).await.expect("owner"),
+            Some(1)
+        );
+
+        let pair = paired_space_ids(pool, driver, 1).await.expect("pair again");
+        upsert_space_member(
+            pool,
+            driver,
+            &pair,
+            5,
+            "editor",
+            "2024-11-01 00:00:00",
+        )
+        .await
+        .expect("add member to both spaces");
+        let members = space_members(pool, driver, 2)
+            .await
+            .expect("read twin members");
+        assert_eq!(members.len(), 1);
+        assert_eq!(members[0].role, "editor");
+        assert_eq!(members[0].source, "manual");
+        upsert_space_member(
+            pool,
+            driver,
+            &pair,
+            5,
+            "admin",
+            "2024-11-02 00:00:00",
+        )
+        .await
+        .expect("existing member takes the new role");
+        let members = space_members(pool, driver, 2)
+            .await
+            .expect("read updated twin members");
+        assert_eq!(members.len(), 1);
+        assert_eq!(members[0].role, "admin");
+
+        set_member_role(pool, driver, &pair, 5, "viewer")
+            .await
+            .expect("set role across the pair");
+        let members = space_members(pool, driver, 1)
+            .await
+            .expect("read original members");
+        assert_eq!(members[0].role, "viewer");
+
+        remove_space_member(pool, driver, &pair, 5)
+            .await
+            .expect("remove from both spaces");
+        assert!(space_members(pool, driver, 1)
+            .await
+            .expect("empty original")
+            .is_empty());
+        assert!(space_members(pool, driver, 2)
+            .await
+            .expect("empty twin")
+            .is_empty());
+
+        for table in ["space_member", user_table, space_table] {
+            sqlx::query(&format!("DROP TABLE {table}"))
+                .execute(pool)
+                .await
+                .expect("drop member fixture");
+        }
     }
 
     async fn verify_sort_writes(pool: &sqlx::AnyPool, driver: Driver) {
