@@ -14,7 +14,7 @@ fi
 export -n SUDO_PASSWORD SUDO_PASSWD 2>/dev/null || true
 
 port="${YIN_PANEL_PORT:-3002}"
-run_dir="${YIN_PANEL_RUNTIME_DIR:-$repo_root/backend}"
+run_dir="${YIN_PANEL_RUNTIME_DIR:-$repo_root/runtime}"
 if [[ "$run_dir" != /* ]]; then
     run_dir="$repo_root/$run_dir"
 fi
@@ -85,8 +85,8 @@ trap 'rm -rf "$build_dir"' EXIT
 printf 'Building frontend...\n'
 (cd "$repo_root/frontend" && npm run build-only)
 
-[[ -f "$repo_root/backend/web/index.html" ]] || die "frontend build did not produce backend/web/index.html"
-cp -a "$repo_root/backend/web" "$build_dir/web"
+[[ -f "$repo_root/runtime/web/index.html" ]] || die "frontend build did not produce runtime/web/index.html"
+cp -a "$repo_root/runtime/web" "$build_dir/web"
 
 printf 'Testing backend...\n'
 (cd "$repo_root/rust/app" && cargo test --quiet)

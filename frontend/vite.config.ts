@@ -241,7 +241,7 @@ export default defineConfig((env) => {
       },
     },
     build: {
-      outDir: path.resolve(__dirname, '../backend/web'),
+      outDir: path.resolve(__dirname, '../runtime/web'),
       reportCompressedSize: false,
       sourcemap: false,
       // Set assets directory to match development environment

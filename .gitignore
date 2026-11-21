@@ -119,7 +119,13 @@ docker-compose.*.local.yml
 backend/my_conf.yaml
 backend/conf.yaml
 backend/database/
-backend/web/
+runtime/web/
+runtime/database/
+runtime/uploads/
+runtime/conf.yaml
+runtime/yin-panel
+runtime/yin-panel.log
+runtime/*.log
 backend/uploads/
 backend/yin-panel
 backend/backup/

@@ -5,8 +5,8 @@
 # keeps the existing `web/`, database, uploads and `conf.yaml`, restarts the
 # service and verifies the running HTTP endpoints.
 #
-# The Go binary is left in `build-output/yin-panel-go` (or can be rebuilt with
-# `cd backend && go build -o ../build-output/yin-panel-go .`) as the rollback.
+# The previous binary is not kept: `git` history holds the Rust build, and the
+# Go tree no longer exists in this repository.
 set -Eeuo pipefail
 
 repo_root="$(git rev-parse --show-toplevel)"
@@ -22,7 +22,7 @@ fi
 export -n SUDO_PASSWORD SUDO_PASSWD 2>/dev/null || true
 
 port="${YIN_PANEL_PORT:-3002}"
-run_dir="${YIN_PANEL_RUNTIME_DIR:-$repo_root/backend}"
+run_dir="${YIN_PANEL_RUNTIME_DIR:-$repo_root/runtime}"
 if [[ "$run_dir" != /* ]]; then
     run_dir="$repo_root/$run_dir"
 fi

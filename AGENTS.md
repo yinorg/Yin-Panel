@@ -18,7 +18,7 @@ For every code-change task, follow this order without asking the user to repeat 
 The source files used for deployment must be exactly the source files approved for the corresponding commit. A successful deployment does not authorize committing only a subset of what was deployed.
 
 - Before deployment, inspect and classify every tracked and untracked change as task-approved, other user work, generated output/cache, secret or machine-local file, or unknown. Do not deploy until the classification is complete.
-- Record a `DEPLOYMENT_MANIFEST` containing every approved tracked and untracked source file, plus an explicit exclusion list and reasons. Generated `backend/web`, binaries, logs, caches, Playwright artifacts, `.env.local`, credentials, and machine-specific files are not commit inputs.
+- Record a `DEPLOYMENT_MANIFEST` containing every approved tracked and untracked source file, plus an explicit exclusion list and reasons. Generated `runtime/web`, binaries, logs, caches, Playwright artifacts, `.env.local`, credentials, and machine-specific files are not commit inputs.
 - Never run `scripts/deploy-local.sh` from a mixed dirty worktree and then commit only selected files. The build would include the uncommitted files that were omitted from the commit.
 - Before committing after user validation, record a `COMMIT_MANIFEST` from the staged files and require `COMMIT_MANIFEST == DEPLOYMENT_MANIFEST`. If the manifests differ, stop and rebuild/redeploy from the corrected scope before committing.
 - If all current relevant changes are explicitly approved, include the complete reviewed set in both manifests. If unrelated or unapproved application changes remain, stop and report the unconfirmed file list; do not deploy until the user confirms the complete scope.
@@ -70,8 +70,8 @@ This section is hand-authored for this repository. Do not run `graphify opencode
 - **Graph before grep — for the right questions.** For architecture, file relationships, or "who calls what", run `graphify query "<question>"` first. Use `graphify path "<A>" "<B>"` for how two things connect and `graphify explain "<concept>"` for a single concept. A query returns a scoped subgraph that is normally far smaller than raw grep or reading files one by one. For one symbol whose file you already know, read the file: a query costs about 1,600 tokens and is the wrong tool for a one-line lookup. The existing rule to search the repository before changing still holds — the graph orders that search, it does not replace it.
 - **Ask in the graph's own vocabulary.** Node labels are English identifiers and a query matches them literally: no stemming, no synonyms, no cross-language matching. Expand a Chinese or otherwise non-literal question into label terms from `GRAPH_REPORT.md` first and query with those; the raw sentence returns nothing useful.
 - **Freshness gate.** The build commit is `built_at_commit` in `graphify-out/graph.json`, and is printed at the top of `GRAPH_REPORT.md` as `Built from commit`. If it no longer matches `git rev-parse HEAD`, run `graphify update .` before querying — AST-only, no API cost, about 6 seconds on this repository. No command compares the two for you, so check it explicitly. A stale graph answering confidently is the main failure mode of this tool. A dirty `graphify-out/` is expected and is never a reason to skip the graph.
-- **Corpus scope: code only.** Persisted `--exclude` patterns in `graphify-out/.graphify_build.json` keep Markdown, PDFs, images and the wallpaper pack out of the scan: `*.md`, `*.pdf`, `*.jpg`, `*.png`, `*.svg`, `*.webp`, `frontend/public/`, `docs/images/`, `backend/internal/biz/theme/wallpaperpack/assets/`. The only non-code files left in scan scope are CI, Helm and Docker config, which stay unindexed without an API key. Do not widen this without asking first: the wallpaper pack alone is 917 JPGs, and a semantic pass over it costs money for no benefit. If `graphify-out/` is ever deleted, rebuild with these same patterns.
-- **Known blind spots — read these files directly.** The AST pass yields file-level nodes but no symbols for definition-only files. It does not model the contents of `backend/internal/global/global.go`, `backend/internal/constant/`, or `backend/internal/web/model/response/ErrorCode.go`, and it does not parse `.css`. Never answer a version, constant, or error-code question from the graph; open the file.
+- **Corpus scope: code only.** Persisted `--exclude` patterns in `graphify-out/.graphify_build.json` keep Markdown, PDFs, images and the wallpaper pack out of the scan: `*.md`, `*.pdf`, `*.jpg`, `*.png`, `*.svg`, `*.webp`, `frontend/public/`, `docs/images/`, `runtime/web/`, and the packaged wallpaper assets. The only non-code files left in scan scope are CI, Helm and Docker config, which stay unindexed without an API key. Do not widen this without asking first: the wallpaper pack alone is 917 JPGs, and a semantic pass over it costs money for no benefit. If `graphify-out/` is ever deleted, rebuild with these same patterns.
+- **Known blind spots — read these files directly.** The AST pass yields file-level nodes but no symbols for definition-only files. It does not parse `.css`, and constants/error codes live in tables rather than single definitions. Never answer a version, constant, or error-code question from the graph; open the file.
 - **Scope.** This graph covers the Core repository only. The E2E repository lives outside it at `YIN_PANEL_E2E_DIR`, and the extension repository is not indexed. Do not use a graph answer to justify a cross-repository claim.
 - **Write back what you learn.** After a graph answer that settles a question, record it with `graphify save-result --question ... --answer ... --nodes ... --outcome useful|dead_end|corrected`. At the start of graph work, run `graphify reflect --if-stale` and read `graphify-out/reflections/LESSONS.md` — preferred sources, known dead ends, prior corrections. This is what makes later sessions cheaper than this one.
 - **Escalate only when needed.** Read `graphify-out/GRAPH_REPORT.md` for broad architecture review, and fall back to source files for exact implementation detail the graph did not surface; state the reason in one line. If `graphify-out/` does not exist, do not treat it as an error: continue with normal source reading and mention that a local graph can be built once from the repository root with `graphify extract . --code-only`.
@@ -168,10 +168,9 @@ A theme invokes them; the Core renders them: `editor.open` (item editor — priv
 - Browser extension repository: `https://github.com/yinorg/yin-panel-extension`
 - E2E project: configure its location with `YIN_PANEL_E2E_DIR`; it is separate from Core.
 - Frontend: `frontend/`
-- Backend: `rust/app/` (the Rust binary). `backend/` is the retired Go oracle and
-  stays only until the removal commit approved in `rust/GOAL_REPLACE_GO.md` T4.4.
-- Frontend production output: `backend/web/` (moves when T4.4 relocates the runtime paths)
-- Local runtime directory: repository `backend/` by default; `YIN_PANEL_RUNTIME_DIR` may explicitly override it
+- Backend: `rust/app/` (the Rust binary). The Go tree has been removed.
+- Frontend production output: `runtime/web/`
+- Local runtime directory: repository `runtime/` by default; `YIN_PANEL_RUNTIME_DIR` may explicitly override it
 - Local binary: `$YIN_PANEL_RUNTIME_DIR/yin-panel`
 - Local HTTP port: `${YIN_PANEL_PORT:-3002}`
 - Current local service is a standalone process, not a Docker container.
@@ -248,7 +247,7 @@ The local update SOP intentionally rebuilds and deploys both artifacts every tim
 
 Local deployment is the default for application code, configuration, and asset changes. After a successful deployment, wait for the user's explicit validation before committing; once validated, commit the reviewed task files locally without asking again. Documentation-only changes that do not affect runtime artifacts do not require a deployment unless the user asks for one.
 
-The Rust service runs from the repository `backend/` directory by default, with that directory as its working directory so `conf.yaml` is found. `YIN_PANEL_RUNTIME_DIR` can explicitly override the target. Never replace its database or uploads with repository copies.
+The Rust service runs from the repository `runtime/` directory by default, with that directory as its working directory so `conf.yaml` is found. `YIN_PANEL_RUNTIME_DIR` can explicitly override the target. Never replace its database or uploads with repository copies.
 
 Run the complete local deployment with:
 
@@ -256,7 +255,7 @@ Run the complete local deployment with:
 ./scripts/deploy-local.sh
 ```
 
-The script requires `backend/conf.yaml` before it stops any running process. It builds the frontend, runs `cargo test`, builds `rust/app` in release mode, then stops only the Yin-Panel listener, replaces the `yin-panel` binary and `web/`, and starts the new binary from the target directory. It does not create backups and never touches database, upload, or configuration files.
+The script requires `runtime/conf.yaml` before it stops any running process. It builds the frontend, runs `cargo test`, builds `rust/app` in release mode, then stops only the Yin-Panel listener, replaces the `yin-panel` binary and `web/`, and starts the new binary from the target directory. It does not create backups and never touches database, upload, or configuration files.
 
 ## Versioning and Tags
 
@@ -273,7 +272,7 @@ Before creating a release tag:
 3. Run `git diff --check`, inspect `git diff`, and confirm old branding and old version strings are gone.
 4. Create the tag only after all checks pass.
 
-The Docker workflow publishes standard version tags such as `0.3.1`. It expects frontend output in `backend/web` and a backend binary in `build-output/yin-panel`. Do not tag before both artifacts are rebuilt.
+The Docker workflow publishes standard version tags such as `0.3.1`. It expects frontend output in `runtime/web` and a backend binary in `build-output/yin-panel`. Do not tag before both artifacts are rebuilt.
 
 The tag name is the contract with CI, so it must have exactly one of these shapes:
 

@@ -61,7 +61,7 @@ rust-anything app replay "$root" --build "sh rust/record/run-rust.sh"
 say "Go/Rust gzip and body parity"
 "$root/rust/bench/pair.sh" up \
     --work "$bench_work" \
-    --source-db "$root/backend/database/database.db" \
+    --source-db "$root/runtime/database/database.db" \
     --go-port 3010 --rust-port 3011
 bench_up=1
 go_token="$(curl -fsS --noproxy '*' -H 'Content-Type: application/json' \

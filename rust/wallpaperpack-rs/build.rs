@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 
 fn main() {
     let manifest = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap());
-    let assets = manifest.join("../../backend/internal/biz/theme/wallpaperpack/assets");
+    let assets = manifest.join("assets");
     println!("cargo:rerun-if-changed={}", assets.display());
 
     let out = PathBuf::from(std::env::var("OUT_DIR").unwrap());
