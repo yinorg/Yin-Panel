@@ -10,6 +10,7 @@ mod monitor;
 mod packages;
 mod repository;
 mod routes;
+mod schema_shared;
 mod site;
 mod units;
 
@@ -99,19 +100,9 @@ fn migrate_db() -> std::process::ExitCode {
 
 async fn serve() {
     report_fallbacks();
-    // The Go build refuses these two configurations; this build serves SQLite
-    // over local storage only. Silently opening a local SQLite file for a MySQL
-    // deployment, or writing uploads to disk for an S3 deployment, would look
-    // like a successful start and lose data.
+    // Local SQLite still refuses to pretend to be a MySQL/S3 deployment: an
+    // empty local file would look like a successful start and lose data.
     let conf = &appcfg::ctx().conf;
-    let drive = conf.base.database_drive.trim().to_ascii_lowercase();
-    if !drive.is_empty() && drive != "sqlite" {
-        eprintln!(
-            "unsupported database drive: {}\nthis build serves sqlite only; move the data with `yin-panel migrate-db`",
-            conf.base.database_drive.trim()
-        );
-        std::process::exit(1);
-    }
     if !conf.rclone.kind.is_empty() && conf.rclone.kind != "local" {
         eprintln!(
             "Core only supports local storage; use the Enterprise image for {:?}",
@@ -121,10 +112,28 @@ async fn serve() {
     }
     // The Go build created and seeded the database at startup; this binary does
     // the same, so an empty directory is a working installation.
-    let database = appcfg::ctx().database_file();
-    if let Err(error) = bootstrap::prepare(&database).await {
-        eprintln!("database startup failed: {error}");
-        std::process::exit(1);
+    match appcfg::ctx().driver() {
+        appcfg::DatabaseDriver::Sqlite => {
+            let database = appcfg::ctx().database_file();
+            if let Err(error) = bootstrap::prepare(&database).await {
+                eprintln!("database startup failed: {error}");
+                std::process::exit(1);
+            }
+        }
+        _ => {
+            let pool = match appcfg::ctx().shared_pool().await {
+                Ok(pool) => pool,
+                Err(error) => {
+                    eprintln!("database startup failed: {error}");
+                    std::process::exit(1);
+                }
+            };
+            let driver = appcfg::ctx().sqlx_driver();
+            if let Err(error) = bootstrap::prepare_shared(pool, driver).await {
+                eprintln!("database startup failed: {error}");
+                std::process::exit(1);
+            }
+        }
     }
     // `global.CacheMonitor.Start()` runs only when the monitor is enabled, and
     // the first collection completes before the listener opens so the first

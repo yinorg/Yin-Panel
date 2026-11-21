@@ -225,10 +225,10 @@ command that proves it).
 | 0 | T0.2 fallback marker | done — `x-yin-unimplemented` only when `YIN_UNIMPLEMENTED_MARKER` is set |
 | 0 | T0.3 inventory probe | done — `rust/check/route-parity.py`, 103 routes, 0 unimplemented |
 | 0 | T0.4 CI wiring | done — `.github/workflows/rust-check.yml` |
-| 1 | T1.1 startup guard | not started |
-| 1 | T1.2 driver bootstrap | not started |
-| 1 | T1.3 three-driver HTTP smoke | not started |
-| 1 | T1.4 config docs | not started |
+| 1 | T1.1 startup guard | done — `main.rs` boots `prepare_shared` for MySQL/PostgreSQL |
+| 1 | T1.2 driver bootstrap | done — `schema_shared.rs` translates DDL, seed runs on all three |
+| 1 | T1.3 three-driver HTTP smoke | done — `rust/check/db-smoke.sh` passes on MySQL 8.4 and PostgreSQL 17 |
+| 1 | T1.4 config docs | done — `rust/CONFIG.md` |
 | 2 | T2.1 sorting | not started |
 | 2 | T2.2 members | not started |
 | 2 | T2.3 space create/rename/copy | not started |

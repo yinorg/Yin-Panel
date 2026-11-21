@@ -9,8 +9,9 @@ never falls back silently to a different backend.
 | --- | --- | --- | --- |
 | `base.http_port` | listens there | listens there | live service on `:3002` |
 | `base.root_url` | used for OAuth redirects and absolute links | parsed; used by the routes that emit absolute URLs | `scripts/verify-upgrade.sh` |
-| `base.database_drive: sqlite` | SQLite | SQLite | `scripts/verify-upgrade.sh` |
-| `base.database_drive: mysql` / `postgres` | serves it | **refused**: `unsupported database drive: mysql` | startup check in `src/main.rs`; `rust/db-tool` can still migrate *to* those databases |
+| `base.database_drive: sqlite` | SQLite | SQLite, upgraded in place | `scripts/verify-upgrade.sh` |
+| `base.database_drive: mysql` / `postgres` | serves it | serves it: creates and seeds an empty database, then runs on the shared pool | `rust/check/db-smoke.sh` against MySQL 8.4 and PostgreSQL 17 |
+| `mysql.*` / `postgres.*` | connection settings | host, port, username, password, db name; `postgres.ssl_mode` becomes `sslmode` | `appcfg.rs::mysql_url` / `postgres_url` |
 | `sqlite.file_path` | opens it | opens it | pair/upgrade runs |
 | `sqlite.read_pool_size` | `>= 0` opens a read-only pool of that size, negative disables the split | **ignored**; one pool with four connections | see below |
 | `base.enable_static_server` | serves `./web` | serves `./web` | `src/site.rs` |
