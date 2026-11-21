@@ -1,7 +1,7 @@
 go_routes=103
 rust_routes=87
 wire_routes=1
-sqlite_pool_handlers=23
-shared_pool_handlers=51
+sqlite_pool_handlers=21
+shared_pool_handlers=53
 last_insert_rowid=3
 sqlite_pool_params=15

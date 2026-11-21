@@ -3307,6 +3307,81 @@ pub async fn instance_pending(
     row.map(|row| text(&row, "pending_revision_id")).transpose()
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WebWallpaper {
+    pub html: Vec<u8>,
+    pub poster: Vec<u8>,
+    pub poster_type: String,
+}
+
+pub async fn web_wallpaper_exists(
+    pool: &AnyPool,
+    driver: Driver,
+    id: &str,
+) -> Result<bool, sqlx::Error> {
+    let sql = query(
+        driver,
+        "SELECT 1 AS found FROM web_wallpaper_record WHERE id = ?",
+    );
+    Ok(sqlx::query(&sql)
+        .bind(id)
+        .fetch_optional(pool)
+        .await?
+        .is_some())
+}
+
+pub async fn insert_web_wallpaper(
+    pool: &AnyPool,
+    driver: Driver,
+    id: &str,
+    owner_id: i64,
+    html: &[u8],
+    poster: &[u8],
+    poster_type: &str,
+    now: &str,
+) -> Result<(), sqlx::Error> {
+    let timestamp = timestamp_bind(driver);
+    let sql = query(
+        driver,
+        &format!(
+            "INSERT INTO web_wallpaper_record (id, owner_id, html, poster, poster_type, created_at) VALUES (?, ?, ?, ?, ?, {timestamp})"
+        ),
+    );
+    sqlx::query(&sql)
+        .bind(id)
+        .bind(owner_id)
+        .bind(html)
+        .bind(poster)
+        .bind(poster_type)
+        .bind(now)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+pub async fn web_wallpaper(
+    pool: &AnyPool,
+    driver: Driver,
+    id: &str,
+) -> Result<Option<WebWallpaper>, sqlx::Error> {
+    let text_type = if driver == Driver::MySql { "CHAR" } else { "TEXT" };
+    let sql = query(
+        driver,
+        &format!(
+            "SELECT html, poster, CAST(poster_type AS {text_type}) AS poster_type FROM web_wallpaper_record WHERE id = ?"
+        ),
+    );
+    let row = sqlx::query(&sql).bind(id).fetch_optional(pool).await?;
+    row.map(|row| {
+        Ok(WebWallpaper {
+            html: row.try_get("html")?,
+            poster: row.try_get("poster")?,
+            poster_type: text(&row, "poster_type")?,
+        })
+    })
+    .transpose()
+}
+
 pub async fn groups_for_space(
     pool: &AnyPool,
     driver: Driver,
@@ -3689,8 +3764,8 @@ mod tests {
         install_package, instance_last_good, instance_pending, latest_revision,
         package_id_for_revision, package_removed, remove_theme_package, revision_manifest,
         revision_package_id, rollback_theme, save_theme_preference,
-        save_trusted_policy, select_user_theme, set_default_theme, theme_admin_state,
-        trusted_enabled,
+        insert_web_wallpaper, save_trusted_policy, select_user_theme, set_default_theme,
+        theme_admin_state, trusted_enabled, web_wallpaper, web_wallpaper_exists,
         update_user_admin, update_user_password, update_user_profile, user_theme_preference,
         withdraw_trusted_grants,
     };
@@ -3828,6 +3903,7 @@ mod tests {
         verify_user_admin_writes(&pool, driver).await;
         verify_theme_writes(&pool, driver).await;
         verify_theme_package_writes(&pool, driver).await;
+        verify_wallpaper_writes(&pool, driver).await;
         pool.close().await;
     }
 
@@ -4228,6 +4304,82 @@ mod tests {
             .execute(pool)
             .await
             .expect("drop item list fixture");
+    }
+
+    async fn verify_wallpaper_writes(pool: &sqlx::AnyPool, driver: Driver) {
+        let timestamp_type = match driver {
+            Driver::MySql => "DATETIME(6)",
+            Driver::Sqlite => "TEXT",
+            Driver::Postgres => "TIMESTAMPTZ",
+        };
+        let blob_type = match driver {
+            Driver::MySql => "LONGBLOB",
+            Driver::Sqlite => "BLOB",
+            Driver::Postgres => "BYTEA",
+        };
+        sqlx::query(&format!(
+            "CREATE TABLE web_wallpaper_record (id VARCHAR(191) PRIMARY KEY, owner_id BIGINT NOT NULL, html {blob_type} NOT NULL, poster {blob_type} NOT NULL, poster_type VARCHAR(32) NOT NULL, created_at {timestamp_type})"
+        ))
+        .execute(pool)
+        .await
+        .expect("create web wallpaper fixture");
+
+        let html = b"<!doctype html><html><body>wall</body></html>".to_vec();
+        let poster = b"\x89PNG\r\n\x1a\n".to_vec();
+        assert!(
+            !web_wallpaper_exists(pool, driver, "wall-1")
+                .await
+                .expect("missing wallpaper")
+        );
+        insert_web_wallpaper(
+            pool,
+            driver,
+            "wall-1",
+            7,
+            &html,
+            &poster,
+            "image/png",
+            "2025-07-01 00:00:00",
+        )
+        .await
+        .expect("insert web wallpaper");
+        assert!(
+            web_wallpaper_exists(pool, driver, "wall-1")
+                .await
+                .expect("wallpaper exists")
+        );
+        let record = web_wallpaper(pool, driver, "wall-1")
+            .await
+            .expect("read web wallpaper")
+            .expect("wallpaper row");
+        assert_eq!(record.html, html);
+        assert_eq!(record.poster, poster);
+        assert_eq!(record.poster_type, "image/png");
+        assert_eq!(
+            web_wallpaper(pool, driver, "missing")
+                .await
+                .expect("missing row"),
+            None
+        );
+
+        // The id is the content hash, so a second upload is a no-op.
+        insert_web_wallpaper(
+            pool,
+            driver,
+            "wall-1",
+            7,
+            &html,
+            &poster,
+            "image/png",
+            "2025-07-01 00:00:00",
+        )
+        .await
+        .expect_err("duplicate id is rejected by the primary key");
+
+        sqlx::query("DROP TABLE web_wallpaper_record")
+            .execute(pool)
+            .await
+            .expect("drop web wallpaper fixture");
     }
 
     async fn verify_theme_package_writes(pool: &sqlx::AnyPool, driver: Driver) {

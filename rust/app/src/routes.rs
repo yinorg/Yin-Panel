@@ -4715,19 +4715,17 @@ async fn web_wallpaper_asset(
     Path((id, name)): Path<(String, String)>,
 ) -> Response {
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool,
         Err(error) => return envelope::error(&error),
     };
-    let row: Option<(Vec<u8>, Vec<u8>, String)> =
-        sqlx::query_as("SELECT html, poster, poster_type FROM web_wallpaper_record WHERE id = ?")
-            .bind(&id)
-            .fetch_optional(pool)
-            .await
-            .unwrap_or(None);
-    let Some((html, poster, poster_type)) = row else {
+    let row = crate::repository::web_wallpaper(pool, ctx.sqlx_driver(), &id)
+        .await
+        .unwrap_or(None);
+    let Some(record) = row else {
         return envelope::empty_not_found();
     };
+    let (html, poster, poster_type) = (record.html, record.poster, record.poster_type);
     let (media_type, content) = if name == "index.html" {
         ("text/html".to_string(), html)
     } else {
@@ -6623,31 +6621,28 @@ async fn upload_web_wallpaper(headers: HeaderMap, request: Request) -> Response 
         .map(|byte| format!("{byte:02x}"))
         .collect();
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool,
         Err(error) => return envelope::error(&error),
     };
-    let exists: Option<(i64,)> = sqlx::query_as("SELECT 1 FROM web_wallpaper_record WHERE id = ?")
-        .bind(&id)
-        .fetch_optional(pool)
+    let exists = crate::repository::web_wallpaper_exists(pool, ctx.sqlx_driver(), &id)
         .await
-        .unwrap_or(None);
-    if exists.is_none() {
-        if sqlx::query(
-            "INSERT INTO web_wallpaper_record (id, owner_id, html, poster, poster_type, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+        .unwrap_or(false);
+    if !exists
+        && crate::repository::insert_web_wallpaper(
+            pool,
+            ctx.sqlx_driver(),
+            &id,
+            user.id,
+            &html,
+            &poster,
+            &poster_type,
+            &now_like_go(),
         )
-        .bind(&id)
-        .bind(user.id)
-        .bind(&html)
-        .bind(&poster)
-        .bind(&poster_type)
-        .bind(now_like_go())
-        .execute(pool)
         .await
         .is_err()
-        {
-            return envelope::database_error();
-        }
+    {
+        return envelope::database_error();
     }
     let poster_name = match poster_type.as_str() {
         "image/jpeg" => "poster.jpg",

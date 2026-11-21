@@ -238,7 +238,7 @@ command that proves it).
 | 2 | T2.7 configs | done — `save_module_config`, `save_user_config` on the shared pool |
 | 2 | T2.8 theme reads | done — preference, admin revisions/packages, audit and trusted policy on the shared pool |
 | 2 | T2.9 theme writes | done — install, remove, default, trial, confirm, rollback on the shared pool |
-| 2 | T2.10 wallpaper | not started |
+| 2 | T2.10 wallpaper | done — web wallpaper upload/asset on the shared pool; library assets are in-memory |
 | 2 | T2.11 icons/favicon | not started |
 | 3 | T3.1–T3.3 route parity | not started |
 | 4 | T4.1–T4.5 remove Go | not started |
