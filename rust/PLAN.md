@@ -1,5 +1,10 @@
 # Execution plan to a pure-Rust Core backend
 
+> Current state: B0–B2 are done and every Core handler runs on the Rust shared
+> pool. Recording coverage is green (`rust/check/coverage-report.py` reports 0
+> missing pairs) and `rust/GOAL_REPLACE_GO.md` tracks Phase 4 (removing the Go
+> build) and Phase 5 (acceptance).
+
 Definition of done, in order. Each batch must end with `diff`/`gate` green for its
 units, `app replay` green, and the run committed. A batch that cannot reach those
 three does not close.

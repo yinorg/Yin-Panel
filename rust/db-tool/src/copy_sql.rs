@@ -214,10 +214,22 @@ pub fn render(table: &Table, dialect: Dialect) -> String {
             });
             continue;
         }
+        // MySQL cannot index a TEXT column without a key length, so a text
+        // column that participates in the primary key becomes a bounded varchar.
+        let column_type = if dialect == Dialect::MySql
+            && column.kind == Kind::Text
+            && column.length.is_none()
+            && (column.default.is_some()
+                || table.primary_key.iter().any(|name| name == &column.name))
+        {
+            "VARCHAR(191)".to_string()
+        } else {
+            type_for(column, dialect)
+        };
         let mut definition = format!(
             "{} {}",
             dialect.quote(&column.name),
-            type_for(column, dialect)
+            column_type
         );
         if column.not_null {
             definition.push_str(" NOT NULL");

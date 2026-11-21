@@ -245,11 +245,11 @@ command that proves it).
 | 4 | T4.2 CI builds Rust | done — `ci-docker.yml`, `cache-warm.yml`, `visual-regression.yml` |
 | 4 | T4.3 Docker runtime | done — glibc base + `curl` healthcheck, binary path unchanged |
 | 4 | T4.4 delete `backend/` | blocked — needs explicit user approval and the web/lang/conf paths moved |
-| 4 | T4.5 docs | pending |
+| 4 | T4.5 docs | done — AGENTS.md, rust/README.md, rust/PLAN.md, frontend/THEME_SYSTEM.md describe the Rust runtime |
 | 5 | T5.1 three-driver HTTP acceptance | done — `rust/check/db-smoke.sh` passes on SQLite, MySQL 8.4 and PostgreSQL 17 |
 | 5 | T5.1 upgrade verification | done — `scripts/verify-upgrade.sh 3040`: Go→Rust→Go, 24 tables/43 rows/1 upload preserved |
-| 5 | T5.1 migrate-db verification | pending — needs a real SQLite→MySQL/PostgreSQL copy run |
-| 5 | T5.2 six-condition sign-off | pending — blocked by T4.4 (backend deletion) and docs |
+| 5 | T5.1 migrate-db verification | done — `rust/check/migrate-db-verify.sh`: 24 tables / 839 rows copied and compared, login+spaces on both copies |
+| 5 | T5.2 six-condition sign-off | pending — only T4.4 (backend deletion, needs approval) remains |
 
 Already landed before this plan (kept for context): shared `Any` layer, auth,
 space list/members/groups/items reads, search-config/public/wallpaper, admin and

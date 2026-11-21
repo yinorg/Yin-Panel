@@ -168,8 +168,9 @@ A theme invokes them; the Core renders them: `editor.open` (item editor — priv
 - Browser extension repository: `https://github.com/yinorg/yin-panel-extension`
 - E2E project: configure its location with `YIN_PANEL_E2E_DIR`; it is separate from Core.
 - Frontend: `frontend/`
-- Backend: `backend/`
-- Frontend production output: `backend/web/`
+- Backend: `rust/app/` (the Rust binary). `backend/` is the retired Go oracle and
+  stays only until the removal commit approved in `rust/GOAL_REPLACE_GO.md` T4.4.
+- Frontend production output: `backend/web/` (moves when T4.4 relocates the runtime paths)
 - Local runtime directory: repository `backend/` by default; `YIN_PANEL_RUNTIME_DIR` may explicitly override it
 - Local binary: `$YIN_PANEL_RUNTIME_DIR/yin-panel`
 - Local HTTP port: `${YIN_PANEL_PORT:-3002}`
@@ -177,7 +178,7 @@ A theme invokes them; the Core renders them: `editor.open` (item editor — priv
 
 ## Test Placement and Ownership
 
-- Keep unit and subsystem integration tests with the code they exercise: backend tests belong under `backend/`, and frontend tests belong under `frontend/` using the local framework conventions.
+- Keep unit and subsystem integration tests with the code they exercise: backend tests belong under `rust/app/` (and `rust/db-tool/`), and frontend tests belong under `frontend/` using the local framework conventions.
 - Put cross-repository acceptance tests and real-browser workflows in the separate E2E repository at `YIN_PANEL_E2E_DIR`, under its `tests/` directory.
 - Scenarios that load the browser extension, exercise `chrome_url_overrides`, or verify Core plus extension behavior belong in E2E, even when the reported defect is in extension code.
 - Do not copy Core or extension source into the E2E repository. Load the tested extension through `YIN_PANEL_EXTENSION_DIR` and record the tested source commit in CI or the test run context.
@@ -247,7 +248,7 @@ The local update SOP intentionally rebuilds and deploys both artifacts every tim
 
 Local deployment is the default for application code, configuration, and asset changes. After a successful deployment, wait for the user's explicit validation before committing; once validated, commit the reviewed task files locally without asking again. Documentation-only changes that do not affect runtime artifacts do not require a deployment unless the user asks for one.
 
-The service runs from the repository `backend/` directory by default, with that directory as its working directory so `conf.yaml` is found. `YIN_PANEL_RUNTIME_DIR` can explicitly override the target. Never replace its database or uploads with repository copies.
+The Rust service runs from the repository `backend/` directory by default, with that directory as its working directory so `conf.yaml` is found. `YIN_PANEL_RUNTIME_DIR` can explicitly override the target. Never replace its database or uploads with repository copies.
 
 Run the complete local deployment with:
 
@@ -255,15 +256,15 @@ Run the complete local deployment with:
 ./scripts/deploy-local.sh
 ```
 
-The script requires `backend/conf.yaml` before it stops any running process. After all builds and tests pass, it stops only the Yin-Panel listener, uses `sudo` to force-remove the old binary and `web/`, then starts the new binary from the target directory. It does not create backups and never touches database, upload, or configuration files.
+The script requires `backend/conf.yaml` before it stops any running process. It builds the frontend, runs `cargo test`, builds `rust/app` in release mode, then stops only the Yin-Panel listener, replaces the `yin-panel` binary and `web/`, and starts the new binary from the target directory. It does not create backups and never touches database, upload, or configuration files.
 
 ## Versioning and Tags
 
 The release version is the git tag, never a source edit. CI injects it with
 `-ldflags "-X .../global.VERSION=${VERSION}"` from `github.ref_name`, and
-`scripts/deploy-local.sh` injects the same value locally from
-`git describe --tags`. `backend/internal/global/global.go` keeps its source
-default as a fallback and is not edited for a release.
+`scripts/deploy-local.sh` exports the same values as
+`YIN_PANEL_VERSION`, `YIN_PANEL_COMMIT` and `YIN_PANEL_BUILD_TIME` for the Rust
+binary at start; no source file is edited for a release.
 
 Before creating a release tag:
 
@@ -303,7 +304,7 @@ For combined or backend changes, run:
 
 ```bash
 repo_root="$(git rev-parse --show-toplevel)"
-cd "$repo_root/backend" && go test ./...
+cd "$repo_root/rust/app" && cargo test
 cd "$repo_root/frontend" && npm run build-only
 cd "$repo_root" && git diff --check
 ```

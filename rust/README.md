@@ -1,17 +1,17 @@
 # Rust port of the Go backend
 
-The backend is being rewritten in Rust with
-[rust-anything](https://github.com/erkamyaman/rust-anything), one verified unit
-at a time. The Go backend stays the reference implementation and answers every
-route the Rust front door has not taken over yet.
+The Core backend now runs on Rust: every registered route is served by the
+Rust binary (`rust/app`), the shared repository layer covers SQLite, MySQL and
+PostgreSQL, and recorded replay is green. The Go build in `backend/` remains
+only as the recording/rollback oracle until the approved removal commit.
 
 Read `DECISIONS.md` first, then `MAP.md` (the queue) and `HANDOFF.md` (where the
 last session stopped).
 
 ## Requirements
 
-- Rust 1.97+ (`rustup`), Go (the version in `backend/go.mod`), and
-  `cargo install rust-anything`.
+- Rust 1.97+ (`rustup`), `cargo install rust-anything`, and Go only while
+  re-recording the oracle.
 - crates.io reachable, or a mirror in `~/.cargo/config.toml` (ADR-008).
 
 ## The loop
