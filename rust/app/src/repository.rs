@@ -2531,17 +2531,6 @@ pub async fn save_theme_preference(
     Ok(())
 }
 
-pub async fn save_theme_mode(
-    pool: &AnyPool,
-    driver: Driver,
-    user_id: i64,
-    mode: &str,
-    theme_mode: &str,
-    now: &str,
-) -> Result<(), sqlx::Error> {
-    save_theme_preference(pool, driver, user_id, mode, theme_mode, now).await
-}
-
 pub async fn theme_admin_state(
     pool: &AnyPool,
     driver: Driver,
@@ -2893,13 +2882,6 @@ fn removed_literal(driver: Driver) -> &'static str {
     match driver {
         Driver::Postgres => "false",
         _ => "0",
-    }
-}
-
-fn removed_condition(driver: Driver) -> &'static str {
-    match driver {
-        Driver::Postgres => "NOT removed",
-        _ => "removed = 0",
     }
 }
 
@@ -3382,6 +3364,221 @@ pub async fn web_wallpaper(
     .transpose()
 }
 
+pub async fn add_oidc_group(
+    pool: &AnyPool,
+    driver: Driver,
+    space_id: i64,
+    provider: &str,
+    group_name: &str,
+    role: &str,
+    now: &str,
+) -> Result<i64, sqlx::Error> {
+    let timestamp = timestamp_bind(driver);
+    let sql = format!(
+        "INSERT INTO space_o_id_c_group (created_at, updated_at, space_id, provider, group_name, role) VALUES ({timestamp}, {timestamp}, ?, ?, ?, ?)"
+    );
+    let mut tx = pool.begin().await?;
+    let id = insert_returning_id!(driver, &sql, [now, now, space_id, provider, group_name, role], &mut *tx);
+    tx.commit().await?;
+    Ok(id)
+}
+
+pub async fn delete_oidc_group(
+    pool: &AnyPool,
+    driver: Driver,
+    space_id: i64,
+    rule_id: i64,
+) -> Result<(), sqlx::Error> {
+    let sql = query(
+        driver,
+        "DELETE FROM space_o_id_c_group WHERE id = ? AND space_id = ?",
+    );
+    sqlx::query(&sql)
+        .bind(rule_id)
+        .bind(space_id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+/// `SpaceRouter.CreateItemWithIcon`: the optional icon file row first, then the
+/// item, in one transaction.
+#[allow(clippy::too_many_arguments)]
+pub async fn create_item_with_icon(
+    pool: &AnyPool,
+    driver: Driver,
+    space_id: i64,
+    user_id: i64,
+    icon_json: &str,
+    title: &str,
+    url: &str,
+    lan_url: &str,
+    mobile_url: &str,
+    description: &str,
+    open_method: i64,
+    sort: i64,
+    group_id: i64,
+    file_name: Option<&str>,
+    now: &str,
+) -> Result<i64, sqlx::Error> {
+    let timestamp = timestamp_bind(driver);
+    let count_file = query(
+        driver,
+        "SELECT COUNT(*) AS total FROM file WHERE user_id = ? AND file_name = ?",
+    );
+    let insert_file = query(
+        driver,
+        &format!(
+            "INSERT INTO file (created_at, updated_at, user_id, file_name) VALUES ({timestamp}, {timestamp}, ?, ?)"
+        ),
+    );
+    let insert_item = format!(
+        "INSERT INTO item_icon (created_at, updated_at, icon_json, title, url, lan_url, mobile_url, description, open_method, sort, item_icon_group_id, user_id, space_id) VALUES ({timestamp}, {timestamp}, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    );
+    let mut tx = pool.begin().await?;
+    if let Some(name) = file_name {
+        use sqlx::Row;
+        let row = sqlx::query(&count_file)
+            .bind(user_id)
+            .bind(name)
+            .fetch_one(&mut *tx)
+            .await?;
+        let total: i64 = row.try_get("total")?;
+        if total == 0 {
+            sqlx::query(&insert_file)
+                .bind(now)
+                .bind(now)
+                .bind(user_id)
+                .bind(name)
+                .execute(&mut *tx)
+                .await?;
+        }
+    }
+    let id = insert_returning_id!(
+        driver,
+        &insert_item,
+        [
+            now,
+            now,
+            icon_json,
+            title,
+            url,
+            lan_url,
+            mobile_url,
+            description,
+            open_method,
+            sort,
+            group_id,
+            user_id,
+            space_id
+        ],
+        &mut *tx
+    );
+    tx.commit().await?;
+    Ok(id)
+}
+
+/// One group inserted inside a caller-owned transaction, returning its id.
+#[allow(clippy::too_many_arguments)]
+pub async fn insert_group_in_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Any>,
+    driver: Driver,
+    space_id: i64,
+    user_id: i64,
+    icon: &str,
+    title: &str,
+    sort: i64,
+    parent_id: Option<i64>,
+    now: &str,
+) -> Result<i64, sqlx::Error> {
+    let timestamp = timestamp_bind(driver);
+    let sql = format!(
+        "INSERT INTO item_icon_group (created_at, updated_at, icon, title, description, sort, user_id, space_id, parent_id) VALUES ({timestamp}, {timestamp}, ?, ?, '', ?, ?, ?, ?)"
+    );
+    let id = insert_returning_id!(
+        driver,
+        &sql,
+        [now, now, icon, title, sort, user_id, space_id, parent_id],
+        &mut **tx
+    );
+    Ok(id)
+}
+
+/// Idempotent file row inside a caller-owned transaction.
+pub async fn insert_file_in_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Any>,
+    driver: Driver,
+    user_id: i64,
+    file_name: &str,
+    now: &str,
+) -> Result<(), sqlx::Error> {
+    use sqlx::Row;
+    let count = query(
+        driver,
+        "SELECT COUNT(*) AS total FROM file WHERE user_id = ? AND file_name = ?",
+    );
+    let row = sqlx::query(&count)
+        .bind(user_id)
+        .bind(file_name)
+        .fetch_one(&mut **tx)
+        .await?;
+    let total: i64 = row.try_get("total")?;
+    if total > 0 {
+        return Ok(());
+    }
+    let timestamp = timestamp_bind(driver);
+    let insert = query(
+        driver,
+        &format!(
+            "INSERT INTO file (created_at, updated_at, user_id, file_name) VALUES ({timestamp}, {timestamp}, ?, ?)"
+        ),
+    );
+    sqlx::query(&insert)
+        .bind(now)
+        .bind(now)
+        .bind(user_id)
+        .bind(file_name)
+        .execute(&mut **tx)
+        .await?;
+    Ok(())
+}
+
+/// Bookmark import stores every link with `openMethod = 2` and empty URLs.
+#[allow(clippy::too_many_arguments)]
+pub async fn insert_imported_item_in_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Any>,
+    driver: Driver,
+    icon_json: &str,
+    title: &str,
+    url: &str,
+    sort: i64,
+    group_id: i64,
+    owner_id: i64,
+    space_id: i64,
+    now: &str,
+) -> Result<(), sqlx::Error> {
+    let timestamp = timestamp_bind(driver);
+    let sql = query(
+        driver,
+        &format!(
+            "INSERT INTO item_icon (created_at, updated_at, icon_json, title, url, lan_url, mobile_url, description, open_method, sort, item_icon_group_id, user_id, space_id) VALUES ({timestamp}, {timestamp}, ?, ?, ?, '', '', '', 2, ?, ?, ?, ?)"
+        ),
+    );
+    sqlx::query(&sql)
+        .bind(now)
+        .bind(now)
+        .bind(icon_json)
+        .bind(title)
+        .bind(url)
+        .bind(sort)
+        .bind(group_id)
+        .bind(owner_id)
+        .bind(space_id)
+        .execute(&mut **tx)
+        .await?;
+    Ok(())
+}
+
 pub async fn groups_for_space(
     pool: &AnyPool,
     driver: Driver,
@@ -3743,8 +3940,10 @@ pub async fn user_access(
 #[cfg(test)]
 mod tests {
     use super::{
-        activation_revision, admin_user_view, audit_entries, begin_theme_trial, bookmark_tree,
+        activation_revision, add_oidc_group, admin_user_view, audit_entries, begin_theme_trial,
+        bookmark_tree,
         can_access_space, can_edit_space, can_manage_space, confirm_theme_trial,
+        create_item_with_icon, delete_oidc_group,
         copy_space, clear_space, create_group, create_item, create_paired_space, create_user,
         delete_group_tree,
         delete_file_row, delete_item, delete_paired_space, delete_user, file_list,
@@ -3904,6 +4103,7 @@ mod tests {
         verify_theme_writes(&pool, driver).await;
         verify_theme_package_writes(&pool, driver).await;
         verify_wallpaper_writes(&pool, driver).await;
+        verify_icon_writes(&pool, driver).await;
         pool.close().await;
     }
 
@@ -4304,6 +4504,198 @@ mod tests {
             .execute(pool)
             .await
             .expect("drop item list fixture");
+    }
+
+    async fn verify_icon_writes(pool: &sqlx::AnyPool, driver: Driver) {
+        let timestamp_type = match driver {
+            Driver::MySql => "DATETIME(6)",
+            Driver::Sqlite => "TEXT",
+            Driver::Postgres => "TIMESTAMPTZ",
+        };
+        let id_type = match driver {
+            Driver::MySql => "BIGINT AUTO_INCREMENT PRIMARY KEY",
+            Driver::Sqlite => "INTEGER PRIMARY KEY AUTOINCREMENT",
+            Driver::Postgres => "BIGSERIAL PRIMARY KEY",
+        };
+        sqlx::query(&format!(
+            "CREATE TABLE space_o_id_c_group (id {id_type}, created_at {timestamp_type} NOT NULL, updated_at {timestamp_type} NOT NULL, space_id BIGINT NOT NULL, provider VARCHAR(50) NOT NULL, group_name VARCHAR(100) NOT NULL, role VARCHAR(32) NOT NULL)"
+        ))
+        .execute(pool)
+        .await
+        .expect("create oidc write fixture");
+        sqlx::query(&format!(
+            "CREATE TABLE file (id {id_type}, created_at {timestamp_type} NOT NULL, updated_at {timestamp_type} NOT NULL, user_id BIGINT NOT NULL, file_name VARCHAR(191) NOT NULL)"
+        ))
+        .execute(pool)
+        .await
+        .expect("create icon file fixture");
+        sqlx::query(&format!(
+            "CREATE TABLE item_icon (id {id_type}, created_at {timestamp_type} NOT NULL, updated_at {timestamp_type} NOT NULL, icon_json TEXT NOT NULL, title VARCHAR(50) NOT NULL, url TEXT NOT NULL, lan_url TEXT NOT NULL, mobile_url TEXT NOT NULL, description TEXT NOT NULL, open_method BIGINT NOT NULL, sort BIGINT NOT NULL, item_icon_group_id BIGINT NOT NULL, user_id BIGINT NOT NULL, space_id BIGINT NOT NULL)"
+        ))
+        .execute(pool)
+        .await
+        .expect("create icon item fixture");
+        sqlx::query(&format!(
+            "CREATE TABLE item_icon_group (id {id_type}, created_at {timestamp_type} NOT NULL, updated_at {timestamp_type} NOT NULL, icon VARCHAR(100) NOT NULL, title VARCHAR(100) NOT NULL, description TEXT NOT NULL, sort BIGINT NOT NULL, user_id BIGINT NOT NULL, space_id BIGINT NOT NULL, parent_id BIGINT)"
+        ))
+        .execute(pool)
+        .await
+        .expect("create icon group fixture");
+
+        let rule = add_oidc_group(
+            pool,
+            driver,
+            78,
+            "github",
+            "team-admins",
+            "editor",
+            "2025-08-01 00:00:00",
+        )
+        .await
+        .expect("add oidc group");
+        assert!(rule > 0);
+        let rows = oidc_groups(pool, driver, 78)
+            .await
+            .expect("read oidc group");
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].id, rule);
+        delete_oidc_group(pool, driver, 78, rule)
+            .await
+            .expect("delete oidc group");
+        assert!(oidc_groups(pool, driver, 78)
+            .await
+            .expect("empty oidc groups")
+            .is_empty());
+
+        let item = create_item_with_icon(
+            pool,
+            driver,
+            78,
+            7,
+            r#"{"itemType":2,"fileName":"icon.png"}"#,
+            "Link",
+            "https://example.test",
+            "",
+            "",
+            "note",
+            2,
+            3,
+            31,
+            Some("icon.png"),
+            "2025-08-02 00:00:00",
+        )
+        .await
+        .expect("create item with icon");
+        assert!(item > 0);
+        let read = item_by_id(pool, driver, 78, item)
+            .await
+            .expect("read item with icon")
+            .expect("item exists");
+        assert_eq!(read.title, "Link");
+        assert_eq!(read.icon_json, r#"{"itemType":2,"fileName":"icon.png"}"#);
+        let files: i64 = sqlx::query(&query(
+            driver,
+            "SELECT COUNT(*) AS total FROM file WHERE user_id = ?",
+        ))
+        .bind(7_i64)
+        .fetch_one(pool)
+        .await
+        .expect("count file rows")
+        .try_get("total")
+        .expect("total");
+        assert_eq!(files, 1, "one row per content hash");
+        // A second item reusing the icon must not duplicate the file row.
+        let second = create_item_with_icon(
+            pool,
+            driver,
+            78,
+            7,
+            "{}",
+            "Second",
+            "https://example.test/two",
+            "",
+            "",
+            "",
+            2,
+            4,
+            31,
+            Some("icon.png"),
+            "2025-08-03 00:00:00",
+        )
+        .await
+        .expect("create second item with the same icon");
+        assert!(second > item);
+        let files: i64 = sqlx::query(&query(
+            driver,
+            "SELECT COUNT(*) AS total FROM file WHERE user_id = ?",
+        ))
+        .bind(7_i64)
+        .fetch_one(pool)
+        .await
+        .expect("count file rows after second item")
+        .try_get("total")
+        .expect("total");
+        assert_eq!(files, 1);
+
+        let mut tx = pool.begin().await.expect("begin import transaction");
+        let group = crate::repository::insert_group_in_tx(
+            &mut tx,
+            driver,
+            78,
+            7,
+            "folder",
+            "Bookmarks",
+            0,
+            None,
+            "2025-08-04 00:00:00",
+        )
+        .await
+        .expect("insert imported group");
+        assert!(group > 0);
+        crate::repository::insert_imported_item_in_tx(
+            &mut tx,
+            driver,
+            "{}",
+            "Imported",
+            "https://imported.test",
+            0,
+            group,
+            7,
+            78,
+            "2025-08-04 00:00:00",
+        )
+        .await
+        .expect("insert imported item");
+        crate::repository::insert_file_in_tx(
+            &mut tx,
+            driver,
+            7,
+            "icon.png",
+            "2025-08-04 00:00:00",
+        )
+        .await
+        .expect("insert existing file row is a no-op");
+        tx.commit().await.expect("commit import transaction");
+        assert_eq!(
+            group_by_id(pool, driver, 78, group)
+                .await
+                .expect("read imported group")
+                .expect("group exists")
+                .title,
+            "Bookmarks"
+        );
+        let imported = items_for_space(pool, driver, 78, Some(group), 0, 0)
+            .await
+            .expect("read imported items");
+        assert_eq!(imported.len(), 1);
+        assert_eq!(imported[0].title, "Imported");
+
+        for table in ["item_icon_group", "item_icon", "file", "space_o_id_c_group"] {
+            sqlx::query(&format!("DROP TABLE {table}"))
+                .execute(pool)
+                .await
+                .expect("drop icon fixture");
+        }
     }
 
     async fn verify_wallpaper_writes(pool: &sqlx::AnyPool, driver: Driver) {

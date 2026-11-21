@@ -513,29 +513,6 @@ struct SpaceItem {
     can_edit: bool,
 }
 
-/// `canAccessSpace`: the owner or any member, for the SQLite write paths not
-/// yet migrated. Read routes use `repository::can_access_space`.
-async fn can_access(pool: &sqlx::SqlitePool, user_id: i64, space_id: i64) -> bool {
-    let owner: Option<(i64,)> = sqlx::query_as(r#"SELECT owner_user_id FROM "space" WHERE id = ?"#)
-        .bind(space_id)
-        .fetch_optional(pool)
-        .await
-        .unwrap_or(None);
-    match owner {
-        Some((owner_id,)) if owner_id == user_id => true,
-        Some(_) => sqlx::query_as::<_, (i64,)>(
-            r#"SELECT id FROM space_member WHERE space_id = ? AND user_id = ? LIMIT 1"#,
-        )
-        .bind(space_id)
-        .bind(user_id)
-        .fetch_optional(pool)
-        .await
-        .unwrap_or(None)
-        .is_some(),
-        None => false,
-    }
-}
-
 async fn guard_shared(headers: &HeaderMap, space_id: i64) -> Result<sqlx::AnyPool, Response> {
     let user = match auth::user(headers).await {
         Ok(user) => user,
@@ -1933,36 +1910,6 @@ fn theme_wallpaper_entry(value: &str) -> bool {
     valid(package) && valid(entry)
 }
 
-/// `spaceRole`: `admin` for the owner, otherwise the member row's role.
-async fn space_role(pool: &sqlx::SqlitePool, user_id: i64, space_id: i64) -> String {
-    let owner: Option<(i64,)> = sqlx::query_as(r#"SELECT owner_user_id FROM "space" WHERE id = ?"#)
-        .bind(space_id)
-        .fetch_optional(pool)
-        .await
-        .unwrap_or(None);
-    match owner {
-        Some((owner_id,)) if owner_id == user_id => "admin".to_string(),
-        Some(_) => sqlx::query_as::<_, (String,)>(
-            "SELECT role FROM space_member WHERE space_id = ? AND user_id = ? LIMIT 1",
-        )
-        .bind(space_id)
-        .bind(user_id)
-        .fetch_optional(pool)
-        .await
-        .unwrap_or(None)
-        .map(|value| value.0)
-        .unwrap_or_default(),
-        None => String::new(),
-    }
-}
-
-async fn can_edit(pool: &sqlx::SqlitePool, user_id: i64, space_id: i64) -> bool {
-    matches!(
-        space_role(pool, user_id, space_id).await.as_str(),
-        "admin" | "editor"
-    )
-}
-
 #[derive(serde::Deserialize)]
 struct GroupRequest {
     #[serde(default)]
@@ -2290,10 +2237,10 @@ async fn create_item(headers: HeaderMap, Path(space_id): Path<i64>, request: Req
         Ok(Some(row)) => row,
         _ => return error_code(404),
     };
-    success_data(item_json(row))
+    success_data(item_json_value(row))
 }
 
-fn item_json(row: crate::repository::ItemListRecord) -> serde_json::Value {
+fn item_json_value(row: crate::repository::ItemListRecord) -> serde_json::Value {
     let icon = if row.icon_json.is_empty() {
         IconInfo::default()
     } else {
@@ -2948,11 +2895,14 @@ async fn add_oidc_group(
         Err(response) => return response,
     };
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool.clone(),
         Err(error) => return envelope::error(&error),
     };
-    if !can_manage(&pool, user.id, space_id).await {
+    if !crate::repository::can_manage_space(&pool, ctx.sqlx_driver(), user.id, space_id)
+        .await
+        .unwrap_or(false)
+    {
         return error_code(1005);
     }
     let body = match axum::body::to_bytes(request.into_body(), 1 << 20).await {
@@ -2971,19 +2921,18 @@ async fn add_oidc_group(
         return envelope::error(" [invalid OIDC group rule]");
     }
     let now = now_like_go();
-    let result = sqlx::query(
-        "INSERT INTO space_o_id_c_group (created_at, updated_at, space_id, provider, group_name, role) VALUES (?, ?, ?, ?, ?, ?)",
+    let id = match crate::repository::add_oidc_group(
+        &pool,
+        ctx.sqlx_driver(),
+        space_id,
+        &req.provider,
+        &req.group_name,
+        &req.role,
+        &now,
     )
-    .bind(&now)
-    .bind(&now)
-    .bind(space_id)
-    .bind(&req.provider)
-    .bind(&req.group_name)
-    .bind(&req.role)
-    .execute(&pool)
-    .await;
-    let id = match result {
-        Ok(result) => result.last_insert_rowid(),
+    .await
+    {
+        Ok(id) => id,
         Err(error) => return envelope::error(&error.to_string()),
     };
     success_data(json!({
@@ -3021,20 +2970,18 @@ async fn delete_oidc_group(
         Err(_) => return envelope::error(" [invalid ruleId]"),
     };
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool.clone(),
         Err(error) => return envelope::error(&error),
     };
-    if !can_manage(&pool, user.id, space_id).await {
+    if !crate::repository::can_manage_space(&pool, ctx.sqlx_driver(), user.id, space_id)
+        .await
+        .unwrap_or(false)
+    {
         return error_code(1005);
     }
-    match sqlx::query("DELETE FROM space_o_id_c_group WHERE id = ? AND space_id = ?")
-        .bind(rule_id)
-        .bind(space_id)
-        .execute(&pool)
-        .await
-    {
-        Ok(_) => success(),
+    match crate::repository::delete_oidc_group(&pool, ctx.sqlx_driver(), space_id, rule_id).await {
+        Ok(()) => success(),
         Err(error) => envelope::error(&error.to_string()),
     }
 }
@@ -3334,11 +3281,14 @@ async fn arrange_layout(
         Err(response) => return response,
     };
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool.clone(),
         Err(error) => return envelope::error(&error),
     };
-    if !can_edit(&pool, user.id, space_id).await {
+    if !crate::repository::can_edit_space(&pool, ctx.sqlx_driver(), user.id, space_id)
+        .await
+        .unwrap_or(false)
+    {
         return error_code(1005);
     }
     let body = match axum::body::to_bytes(request.into_body(), 1 << 20).await {
@@ -3640,11 +3590,14 @@ async fn create_item_with_icon(
         Err(response) => return response,
     };
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool.clone(),
         Err(error) => return envelope::error(&error),
     };
-    if !can_edit(&pool, user.id, space_id).await {
+    if !crate::repository::can_edit_space(&pool, ctx.sqlx_driver(), user.id, space_id)
+        .await
+        .unwrap_or(false)
+    {
         return error_code(1005);
     }
     let mut item_json: Option<String> = None;
@@ -3685,14 +3638,15 @@ async fn create_item_with_icon(
     if input.item_icon_group_id == 0 || !valid_item_title(&input.title) {
         return envelope::error(" [invalid item or group]");
     }
-    let group: Option<(i64,)> =
-        sqlx::query_as("SELECT id FROM item_icon_group WHERE id = ? AND space_id = ?")
-            .bind(input.item_icon_group_id)
-            .bind(space_id)
-            .fetch_optional(&pool)
-            .await
-            .unwrap_or(None);
-    if group.is_none() {
+    if !crate::repository::group_belongs(
+        &pool,
+        ctx.sqlx_driver(),
+        space_id,
+        input.item_icon_group_id,
+    )
+    .await
+    .unwrap_or(false)
+    {
         return error_code(404);
     }
 
@@ -3721,62 +3675,31 @@ async fn create_item_with_icon(
         ensure_item_icon(&input.title, &mut input.icon);
     }
     let icon_json = serde_json::to_string(&input.icon).unwrap_or_else(|_| "{}".to_string());
-    let now = now_like_go();
-    let mut tx = match pool.begin().await {
-        Ok(tx) => tx,
-        Err(error) => return envelope::error(&error.to_string()),
-    };
-    if let Some(name) = &stored {
-        let count: (i64,) =
-            sqlx::query_as("SELECT COUNT(*) FROM file WHERE user_id = ? AND file_name = ?")
-                .bind(user.id)
-                .bind(name)
-                .fetch_one(&mut *tx)
-                .await
-                .unwrap_or((0,));
-        if count.0 == 0
-            && sqlx::query(
-                "INSERT INTO file (created_at, updated_at, user_id, file_name) VALUES (?, ?, ?, ?)",
-            )
-            .bind(&now)
-            .bind(&now)
-            .bind(user.id)
-            .bind(name)
-            .execute(&mut *tx)
-            .await
-            .is_err()
-        {
-            return envelope::error("create file record");
-        }
-    }
-    let inserted = sqlx::query(
-        "INSERT INTO item_icon (created_at, updated_at, icon_json, title, url, lan_url, mobile_url, description, open_method, sort, item_icon_group_id, user_id, space_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    let id = match crate::repository::create_item_with_icon(
+        &pool,
+        ctx.sqlx_driver(),
+        space_id,
+        user.id,
+        &icon_json,
+        &input.title,
+        &input.url,
+        &input.lan_url,
+        &input.mobile_url,
+        &input.description,
+        input.open_method,
+        input.sort,
+        input.item_icon_group_id,
+        stored.as_deref(),
+        &now_like_go(),
     )
-    .bind(&now)
-    .bind(&now)
-    .bind(&icon_json)
-    .bind(&input.title)
-    .bind(&input.url)
-    .bind(&input.lan_url)
-    .bind(&input.mobile_url)
-    .bind(&input.description)
-    .bind(input.open_method)
-    .bind(input.sort)
-    .bind(input.item_icon_group_id)
-    .bind(user.id)
-    .bind(space_id)
-    .execute(&mut *tx)
-    .await;
-    let id = match inserted {
-        Ok(result) => result.last_insert_rowid(),
+    .await
+    {
+        Ok(id) => id,
         Err(error) => return envelope::error(&error.to_string()),
     };
-    if let Err(error) = tx.commit().await {
-        return envelope::error(&error.to_string());
-    }
-    match load_item(&pool, space_id, id).await {
-        Some(item) => success_data(item),
-        None => error_code(404),
+    match crate::repository::item_by_id(&pool, ctx.sqlx_driver(), space_id, id).await {
+        Ok(Some(row)) => success_data(crate::routes::item_json_value(row)),
+        _ => error_code(404),
     }
 }
 
@@ -3824,7 +3747,8 @@ fn limit_title(title: &str) -> String {
 /// `importBookmarkNode`: find or create the folder, then add its links, skipping
 /// a link that is already stored or repeated in the same file.
 fn import_node<'a>(
-    tx: &'a mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    tx: &'a mut sqlx::Transaction<'_, sqlx::Any>,
+    driver: crate::db::Driver,
     icons: &'a std::collections::HashMap<String, IconInfo>,
     space_id: i64,
     user_id: i64,
@@ -3838,44 +3762,48 @@ fn import_node<'a>(
         if title.is_empty() {
             return Ok(());
         }
-        let found: Option<(i64,)> = match parent_id {
-            None => sqlx::query_as(
-                "SELECT id FROM item_icon_group WHERE space_id = ? AND title = ? AND parent_id IS NULL LIMIT 1",
-            )
-            .bind(space_id)
-            .bind(&title)
-            .fetch_optional(&mut **tx)
-            .await
-            .map_err(|error| error.to_string())?,
-            Some(parent) => sqlx::query_as(
-                "SELECT id FROM item_icon_group WHERE space_id = ? AND title = ? AND parent_id = ? LIMIT 1",
-            )
-            .bind(space_id)
-            .bind(&title)
-            .bind(parent)
-            .fetch_optional(&mut **tx)
-            .await
-            .map_err(|error| error.to_string())?,
+        let found: Option<i64> = {
+            use sqlx::Row;
+            let (sql, bind_parent) = match parent_id {
+                None => (
+                    "SELECT id FROM item_icon_group WHERE space_id = ? AND title = ? AND parent_id IS NULL LIMIT 1".to_string(),
+                    false,
+                ),
+                Some(_) => (
+                    "SELECT id FROM item_icon_group WHERE space_id = ? AND title = ? AND parent_id = ? LIMIT 1".to_string(),
+                    true,
+                ),
+            };
+            let sql = crate::db::query(driver, &sql);
+            let mut statement = sqlx::query(&sql).bind(space_id).bind(&title);
+            if bind_parent {
+                statement = statement.bind(parent_id);
+            }
+            statement
+                .fetch_optional(&mut **tx)
+                .await
+                .map_err(|error| error.to_string())?
+                .map(|row| row.try_get::<i64, _>("id").unwrap_or(0))
         };
         let group_id = match found {
-            Some((id,)) => id,
+            Some(id) => id,
             None => {
-                let inserted = sqlx::query(
-                    "INSERT INTO item_icon_group (created_at, updated_at, icon, title, description, sort, user_id, space_id, parent_id) VALUES (?, ?, ?, ?, '', ?, ?, ?, ?)",
+                let now = now_like_go();
+                let id = crate::repository::insert_group_in_tx(
+                    tx,
+                    driver,
+                    space_id,
+                    user_id,
+                    &node.icon,
+                    &title,
+                    index,
+                    parent_id,
+                    &now,
                 )
-                .bind(now_like_go())
-                .bind(now_like_go())
-                .bind(&node.icon)
-                .bind(&title)
-                .bind(index)
-                .bind(user_id)
-                .bind(space_id)
-                .bind(parent_id)
-                .execute(&mut **tx)
                 .await
                 .map_err(|error| error.to_string())?;
                 summary.groups += 1;
-                inserted.last_insert_rowid()
+                id
             }
         };
 
@@ -3888,16 +3816,22 @@ fn import_node<'a>(
                 summary.skipped += 1;
                 continue;
             }
-            let existing: (i64,) = sqlx::query_as(
-                "SELECT COUNT(*) FROM item_icon WHERE space_id = ? AND item_icon_group_id = ? AND url = ?",
-            )
-            .bind(space_id)
-            .bind(group_id)
-            .bind(&bookmark.url)
-            .fetch_one(&mut **tx)
-            .await
-            .map_err(|error| error.to_string())?;
-            if existing.0 > 0 {
+            let existing: i64 = {
+                use sqlx::Row;
+                let sql = crate::db::query(
+                    driver,
+                    "SELECT COUNT(*) AS total FROM item_icon WHERE space_id = ? AND item_icon_group_id = ? AND url = ?",
+                );
+                let row = sqlx::query(&sql)
+                    .bind(space_id)
+                    .bind(group_id)
+                    .bind(&bookmark.url)
+                    .fetch_one(&mut **tx)
+                    .await
+                    .map_err(|error| error.to_string())?;
+                row.try_get("total").unwrap_or(0)
+            };
+            if existing > 0 {
                 summary.seen.insert(key);
                 summary.skipped += 1;
                 continue;
@@ -3945,6 +3879,7 @@ fn import_node<'a>(
         for (child_index, child) in node.children.iter().enumerate() {
             import_node(
                 tx,
+                driver,
                 icons,
                 space_id,
                 user_id,
@@ -3970,11 +3905,14 @@ async fn import_bookmarks(
         Err(response) => return response,
     };
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool.clone(),
         Err(error) => return envelope::error(&error),
     };
-    if !can_edit(&pool, user.id, space_id).await {
+    if !crate::repository::can_edit_space(&pool, ctx.sqlx_driver(), user.id, space_id)
+        .await
+        .unwrap_or(false)
+    {
         return error_code(1005);
     }
 
@@ -4045,24 +3983,15 @@ async fn import_bookmarks(
     };
     let now = now_like_go();
     for icon in icons.values() {
-        let count: (i64,) =
-            sqlx::query_as("SELECT COUNT(*) FROM file WHERE user_id = ? AND file_name = ?")
-                .bind(user.id)
-                .bind(&icon.file_name)
-                .fetch_one(&mut *tx)
-                .await
-                .unwrap_or((0,));
-        if count.0 == 0
-            && sqlx::query(
-                "INSERT INTO file (created_at, updated_at, user_id, file_name) VALUES (?, ?, ?, ?)",
-            )
-            .bind(&now)
-            .bind(&now)
-            .bind(user.id)
-            .bind(&icon.file_name)
-            .execute(&mut *tx)
-            .await
-            .is_err()
+        if crate::repository::insert_file_in_tx(
+            &mut tx,
+            ctx.sqlx_driver(),
+            user.id,
+            &icon.file_name,
+            &now,
+        )
+        .await
+        .is_err()
         {
             return envelope::error("create file record");
         }
@@ -4076,6 +4005,7 @@ async fn import_bookmarks(
     for (index, node) in batch.groups.iter().enumerate() {
         if let Err(error) = import_node(
             &mut tx,
+            ctx.sqlx_driver(),
             &icons,
             space_id,
             user.id,
@@ -4090,19 +4020,18 @@ async fn import_bookmarks(
         }
     }
     for (icon_json, title, group_id, sort, space, owner, url) in &summary.items {
-        if sqlx::query(
-            "INSERT INTO item_icon (created_at, updated_at, icon_json, title, url, lan_url, mobile_url, description, open_method, sort, item_icon_group_id, user_id, space_id) VALUES (?, ?, ?, ?, ?, '', '', '', 2, ?, ?, ?, ?)",
+        if crate::repository::insert_imported_item_in_tx(
+            &mut tx,
+            ctx.sqlx_driver(),
+            icon_json,
+            title,
+            url,
+            *sort,
+            *group_id,
+            *owner,
+            *space,
+            &now,
         )
-        .bind(&now)
-        .bind(&now)
-        .bind(icon_json)
-        .bind(title)
-        .bind(url)
-        .bind(sort)
-        .bind(group_id)
-        .bind(owner)
-        .bind(space)
-        .execute(&mut *tx)
         .await
         .is_err()
         {
@@ -5876,19 +5805,17 @@ async fn get_site_favicon(headers: HeaderMap, request: Request) -> Response {
         return envelope::error("acquisition failed: download failed to upload file");
     }
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool,
         Err(error) => return envelope::error(&error),
     };
-    let now = now_like_go();
-    if sqlx::query(
-        "INSERT INTO file (created_at, updated_at, user_id, file_name) VALUES (?, ?, ?, ?)",
+    if crate::repository::insert_file(
+        pool,
+        ctx.sqlx_driver(),
+        user.id,
+        &file_name,
+        &now_like_go(),
     )
-    .bind(&now)
-    .bind(&now)
-    .bind(user.id)
-    .bind(&file_name)
-    .execute(pool)
     .await
     .is_err()
     {
