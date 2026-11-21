@@ -68,6 +68,8 @@ the port is suspect.
 | `rust/wallpaperpack-rs/` | first ported unit, with its own cases |
 | `rust/MAP.md` | every unit, in port order, with state |
 | `rust/HANDOFF.md` | what the next session should do |
+| `rust/DATABASE.md` | shared SQLx layer: dialect boundaries, migrated slices, verification gate |
+| `rust/GOAL_REPLACE_GO.md` | goal-executable plan to replace the Go backend |
 
 ## Rules
 

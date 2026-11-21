@@ -681,20 +681,6 @@ async fn members(headers: HeaderMap, Path(space_id): Path<i64>) -> Response {
 }
 
 #[derive(sqlx::FromRow)]
-struct GroupRow {
-    id: i64,
-    created_at: String,
-    updated_at: String,
-    icon: String,
-    title: String,
-    description: String,
-    sort: i64,
-    user_id: i64,
-    space_id: i64,
-    parent_id: Option<i64>,
-}
-
-#[derive(sqlx::FromRow)]
 struct ItemRow {
     id: i64,
     created_at: String,
@@ -2047,11 +2033,14 @@ async fn create_group(headers: HeaderMap, Path(space_id): Path<i64>, request: Re
         Err(response) => return response,
     };
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool.clone(),
         Err(error) => return envelope::error(&error),
     };
-    if !can_edit(&pool, user.id, space_id).await {
+    if !crate::repository::can_edit_space(&pool, ctx.sqlx_driver(), user.id, space_id)
+        .await
+        .unwrap_or(false)
+    {
         return error_code(1005);
     }
     let body = match axum::body::to_bytes(request.into_body(), 1 << 20).await {
@@ -2072,67 +2061,49 @@ async fn create_group(headers: HeaderMap, Path(space_id): Path<i64>, request: Re
         if parent == 0 {
             return envelope::error(" [invalid parent group]");
         }
-        let exists: Option<(i64,)> =
-            sqlx::query_as("SELECT id FROM item_icon_group WHERE id = ? AND space_id = ?")
-                .bind(parent)
-                .bind(space_id)
-                .fetch_optional(&pool)
-                .await
-                .unwrap_or(None);
-        if exists.is_none() {
-            return envelope::error(" [invalid parent group]");
+        match crate::repository::group_belongs(&pool, ctx.sqlx_driver(), space_id, parent).await {
+            Ok(true) => {}
+            _ => return envelope::error(" [invalid parent group]"),
         }
     }
     let now = now_like_go();
-    let result = sqlx::query(
-        "INSERT INTO item_icon_group (created_at, updated_at, icon, title, description, sort, user_id, space_id, parent_id) VALUES (?, ?, ?, ?, '', 9999, ?, ?, ?)",
+    let id = match crate::repository::create_group(
+        &pool,
+        ctx.sqlx_driver(),
+        space_id,
+        user.id,
+        &req.icon,
+        &req.title,
+        req.parent_id,
+        &now,
     )
-    .bind(&now)
-    .bind(&now)
-    .bind(&req.icon)
-    .bind(&req.title)
-    .bind(user.id)
-    .bind(space_id)
-    .bind(req.parent_id)
-    .execute(&pool)
-    .await;
-    let id = match result {
-        Ok(result) => result.last_insert_rowid(),
+    .await
+    {
+        Ok(id) => id,
         Err(error) => return envelope::error(&error.to_string()),
     };
-    let group = match load_group(&pool, space_id, id).await {
-        Some(group) => group,
-        None => return envelope::error("group not found"),
+    let group = match crate::repository::group_by_id(&pool, ctx.sqlx_driver(), space_id, id).await {
+        Ok(Some(row)) => group_item_json(row),
+        _ => return envelope::error("group not found"),
     };
     success_data(group)
 }
 
-async fn load_group(pool: &sqlx::SqlitePool, space_id: i64, id: i64) -> Option<serde_json::Value> {
-    let row = sqlx::query_as::<_, GroupRow>(
-        r#"SELECT id, created_at, updated_at, icon, title, description, sort, user_id, space_id,
-                  parent_id FROM item_icon_group WHERE id = ? AND space_id = ?"#,
-    )
-    .bind(id)
-    .bind(space_id)
-    .fetch_optional(pool)
-    .await
-    .unwrap_or(None)?;
-    Some(
-        serde_json::to_value(GroupItem {
-            id: row.id,
-            create_time: rfc3339(&row.created_at),
-            update_time: rfc3339(&row.updated_at),
-            icon: row.icon,
-            title: row.title,
-            description: row.description,
-            sort: row.sort,
-            user_id: row.user_id,
-            space_id: row.space_id,
-            parent_id: row.parent_id,
-            item_count: 0,
-        })
-        .unwrap_or(serde_json::Value::Null),
-    )
+fn group_item_json(row: crate::repository::GroupListRecord) -> serde_json::Value {
+    serde_json::to_value(GroupItem {
+        id: row.id,
+        create_time: rfc3339(&row.created_at),
+        update_time: rfc3339(&row.updated_at),
+        icon: row.icon,
+        title: row.title,
+        description: row.description,
+        sort: row.sort,
+        user_id: row.user_id,
+        space_id: row.space_id,
+        parent_id: row.parent_id,
+        item_count: row.item_count,
+    })
+    .unwrap_or(serde_json::Value::Null)
 }
 
 async fn group_belongs(pool: &sqlx::SqlitePool, group_id: i64, space_id: i64) -> bool {
@@ -2143,35 +2114,6 @@ async fn group_belongs(pool: &sqlx::SqlitePool, group_id: i64, space_id: i64) ->
         .await
         .unwrap_or(None)
         .is_some()
-}
-
-/// `groupHasDescendant`: walking up from the candidate must not reach the group.
-async fn group_has_descendant(
-    pool: &sqlx::SqlitePool,
-    space_id: i64,
-    group_id: i64,
-    candidate: i64,
-) -> bool {
-    let mut current = candidate;
-    let mut hops = 0;
-    while current != 0 && hops < 256 {
-        if current == group_id {
-            return true;
-        }
-        let parent: Option<(Option<i64>,)> =
-            sqlx::query_as("SELECT parent_id FROM item_icon_group WHERE id = ? AND space_id = ?")
-                .bind(current)
-                .bind(space_id)
-                .fetch_optional(pool)
-                .await
-                .unwrap_or(None);
-        match parent.and_then(|value| value.0) {
-            Some(next) => current = next,
-            None => return false,
-        }
-        hops += 1;
-    }
-    false
 }
 
 /// `SpaceRouter.UpdateGroup`.
@@ -2189,11 +2131,14 @@ async fn update_group(
         Err(_) => return envelope::error(" [invalid groupId]"),
     };
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool.clone(),
         Err(error) => return envelope::error(&error),
     };
-    if !can_edit(&pool, user.id, space_id).await {
+    if !crate::repository::can_edit_space(&pool, ctx.sqlx_driver(), user.id, space_id)
+        .await
+        .unwrap_or(false)
+    {
         return error_code(1005);
     }
     let body = match axum::body::to_bytes(request.into_body(), 1 << 20).await {
@@ -2208,26 +2153,39 @@ async fn update_group(
         return envelope::error(" [ Title为必填字段]");
     }
     if let Some(parent) = req.parent_id {
-        if parent == group_id || !group_belongs(&pool, parent, space_id).await {
+        let belongs = crate::repository::group_belongs(&pool, ctx.sqlx_driver(), space_id, parent)
+            .await
+            .unwrap_or(false);
+        if parent == group_id || !belongs {
             return envelope::error(" [invalid parent group]");
         }
-        if group_has_descendant(&pool, space_id, group_id, parent).await {
+        if crate::repository::group_has_descendant(
+            &pool,
+            ctx.sqlx_driver(),
+            space_id,
+            group_id,
+            parent,
+        )
+        .await
+        .unwrap_or(false)
+        {
             return envelope::error(" [group cycle detected]");
         }
     }
-    let result = sqlx::query(
-        "UPDATE item_icon_group SET title = ?, icon = ?, parent_id = ?, updated_at = ? WHERE id = ? AND space_id = ?",
+    let now = now_like_go();
+    match crate::repository::update_group(
+        &pool,
+        ctx.sqlx_driver(),
+        space_id,
+        group_id,
+        &req.title,
+        &req.icon,
+        req.parent_id,
+        &now,
     )
-    .bind(&req.title)
-    .bind(&req.icon)
-    .bind(req.parent_id)
-    .bind(now_like_go())
-    .bind(group_id)
-    .bind(space_id)
-    .execute(&pool)
-    .await;
-    match result {
-        Ok(_) => success(),
+    .await
+    {
+        Ok(()) => success(),
         Err(error) => envelope::error(&error.to_string()),
     }
 }
@@ -2246,55 +2204,19 @@ async fn delete_group(
         Err(_) => return envelope::error(" [invalid groupId]"),
     };
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool.clone(),
         Err(error) => return envelope::error(&error),
     };
-    if !can_edit(&pool, user.id, space_id).await {
+    if !crate::repository::can_edit_space(&pool, ctx.sqlx_driver(), user.id, space_id)
+        .await
+        .unwrap_or(false)
+    {
         return error_code(1005);
     }
-    let mut ids = vec![group_id];
-    let mut index = 0;
-    while index < ids.len() {
-        let children: Vec<(i64,)> =
-            sqlx::query_as("SELECT id FROM item_icon_group WHERE space_id = ? AND parent_id = ?")
-                .bind(space_id)
-                .bind(ids[index])
-                .fetch_all(&pool)
-                .await
-                .unwrap_or_default();
-        for (child,) in children {
-            ids.push(child);
-        }
-        index += 1;
-    }
-    let placeholders = vec!["?"; ids.len()].join(",");
-    let mut tx = match pool.begin().await {
-        Ok(tx) => tx,
-        Err(error) => return envelope::error(&error.to_string()),
-    };
-    let delete_items = format!(
-        "DELETE FROM item_icon WHERE space_id = ? AND item_icon_group_id IN ({placeholders})"
-    );
-    let mut statement = sqlx::query(&delete_items).bind(space_id);
-    for id in &ids {
-        statement = statement.bind(id);
-    }
-    if statement.execute(&mut *tx).await.is_err() {
-        return envelope::error("delete failed");
-    }
-    let delete_groups =
-        format!("DELETE FROM item_icon_group WHERE space_id = ? AND id IN ({placeholders})");
-    let mut statement = sqlx::query(&delete_groups).bind(space_id);
-    for id in &ids {
-        statement = statement.bind(id);
-    }
-    if statement.execute(&mut *tx).await.is_err() {
-        return envelope::error("delete failed");
-    }
-    match tx.commit().await {
-        Ok(_) => success(),
-        Err(error) => envelope::error(&error.to_string()),
+    match crate::repository::delete_group_tree(&pool, ctx.sqlx_driver(), space_id, group_id).await {
+        Ok(()) => success(),
+        Err(_) => envelope::error("delete failed"),
     }
 }
 
@@ -2355,11 +2277,14 @@ async fn create_item(headers: HeaderMap, Path(space_id): Path<i64>, request: Req
         Err(response) => return response,
     };
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool.clone(),
         Err(error) => return envelope::error(&error),
     };
-    if !can_edit(&pool, user.id, space_id).await {
+    if !crate::repository::can_edit_space(&pool, ctx.sqlx_driver(), user.id, space_id)
+        .await
+        .unwrap_or(false)
+    {
         return error_code(1005);
     }
     let body = match axum::body::to_bytes(request.into_body(), 1 << 20).await {
@@ -2377,45 +2302,73 @@ async fn create_item(headers: HeaderMap, Path(space_id): Path<i64>, request: Req
         return envelope::error(" [title must be at most 20 characters]");
     }
     ensure_item_icon(&input.title, &mut input.icon);
-    let group: Option<(i64,)> =
-        sqlx::query_as("SELECT id FROM item_icon_group WHERE id = ? AND space_id = ?")
-            .bind(input.item_icon_group_id)
-            .bind(space_id)
-            .fetch_optional(&pool)
-            .await
-            .unwrap_or(None);
-    if group.is_none() {
+    let group_exists = crate::repository::group_belongs(
+        &pool,
+        ctx.sqlx_driver(),
+        space_id,
+        input.item_icon_group_id,
+    )
+    .await
+    .unwrap_or(false);
+    if !group_exists {
         return error_code(404);
     }
     let now = now_like_go();
     let icon_json = serde_json::to_string(&input.icon).unwrap_or_else(|_| "{}".to_string());
-    let result = sqlx::query(
-        "INSERT INTO item_icon (created_at, updated_at, icon_json, title, url, lan_url, mobile_url, description, open_method, sort, item_icon_group_id, user_id, space_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    let record = crate::repository::ItemWriteRecord {
+        icon_json,
+        title: input.title,
+        url: input.url,
+        lan_url: input.lan_url,
+        mobile_url: input.mobile_url,
+        description: input.description,
+        open_method: input.open_method,
+        sort: input.sort,
+        group_id: input.item_icon_group_id,
+    };
+    let id = match crate::repository::create_item(
+        &pool,
+        ctx.sqlx_driver(),
+        space_id,
+        user.id,
+        &record,
+        &now,
     )
-    .bind(&now)
-    .bind(&now)
-    .bind(&icon_json)
-    .bind(&input.title)
-    .bind(&input.url)
-    .bind(&input.lan_url)
-    .bind(&input.mobile_url)
-    .bind(&input.description)
-    .bind(input.open_method)
-    .bind(input.sort)
-    .bind(input.item_icon_group_id)
-    .bind(user.id)
-    .bind(space_id)
-    .execute(&pool)
-    .await;
-    let id = match result {
-        Ok(result) => result.last_insert_rowid(),
+    .await
+    {
+        Ok(id) => id,
         Err(error) => return envelope::error(&error.to_string()),
     };
-    let row = match load_item(&pool, space_id, id).await {
-        Some(row) => row,
-        None => return error_code(404),
+    let row = match crate::repository::item_by_id(&pool, ctx.sqlx_driver(), space_id, id).await {
+        Ok(Some(row)) => row,
+        _ => return error_code(404),
     };
-    success_data(row)
+    success_data(item_json(row))
+}
+
+fn item_json(row: crate::repository::ItemListRecord) -> serde_json::Value {
+    let icon = if row.icon_json.is_empty() {
+        IconInfo::default()
+    } else {
+        serde_json::from_str(&row.icon_json).unwrap_or_default()
+    };
+    serde_json::to_value(ItemOut {
+        id: row.id,
+        create_time: rfc3339(&row.created_at),
+        update_time: rfc3339(&row.updated_at),
+        icon,
+        title: row.title,
+        url: row.url,
+        lan_url: row.lan_url,
+        mobile_url: row.mobile_url,
+        description: row.description,
+        open_method: row.open_method,
+        sort: row.sort,
+        item_icon_group_id: row.item_icon_group_id,
+        user_id: row.user_id,
+        space_id: row.space_id,
+    })
+    .unwrap_or(serde_json::Value::Null)
 }
 
 async fn load_item(pool: &sqlx::SqlitePool, space_id: i64, id: i64) -> Option<serde_json::Value> {
@@ -2488,11 +2441,14 @@ async fn update_item(
         Err(_) => return envelope::error(" [invalid itemId]"),
     };
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool.clone(),
         Err(error) => return envelope::error(&error),
     };
-    if !can_edit(&pool, user.id, space_id).await {
+    if !crate::repository::can_edit_space(&pool, ctx.sqlx_driver(), user.id, space_id)
+        .await
+        .unwrap_or(false)
+    {
         return error_code(1005);
     }
     let body = match axum::body::to_bytes(request.into_body(), 1 << 20).await {
@@ -2510,36 +2466,40 @@ async fn update_item(
         return envelope::error(" [title must be at most 20 characters]");
     }
     ensure_item_icon(&input.title, &mut input.icon);
-    let group: Option<(i64,)> =
-        sqlx::query_as("SELECT id FROM item_icon_group WHERE id = ? AND space_id = ?")
-            .bind(input.item_icon_group_id)
-            .bind(space_id)
-            .fetch_optional(&pool)
-            .await
-            .unwrap_or(None);
-    if group.is_none() {
+    let group_exists = crate::repository::group_belongs(
+        &pool,
+        ctx.sqlx_driver(),
+        space_id,
+        input.item_icon_group_id,
+    )
+    .await
+    .unwrap_or(false);
+    if !group_exists {
         return error_code(404);
     }
     let icon_json = serde_json::to_string(&input.icon).unwrap_or_else(|_| "{}".to_string());
-    let result = sqlx::query(
-        "UPDATE item_icon SET icon_json = ?, title = ?, url = ?, lan_url = ?, mobile_url = ?, description = ?, open_method = ?, sort = ?, item_icon_group_id = ?, updated_at = ? WHERE id = ? AND space_id = ?",
+    let record = crate::repository::ItemWriteRecord {
+        icon_json,
+        title: input.title,
+        url: input.url,
+        lan_url: input.lan_url,
+        mobile_url: input.mobile_url,
+        description: input.description,
+        open_method: input.open_method,
+        sort: input.sort,
+        group_id: input.item_icon_group_id,
+    };
+    match crate::repository::update_item(
+        &pool,
+        ctx.sqlx_driver(),
+        space_id,
+        item_id,
+        &record,
+        &now_like_go(),
     )
-    .bind(&icon_json)
-    .bind(&input.title)
-    .bind(&input.url)
-    .bind(&input.lan_url)
-    .bind(&input.mobile_url)
-    .bind(&input.description)
-    .bind(input.open_method)
-    .bind(input.sort)
-    .bind(input.item_icon_group_id)
-    .bind(now_like_go())
-    .bind(item_id)
-    .bind(space_id)
-    .execute(&pool)
-    .await;
-    match result {
-        Ok(_) => success(),
+    .await
+    {
+        Ok(()) => success(),
         Err(error) => envelope::error(&error.to_string()),
     }
 }
@@ -2558,20 +2518,18 @@ async fn delete_item(
         Err(_) => return envelope::error(" [invalid itemId]"),
     };
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool.clone(),
         Err(error) => return envelope::error(&error),
     };
-    if !can_edit(&pool, user.id, space_id).await {
+    if !crate::repository::can_edit_space(&pool, ctx.sqlx_driver(), user.id, space_id)
+        .await
+        .unwrap_or(false)
+    {
         return error_code(1005);
     }
-    match sqlx::query("DELETE FROM item_icon WHERE id = ? AND space_id = ?")
-        .bind(item_id)
-        .bind(space_id)
-        .execute(&pool)
-        .await
-    {
-        Ok(_) => success(),
+    match crate::repository::delete_item(&pool, ctx.sqlx_driver(), space_id, item_id).await {
+        Ok(()) => success(),
         Err(error) => envelope::error(&error.to_string()),
     }
 }
@@ -6719,6 +6677,18 @@ pub fn pattern_matches(pattern: &str, path: &str) -> bool {
 /// answers exactly what Gin's NoRoute answers, and a trailing slash on a path
 /// whose trimmed form would match a `:param` route answers Gin's redirect.
 pub async fn go_fallback(req: Request) -> Response {
+    let mut response = go_fallback_inner(req).await;
+    // Only the parity probe sets this: replay and production must see exactly
+    // the bytes Gin produced, so the marker header is opt-in.
+    if std::env::var_os("YIN_UNIMPLEMENTED_MARKER").is_some() {
+        response
+            .headers_mut()
+            .insert("x-yin-unimplemented", HeaderValue::from_static("1"));
+    }
+    response
+}
+
+async fn go_fallback_inner(req: Request) -> Response {
     let method = req.method().as_str().to_string();
     let path = req.uri().path().to_string();
     if path.len() > 1 && path.ends_with('/') {

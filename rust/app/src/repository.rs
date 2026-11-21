@@ -712,6 +712,373 @@ pub async fn oidc_groups(
         .collect()
 }
 
+/// The bind expression a driver needs to accept a Go-style timestamp string.
+pub(crate) fn timestamp_bind(driver: Driver) -> &'static str {
+    match driver {
+        Driver::MySql => "CAST(LEFT(?, 26) AS DATETIME(6))",
+        Driver::Sqlite => "?",
+        Driver::Postgres => "CAST(? AS TIMESTAMP WITH TIME ZONE)",
+    }
+}
+
+pub async fn group_belongs(
+    pool: &AnyPool,
+    driver: Driver,
+    space_id: i64,
+    group_id: i64,
+) -> Result<bool, sqlx::Error> {
+    let sql = query(
+        driver,
+        "SELECT 1 FROM item_icon_group WHERE id = ? AND space_id = ?",
+    );
+    Ok(sqlx::query(&sql)
+        .bind(group_id)
+        .bind(space_id)
+        .fetch_optional(pool)
+        .await?
+        .is_some())
+}
+
+/// `groupHasDescendant`: walking up from the candidate must not reach the group.
+pub async fn group_has_descendant(
+    pool: &AnyPool,
+    driver: Driver,
+    space_id: i64,
+    group_id: i64,
+    candidate: i64,
+) -> Result<bool, sqlx::Error> {
+    let sql = query(
+        driver,
+        "SELECT parent_id FROM item_icon_group WHERE id = ? AND space_id = ?",
+    );
+    let mut current = candidate;
+    let mut hops = 0;
+    while current != 0 && hops < 256 {
+        if current == group_id {
+            return Ok(true);
+        }
+        let row = sqlx::query(&sql)
+            .bind(current)
+            .bind(space_id)
+            .fetch_optional(pool)
+            .await?;
+        match row.and_then(|row| row.try_get::<Option<i64>, _>("parent_id").ok().flatten()) {
+            Some(next) => current = next,
+            None => return Ok(false),
+        }
+        hops += 1;
+    }
+    Ok(false)
+}
+
+/// Insert a group and return its new id on every driver: PostgreSQL and SQLite
+/// support `RETURNING`, while MySQL reports `last_insert_id`.
+pub async fn create_group(
+    pool: &AnyPool,
+    driver: Driver,
+    space_id: i64,
+    user_id: i64,
+    icon: &str,
+    title: &str,
+    parent_id: Option<i64>,
+    now: &str,
+) -> Result<i64, sqlx::Error> {
+    let timestamp = timestamp_bind(driver);
+    let use_returning = driver != Driver::MySql;
+    let suffix = if use_returning { " RETURNING id" } else { "" };
+    let sql = query(
+        driver,
+        &format!(
+            "INSERT INTO item_icon_group (created_at, updated_at, icon, title, description, sort, user_id, space_id, parent_id) VALUES ({timestamp}, {timestamp}, ?, ?, '', 9999, ?, ?, ?){suffix}"
+        ),
+    );
+    let statement = sqlx::query(&sql)
+        .bind(now)
+        .bind(now)
+        .bind(icon)
+        .bind(title)
+        .bind(user_id)
+        .bind(space_id)
+        .bind(parent_id);
+    if use_returning {
+        let row = statement.fetch_one(pool).await?;
+        return row.try_get("id");
+    }
+    let result = statement.execute(pool).await?;
+    result
+        .last_insert_id()
+        .ok_or_else(|| sqlx::Error::Protocol("driver did not report an insert id".into()))
+}
+
+pub async fn group_by_id(
+    pool: &AnyPool,
+    driver: Driver,
+    space_id: i64,
+    id: i64,
+) -> Result<Option<GroupListRecord>, sqlx::Error> {
+    let text_type = if driver == Driver::MySql {
+        "CHAR"
+    } else {
+        "TEXT"
+    };
+    let sql = query(
+        driver,
+        &format!(
+            "SELECT id, CAST(created_at AS {text_type}) AS created_at, CAST(updated_at AS {text_type}) AS updated_at, CAST(icon AS {text_type}) AS icon, CAST(title AS {text_type}) AS title, CAST(description AS {text_type}) AS description, sort, user_id, space_id, parent_id FROM item_icon_group WHERE id = ? AND space_id = ?"
+        ),
+    );
+    let row = sqlx::query(&sql)
+        .bind(id)
+        .bind(space_id)
+        .fetch_optional(pool)
+        .await?;
+    row.map(|row| {
+        Ok(GroupListRecord {
+            id: row.try_get("id")?,
+            created_at: text(&row, "created_at")?,
+            updated_at: text(&row, "updated_at")?,
+            icon: text(&row, "icon")?,
+            title: text(&row, "title")?,
+            description: text(&row, "description")?,
+            sort: row.try_get("sort")?,
+            user_id: row.try_get("user_id")?,
+            space_id: row.try_get("space_id")?,
+            parent_id: row.try_get("parent_id")?,
+            item_count: 0,
+        })
+    })
+    .transpose()
+}
+
+pub async fn update_group(
+    pool: &AnyPool,
+    driver: Driver,
+    space_id: i64,
+    group_id: i64,
+    title: &str,
+    icon: &str,
+    parent_id: Option<i64>,
+    now: &str,
+) -> Result<(), sqlx::Error> {
+    let timestamp = timestamp_bind(driver);
+    let sql = query(
+        driver,
+        &format!(
+            "UPDATE item_icon_group SET title = ?, icon = ?, parent_id = ?, updated_at = {timestamp} WHERE id = ? AND space_id = ?"
+        ),
+    );
+    sqlx::query(&sql)
+        .bind(title)
+        .bind(icon)
+        .bind(parent_id)
+        .bind(now)
+        .bind(group_id)
+        .bind(space_id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+/// Delete a group, its descendants and their items in one transaction.
+pub async fn delete_group_tree(
+    pool: &AnyPool,
+    driver: Driver,
+    space_id: i64,
+    group_id: i64,
+) -> Result<(), sqlx::Error> {
+    let child_sql = query(
+        driver,
+        "SELECT id FROM item_icon_group WHERE space_id = ? AND parent_id = ?",
+    );
+    let mut ids = vec![group_id];
+    let mut index = 0;
+    while index < ids.len() {
+        let rows = sqlx::query(&child_sql)
+            .bind(space_id)
+            .bind(ids[index])
+            .fetch_all(pool)
+            .await?;
+        for row in rows {
+            ids.push(row.try_get("id")?);
+        }
+        index += 1;
+    }
+
+    let placeholders = vec!["?"; ids.len()].join(",");
+    let delete_items = query(
+        driver,
+        &format!(
+            "DELETE FROM item_icon WHERE space_id = ? AND item_icon_group_id IN ({placeholders})"
+        ),
+    );
+    let delete_groups = query(
+        driver,
+        &format!("DELETE FROM item_icon_group WHERE space_id = ? AND id IN ({placeholders})"),
+    );
+
+    let mut tx = pool.begin().await?;
+    let mut statement = sqlx::query(&delete_items).bind(space_id);
+    for id in &ids {
+        statement = statement.bind(id);
+    }
+    statement.execute(&mut *tx).await?;
+    let mut statement = sqlx::query(&delete_groups).bind(space_id);
+    for id in &ids {
+        statement = statement.bind(id);
+    }
+    statement.execute(&mut *tx).await?;
+    tx.commit().await?;
+    Ok(())
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ItemWriteRecord {
+    pub icon_json: String,
+    pub title: String,
+    pub url: String,
+    pub lan_url: String,
+    pub mobile_url: String,
+    pub description: String,
+    pub open_method: i64,
+    pub sort: i64,
+    pub group_id: i64,
+}
+
+pub async fn item_by_id(
+    pool: &AnyPool,
+    driver: Driver,
+    space_id: i64,
+    id: i64,
+) -> Result<Option<ItemListRecord>, sqlx::Error> {
+    let text_type = if driver == Driver::MySql {
+        "CHAR"
+    } else {
+        "TEXT"
+    };
+    let sql = query(
+        driver,
+        &format!(
+            "SELECT id, CAST(created_at AS {text_type}) AS created_at, CAST(updated_at AS {text_type}) AS updated_at, CAST(icon_json AS {text_type}) AS icon_json, CAST(title AS {text_type}) AS title, CAST(url AS {text_type}) AS url, CAST(lan_url AS {text_type}) AS lan_url, CAST(mobile_url AS {text_type}) AS mobile_url, CAST(description AS {text_type}) AS description, open_method, sort, item_icon_group_id, user_id, space_id FROM item_icon WHERE id = ? AND space_id = ?"
+        ),
+    );
+    let row = sqlx::query(&sql)
+        .bind(id)
+        .bind(space_id)
+        .fetch_optional(pool)
+        .await?;
+    row.map(|row| {
+        Ok(ItemListRecord {
+            id: row.try_get("id")?,
+            created_at: text(&row, "created_at")?,
+            updated_at: text(&row, "updated_at")?,
+            icon_json: text(&row, "icon_json")?,
+            title: text(&row, "title")?,
+            url: text(&row, "url")?,
+            lan_url: text(&row, "lan_url")?,
+            mobile_url: text(&row, "mobile_url")?,
+            description: text(&row, "description")?,
+            open_method: row.try_get("open_method")?,
+            sort: row.try_get("sort")?,
+            item_icon_group_id: row.try_get("item_icon_group_id")?,
+            user_id: row.try_get("user_id")?,
+            space_id: row.try_get("space_id")?,
+        })
+    })
+    .transpose()
+}
+
+pub async fn create_item(
+    pool: &AnyPool,
+    driver: Driver,
+    space_id: i64,
+    user_id: i64,
+    item: &ItemWriteRecord,
+    now: &str,
+) -> Result<i64, sqlx::Error> {
+    let timestamp = timestamp_bind(driver);
+    let use_returning = driver != Driver::MySql;
+    let suffix = if use_returning { " RETURNING id" } else { "" };
+    let sql = query(
+        driver,
+        &format!(
+            "INSERT INTO item_icon (created_at, updated_at, icon_json, title, url, lan_url, mobile_url, description, open_method, sort, item_icon_group_id, user_id, space_id) VALUES ({timestamp}, {timestamp}, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?){suffix}"
+        ),
+    );
+    let statement = sqlx::query(&sql)
+        .bind(now)
+        .bind(now)
+        .bind(&item.icon_json)
+        .bind(&item.title)
+        .bind(&item.url)
+        .bind(&item.lan_url)
+        .bind(&item.mobile_url)
+        .bind(&item.description)
+        .bind(item.open_method)
+        .bind(item.sort)
+        .bind(item.group_id)
+        .bind(user_id)
+        .bind(space_id);
+    if use_returning {
+        let row = statement.fetch_one(pool).await?;
+        return row.try_get("id");
+    }
+    let result = statement.execute(pool).await?;
+    result
+        .last_insert_id()
+        .ok_or_else(|| sqlx::Error::Protocol("driver did not report an insert id".into()))
+}
+
+pub async fn update_item(
+    pool: &AnyPool,
+    driver: Driver,
+    space_id: i64,
+    item_id: i64,
+    item: &ItemWriteRecord,
+    now: &str,
+) -> Result<(), sqlx::Error> {
+    let timestamp = timestamp_bind(driver);
+    let sql = query(
+        driver,
+        &format!(
+            "UPDATE item_icon SET icon_json = ?, title = ?, url = ?, lan_url = ?, mobile_url = ?, description = ?, open_method = ?, sort = ?, item_icon_group_id = ?, updated_at = {timestamp} WHERE id = ? AND space_id = ?"
+        ),
+    );
+    sqlx::query(&sql)
+        .bind(&item.icon_json)
+        .bind(&item.title)
+        .bind(&item.url)
+        .bind(&item.lan_url)
+        .bind(&item.mobile_url)
+        .bind(&item.description)
+        .bind(item.open_method)
+        .bind(item.sort)
+        .bind(item.group_id)
+        .bind(now)
+        .bind(item_id)
+        .bind(space_id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+pub async fn delete_item(
+    pool: &AnyPool,
+    driver: Driver,
+    space_id: i64,
+    item_id: i64,
+) -> Result<(), sqlx::Error> {
+    let sql = query(
+        driver,
+        "DELETE FROM item_icon WHERE id = ? AND space_id = ?",
+    );
+    sqlx::query(&sql)
+        .bind(item_id)
+        .bind(space_id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
 pub async fn groups_for_space(
     pool: &AnyPool,
     driver: Driver,
@@ -1073,13 +1440,16 @@ pub async fn user_access(
 #[cfg(test)]
 mod tests {
     use super::{
-        bookmark_tree, can_access_space, can_edit_space, can_manage_space, file_list,
-        groups_for_space, items_for_space, module_config_value, oidc_groups, revoke_user_sessions,
-        space_list, space_members, space_public_config, space_search_config, space_wallpaper_json,
+        bookmark_tree, can_access_space, can_edit_space, can_manage_space, create_group,
+        create_item, delete_group_tree, delete_item, file_list, group_belongs, group_by_id,
+        group_has_descendant, groups_for_space, item_by_id, items_for_space, module_config_value,
+        oidc_groups, revoke_user_sessions, space_list, space_members, space_public_config,
+        space_search_config, space_wallpaper_json, update_group, update_item,
         update_space_public_config, update_space_search_config, update_space_wallpaper,
         user_access, user_by_credentials, user_by_id, user_config, user_list,
     };
     use crate::db::{Driver, connect, query};
+    use sqlx::Row;
 
     async fn verify_user_repository(driver: Driver, url: &str) {
         let pool = connect(driver, url)
@@ -1200,6 +1570,8 @@ mod tests {
         verify_space_public(&pool, driver).await;
         verify_space_wallpaper(&pool, driver).await;
         verify_admin_and_config_reads(&pool, driver).await;
+        verify_group_writes(&pool, driver).await;
+        verify_item_writes(&pool, driver).await;
         pool.close().await;
     }
 
@@ -1600,6 +1972,285 @@ mod tests {
             .execute(pool)
             .await
             .expect("drop item list fixture");
+    }
+
+    async fn verify_item_writes(pool: &sqlx::AnyPool, driver: Driver) {
+        let (group_table, item_table, timestamp_type, id_type) = match driver {
+            Driver::MySql => (
+                "item_icon_group",
+                "item_icon",
+                "DATETIME(6)",
+                "BIGINT AUTO_INCREMENT PRIMARY KEY",
+            ),
+            Driver::Sqlite => (
+                "item_icon_group",
+                "item_icon",
+                "TEXT",
+                "INTEGER PRIMARY KEY AUTOINCREMENT",
+            ),
+            Driver::Postgres => (
+                "item_icon_group",
+                "item_icon",
+                "TIMESTAMPTZ",
+                "BIGSERIAL PRIMARY KEY",
+            ),
+        };
+        sqlx::query(&format!(
+            "CREATE TABLE {group_table} (id {id_type}, created_at {timestamp_type} NOT NULL, updated_at {timestamp_type} NOT NULL, icon VARCHAR(100) NOT NULL, title VARCHAR(100) NOT NULL, description TEXT NOT NULL, sort BIGINT NOT NULL, user_id BIGINT NOT NULL, space_id BIGINT NOT NULL, parent_id BIGINT)"
+        ))
+        .execute(pool)
+        .await
+        .expect("create item write group fixture");
+        sqlx::query(&format!(
+            "CREATE TABLE {item_table} (id {id_type}, created_at {timestamp_type} NOT NULL, updated_at {timestamp_type} NOT NULL, icon_json TEXT NOT NULL, title VARCHAR(50) NOT NULL, url TEXT NOT NULL, lan_url TEXT NOT NULL, mobile_url TEXT NOT NULL, description TEXT NOT NULL, open_method BIGINT NOT NULL, sort BIGINT NOT NULL, item_icon_group_id BIGINT NOT NULL, user_id BIGINT NOT NULL, space_id BIGINT NOT NULL)"
+        ))
+        .execute(pool)
+        .await
+        .expect("create item write fixture");
+
+        let group = create_group(
+            pool,
+            driver,
+            78,
+            7,
+            "folder",
+            "Links",
+            None,
+            "2024-09-01 00:00:00",
+        )
+        .await
+        .expect("create item group");
+        let record = super::ItemWriteRecord {
+            icon_json: r#"{"itemType":2,"src":"favicon.ico"}"#.to_string(),
+            title: "Link".to_string(),
+            url: "https://example.test".to_string(),
+            lan_url: "http://lan.example.test".to_string(),
+            mobile_url: String::new(),
+            description: "note".to_string(),
+            open_method: 2,
+            sort: 3,
+            group_id: group,
+        };
+        let item = create_item(pool, driver, 78, 7, &record, "2024-09-02 00:00:00")
+            .await
+            .expect("create item");
+        assert!(item > 0);
+        let row = item_by_id(pool, driver, 78, item)
+            .await
+            .expect("read created item")
+            .expect("item exists");
+        assert_eq!(row.title, "Link");
+        assert_eq!(row.icon_json, record.icon_json);
+        assert_eq!(row.lan_url, "http://lan.example.test");
+        assert_eq!(row.open_method, 2);
+        assert_eq!(row.sort, 3);
+        assert_eq!(row.user_id, 7);
+        assert_eq!(
+            item_by_id(pool, driver, 78, item + 1)
+                .await
+                .expect("missing item"),
+            None
+        );
+
+        let updated = super::ItemWriteRecord {
+            title: "Renamed".to_string(),
+            sort: 9,
+            ..record.clone()
+        };
+        update_item(pool, driver, 78, item, &updated, "2024-09-03 00:00:00")
+            .await
+            .expect("update item");
+        let row = item_by_id(pool, driver, 78, item)
+            .await
+            .expect("read updated item")
+            .expect("item remains");
+        assert_eq!(row.title, "Renamed");
+        assert_eq!(row.sort, 9);
+
+        delete_item(pool, driver, 78, item)
+            .await
+            .expect("delete item");
+        assert_eq!(
+            item_by_id(pool, driver, 78, item).await.expect("item gone"),
+            None
+        );
+
+        sqlx::query(&format!("DROP TABLE {item_table}"))
+            .execute(pool)
+            .await
+            .expect("drop item write fixture");
+        sqlx::query(&format!("DROP TABLE {group_table}"))
+            .execute(pool)
+            .await
+            .expect("drop item group fixture");
+    }
+
+    async fn verify_group_writes(pool: &sqlx::AnyPool, driver: Driver) {
+        let (group_table, item_table, timestamp_type, id_type) = match driver {
+            Driver::MySql => (
+                "item_icon_group",
+                "item_icon",
+                "DATETIME(6)",
+                "BIGINT AUTO_INCREMENT PRIMARY KEY",
+            ),
+            Driver::Sqlite => (
+                "item_icon_group",
+                "item_icon",
+                "TEXT",
+                "INTEGER PRIMARY KEY AUTOINCREMENT",
+            ),
+            Driver::Postgres => (
+                "item_icon_group",
+                "item_icon",
+                "TIMESTAMPTZ",
+                "BIGSERIAL PRIMARY KEY",
+            ),
+        };
+        sqlx::query(&format!(
+            "CREATE TABLE {group_table} (id {id_type}, created_at {timestamp_type} NOT NULL, updated_at {timestamp_type} NOT NULL, icon VARCHAR(100) NOT NULL, title VARCHAR(100) NOT NULL, description TEXT NOT NULL, sort BIGINT NOT NULL, user_id BIGINT NOT NULL, space_id BIGINT NOT NULL, parent_id BIGINT)"
+        ))
+        .execute(pool)
+        .await
+        .expect("create group write fixture");
+        sqlx::query(&format!(
+            "CREATE TABLE {item_table} (id {id_type}, space_id BIGINT NOT NULL, item_icon_group_id BIGINT NOT NULL)"
+        ))
+        .execute(pool)
+        .await
+        .expect("create group item fixture");
+
+        let root = create_group(
+            pool,
+            driver,
+            78,
+            7,
+            "folder",
+            "Root",
+            None,
+            "2024-08-01 00:00:00",
+        )
+        .await
+        .expect("create root group");
+        assert!(root > 0);
+        let root_row = group_by_id(pool, driver, 78, root)
+            .await
+            .expect("read root group")
+            .expect("root group exists");
+        assert_eq!(root_row.title, "Root");
+        assert_eq!(root_row.icon, "folder");
+        assert_eq!(root_row.sort, 9999);
+        assert_eq!(root_row.item_count, 0);
+        assert_eq!(
+            group_by_id(pool, driver, 78, root + 1)
+                .await
+                .expect("missing group"),
+            None
+        );
+
+        let child = create_group(
+            pool,
+            driver,
+            78,
+            7,
+            "file",
+            "Child",
+            Some(root),
+            "2024-08-02 00:00:00",
+        )
+        .await
+        .expect("create child group");
+        assert!(child > root);
+        assert!(
+            group_belongs(pool, driver, 78, root)
+                .await
+                .expect("belongs in space")
+        );
+        assert!(
+            !group_belongs(pool, driver, 78, root + 100)
+                .await
+                .expect("unknown group")
+        );
+        assert!(
+            group_has_descendant(pool, driver, 78, root, child)
+                .await
+                .expect("cycle detected")
+        );
+        assert!(
+            !group_has_descendant(pool, driver, 78, child, root)
+                .await
+                .expect("no cycle upwards")
+        );
+
+        update_group(
+            pool,
+            driver,
+            78,
+            child,
+            "Renamed",
+            "icon",
+            Some(root),
+            "2024-08-03 00:00:00",
+        )
+        .await
+        .expect("rename child group");
+        assert_eq!(
+            group_by_id(pool, driver, 78, child)
+                .await
+                .expect("read renamed child")
+                .expect("child exists")
+                .title,
+            "Renamed"
+        );
+
+        for id in [1_i64, 2] {
+            sqlx::query(&query(
+                driver,
+                &format!(
+                    "INSERT INTO {item_table} (id, space_id, item_icon_group_id) VALUES (?, ?, ?)"
+                ),
+            ))
+            .bind(id)
+            .bind(78_i64)
+            .bind(root)
+            .execute(pool)
+            .await
+            .expect("insert grouped item");
+        }
+        delete_group_tree(pool, driver, 78, root)
+            .await
+            .expect("delete group tree");
+        assert_eq!(
+            group_by_id(pool, driver, 78, root)
+                .await
+                .expect("root gone"),
+            None
+        );
+        assert_eq!(
+            group_by_id(pool, driver, 78, child)
+                .await
+                .expect("child gone"),
+            None
+        );
+        let remaining: i64 = sqlx::query(&query(
+            driver,
+            &format!("SELECT COUNT(*) AS total FROM {item_table} WHERE space_id = ?"),
+        ))
+        .bind(78_i64)
+        .fetch_one(pool)
+        .await
+        .expect("count remaining items")
+        .try_get("total")
+        .expect("total");
+        assert_eq!(remaining, 0);
+
+        sqlx::query(&format!("DROP TABLE {item_table}"))
+            .execute(pool)
+            .await
+            .expect("drop group item fixture");
+        sqlx::query(&format!("DROP TABLE {group_table}"))
+            .execute(pool)
+            .await
+            .expect("drop group write fixture");
     }
 
     async fn verify_admin_and_config_reads(pool: &sqlx::AnyPool, driver: Driver) {

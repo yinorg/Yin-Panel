@@ -1,0 +1,45 @@
+name: Rust Parity Check
+
+# The Rust front door must keep every route the Go build registers, and the
+# migration metrics may only shrink. These two checks are the gates that stop a
+# missing handler from hiding behind Gin's 404 page.
+on:
+  pull_request:
+  push:
+    branches: ['**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rust-parity:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/app/target
+          key: rust-parity-${{ hashFiles('rust/app/Cargo.lock') }}
+      - name: Metrics may not regress
+        run: ./scripts/rust-parity-metrics.sh
+      - name: Unit and slice tests
+        run: cargo test --manifest-path rust/app/Cargo.toml
+      - name: Build the front door
+        run: cargo build --release --manifest-path rust/app/Cargo.toml
+      - name: Every Go route has a Rust handler
+        run: python3 rust/check/route-parity.py
+      - name: Upload the unimplemented list on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: parity-unimplemented
+          path: rust/parity-unimplemented.txt
+          if-no-files-found: ignore
