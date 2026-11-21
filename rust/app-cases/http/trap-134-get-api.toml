@@ -1,10 +1,9 @@
 [request]
 method = "GET"
-path = "/api/theme/v2/package/"
+path = "/api/a%C2%A0b/v2/package/org.yin.default"
 
 [response]
-status = 301
+status = 404
 
 [response.headers]
-content-type = "text/html; charset=utf-8"
-location = "/api/theme/v2/package"
+content-type = "text/plain"

@@ -4,11 +4,11 @@
 //! hashed build assets are immutable, the entry documents and PWA control files
 //! are never cached, and the SPA routes fall back to `index.html`.
 
+use axum::Router;
 use axum::extract::Path;
 use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
-use axum::Router;
 
 use crate::appcfg;
 
@@ -98,11 +98,13 @@ fn serve_file(
         }
         headers.insert(
             header::CONTENT_TYPE,
-            HeaderValue::from_str(mime_type(relative)).unwrap_or(HeaderValue::from_static("application/octet-stream")),
+            HeaderValue::from_str(mime_type(relative))
+                .unwrap_or(HeaderValue::from_static("application/octet-stream")),
         );
         headers.insert(
             header::CONTENT_LENGTH,
-            HeaderValue::from_str(&content.len().to_string()).unwrap_or(HeaderValue::from_static("0")),
+            HeaderValue::from_str(&content.len().to_string())
+                .unwrap_or(HeaderValue::from_static("0")),
         );
         headers.insert(header::ACCEPT_RANGES, HeaderValue::from_static("bytes"));
         if let Some(modified) = modified
@@ -233,7 +235,10 @@ async fn workbox(headers: HeaderMap, Path(filename): Path<String>) -> Response {
     if !filename.ends_with(".js") || filename.contains('/') {
         return (
             StatusCode::NOT_FOUND,
-            [(header::CONTENT_TYPE, HeaderValue::from_static("text/plain; charset=utf-8"))],
+            [(
+                header::CONTENT_TYPE,
+                HeaderValue::from_static("text/plain; charset=utf-8"),
+            )],
             "",
         )
             .into_response();

@@ -1,9 +1,12 @@
 [request]
 method = "GET"
-path = "/api/theme/v2/h%C3%A9llo%20w%C3%B6rld/library"
+path = "/api/theme/v2/package/stra%C3%9Fe"
 
 [response]
 status = 404
 
 [response.headers]
-content-type = "text/plain"
+cache-control = "no-store"
+referrer-policy = "strict-origin-when-cross-origin"
+x-content-type-options = "nosniff"
+x-frame-options = "SAMEORIGIN"

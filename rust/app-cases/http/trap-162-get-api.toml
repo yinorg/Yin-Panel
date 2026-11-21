@@ -1,9 +1,12 @@
 [request]
 method = "GET"
-path = "/api/theme/v2/%F0%9F%91%8D%F0%9F%8F%BD%20thumbs/library"
+path = "/api/theme/v2/package/%C4%B1l%C4%B1k%20%C4%B1rmak"
 
 [response]
 status = 404
 
 [response.headers]
-content-type = "text/plain"
+cache-control = "no-store"
+referrer-policy = "strict-origin-when-cross-origin"
+x-content-type-options = "nosniff"
+x-frame-options = "SAMEORIGIN"

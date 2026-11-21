@@ -54,7 +54,10 @@ fn build_body() -> String {
             entry.insert("name".into(), json!(text(&item, "name")));
             let poster = text(&item, "poster");
             if !poster.is_empty() {
-                entry.insert("poster".into(), json!(format!("{LIBRARY_ROOT}{version}/{poster}")));
+                entry.insert(
+                    "poster".into(),
+                    json!(format!("{LIBRARY_ROOT}{version}/{poster}")),
+                );
             }
             entry.insert(
                 "source".into(),

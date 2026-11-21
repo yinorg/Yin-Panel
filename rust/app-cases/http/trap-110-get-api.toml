@@ -1,6 +1,6 @@
 [request]
 method = "GET"
-path = "/api/a%C2%A0b/v2/package/org.yin.default"
+path = "/api/%C4%B0stanbul/v2/packages"
 
 [response]
 status = 404

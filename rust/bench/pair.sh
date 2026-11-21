@@ -133,10 +133,14 @@ case "$command" in
         rm -rf "$work"
         for side in go rust; do
             mkdir -p "$work/$side/database" "$work/$side/uploads"
-            snapshot_db "$source_db" "$work/$side/database/database.db"
             ln -s "$root/backend/web" "$work/$side/web"
             cp -a "$root/backend/lang" "$work/$side/lang"
         done
+        # Make one SQLite-consistent snapshot, then copy that exact byte image
+        # to both runs. Two calls to `backup()` can include writes that land
+        # between snapshots and would make the comparison dishonest.
+        snapshot_db "$source_db" "$work/go/database/database.db"
+        cp -a "$work/go/database/database.db" "$work/rust/database/database.db"
         write_conf "$work/go" "$go_port"
         write_conf "$work/rust" "$rust_port"
         go_pid="$(start_one "$go_bin" "$work/go" go "$go_port")"
@@ -166,9 +170,9 @@ case "$command" in
                 continue
             fi
             exe="$(exe_of "$pid")"
-            # The rollback artifact is `yin-panel-go`; both names are this pair's.
+            # The pair may use the production Rust binary or the replay build.
             case "$(basename "$exe")" in
-                yin-panel|yin-panel-go) ;;
+                yin-panel|yin-panel-go|run-original) ;;
                 *) die "pid $pid is $exe, not the yin-panel this pair started; refusing to stop it" ;;
             esac
             kill "$pid" 2>/dev/null || true

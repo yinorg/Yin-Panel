@@ -3,7 +3,7 @@
 //! `backend/internal/web/router/system`.
 
 use axum::Router;
-use axum::extract::{Multipart, Path, Query, Request};
+use axum::extract::{FromRequest, Multipart, Path, Query, Request};
 use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::response::IntoResponse;
 use axum::response::Response;
@@ -15,6 +15,14 @@ use serde_json::json;
 use crate::appcfg;
 use crate::auth::{self, AuthError};
 use crate::envelope::{self, error_code, success, success_data};
+
+fn go_json_error(error: &serde_json::Error) -> String {
+    if error.is_eof() {
+        "unexpected EOF".to_string()
+    } else {
+        error.to_string()
+    }
+}
 
 pub fn router() -> Router<()> {
     Router::new()
@@ -29,14 +37,14 @@ pub fn router() -> Router<()> {
         .route("/api/spaces/{space_id}/groups", get(groups))
         .route("/api/spaces/{space_id}/items", get(items))
         .route("/api/spaces/{space_id}/members", get(members))
-        .route("/api/spaces/{space_id}/public", get(space_public))
+        .route(
+            "/api/spaces/{space_id}/public",
+            get(space_public).post(set_space_public),
+        )
         .route("/api/system/moduleConfig/getByName", get(module_config))
         .route("/api/file/getList", get(file_list))
         .route("/api/file/uploadImg", post(upload_image))
-        .route(
-            "/api/panel/itemIcon/getSiteFavicon",
-            post(get_site_favicon),
-        )
+        .route("/api/panel/itemIcon/getSiteFavicon", post(get_site_favicon))
         .route("/api/user/updateInfo", post(update_user_info))
         .route("/api/user/updatePassword", post(update_password))
         .route("/api/file/s3/{*filepath}", get(serve_stored_file_api))
@@ -48,10 +56,19 @@ pub fn router() -> Router<()> {
         .route("/api/panel/users/delete", post(delete_user))
         .route("/api/file/delete", post(delete_file))
         .route("/api/panel/userConfig/getConfig", get(user_config))
-        .route("/api/system/monitor/getEnableStatus", post(monitor_enable_status))
-        .route("/api/system/monitor/getSnapshot", post(monitor_disabled))
-        .route("/api/system/monitor/getDiskMountpoints", post(monitor_disabled))
-        .route("/api/system/monitor/getDiskStateByPath", post(monitor_disabled))
+        .route(
+            "/api/system/monitor/getEnableStatus",
+            post(monitor_enable_status),
+        )
+        .route("/api/system/monitor/getSnapshot", post(monitor_snapshot))
+        .route(
+            "/api/system/monitor/getDiskMountpoints",
+            post(monitor_disk_mountpoints),
+        )
+        .route(
+            "/api/system/monitor/getDiskStateByPath",
+            post(monitor_disk_state),
+        )
         .route(
             "/api/theme/v2/preference",
             get(theme_preference).post(set_theme_preference),
@@ -63,10 +80,7 @@ pub fn router() -> Router<()> {
             "/api/theme/v2/admin/trusted/{revision}",
             get(admin_trusted).put(set_trusted),
         )
-        .route(
-            "/api/theme/v2/revisions/{revision}",
-            get(theme_revision),
-        )
+        .route("/api/theme/v2/revisions/{revision}", get(theme_revision))
         .route("/api/theme/v2/admin/preview", post(theme_preview_upload))
         .route("/api/theme/v2/admin/install", post(theme_install))
         .route(
@@ -94,39 +108,39 @@ pub fn router() -> Router<()> {
         )
         .route(
             "/api/theme/v2/grants/{revision}",
-            get(theme_grant).post(set_theme_grant).delete(revoke_theme_grant),
+            get(theme_grant)
+                .post(set_theme_grant)
+                .delete(revoke_theme_grant),
         )
         .route(
             "/api/theme/v2/wallpaper/web/{id}/{name}",
             get(web_wallpaper_asset),
         )
-        .route("/api/theme/v2/space/{space_id}", get(theme_space))
+        .route(
+            "/api/theme/v2/space/{space_id}",
+            get(theme_space)
+                .put(set_space_theme)
+                .delete(clear_space_theme),
+        )
         .route("/api/theme/v2/current", get(theme_current))
         .route("/api/theme/v2/packages", get(theme_packages))
         .route("/api/theme/v2/package/{package_id}", get(theme_package))
         .route("/api/theme/v2/mine", get(theme_mine))
         .route("/api/theme/v2/effective", get(theme_effective))
-        .route(
-            "/api/theme/v2/assets/{revision}/{*name}",
-            get(theme_asset),
-        )
+        .route("/api/theme/v2/assets/{revision}/{*name}", get(theme_asset))
         .route("/api/system/moduleConfig/save", post(module_config_save))
         .route("/api/panel/userConfig/setConfig", post(user_config_save))
-        .route(
-            "/api/spaces/{space_id}/groups",
-            post(create_group),
-        )
+        .route("/api/spaces/{space_id}/groups", post(create_group))
         .route(
             "/api/spaces/{space_id}/groups/{group_id}",
             post(update_group).delete(delete_group).put(update_group),
         )
-        .route(
-            "/api/spaces/{space_id}/members",
-            post(add_member),
-        )
+        .route("/api/spaces/{space_id}/members", post(add_member))
         .route(
             "/api/spaces/{space_id}/members/{user_id}",
-            axum::routing::put(update_member).delete(remove_member),
+            axum::routing::put(update_member)
+                .post(update_member)
+                .delete(remove_member),
         )
         .route(
             "/api/spaces/{space_id}/members/{user_id}/delete",
@@ -167,7 +181,9 @@ pub fn router() -> Router<()> {
         )
         .route(
             "/api/spaces/{space_id}",
-            axum::routing::delete(delete_space).post(rename_space),
+            axum::routing::delete(delete_space)
+                .post(rename_space)
+                .put(rename_space),
         )
         .route("/api/spaces/{space_id}/delete", post(delete_space))
         .route("/api/spaces/shared", post(create_space))
@@ -273,18 +289,21 @@ async fn login(request: Request) -> Response {
     }
 
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool,
         Err(error) => return envelope::error(&error),
     };
-    let user: Option<PasswordUser> = sqlx::query_as(
-        r#"SELECT id, name, role, mail, status, token_version FROM "user" WHERE mail = ? AND password = ?"#,
+    let user = match crate::repository::user_by_credentials(
+        pool,
+        ctx.sqlx_driver(),
+        &mail,
+        &password_encryption(&params.password),
     )
-    .bind(&mail)
-    .bind(password_encryption(&params.password))
-    .fetch_optional(pool)
     .await
-    .unwrap_or(None);
+    {
+        Ok(user) => user,
+        Err(_) => return error_code(1003),
+    };
     let Some(user) = user else {
         return error_code(1003);
     };
@@ -317,16 +336,6 @@ struct LoginParams {
     mail: String,
     #[serde(default)]
     password: String,
-}
-
-#[derive(sqlx::FromRow)]
-struct PasswordUser {
-    id: i64,
-    name: String,
-    role: i64,
-    mail: String,
-    status: i64,
-    token_version: i64,
 }
 
 /// `util.PasswordEncryption`: MD5 applied three times, hex, lowercase.
@@ -379,15 +388,14 @@ async fn logout(headers: HeaderMap) -> Response {
         Err(AuthError::Disabled) => return error_code(1004),
     };
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool,
         Err(error) => return envelope::error(&error),
     };
-    let result = sqlx::query(r#"UPDATE "user" SET token_version = token_version + 1 WHERE id = ?"#)
-        .bind(user.id)
-        .execute(pool)
-        .await;
-    if result.is_err() {
+    if crate::repository::revoke_user_sessions(pool, ctx.sqlx_driver(), user.id)
+        .await
+        .is_err()
+    {
         return envelope::error("退出登录失败");
     }
     envelope::with_header(
@@ -407,73 +415,19 @@ async fn list_spaces(headers: HeaderMap) -> Response {
         Err(AuthError::Disabled) => return error_code(1004),
     };
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool,
         Err(error) => return envelope::error(&error),
     };
-    let rows: Vec<SpaceRow> = match sqlx::query_as(
-        r#"SELECT id, created_at, updated_at, type, name, owner_user_id, pair_id, side,
-                  public_enabled, public_id, public_mode
-           FROM "space"
-           WHERE (owner_user_id = ? OR id IN (SELECT space_id FROM space_member WHERE user_id = ?))
-             AND side = 'yin'
-           ORDER BY type, created_at"#,
-    )
-    .bind(user.id)
-    .bind(user.id)
-    .fetch_all(pool)
-    .await
-    {
+    let rows = match crate::repository::space_list(pool, ctx.sqlx_driver(), user.id).await {
         Ok(rows) => rows,
         Err(error) => return envelope::error(&error.to_string()),
     };
-
-    // `List` resolves the paired space and the caller's role in two batched
-    // queries rather than two per space, which matters once an account owns or
-    // joins many Spaces.
-    let mut paired_by_id: std::collections::HashMap<i64, i64> = std::collections::HashMap::new();
-    let mut role_by_id: std::collections::HashMap<i64, String> = std::collections::HashMap::new();
-    if !rows.is_empty() {
-        let placeholders = vec!["?"; rows.len()].join(",");
-        let paired_sql = format!(
-            r#"SELECT id, pair_id FROM "space" WHERE pair_id IN ({placeholders}) AND side = 'yang'"#
-        );
-        let mut query = sqlx::query_as::<_, (i64, i64)>(&paired_sql);
-        for row in &rows {
-            query = query.bind(row.id);
-        }
-        if let Ok(paired) = query.fetch_all(pool).await {
-            for (id, pair_id) in paired {
-                paired_by_id.insert(pair_id, id);
-            }
-        }
-        let member_sql = format!(
-            "SELECT space_id, role FROM space_member WHERE user_id = ? AND space_id IN ({placeholders})"
-        );
-        let mut query = sqlx::query_as::<_, (i64, String)>(&member_sql).bind(user.id);
-        for row in &rows {
-            query = query.bind(row.id);
-        }
-        if let Ok(members) = query.fetch_all(pool).await {
-            for (space_id, role) in members {
-                role_by_id.insert(space_id, role);
-            }
-        }
-    }
-
-    let mut items = Vec::with_capacity(rows.len());
-    for row in rows {
-        let role = match role_by_id.get(&row.id) {
-            Some(role) => role.clone(),
-            None => String::new(),
-        };
-        // The owner is always an administrator, whatever the member row says.
-        let can_edit = row.owner_user_id == user.id
-            || role == "admin"
-            || role == "editor";
-        items.push(SpaceItem {
-            paired_space_id: paired_by_id.get(&row.id).copied(),
-            can_edit,
+    let items = rows
+        .into_iter()
+        .map(|row| SpaceItem {
+            paired_space_id: row.paired_space_id,
+            can_edit: row.can_edit,
             id: row.id,
             create_time: rfc3339(&row.created_at),
             update_time: rfc3339(&row.updated_at),
@@ -482,11 +436,11 @@ async fn list_spaces(headers: HeaderMap) -> Response {
             owner_user_id: row.owner_user_id,
             pair_id: row.pair_id,
             side: row.side,
-            public_enabled: row.public_enabled != 0,
+            public_enabled: row.public_enabled,
             public_id: row.public_id,
             public_mode: row.public_mode,
-        });
-    }
+        })
+        .collect::<Vec<_>>();
     envelope::success_struct(items)
 }
 
@@ -499,53 +453,27 @@ async fn search_config(headers: HeaderMap, Path(space_id): Path<i64>) -> Respons
         Err(AuthError::Disabled) => return error_code(1004),
     };
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool,
         Err(error) => return envelope::error(&error),
     };
-    let found: Option<(i64, String)> =
-        sqlx::query_as(r#"SELECT owner_user_id, search_config_json FROM "space" WHERE id = ?"#)
-            .bind(space_id)
-            .fetch_optional(pool)
+    let found =
+        match crate::repository::space_search_config(pool, ctx.sqlx_driver(), user.id, space_id)
             .await
-            .unwrap_or(None);
-    let Some((owner, config)) = found else {
-        return error_code(404);
-    };
-    let member: Option<(String,)> = sqlx::query_as(
-        r#"SELECT role FROM space_member WHERE space_id = ? AND user_id = ? LIMIT 1"#,
-    )
-    .bind(space_id)
-    .bind(user.id)
-    .fetch_optional(pool)
-    .await
-    .unwrap_or(None);
-    if owner != user.id && member.is_none() {
+        {
+            Ok(Some(found)) => found,
+            Ok(None) | Err(_) => return error_code(404),
+        };
+    if found.owner_user_id != user.id && !found.is_member {
         return error_code(1005);
     }
-    if config.is_empty() {
+    if found.config_json.is_empty() {
         return success();
     }
-    match serde_json::from_str::<serde_json::Value>(&config) {
+    match serde_json::from_str::<serde_json::Value>(&found.config_json) {
         Ok(value) => success_data(value),
         Err(error) => envelope::error(&error.to_string()),
     }
-}
-
-#[derive(sqlx::FromRow)]
-struct SpaceRow {
-    id: i64,
-    created_at: String,
-    updated_at: String,
-    #[sqlx(rename = "type")]
-    kind: String,
-    name: String,
-    owner_user_id: i64,
-    pair_id: i64,
-    side: String,
-    public_enabled: i64,
-    public_id: Option<String>,
-    public_mode: String,
 }
 
 /// Go stores `time.Time` in SQLite as `YYYY-MM-DD HH:MM:SS(.frac)(offset)` and
@@ -585,7 +513,8 @@ struct SpaceItem {
     can_edit: bool,
 }
 
-/// `canAccessSpace`: the owner or any member.
+/// `canAccessSpace`: the owner or any member, for the SQLite write paths not
+/// yet migrated. Read routes use `repository::can_access_space`.
 async fn can_access(pool: &sqlx::SqlitePool, user_id: i64, space_id: i64) -> bool {
     let owner: Option<(i64,)> = sqlx::query_as(r#"SELECT owner_user_id FROM "space" WHERE id = ?"#)
         .bind(space_id)
@@ -607,56 +536,39 @@ async fn can_access(pool: &sqlx::SqlitePool, user_id: i64, space_id: i64) -> boo
     }
 }
 
-async fn guard(headers: &HeaderMap, space_id: i64) -> Result<sqlx::SqlitePool, Response> {
+async fn guard_shared(headers: &HeaderMap, space_id: i64) -> Result<sqlx::AnyPool, Response> {
     let user = match auth::user(headers).await {
         Ok(user) => user,
         Err(AuthError::NotLoggedIn) => return Err(error_code(1000)),
         Err(AuthError::Disabled) => return Err(error_code(1004)),
     };
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool.clone(),
         Err(error) => return Err(envelope::error(&error)),
     };
-    if !can_access(&pool, user.id, space_id).await {
-        return Err(error_code(1005));
+    match crate::repository::can_access_space(&pool, ctx.sqlx_driver(), user.id, space_id).await {
+        Ok(true) => Ok(pool),
+        Ok(false) | Err(_) => Err(error_code(1005)),
     }
-    Ok(pool)
 }
 
 /// `SpaceRouter.Groups`: one grouped count for the whole Space.
 async fn groups(headers: HeaderMap, Path(space_id): Path<i64>) -> Response {
-    let pool = match guard(&headers, space_id).await {
+    let pool = match guard_shared(&headers, space_id).await {
         Ok(pool) => pool,
         Err(response) => return response,
     };
-    let rows: Vec<GroupRow> = match sqlx::query_as(
-        r#"SELECT id, created_at, updated_at, icon, title, description, sort, user_id, space_id,
-                  parent_id
-           FROM item_icon_group WHERE space_id = ? ORDER BY sort, created_at"#,
-    )
-    .bind(space_id)
-    .fetch_all(&pool)
-    .await
-    {
-        Ok(rows) => rows,
-        Err(error) => return envelope::error(&error.to_string()),
-    };
-    let counts: Vec<(i64, i64)> = sqlx::query_as(
-        "SELECT item_icon_group_id, COUNT(*) FROM item_icon WHERE space_id = ? GROUP BY item_icon_group_id",
-    )
-    .bind(space_id)
-    .fetch_all(&pool)
-    .await
-    .unwrap_or_default();
-    let mut items = Vec::with_capacity(rows.len());
-    for row in rows {
-        let count = counts
-            .iter()
-            .find(|(group, _)| *group == row.id)
-            .map(|(_, total)| *total)
-            .unwrap_or(0);
-        items.push(GroupItem {
+    let rows =
+        match crate::repository::groups_for_space(&pool, appcfg::ctx().sqlx_driver(), space_id)
+            .await
+        {
+            Ok(rows) => rows,
+            Err(error) => return envelope::error(&error.to_string()),
+        };
+    let items = rows
+        .into_iter()
+        .map(|row| GroupItem {
             id: row.id,
             create_time: rfc3339(&row.created_at),
             update_time: rfc3339(&row.updated_at),
@@ -667,9 +579,9 @@ async fn groups(headers: HeaderMap, Path(space_id): Path<i64>) -> Response {
             user_id: row.user_id,
             space_id: row.space_id,
             parent_id: row.parent_id,
-            item_count: count,
-        });
-    }
+            item_count: row.item_count,
+        })
+        .collect::<Vec<_>>();
     envelope::success_struct(items)
 }
 
@@ -680,57 +592,34 @@ async fn items(
     Path(space_id): Path<i64>,
     Query(query): Query<std::collections::HashMap<String, String>>,
 ) -> Response {
-    let pool = match guard(&headers, space_id).await {
+    let pool = match guard_shared(&headers, space_id).await {
         Ok(pool) => pool,
         Err(response) => return response,
     };
-    let mut sql = String::from(
-        r#"SELECT id, created_at, updated_at, icon_json, title, url, lan_url, mobile_url,
-                  description, open_method, sort, item_icon_group_id, user_id, space_id
-           FROM item_icon WHERE space_id = ?"#,
-    );
     let group = query.get("groupId").cloned().unwrap_or_default();
-    if !group.is_empty() {
-        sql.push_str(" AND item_icon_group_id = ?");
-    }
-    sql.push_str(" ORDER BY sort, created_at, id");
-    let mut binder = sqlx::query_as::<_, ItemRow>(&sql).bind(space_id);
-    if !group.is_empty() {
-        binder = binder.bind(group.parse::<i64>().unwrap_or(-1));
-    }
+    let group_id = if group.is_empty() {
+        None
+    } else {
+        Some(group.parse::<i64>().unwrap_or(-1))
+    };
     let page: i64 = query
         .get("page")
         .and_then(|value| value.parse().ok())
         .unwrap_or(0);
-    if page > 0 {
-        let mut size: i64 = query
-            .get("pageSize")
-            .and_then(|value| value.parse().ok())
-            .unwrap_or(0);
-        if size < 1 {
-            size = 50;
-        }
-        if size > 200 {
-            size = 200;
-        }
-        sql.clear();
-        sql.push_str(
-            r#"SELECT id, created_at, updated_at, icon_json, title, url, lan_url, mobile_url,
-                      description, open_method, sort, item_icon_group_id, user_id, space_id
-               FROM item_icon WHERE space_id = ?"#,
-        );
-        if !group.is_empty() {
-            sql.push_str(" AND item_icon_group_id = ?");
-        }
-        sql.push_str(" ORDER BY sort, created_at, id LIMIT ? OFFSET ?");
-        let mut paged = sqlx::query_as::<_, ItemRow>(&sql).bind(space_id);
-        if !group.is_empty() {
-            paged = paged.bind(group.parse::<i64>().unwrap_or(-1));
-        }
-        paged = paged.bind(size).bind((page - 1) * size);
-        binder = paged;
-    }
-    let rows = match binder.fetch_all(&pool).await {
+    let page_size: i64 = query
+        .get("pageSize")
+        .and_then(|value| value.parse().ok())
+        .unwrap_or(0);
+    let rows = match crate::repository::items_for_space(
+        &pool,
+        appcfg::ctx().sqlx_driver(),
+        space_id,
+        group_id,
+        page,
+        page_size,
+    )
+    .await
+    {
         Ok(rows) => rows,
         Err(error) => return envelope::error(&error.to_string()),
     };
@@ -765,35 +654,23 @@ async fn items(
 
 /// `SpaceRouter.Members`: `map[string]any` in Go, so keys come out sorted.
 async fn members(headers: HeaderMap, Path(space_id): Path<i64>) -> Response {
-    let pool = match guard(&headers, space_id).await {
+    let pool = match guard_shared(&headers, space_id).await {
         Ok(pool) => pool,
         Err(response) => return response,
     };
-    let rows: Vec<MemberRow> = match sqlx::query_as(
-        r#"SELECT id, space_id, user_id, role, source, joined_at
-           FROM space_member WHERE space_id = ? ORDER BY id"#,
-    )
-    .bind(space_id)
-    .fetch_all(&pool)
-    .await
+    let rows = match crate::repository::space_members(&pool, appcfg::ctx().sqlx_driver(), space_id)
+        .await
     {
         Ok(rows) => rows,
         Err(error) => return envelope::error(&error.to_string()),
     };
     let mut out = Vec::with_capacity(rows.len());
     for row in rows {
-        let account: Option<(String, String)> =
-            sqlx::query_as(r#"SELECT mail, name FROM "user" WHERE id = ?"#)
-                .bind(row.user_id)
-                .fetch_optional(&pool)
-                .await
-                .unwrap_or(None);
-        let (email, name) = account.unwrap_or_default();
         out.push(json!({
-            "email": email,
+            "email": row.email,
             "id": row.id,
             "joinedAt": rfc3339(&row.joined_at),
-            "name": name,
+            "name": row.name,
             "role": row.role,
             "source": row.source,
             "spaceId": row.space_id,
@@ -833,16 +710,6 @@ struct ItemRow {
     item_icon_group_id: i64,
     user_id: i64,
     space_id: i64,
-}
-
-#[derive(sqlx::FromRow)]
-struct MemberRow {
-    id: i64,
-    space_id: i64,
-    user_id: i64,
-    role: String,
-    source: String,
-    joined_at: String,
 }
 
 #[derive(Serialize)]
@@ -940,28 +807,109 @@ async fn space_public(headers: HeaderMap, Path(space_id): Path<i64>) -> Response
         Err(AuthError::Disabled) => return error_code(1004),
     };
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool.clone(),
         Err(error) => return envelope::error(&error),
     };
-    if !can_manage(&pool, user.id, space_id).await {
+    if !crate::repository::can_manage_space(&pool, ctx.sqlx_driver(), user.id, space_id)
+        .await
+        .unwrap_or(false)
+    {
         return error_code(1005);
     }
-    let row: Option<(i64, Option<String>, String)> = sqlx::query_as(
-        r#"SELECT public_enabled, public_id, public_mode FROM "space" WHERE id = ?"#,
-    )
-    .bind(space_id)
-    .fetch_optional(&pool)
-    .await
-    .unwrap_or(None);
-    let Some((enabled, public_id, mode)) = row else {
-        return error_code(404);
+    let row = match crate::repository::space_public_config(&pool, ctx.sqlx_driver(), space_id).await
+    {
+        Ok(Some(row)) => row,
+        Ok(None) | Err(_) => return error_code(404),
     };
     success_data(json!({
-        "enabled": enabled != 0,
-        "mode": mode,
-        "publicId": public_id,
+        "enabled": row.enabled,
+        "mode": row.mode,
+        "publicId": row.public_id,
     }))
+}
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PublicConfigRequest {
+    enabled: bool,
+    #[serde(default)]
+    public_id: String,
+    mode: String,
+    #[serde(default)]
+    access_code: String,
+}
+
+async fn set_space_public(
+    headers: HeaderMap,
+    Path(space_id): Path<i64>,
+    request: Request,
+) -> Response {
+    let user = match auth::user(&headers).await {
+        Ok(user) => user,
+        Err(AuthError::NotLoggedIn) => return error_code(1000),
+        Err(AuthError::Disabled) => return error_code(1004),
+    };
+    let ctx = appcfg::ctx();
+    let pool = match ctx.shared_pool().await {
+        Ok(pool) => pool.clone(),
+        Err(error) => return envelope::error(&error),
+    };
+    if !crate::repository::can_manage_space(&pool, ctx.sqlx_driver(), user.id, space_id)
+        .await
+        .unwrap_or(false)
+    {
+        return error_code(1005);
+    }
+    let body = match axum::body::to_bytes(request.into_body(), 1 << 20).await {
+        Ok(body) => body,
+        Err(_) => return envelope::error(" [invalid public config]"),
+    };
+    let req: PublicConfigRequest = match serde_json::from_slice(&body) {
+        Ok(req) => req,
+        Err(_) => return envelope::error(" [invalid public config]"),
+    };
+    let valid_public_id = !req.public_id.is_empty()
+        && req.public_id.len() <= 64
+        && req
+            .public_id
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_');
+    if req.enabled && !valid_public_id {
+        return envelope::error(" [invalid publicId]");
+    }
+    if req.mode != "direct" && req.mode != "code" {
+        return envelope::error(" [invalid public mode]");
+    }
+    if req.mode == "code" && req.enabled && !(4..=12).contains(&req.access_code.len()) {
+        return envelope::error(" [invalid access code]");
+    }
+    let public_id = if req.enabled {
+        Some(req.public_id.as_str())
+    } else {
+        None
+    };
+    let code_hash = if !req.enabled {
+        Some(String::new())
+    } else if req.mode == "code" && !req.access_code.is_empty() {
+        Some(hex_digest(req.access_code.as_bytes(), true))
+    } else {
+        None
+    };
+    match crate::repository::update_space_public_config(
+        &pool,
+        ctx.sqlx_driver(),
+        space_id,
+        req.enabled,
+        public_id,
+        &req.mode,
+        code_hash.as_deref(),
+    )
+    .await
+    {
+        Ok(()) => success(),
+        Err(error) => envelope::error(&format!("save public config: {error}")),
+    }
 }
 
 /// `ModuleConfigRouter.GetByName`: a missing row answers `"data": null`, which
@@ -977,24 +925,29 @@ async fn module_config(
     };
     let name = query.get("name").cloned().unwrap_or_default();
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool,
         Err(error) => return envelope::error(&error),
     };
-    let row: Option<(String,)> = sqlx::query_as(
-        r#"SELECT value_json FROM module_config WHERE user_id = ? AND name = ? LIMIT 1"#,
-    )
-    .bind(user.id)
-    .bind(&name)
-    .fetch_optional(pool)
-    .await
-    .unwrap_or(None);
+    let row = crate::repository::module_config_value(pool, ctx.sqlx_driver(), user.id, &name)
+        .await
+        .unwrap_or(None);
     match row {
-        None => (axum::http::StatusCode::OK, envelope::headers(), envelope::body(0, "OK", Some(serde_json::Value::Null))).into_response(),
-        Some((value_json,)) => {
+        None => (
+            axum::http::StatusCode::OK,
+            envelope::headers(),
+            envelope::body(0, "OK", Some(serde_json::Value::Null)),
+        )
+            .into_response(),
+        Some(value_json) => {
             let value: serde_json::Value =
                 serde_json::from_str(&value_json).unwrap_or(serde_json::Value::Null);
-            (axum::http::StatusCode::OK, envelope::headers(), envelope::body(0, "OK", Some(value))).into_response()
+            (
+                axum::http::StatusCode::OK,
+                envelope::headers(),
+                envelope::body(0, "OK", Some(value)),
+            )
+                .into_response()
         }
     }
 }
@@ -1014,32 +967,24 @@ async fn file_list(
         return error_code(1005);
     }
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool,
         Err(error) => return envelope::error(&error),
     };
-    let total: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM file")
-        .fetch_one(pool)
-        .await
-        .unwrap_or((0,));
-    let limit: i64 = query.get("limit").and_then(|value| value.parse().ok()).unwrap_or(0);
-    let rows: Vec<FileRow> = if limit > 0 {
-        let page: i64 = query.get("page").and_then(|value| value.parse().ok()).unwrap_or(1).max(1);
-        let limit = limit.min(200);
-        sqlx::query_as(
-            "SELECT id, created_at, updated_at, file_name FROM file ORDER BY created_at DESC LIMIT ? OFFSET ?",
-        )
-        .bind(limit)
-        .bind((page - 1) * limit)
-        .fetch_all(pool)
-        .await
-        .unwrap_or_default()
-    } else {
-        sqlx::query_as("SELECT id, created_at, updated_at, file_name FROM file ORDER BY created_at DESC")
-            .fetch_all(pool)
-            .await
-            .unwrap_or_default()
-    };
+    let limit: i64 = query
+        .get("limit")
+        .and_then(|value| value.parse().ok())
+        .unwrap_or(0);
+    let page: i64 = query
+        .get("page")
+        .and_then(|value| value.parse().ok())
+        .unwrap_or(1)
+        .max(1);
+    let (total, rows) =
+        match crate::repository::file_list(pool, ctx.sqlx_driver(), limit, page).await {
+            Ok(result) => result,
+            Err(_) => (0, Vec::new()),
+        };
     let prefix = if ctx.conf.base.url_prefix.is_empty() {
         "/uploads/"
     } else {
@@ -1062,44 +1007,34 @@ async fn file_list(
     } else {
         serde_json::Value::Array(list)
     };
-    success_data(json!({"count": total.0, "list": list}))
-}
-
-#[derive(sqlx::FromRow)]
-struct FileRow {
-    id: i64,
-    created_at: String,
-    updated_at: String,
-    file_name: String,
+    success_data(json!({"count": total, "list": list}))
 }
 
 /// `SpaceRouter.BookmarkTree`: groups ordered `sort, id`, items ordered
 /// `sort, id`, folded into a tree capped at `bookmarkTreeMaxDepth`.
 async fn bookmarks_tree(headers: HeaderMap, Path(space_id): Path<i64>) -> Response {
-    let pool = match guard(&headers, space_id).await {
+    let pool = match guard_shared(&headers, space_id).await {
         Ok(pool) => pool,
         Err(response) => return response,
     };
-    let groups: Vec<(i64, String, String, Option<i64>)> = match sqlx::query_as(
-        r#"SELECT id, title, icon, parent_id FROM item_icon_group WHERE space_id = ? ORDER BY sort, id"#,
+    let (groups, items) = match crate::repository::bookmark_tree(
+        &pool,
+        appcfg::ctx().sqlx_driver(),
+        space_id,
     )
-    .bind(space_id)
-    .fetch_all(&pool)
     .await
     {
-        Ok(rows) => rows,
+        Ok(result) => result,
         Err(error) => return envelope::error(&error.to_string()),
     };
-    let items: Vec<(i64, String, String)> = match sqlx::query_as(
-        "SELECT item_icon_group_id, title, url FROM item_icon WHERE space_id = ? ORDER BY sort, id",
-    )
-    .bind(space_id)
-    .fetch_all(&pool)
-    .await
-    {
-        Ok(rows) => rows,
-        Err(error) => return envelope::error(&error.to_string()),
-    };
+    let groups: Vec<(i64, String, String, Option<i64>)> = groups
+        .into_iter()
+        .map(|group| (group.id, group.title, group.icon, group.parent_id))
+        .collect();
+    let items: Vec<(i64, String, String)> = items
+        .into_iter()
+        .map(|item| (item.group_id, item.title, item.url))
+        .collect();
     let known: std::collections::HashSet<i64> = groups.iter().map(|group| group.0).collect();
     let mut children: std::collections::HashMap<i64, Vec<&(i64, String, String, Option<i64>)>> =
         std::collections::HashMap::new();
@@ -1163,30 +1098,23 @@ async fn users_list(
         return error_code(1005);
     }
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool,
         Err(error) => return envelope::error(&error),
     };
-    let total: (i64,) = sqlx::query_as(r#"SELECT COUNT(*) FROM "user""#)
-        .fetch_one(pool)
-        .await
-        .unwrap_or((0,));
-    let limit: i64 = query.get("limit").and_then(|value| value.parse().ok()).unwrap_or(0);
-    let page: i64 = query.get("page").and_then(|value| value.parse().ok()).unwrap_or(0);
-    let rows: Vec<UserRowOut> = if limit > 0 {
-        let offset = limit * (page.max(1) - 1);
-        sqlx::query_as(
-            r#"SELECT id, created_at, updated_at, name, head_image, status, role, mail,
-                      token_version FROM "user" ORDER BY id LIMIT ? OFFSET ?"#,
-        )
-        .bind(limit)
-        .bind(offset)
-        .fetch_all(pool)
-        .await
-        .unwrap_or_default()
-    } else {
-        Vec::new()
-    };
+    let limit: i64 = query
+        .get("limit")
+        .and_then(|value| value.parse().ok())
+        .unwrap_or(0);
+    let page: i64 = query
+        .get("page")
+        .and_then(|value| value.parse().ok())
+        .unwrap_or(0);
+    let (total, rows) =
+        match crate::repository::user_list(pool, ctx.sqlx_driver(), limit, page).await {
+            Ok(result) => result,
+            Err(_) => (0, Vec::new()),
+        };
     let list: Vec<serde_json::Value> = rows
         .into_iter()
         .map(|row| {
@@ -1204,20 +1132,7 @@ async fn users_list(
             })
         })
         .collect();
-    success_data(json!({"count": total.0, "list": list}))
-}
-
-#[derive(sqlx::FromRow)]
-struct UserRowOut {
-    id: i64,
-    created_at: String,
-    updated_at: String,
-    name: String,
-    head_image: String,
-    status: i64,
-    role: i64,
-    mail: String,
-    token_version: i64,
+    success_data(json!({"count": total, "list": list}))
 }
 
 /// `UserConfigRouter.GetConfig`: a missing row is `404 Data not found`.
@@ -1228,25 +1143,36 @@ async fn user_config(headers: HeaderMap) -> Response {
         Err(AuthError::Disabled) => return error_code(1004),
     };
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool,
         Err(error) => return envelope::error(&error),
     };
-    let row: Option<(String, String)> =
-        sqlx::query_as(r#"SELECT panel_json, language FROM user_config WHERE user_id = ?"#)
-            .bind(user.id)
-            .fetch_optional(pool)
-            .await
-            .unwrap_or(None);
-    let Some((panel_json, language)) = row else {
+    let row = crate::repository::user_config(pool, ctx.sqlx_driver(), user.id)
+        .await
+        .unwrap_or(None);
+    let Some(config) = row else {
         return error_code(404);
     };
-    let panel: serde_json::Value = if panel_json.is_empty() {
+    let user_id = config.user_id;
+    let panel_json = config.panel_json;
+    let language = config.language;
+    let mut panel: serde_json::Value = if panel_json.is_empty() {
         serde_json::Value::Null
     } else {
         serde_json::from_str(&panel_json).unwrap_or(serde_json::Value::Null)
     };
-    success_data(json!({"panel": panel, "language": language}))
+    if panel.is_null() {
+        panel = json!({});
+    }
+    if let Some(fields) = panel.as_object_mut() {
+        fields
+            .entry("maxWidthUnit".to_string())
+            .or_insert_with(|| json!(""));
+        fields
+            .entry("footerHtml".to_string())
+            .or_insert_with(|| json!(""));
+    }
+    success_data(json!({"userId": user_id, "panel": panel, "language": language}))
 }
 
 /// `MonitorRouter.GetEnableStatus`.
@@ -1266,21 +1192,60 @@ async fn monitor_enable_status(headers: HeaderMap) -> Response {
     }))
 }
 
-/// `MonitorRouter.GetSnapshot` and the disk readers while the monitor is off.
-async fn monitor_disabled(headers: HeaderMap) -> Response {
-    if let Err(response) = require_user(&headers).await {
-        return response;
+async fn monitor_guard(headers: &HeaderMap) -> Result<(), Response> {
+    if let Err(response) = require_user(headers).await {
+        return Err(response);
     }
     if !appcfg::ctx().conf.base.enable_monitor {
-        return envelope::error("system monitor is disabled");
+        return Err(envelope::error("system monitor is disabled"));
     }
-    // The Go service answers from a snapshot refreshed every three seconds; the
-    // port collects one per request, which is slower but always current.
+    Ok(())
+}
+
+/// `MonitorRouter.GetSnapshot`.
+async fn monitor_snapshot(headers: HeaderMap) -> Response {
+    if let Err(response) = monitor_guard(&headers).await {
+        return response;
+    }
     let snapshot = crate::monitor::snapshot().await;
     if snapshot.is_empty() {
         return envelope::error("failed");
     }
     success_data(serde_json::Value::Object(snapshot.into_iter().collect()))
+}
+
+/// `MonitorRouter.GetDiskMountpoints`.
+async fn monitor_disk_mountpoints(headers: HeaderMap) -> Response {
+    if let Err(response) = monitor_guard(&headers).await {
+        return response;
+    }
+    match crate::monitor::disk_mountpoints() {
+        Ok(mountpoints) => success_data(json!(mountpoints)),
+        Err(error) => envelope::error(&error),
+    }
+}
+
+/// `MonitorRouter.GetDiskStateByPath`.
+async fn monitor_disk_state(request: Request) -> Response {
+    let (parts, body) = request.into_parts();
+    if let Err(response) = monitor_guard(&parts.headers).await {
+        return response;
+    }
+    let bytes = match axum::body::to_bytes(body, 64 * 1024).await {
+        Ok(bytes) => bytes,
+        Err(error) => return envelope::error(&format!(" [invalid request: {error}]")),
+    };
+    let payload: serde_json::Value = match serde_json::from_slice(&bytes) {
+        Ok(payload) => payload,
+        Err(_) => return error_code(1002),
+    };
+    let Some(path) = payload.get("path").and_then(serde_json::Value::as_str) else {
+        return error_code(1002);
+    };
+    match crate::monitor::disk_state(path) {
+        Ok(state) => success_data(json!(state)),
+        Err(_) => envelope::error("failed"),
+    }
 }
 
 /// `ThemeRouter.Preference`: the stored mode, or `auto` / `follow-space`.
@@ -1294,15 +1259,19 @@ async fn theme_preference(headers: HeaderMap) -> Response {
         Ok(pool) => pool,
         Err(error) => return envelope::error(&error),
     };
-    let row: Option<(String, String)> = sqlx::query_as(
-        "SELECT mode, theme_mode FROM user_theme_preference_v2 WHERE user_id = ?",
-    )
-    .bind(user.id)
-    .fetch_optional(pool)
-    .await
-    .unwrap_or(None);
-    let (mode, theme_mode) = row.unwrap_or_else(|| ("auto".to_string(), "follow-space".to_string()));
-    let mode = if mode.is_empty() { "auto".to_string() } else { mode };
+    let row: Option<(String, String)> =
+        sqlx::query_as("SELECT mode, theme_mode FROM user_theme_preference_v2 WHERE user_id = ?")
+            .bind(user.id)
+            .fetch_optional(pool)
+            .await
+            .unwrap_or(None);
+    let (mode, theme_mode) =
+        row.unwrap_or_else(|| ("auto".to_string(), "follow-space".to_string()));
+    let mode = if mode.is_empty() {
+        "auto".to_string()
+    } else {
+        mode
+    };
     let theme_mode = if theme_mode.is_empty() {
         "follow-space".to_string()
     } else {
@@ -1340,8 +1309,10 @@ async fn theme_space(headers: HeaderMap, Path(space_id): Path<i64>) -> Response 
     .fetch_optional(pool)
     .await
     .unwrap_or(None);
-    let theme = space_theme.map(|(package_id, revision)| json!({"packageId": package_id, "revision": revision}));
-    let override_value = override_theme.map(|(package_id, revision)| json!({"packageId": package_id, "revision": revision}));
+    let theme = space_theme
+        .map(|(package_id, revision)| json!({"packageId": package_id, "revision": revision}));
+    let override_value = override_theme
+        .map(|(package_id, revision)| json!({"packageId": package_id, "revision": revision}));
     success_data(json!({
         "override": override_value,
         "spaceId": space_id,
@@ -1359,7 +1330,10 @@ async fn require_user(headers: &HeaderMap) -> Result<auth::UserRow, Response> {
 
 /// `PackageRevisionPublicV2`: the stored manifest and tokens pass through in
 /// their stored order, with the asset URL added to each resource.
-async fn revision_public(pool: &sqlx::SqlitePool, revision_id: &str) -> Result<serde_json::Value, String> {
+async fn revision_public(
+    pool: &sqlx::SqlitePool,
+    revision_id: &str,
+) -> Result<serde_json::Value, String> {
     let row: Option<(String, String, i64)> = sqlx::query_as(
         "SELECT manifest_json, tokens_json, verified FROM revision_record_v2 WHERE id = ?",
     )
@@ -1370,8 +1344,17 @@ async fn revision_public(pool: &sqlx::SqlitePool, revision_id: &str) -> Result<s
     let Some((manifest_json, tokens_json, verified)) = row else {
         return Err("revision not found".to_string());
     };
+    revision_public_from_parts(revision_id, &manifest_json, &tokens_json, verified)
+}
+
+fn revision_public_from_parts(
+    revision_id: &str,
+    manifest_json: &str,
+    tokens_json: &str,
+    verified: i64,
+) -> Result<serde_json::Value, String> {
     let mut manifest: serde_json::Value =
-        serde_json::from_str(&manifest_json).map_err(|error| error.to_string())?;
+        serde_json::from_str(manifest_json).map_err(|error| error.to_string())?;
     if let Some(resources) = manifest
         .get_mut("resources")
         .and_then(serde_json::Value::as_array_mut)
@@ -1391,7 +1374,7 @@ async fn revision_public(pool: &sqlx::SqlitePool, revision_id: &str) -> Result<s
         }
     }
     let tokens: serde_json::Value =
-        serde_json::from_str(&tokens_json).map_err(|error| error.to_string())?;
+        serde_json::from_str(tokens_json).map_err(|error| error.to_string())?;
     Ok(json!({
         "manifest": manifest,
         "tokens": tokens,
@@ -1405,7 +1388,25 @@ fn path_escape(segment: &str) -> String {
     let mut out = String::with_capacity(segment.len());
     for byte in segment.bytes() {
         let keep = byte.is_ascii_alphanumeric()
-            || matches!(byte, b'-' | b'_' | b'.' | b'~' | b'+' | b'$' | b'&' | b'!' | b'*' | b'\'' | b'(' | b')' | b',' | b';' | b'=' | b':' | b'@');
+            || matches!(
+                byte,
+                b'-' | b'_'
+                    | b'.'
+                    | b'~'
+                    | b'+'
+                    | b'$'
+                    | b'&'
+                    | b'!'
+                    | b'*'
+                    | b'\''
+                    | b'('
+                    | b')'
+                    | b','
+                    | b';'
+                    | b'='
+                    | b':'
+                    | b'@'
+            );
         if keep {
             out.push(byte as char);
         } else {
@@ -1431,14 +1432,34 @@ async fn instance_default_revision(pool: &sqlx::SqlitePool) -> Result<String, St
     latest_revision_of(pool, "org.yin.default").await
 }
 
-async fn activation_revision(pool: &sqlx::SqlitePool, scope: &str) -> Option<String> {
-    let row: Option<(String,)> = sqlx::query_as(
-        "SELECT active_revision_id FROM activation_record_v2 WHERE scope = ?",
+async fn instance_default_package(pool: &sqlx::SqlitePool) -> Result<serde_json::Value, String> {
+    let row: Option<(String, String, String, i64)> = sqlx::query_as(
+        r#"SELECT package_record_v2.latest_revision,
+                  revision_record_v2.manifest_json,
+                  revision_record_v2.tokens_json,
+                  revision_record_v2.verified
+           FROM package_record_v2
+           JOIN revision_record_v2
+             ON revision_record_v2.id = package_record_v2.latest_revision
+           WHERE package_record_v2.id = 'org.yin.default'
+             AND package_record_v2.removed = 0"#,
     )
-    .bind(scope)
     .fetch_optional(pool)
     .await
-    .unwrap_or(None);
+    .map_err(|error| error.to_string())?;
+    let Some((revision, manifest, tokens, verified)) = row else {
+        return Err("package not found".to_string());
+    };
+    revision_public_from_parts(&revision, &manifest, &tokens, verified)
+}
+
+async fn activation_revision(pool: &sqlx::SqlitePool, scope: &str) -> Option<String> {
+    let row: Option<(String,)> =
+        sqlx::query_as("SELECT active_revision_id FROM activation_record_v2 WHERE scope = ?")
+            .bind(scope)
+            .fetch_optional(pool)
+            .await
+            .unwrap_or(None);
     row.map(|value| value.0).filter(|value| !value.is_empty())
 }
 
@@ -1449,11 +1470,7 @@ async fn theme_current() -> Response {
         Ok(pool) => pool,
         Err(error) => return envelope::error(&error),
     };
-    let revision = match instance_default_revision(pool).await {
-        Ok(revision) => revision,
-        Err(error) => return envelope::error(&error),
-    };
-    match revision_public(pool, &revision).await {
+    match instance_default_package(pool).await {
         Ok(value) => success_data(value),
         Err(error) => envelope::error(&error),
     }
@@ -1558,17 +1575,21 @@ async fn theme_mine(headers: HeaderMap) -> Response {
 }
 
 async fn user_theme_modes(pool: &sqlx::SqlitePool, user_id: i64) -> (String, String) {
-    let row: Option<(String, String)> = sqlx::query_as(
-        "SELECT mode, theme_mode FROM user_theme_preference_v2 WHERE user_id = ?",
-    )
-    .bind(user_id)
-    .fetch_optional(pool)
-    .await
-    .unwrap_or(None);
-    let (mode, theme_mode) = row.unwrap_or_else(|| ("auto".to_string(), "follow-space".to_string()));
+    let row: Option<(String, String)> =
+        sqlx::query_as("SELECT mode, theme_mode FROM user_theme_preference_v2 WHERE user_id = ?")
+            .bind(user_id)
+            .fetch_optional(pool)
+            .await
+            .unwrap_or(None);
+    let (mode, theme_mode) =
+        row.unwrap_or_else(|| ("auto".to_string(), "follow-space".to_string()));
     (
         if mode.is_empty() { "auto".into() } else { mode },
-        if theme_mode.is_empty() { "follow-space".into() } else { theme_mode },
+        if theme_mode.is_empty() {
+            "follow-space".into()
+        } else {
+            theme_mode
+        },
     )
 }
 
@@ -1625,12 +1646,13 @@ async fn theme_effective(
     }
     if resolution.is_none() {
         if let Some(space) = space_id {
-            let row: Option<(String,)> =
-                sqlx::query_as("SELECT revision_id FROM space_theme_preference_v2 WHERE space_id = ?")
-                    .bind(space)
-                    .fetch_optional(pool)
-                    .await
-                    .unwrap_or(None);
+            let row: Option<(String,)> = sqlx::query_as(
+                "SELECT revision_id FROM space_theme_preference_v2 WHERE space_id = ?",
+            )
+            .bind(space)
+            .fetch_optional(pool)
+            .await
+            .unwrap_or(None);
             if let Some((revision,)) = row {
                 resolution = Some((revision, "space"));
             }
@@ -1690,7 +1712,13 @@ async fn theme_asset(
     let etag = if is_html {
         use sha2::{Digest, Sha256};
         let digest = Sha256::digest(&content);
-        Some(format!("\"{}\"", digest.iter().map(|byte| format!("{byte:02x}")).collect::<String>()))
+        Some(format!(
+            "\"{}\"",
+            digest
+                .iter()
+                .map(|byte| format!("{byte:02x}"))
+                .collect::<String>()
+        ))
     } else {
         None
     };
@@ -1701,8 +1729,15 @@ async fn theme_asset(
         for (key, value) in envelope::headers() {
             out.insert(key, value);
         }
-        out.insert(header::CONTENT_TYPE, HeaderValue::from_str(&media_type).unwrap_or(HeaderValue::from_static("application/octet-stream")));
-        out.insert(header::X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
+        out.insert(
+            header::CONTENT_TYPE,
+            HeaderValue::from_str(&media_type)
+                .unwrap_or(HeaderValue::from_static("application/octet-stream")),
+        );
+        out.insert(
+            header::X_CONTENT_TYPE_OPTIONS,
+            HeaderValue::from_static("nosniff"),
+        );
         let cache = if is_html {
             "public, max-age=0, must-revalidate, no-transform"
         } else {
@@ -1710,14 +1745,23 @@ async fn theme_asset(
         };
         out.insert(header::CACHE_CONTROL, HeaderValue::from_static(cache));
         if let Some(etag) = &etag {
-            out.insert(header::ETAG, HeaderValue::from_str(etag).unwrap_or(HeaderValue::from_static("")));
+            out.insert(
+                header::ETAG,
+                HeaderValue::from_str(etag).unwrap_or(HeaderValue::from_static("")),
+            );
         }
         if is_html {
             out.insert(header::CONTENT_SECURITY_POLICY, HeaderValue::from_static("sandbox allow-scripts; default-src 'none'; script-src 'unsafe-inline' https://static.cloudflareinsights.com; style-src 'unsafe-inline'; img-src data:; connect-src https://cloudflareinsights.com; font-src 'none'; media-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'none'"));
-            out.insert(header::REFERRER_POLICY, HeaderValue::from_static("no-referrer"));
+            out.insert(
+                header::REFERRER_POLICY,
+                HeaderValue::from_static("no-referrer"),
+            );
         } else if media_type == "image/svg+xml" {
             out.insert(header::CONTENT_SECURITY_POLICY, HeaderValue::from_static("sandbox; default-src 'none'; script-src 'none'; style-src 'unsafe-inline'; img-src data: blob:; object-src 'none'; form-action 'none'; base-uri 'none'"));
-            out.insert(header::REFERRER_POLICY, HeaderValue::from_static("no-referrer"));
+            out.insert(
+                header::REFERRER_POLICY,
+                HeaderValue::from_static("no-referrer"),
+            );
         }
     }
 
@@ -1725,7 +1769,6 @@ async fn theme_asset(
     let (parts, _) = response.into_parts();
     crate::content::serve(&headers, parts, &content)
 }
-
 
 /// The timestamps GORM writes: local time, nanosecond fraction, numeric offset.
 fn now_like_go() -> String {
@@ -1757,7 +1800,10 @@ async fn module_config_save(headers: HeaderMap, request: Request) -> Response {
         .and_then(serde_json::Value::as_str)
         .unwrap_or("")
         .to_string();
-    let value = payload.get("value").cloned().unwrap_or(serde_json::Value::Null);
+    let value = payload
+        .get("value")
+        .cloned()
+        .unwrap_or(serde_json::Value::Null);
     if !value.is_object() && !value.is_null() {
         let kind = match &value {
             serde_json::Value::String(_) => "string",
@@ -1781,14 +1827,13 @@ async fn module_config_save(headers: HeaderMap, request: Request) -> Response {
         Err(error) => return envelope::error(&error),
     };
     let now = now_like_go();
-    let existing: Option<(i64,)> = sqlx::query_as(
-        "SELECT id FROM module_config WHERE user_id = ? AND name = ? LIMIT 1",
-    )
-    .bind(user.id)
-    .bind(&name)
-    .fetch_optional(pool)
-    .await
-    .unwrap_or(None);
+    let existing: Option<(i64,)> =
+        sqlx::query_as("SELECT id FROM module_config WHERE user_id = ? AND name = ? LIMIT 1")
+            .bind(user.id)
+            .bind(&name)
+            .fetch_optional(pool)
+            .await
+            .unwrap_or(None);
     let result = match existing {
         Some((id,)) => {
             sqlx::query("UPDATE module_config SET value_json = ?, updated_at = ? WHERE id = ?")
@@ -1830,7 +1875,7 @@ async fn user_config_save(headers: HeaderMap, request: Request) -> Response {
     };
     let payload: serde_json::Value = match serde_json::from_slice(&body) {
         Ok(value) => value,
-        Err(error) => return envelope::error(&format!(" [{error}]")),
+        Err(error) => return envelope::error(&format!(" [{}]", go_json_error(&error))),
     };
     let language = payload
         .get("language")
@@ -1840,7 +1885,10 @@ async fn user_config_save(headers: HeaderMap, request: Request) -> Response {
     if !language.is_empty() && !supported_language(&language) {
         return envelope::error(" [invalid language]");
     }
-    let panel = payload.get("panel").cloned().filter(|value| value.is_object());
+    let panel = payload
+        .get("panel")
+        .cloned()
+        .filter(|value| value.is_object());
     if let Some(panel) = &panel {
         let mode = panel
             .get("wallpaperMode")
@@ -1893,14 +1941,17 @@ async fn user_config_save(headers: HeaderMap, request: Request) -> Response {
             }
         },
         None => {
-            sqlx::query(
-                "INSERT INTO user_config (user_id, panel_json, language) VALUES (?, ?, ?)",
-            )
-            .bind(user.id)
-            .bind(panel.as_ref().map(|value| value.to_string()).unwrap_or_default())
-            .bind(&language)
-            .execute(pool)
-            .await
+            sqlx::query("INSERT INTO user_config (user_id, panel_json, language) VALUES (?, ?, ?)")
+                .bind(user.id)
+                .bind(
+                    panel
+                        .as_ref()
+                        .map(|value| value.to_string())
+                        .unwrap_or_default(),
+                )
+                .bind(&language)
+                .execute(pool)
+                .await
         }
     };
     match result {
@@ -1912,9 +1963,24 @@ async fn user_config_save(headers: HeaderMap, request: Request) -> Response {
 fn supported_language(language: &str) -> bool {
     matches!(
         language,
-        "auto" | "en-US" | "zh-CN" | "zh-TW" | "ja-JP" | "ko-KR" | "de-DE" | "fr-FR"
-            | "es-ES" | "pt-BR" | "ru-RU" | "id-ID" | "tr-TR" | "pl-PL" | "it-IT"
-            | "nl-NL" | "hi-IN" | "th-TH"
+        "auto"
+            | "en-US"
+            | "zh-CN"
+            | "zh-TW"
+            | "ja-JP"
+            | "ko-KR"
+            | "de-DE"
+            | "fr-FR"
+            | "es-ES"
+            | "pt-BR"
+            | "ru-RU"
+            | "id-ID"
+            | "tr-TR"
+            | "pl-PL"
+            | "it-IT"
+            | "nl-NL"
+            | "hi-IN"
+            | "th-TH"
     )
 }
 
@@ -1958,7 +2024,10 @@ async fn space_role(pool: &sqlx::SqlitePool, user_id: i64, space_id: i64) -> Str
 }
 
 async fn can_edit(pool: &sqlx::SqlitePool, user_id: i64, space_id: i64) -> bool {
-    matches!(space_role(pool, user_id, space_id).await.as_str(), "admin" | "editor")
+    matches!(
+        space_role(pool, user_id, space_id).await.as_str(),
+        "admin" | "editor"
+    )
 }
 
 #[derive(serde::Deserialize)]
@@ -1972,11 +2041,7 @@ struct GroupRequest {
 }
 
 /// `SpaceRouter.CreateGroup`.
-async fn create_group(
-    headers: HeaderMap,
-    Path(space_id): Path<i64>,
-    request: Request,
-) -> Response {
+async fn create_group(headers: HeaderMap, Path(space_id): Path<i64>, request: Request) -> Response {
     let user = match require_user(&headers).await {
         Ok(user) => user,
         Err(response) => return response,
@@ -2007,14 +2072,13 @@ async fn create_group(
         if parent == 0 {
             return envelope::error(" [invalid parent group]");
         }
-        let exists: Option<(i64,)> = sqlx::query_as(
-            "SELECT id FROM item_icon_group WHERE id = ? AND space_id = ?",
-        )
-        .bind(parent)
-        .bind(space_id)
-        .fetch_optional(&pool)
-        .await
-        .unwrap_or(None);
+        let exists: Option<(i64,)> =
+            sqlx::query_as("SELECT id FROM item_icon_group WHERE id = ? AND space_id = ?")
+                .bind(parent)
+                .bind(space_id)
+                .fetch_optional(&pool)
+                .await
+                .unwrap_or(None);
         if exists.is_none() {
             return envelope::error(" [invalid parent group]");
         }
@@ -2053,50 +2117,54 @@ async fn load_group(pool: &sqlx::SqlitePool, space_id: i64, id: i64) -> Option<s
     .fetch_optional(pool)
     .await
     .unwrap_or(None)?;
-    Some(serde_json::to_value(GroupItem {
-        id: row.id,
-        create_time: rfc3339(&row.created_at),
-        update_time: rfc3339(&row.updated_at),
-        icon: row.icon,
-        title: row.title,
-        description: row.description,
-        sort: row.sort,
-        user_id: row.user_id,
-        space_id: row.space_id,
-        parent_id: row.parent_id,
-        item_count: 0,
-    })
-    .unwrap_or(serde_json::Value::Null))
+    Some(
+        serde_json::to_value(GroupItem {
+            id: row.id,
+            create_time: rfc3339(&row.created_at),
+            update_time: rfc3339(&row.updated_at),
+            icon: row.icon,
+            title: row.title,
+            description: row.description,
+            sort: row.sort,
+            user_id: row.user_id,
+            space_id: row.space_id,
+            parent_id: row.parent_id,
+            item_count: 0,
+        })
+        .unwrap_or(serde_json::Value::Null),
+    )
 }
 
 async fn group_belongs(pool: &sqlx::SqlitePool, group_id: i64, space_id: i64) -> bool {
-    sqlx::query_as::<_, (i64,)>(
-        "SELECT id FROM item_icon_group WHERE id = ? AND space_id = ?",
-    )
-    .bind(group_id)
-    .bind(space_id)
-    .fetch_optional(pool)
-    .await
-    .unwrap_or(None)
-    .is_some()
+    sqlx::query_as::<_, (i64,)>("SELECT id FROM item_icon_group WHERE id = ? AND space_id = ?")
+        .bind(group_id)
+        .bind(space_id)
+        .fetch_optional(pool)
+        .await
+        .unwrap_or(None)
+        .is_some()
 }
 
 /// `groupHasDescendant`: walking up from the candidate must not reach the group.
-async fn group_has_descendant(pool: &sqlx::SqlitePool, space_id: i64, group_id: i64, candidate: i64) -> bool {
+async fn group_has_descendant(
+    pool: &sqlx::SqlitePool,
+    space_id: i64,
+    group_id: i64,
+    candidate: i64,
+) -> bool {
     let mut current = candidate;
     let mut hops = 0;
     while current != 0 && hops < 256 {
         if current == group_id {
             return true;
         }
-        let parent: Option<(Option<i64>,)> = sqlx::query_as(
-            "SELECT parent_id FROM item_icon_group WHERE id = ? AND space_id = ?",
-        )
-        .bind(current)
-        .bind(space_id)
-        .fetch_optional(pool)
-        .await
-        .unwrap_or(None);
+        let parent: Option<(Option<i64>,)> =
+            sqlx::query_as("SELECT parent_id FROM item_icon_group WHERE id = ? AND space_id = ?")
+                .bind(current)
+                .bind(space_id)
+                .fetch_optional(pool)
+                .await
+                .unwrap_or(None);
         match parent.and_then(|value| value.0) {
             Some(next) => current = next,
             None => return false,
@@ -2188,14 +2256,13 @@ async fn delete_group(
     let mut ids = vec![group_id];
     let mut index = 0;
     while index < ids.len() {
-        let children: Vec<(i64,)> = sqlx::query_as(
-            "SELECT id FROM item_icon_group WHERE space_id = ? AND parent_id = ?",
-        )
-        .bind(space_id)
-        .bind(ids[index])
-        .fetch_all(&pool)
-        .await
-        .unwrap_or_default();
+        let children: Vec<(i64,)> =
+            sqlx::query_as("SELECT id FROM item_icon_group WHERE space_id = ? AND parent_id = ?")
+                .bind(space_id)
+                .bind(ids[index])
+                .fetch_all(&pool)
+                .await
+                .unwrap_or_default();
         for (child,) in children {
             ids.push(child);
         }
@@ -2216,9 +2283,8 @@ async fn delete_group(
     if statement.execute(&mut *tx).await.is_err() {
         return envelope::error("delete failed");
     }
-    let delete_groups = format!(
-        "DELETE FROM item_icon_group WHERE space_id = ? AND id IN ({placeholders})"
-    );
+    let delete_groups =
+        format!("DELETE FROM item_icon_group WHERE space_id = ? AND id IN ({placeholders})");
     let mut statement = sqlx::query(&delete_groups).bind(space_id);
     for id in &ids {
         statement = statement.bind(id);
@@ -2264,7 +2330,11 @@ fn ensure_item_icon(title: &str, icon: &mut IconInfo) {
     }
     let mut text = if !han.is_empty() { han } else { latin };
     if text.is_empty() {
-        text = trimmed.chars().find(|ch| !ch.is_whitespace()).map(String::from).unwrap_or_default();
+        text = trimmed
+            .chars()
+            .find(|ch| !ch.is_whitespace())
+            .map(String::from)
+            .unwrap_or_default();
     }
     if text.is_empty() {
         text = "?".to_string();
@@ -2279,11 +2349,7 @@ fn ensure_item_icon(title: &str, icon: &mut IconInfo) {
 }
 
 /// `SpaceRouter.CreateItem`.
-async fn create_item(
-    headers: HeaderMap,
-    Path(space_id): Path<i64>,
-    request: Request,
-) -> Response {
+async fn create_item(headers: HeaderMap, Path(space_id): Path<i64>, request: Request) -> Response {
     let user = match require_user(&headers).await {
         Ok(user) => user,
         Err(response) => return response,
@@ -2311,14 +2377,13 @@ async fn create_item(
         return envelope::error(" [title must be at most 20 characters]");
     }
     ensure_item_icon(&input.title, &mut input.icon);
-    let group: Option<(i64,)> = sqlx::query_as(
-        "SELECT id FROM item_icon_group WHERE id = ? AND space_id = ?",
-    )
-    .bind(input.item_icon_group_id)
-    .bind(space_id)
-    .fetch_optional(&pool)
-    .await
-    .unwrap_or(None);
+    let group: Option<(i64,)> =
+        sqlx::query_as("SELECT id FROM item_icon_group WHERE id = ? AND space_id = ?")
+            .bind(input.item_icon_group_id)
+            .bind(space_id)
+            .fetch_optional(&pool)
+            .await
+            .unwrap_or(None);
     if group.is_none() {
         return error_code(404);
     }
@@ -2365,23 +2430,25 @@ async fn load_item(pool: &sqlx::SqlitePool, space_id: i64, id: i64) -> Option<se
     .await
     .unwrap_or(None)?;
     let icon: IconInfo = serde_json::from_str(&row.icon_json).unwrap_or_default();
-    Some(serde_json::to_value(ItemOut {
-        id: row.id,
-        create_time: rfc3339(&row.created_at),
-        update_time: rfc3339(&row.updated_at),
-        icon,
-        title: row.title,
-        url: row.url,
-        lan_url: row.lan_url,
-        mobile_url: row.mobile_url,
-        description: row.description,
-        open_method: row.open_method,
-        sort: row.sort,
-        item_icon_group_id: row.item_icon_group_id,
-        user_id: row.user_id,
-        space_id: row.space_id,
-    })
-    .unwrap_or(serde_json::Value::Null))
+    Some(
+        serde_json::to_value(ItemOut {
+            id: row.id,
+            create_time: rfc3339(&row.created_at),
+            update_time: rfc3339(&row.updated_at),
+            icon,
+            title: row.title,
+            url: row.url,
+            lan_url: row.lan_url,
+            mobile_url: row.mobile_url,
+            description: row.description,
+            open_method: row.open_method,
+            sort: row.sort,
+            item_icon_group_id: row.item_icon_group_id,
+            user_id: row.user_id,
+            space_id: row.space_id,
+        })
+        .unwrap_or(serde_json::Value::Null),
+    )
 }
 
 #[derive(serde::Deserialize)]
@@ -2443,14 +2510,13 @@ async fn update_item(
         return envelope::error(" [title must be at most 20 characters]");
     }
     ensure_item_icon(&input.title, &mut input.icon);
-    let group: Option<(i64,)> = sqlx::query_as(
-        "SELECT id FROM item_icon_group WHERE id = ? AND space_id = ?",
-    )
-    .bind(input.item_icon_group_id)
-    .bind(space_id)
-    .fetch_optional(&pool)
-    .await
-    .unwrap_or(None);
+    let group: Option<(i64,)> =
+        sqlx::query_as("SELECT id FROM item_icon_group WHERE id = ? AND space_id = ?")
+            .bind(input.item_icon_group_id)
+            .bind(space_id)
+            .fetch_optional(&pool)
+            .await
+            .unwrap_or(None);
     if group.is_none() {
         return error_code(404);
     }
@@ -2521,13 +2587,12 @@ async fn paired_ids(pool: &sqlx::SqlitePool, space_id: i64) -> Vec<i64> {
     if pair_id == 0 {
         return vec![space_id];
     }
-    let yang: Option<(i64,)> = sqlx::query_as(
-        r#"SELECT id FROM "space" WHERE pair_id = ? AND side = 'yang' LIMIT 1"#,
-    )
-    .bind(pair_id)
-    .fetch_optional(pool)
-    .await
-    .unwrap_or(None);
+    let yang: Option<(i64,)> =
+        sqlx::query_as(r#"SELECT id FROM "space" WHERE pair_id = ? AND side = 'yang' LIMIT 1"#)
+            .bind(pair_id)
+            .fetch_optional(pool)
+            .await
+            .unwrap_or(None);
     match yang {
         Some((id,)) => vec![pair_id, id],
         None => vec![pair_id],
@@ -2553,11 +2618,7 @@ struct MemberRoleRequest {
 }
 
 /// `SpaceRouter.AddMember`: the member row exists in both paired Spaces.
-async fn add_member(
-    headers: HeaderMap,
-    Path(space_id): Path<i64>,
-    request: Request,
-) -> Response {
+async fn add_member(headers: HeaderMap, Path(space_id): Path<i64>, request: Request) -> Response {
     let user = match require_user(&headers).await {
         Ok(user) => user,
         Err(response) => return response,
@@ -2582,12 +2643,11 @@ async fn add_member(
         return envelope::error(" [invalid member request]");
     }
     let email = req.email.trim().to_lowercase();
-    let target: Option<(i64,)> =
-        sqlx::query_as(r#"SELECT id FROM "user" WHERE mail = ?"#)
-            .bind(&email)
-            .fetch_optional(&pool)
-            .await
-            .unwrap_or(None);
+    let target: Option<(i64,)> = sqlx::query_as(r#"SELECT id FROM "user" WHERE mail = ?"#)
+        .bind(&email)
+        .fetch_optional(&pool)
+        .await
+        .unwrap_or(None);
     let Some((target_id,)) = target else {
         return error_code(404);
     };
@@ -2732,7 +2792,8 @@ async fn remove_member(
         let ids = paired_ids(&pool, space_id).await;
         vec!["?"; ids.len()].join(",")
     };
-    let sql = format!("DELETE FROM space_member WHERE space_id IN ({placeholders}) AND user_id = ?");
+    let sql =
+        format!("DELETE FROM space_member WHERE space_id IN ({placeholders}) AND user_id = ?");
     let mut statement = sqlx::query(&sql);
     for sid in paired_ids(&pool, space_id).await {
         statement = statement.bind(sid);
@@ -2750,11 +2811,7 @@ struct RenameRequest {
 }
 
 /// `SpaceRouter.Rename`: the Yang twin becomes `<name>-B`.
-async fn rename_space(
-    headers: HeaderMap,
-    Path(space_id): Path<i64>,
-    request: Request,
-) -> Response {
+async fn rename_space(headers: HeaderMap, Path(space_id): Path<i64>, request: Request) -> Response {
     let user = match require_user(&headers).await {
         Ok(user) => user,
         Err(response) => return response,
@@ -2773,7 +2830,7 @@ async fn rename_space(
     };
     let req: RenameRequest = match serde_json::from_slice(&body) {
         Ok(req) => req,
-        Err(_) => return envelope::error(" [invalid name]"),
+        Err(error) => return envelope::error(&format!(" [{}]", go_json_error(&error))),
     };
     if req.name.is_empty() {
         return envelope::error(" [ Name为必填字段]");
@@ -2835,11 +2892,14 @@ async fn set_search_config(
         Err(response) => return response,
     };
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool.clone(),
         Err(error) => return envelope::error(&error),
     };
-    if !can_edit(&pool, user.id, space_id).await {
+    if !crate::repository::can_edit_space(&pool, ctx.sqlx_driver(), user.id, space_id)
+        .await
+        .unwrap_or(false)
+    {
         return error_code(1005);
     }
     let body = match axum::body::to_bytes(request.into_body(), 1 << 20).await {
@@ -2858,33 +2918,33 @@ async fn set_search_config(
     if url.is_empty() {
         return envelope::error(" [invalid search config]");
     }
-    match sqlx::query(r#"UPDATE "space" SET search_config_json = ?, updated_at = ? WHERE id = ?"#)
-        .bind(value.to_string())
-        .bind(now_like_go())
-        .bind(space_id)
-        .execute(&pool)
-        .await
+    match crate::repository::update_space_search_config(
+        &pool,
+        ctx.sqlx_driver(),
+        space_id,
+        &value.to_string(),
+        &now_like_go(),
+    )
+    .await
     {
-        Ok(_) => success(),
+        Ok(()) => success(),
         Err(error) => envelope::error(&error.to_string()),
     }
 }
 
 /// `SpaceRouter.GetWallpaperConfig`.
 async fn get_wallpaper(headers: HeaderMap, Path(space_id): Path<i64>) -> Response {
-    let pool = match guard(&headers, space_id).await {
+    let pool = match guard_shared(&headers, space_id).await {
         Ok(pool) => pool,
         Err(response) => return response,
     };
-    let row: Option<(String,)> =
-        sqlx::query_as(r#"SELECT wallpaper_json FROM "space" WHERE id = ?"#)
-            .bind(space_id)
-            .fetch_optional(&pool)
+    let stored =
+        match crate::repository::space_wallpaper_json(&pool, appcfg::ctx().sqlx_driver(), space_id)
             .await
-            .unwrap_or(None);
-    let Some((stored,)) = row else {
-        return error_code(404);
-    };
+        {
+            Ok(Some(stored)) => stored,
+            Ok(None) | Err(_) => return error_code(404),
+        };
     if stored.is_empty() {
         return success();
     }
@@ -2908,7 +2968,11 @@ struct SpaceWallpaper {
     source: String,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     poster: String,
-    #[serde(default, rename = "libraryEntry", skip_serializing_if = "String::is_empty")]
+    #[serde(
+        default,
+        rename = "libraryEntry",
+        skip_serializing_if = "String::is_empty"
+    )]
     library_entry: String,
 }
 
@@ -2927,11 +2991,14 @@ async fn set_wallpaper(
         Err(response) => return response,
     };
     let ctx = appcfg::ctx();
-    let pool = match ctx.pool().await {
+    let pool = match ctx.shared_pool().await {
         Ok(pool) => pool.clone(),
         Err(error) => return envelope::error(&error),
     };
-    if !can_edit(&pool, user.id, space_id).await {
+    if !crate::repository::can_edit_space(&pool, ctx.sqlx_driver(), user.id, space_id)
+        .await
+        .unwrap_or(false)
+    {
         return error_code(1005);
     }
     let body = match axum::body::to_bytes(request.into_body(), 1 << 20).await {
@@ -2954,45 +3021,42 @@ async fn set_wallpaper(
     } else {
         value.to_string()
     };
-    match sqlx::query(r#"UPDATE "space" SET wallpaper_json = ?, updated_at = ? WHERE id = ?"#)
-        .bind(&stored)
-        .bind(now_like_go())
-        .bind(space_id)
-        .execute(&pool)
-        .await
+    match crate::repository::update_space_wallpaper(
+        &pool,
+        ctx.sqlx_driver(),
+        space_id,
+        &stored,
+        &now_like_go(),
+    )
+    .await
     {
-        Ok(_) => success(),
+        Ok(()) => success(),
         Err(error) => envelope::error(&error.to_string()),
     }
 }
 
 /// `SpaceRouter.OIDCGroups` (the list the routes expose alongside add/delete).
 async fn list_oidc_groups(headers: HeaderMap, Path(space_id): Path<i64>) -> Response {
-    let pool = match guard(&headers, space_id).await {
+    let pool = match guard_shared(&headers, space_id).await {
         Ok(pool) => pool,
         Err(response) => return response,
     };
-    let rows: Vec<(i64, String, String, String, String, String)> = match sqlx::query_as(
-        "SELECT id, created_at, updated_at, provider, group_name, role FROM space_o_id_c_group WHERE space_id = ? ORDER BY id",
-    )
-    .bind(space_id)
-    .fetch_all(&pool)
-    .await
-    {
-        Ok(rows) => rows,
-        Err(error) => return envelope::error(&error.to_string()),
-    };
+    let rows =
+        match crate::repository::oidc_groups(&pool, appcfg::ctx().sqlx_driver(), space_id).await {
+            Ok(rows) => rows,
+            Err(error) => return envelope::error(&error.to_string()),
+        };
     let list: Vec<serde_json::Value> = rows
         .into_iter()
         .map(|row| {
             json!({
-                "id": row.0,
-                "createTime": rfc3339(&row.1),
-                "updateTime": rfc3339(&row.2),
+                "id": row.id,
+                "createTime": rfc3339(&row.created_at),
+                "updateTime": rfc3339(&row.updated_at),
                 "spaceId": space_id,
-                "provider": row.3,
-                "groupName": row.4,
-                "role": row.5,
+                "provider": row.provider,
+                "groupName": row.group_name,
+                "role": row.role,
             })
         })
         .collect();
@@ -3147,38 +3211,36 @@ async fn transfer_space(
         Err(error) => return envelope::error(&error.to_string()),
     };
     let now = now_like_go();
-    let steps = [
-        sqlx::query(r#"UPDATE "space" SET owner_user_id = ?, updated_at = ? WHERE id = ?"#)
-            .bind(target_id)
-            .bind(&now)
-            .bind(space_id)
-            .execute(&mut *tx),
-    ];
+    let steps =
+        [
+            sqlx::query(r#"UPDATE "space" SET owner_user_id = ?, updated_at = ? WHERE id = ?"#)
+                .bind(target_id)
+                .bind(&now)
+                .bind(space_id)
+                .execute(&mut *tx),
+        ];
     for step in steps {
         if step.await.is_err() {
             return envelope::error("transfer failed");
         }
     }
-    if sqlx::query(
-        "UPDATE space_member SET role = 'editor' WHERE space_id = ? AND user_id = ?",
-    )
-    .bind(space_id)
-    .bind(user.id)
-    .execute(&mut *tx)
-    .await
-    .is_err()
+    if sqlx::query("UPDATE space_member SET role = 'editor' WHERE space_id = ? AND user_id = ?")
+        .bind(space_id)
+        .bind(user.id)
+        .execute(&mut *tx)
+        .await
+        .is_err()
     {
         return envelope::error("transfer failed");
     }
     // The target may not have a row yet; make one, or promote the existing one.
-    let existing: Option<(i64,)> = sqlx::query_as(
-        "SELECT id FROM space_member WHERE space_id = ? AND user_id = ? LIMIT 1",
-    )
-    .bind(space_id)
-    .bind(target_id)
-    .fetch_optional(&mut *tx)
-    .await
-    .unwrap_or(None);
+    let existing: Option<(i64,)> =
+        sqlx::query_as("SELECT id FROM space_member WHERE space_id = ? AND user_id = ? LIMIT 1")
+            .bind(space_id)
+            .bind(target_id)
+            .fetch_optional(&mut *tx)
+            .await
+            .unwrap_or(None);
     let result = match existing {
         Some((id,)) => {
             sqlx::query("UPDATE space_member SET role = 'admin' WHERE id = ?")
@@ -3261,7 +3323,7 @@ async fn create_space(headers: HeaderMap, request: Request) -> Response {
     };
     let req: RenameRequest = match serde_json::from_slice(&body) {
         Ok(req) => req,
-        Err(_) => return envelope::error(" [invalid name]"),
+        Err(error) => return envelope::error(&format!(" [{}]", go_json_error(&error))),
     };
     if req.name.is_empty() {
         return envelope::error(" [ Name为必填字段]");
@@ -3364,11 +3426,7 @@ struct SortEntry {
 }
 
 /// `SpaceRouter.SortItems`.
-async fn sort_items(
-    headers: HeaderMap,
-    Path(space_id): Path<i64>,
-    request: Request,
-) -> Response {
+async fn sort_items(headers: HeaderMap, Path(space_id): Path<i64>, request: Request) -> Response {
     let user = match require_user(&headers).await {
         Ok(user) => user,
         Err(response) => return response,
@@ -3428,11 +3486,7 @@ struct GroupSortRequest {
 
 /// `SpaceRouter.SortGroups`: every sibling must appear exactly once with a
 /// distinct, positive sort value.
-async fn sort_groups(
-    headers: HeaderMap,
-    Path(space_id): Path<i64>,
-    request: Request,
-) -> Response {
+async fn sort_groups(headers: HeaderMap, Path(space_id): Path<i64>, request: Request) -> Response {
     let user = match require_user(&headers).await {
         Ok(user) => user,
         Err(response) => return response,
@@ -3470,15 +3524,15 @@ async fn sort_groups(
         .await
         .unwrap_or_default()
         .into_iter(),
-        Some(parent) => sqlx::query_as(
-            "SELECT id FROM item_icon_group WHERE space_id = ? AND parent_id = ?",
-        )
-        .bind(space_id)
-        .bind(parent)
-        .fetch_all(&pool)
-        .await
-        .unwrap_or_default()
-        .into_iter(),
+        Some(parent) => {
+            sqlx::query_as("SELECT id FROM item_icon_group WHERE space_id = ? AND parent_id = ?")
+                .bind(space_id)
+                .bind(parent)
+                .fetch_all(&pool)
+                .await
+                .unwrap_or_default()
+                .into_iter()
+        }
     }
     .map(|(id,)| id)
     .collect();
@@ -3593,25 +3647,23 @@ async fn arrange_layout(
         Err(error) => return envelope::error(&error.to_string()),
     };
     for item in &req.items {
-        let exists: Option<(i64,)> = sqlx::query_as(
-            "SELECT id FROM item_icon WHERE id = ? AND space_id = ?",
-        )
-        .bind(item.id)
-        .bind(space_id)
-        .fetch_optional(&mut *tx)
-        .await
-        .unwrap_or(None);
+        let exists: Option<(i64,)> =
+            sqlx::query_as("SELECT id FROM item_icon WHERE id = ? AND space_id = ?")
+                .bind(item.id)
+                .bind(space_id)
+                .fetch_optional(&mut *tx)
+                .await
+                .unwrap_or(None);
         if exists.is_none() {
             return envelope::error(&format!(" [item {} is not in this space]", item.id));
         }
-        let group: Option<(i64,)> = sqlx::query_as(
-            "SELECT id FROM item_icon_group WHERE id = ? AND space_id = ?",
-        )
-        .bind(item.item_icon_group_id)
-        .bind(space_id)
-        .fetch_optional(&mut *tx)
-        .await
-        .unwrap_or(None);
+        let group: Option<(i64,)> =
+            sqlx::query_as("SELECT id FROM item_icon_group WHERE id = ? AND space_id = ?")
+                .bind(item.item_icon_group_id)
+                .bind(space_id)
+                .fetch_optional(&mut *tx)
+                .await
+                .unwrap_or(None);
         if group.is_none() {
             return envelope::error(&format!(
                 " [target group {} is not in this space]",
@@ -3633,14 +3685,13 @@ async fn arrange_layout(
         }
     }
     for group in &req.groups {
-        let exists: Option<(i64,)> = sqlx::query_as(
-            "SELECT id FROM item_icon_group WHERE id = ? AND space_id = ?",
-        )
-        .bind(group.id)
-        .bind(space_id)
-        .fetch_optional(&mut *tx)
-        .await
-        .unwrap_or(None);
+        let exists: Option<(i64,)> =
+            sqlx::query_as("SELECT id FROM item_icon_group WHERE id = ? AND space_id = ?")
+                .bind(group.id)
+                .bind(space_id)
+                .fetch_optional(&mut *tx)
+                .await
+                .unwrap_or(None);
         if exists.is_none() {
             return envelope::error(&format!(" [group {} is not in this space]", group.id));
         }
@@ -3698,9 +3749,7 @@ async fn delete_space(headers: HeaderMap, Path(space_id): Path<i64>) -> Response
     };
 
     // Files named by this Space's item icons, kept only if nothing else uses them.
-    let item_sql = format!(
-        "SELECT icon_json FROM item_icon WHERE space_id IN ({placeholders})"
-    );
+    let item_sql = format!("SELECT icon_json FROM item_icon WHERE space_id IN ({placeholders})");
     let mut query = sqlx::query_as::<_, (String,)>(&item_sql);
     for id in &ids {
         query = query.bind(id);
@@ -3844,13 +3893,14 @@ fn hex_digest(bytes: &[u8], sha256: bool) -> String {
 }
 
 /// `FileRouter.UploadImg`: MD5-named content, one `file` row per upload.
-async fn upload_image(headers: HeaderMap, mut multipart: Multipart) -> Response {
-    if let Err(response) = require_user(&headers).await {
-        return response;
-    }
+async fn upload_image(headers: HeaderMap, request: Request) -> Response {
     let user = match require_user(&headers).await {
         Ok(user) => user,
         Err(response) => return response,
+    };
+    let mut multipart = match Multipart::from_request(request, &()).await {
+        Ok(multipart) => multipart,
+        Err(_) => return error_code(1300),
     };
     let mut uploaded: Option<(String, Vec<u8>)> = None;
     while let Some(field) = multipart.next_field().await.unwrap_or(None) {
@@ -3972,14 +4022,13 @@ async fn create_item_with_icon(
     if input.item_icon_group_id == 0 || !valid_item_title(&input.title) {
         return envelope::error(" [invalid item or group]");
     }
-    let group: Option<(i64,)> = sqlx::query_as(
-        "SELECT id FROM item_icon_group WHERE id = ? AND space_id = ?",
-    )
-    .bind(input.item_icon_group_id)
-    .bind(space_id)
-    .fetch_optional(&pool)
-    .await
-    .unwrap_or(None);
+    let group: Option<(i64,)> =
+        sqlx::query_as("SELECT id FROM item_icon_group WHERE id = ? AND space_id = ?")
+            .bind(input.item_icon_group_id)
+            .bind(space_id)
+            .fetch_optional(&pool)
+            .await
+            .unwrap_or(None);
     if group.is_none() {
         return error_code(404);
     }
@@ -4015,14 +4064,13 @@ async fn create_item_with_icon(
         Err(error) => return envelope::error(&error.to_string()),
     };
     if let Some(name) = &stored {
-        let count: (i64,) = sqlx::query_as(
-            "SELECT COUNT(*) FROM file WHERE user_id = ? AND file_name = ?",
-        )
-        .bind(user.id)
-        .bind(name)
-        .fetch_one(&mut *tx)
-        .await
-        .unwrap_or((0,));
+        let count: (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM file WHERE user_id = ? AND file_name = ?")
+                .bind(user.id)
+                .bind(name)
+                .fetch_one(&mut *tx)
+                .await
+                .unwrap_or((0,));
         if count.0 == 0
             && sqlx::query(
                 "INSERT INTO file (created_at, updated_at, user_id, file_name) VALUES (?, ?, ?, ?)",
@@ -4252,7 +4300,7 @@ fn import_node<'a>(
 async fn import_bookmarks(
     headers: HeaderMap,
     Path(space_id): Path<i64>,
-    mut multipart: Multipart,
+    request: Request,
 ) -> Response {
     let user = match require_user(&headers).await {
         Ok(user) => user,
@@ -4266,6 +4314,11 @@ async fn import_bookmarks(
     if !can_edit(&pool, user.id, space_id).await {
         return error_code(1005);
     }
+
+    let mut multipart = match Multipart::from_request(request, &()).await {
+        Ok(multipart) => multipart,
+        Err(_) => return envelope::error(" [invalid bookmarks]"),
+    };
 
     let mut bookmarks_json: Option<String> = None;
     let mut files: std::collections::HashMap<String, (String, Vec<u8>)> =
@@ -4358,8 +4411,17 @@ async fn import_bookmarks(
         items: Vec::new(),
     };
     for (index, node) in batch.groups.iter().enumerate() {
-        if let Err(error) =
-            import_node(&mut tx, &icons, space_id, user.id, None, node, index as i64, &mut summary).await
+        if let Err(error) = import_node(
+            &mut tx,
+            &icons,
+            space_id,
+            user.id,
+            None,
+            node,
+            index as i64,
+            &mut summary,
+        )
+        .await
         {
             return envelope::error(&error);
         }
@@ -4432,7 +4494,7 @@ async fn create_user(headers: HeaderMap, request: Request) -> Response {
     };
     let input: UserIn = match serde_json::from_slice(&body) {
         Ok(input) => input,
-        Err(error) => return envelope::error(&format!(" [{}]", error)),
+        Err(error) => return envelope::error(&format!(" [{}]", go_json_error(&error))),
     };
     let mail = input.mail.trim().to_lowercase();
     if mail.len() < 5 {
@@ -4443,12 +4505,11 @@ async fn create_user(headers: HeaderMap, request: Request) -> Response {
         Ok(pool) => pool.clone(),
         Err(error) => return envelope::error(&error),
     };
-    let exists: Option<(i64,)> =
-        sqlx::query_as(r#"SELECT id FROM "user" WHERE mail = ?"#)
-            .bind(&mail)
-            .fetch_optional(&pool)
-            .await
-            .unwrap_or(None);
+    let exists: Option<(i64,)> = sqlx::query_as(r#"SELECT id FROM "user" WHERE mail = ?"#)
+        .bind(&mail)
+        .fetch_optional(&pool)
+        .await
+        .unwrap_or(None);
     if exists.is_some() {
         return error_code(1008);
     }
@@ -4556,7 +4617,7 @@ async fn update_user(headers: HeaderMap, request: Request) -> Response {
     };
     let input: UserIn = match serde_json::from_slice(&body) {
         Ok(input) => input,
-        Err(error) => return envelope::error(&format!(" [{}]", error)),
+        Err(error) => return envelope::error(&format!(" [{}]", go_json_error(&error))),
     };
     let ctx = appcfg::ctx();
     let pool = match ctx.pool().await {
@@ -4704,7 +4765,7 @@ async fn delete_user(headers: HeaderMap, request: Request) -> Response {
     };
     let req: UserDeleteRequest = match serde_json::from_slice(&body) {
         Ok(req) => req,
-        Err(error) => return envelope::error(&format!(" [{}]", error)),
+        Err(error) => return envelope::error(&format!(" [{}]", go_json_error(&error))),
     };
     let ctx = appcfg::ctx();
     let pool = match ctx.pool().await {
@@ -4738,7 +4799,12 @@ async fn delete_user(headers: HeaderMap, request: Request) -> Response {
     };
     if !ids.is_empty() {
         let placeholders = vec!["?"; ids.len()].join(",");
-        for table in ["item_icon", "item_icon_group", "space_member", "space_o_id_c_group"] {
+        for table in [
+            "item_icon",
+            "item_icon_group",
+            "space_member",
+            "space_o_id_c_group",
+        ] {
             let sql = format!("DELETE FROM {table} WHERE space_id IN ({placeholders})");
             let mut statement = sqlx::query(&sql);
             for id in &ids {
@@ -4757,7 +4823,13 @@ async fn delete_user(headers: HeaderMap, request: Request) -> Response {
             return envelope::error("delete failed");
         }
     }
-    for table in ["o_auth_identity", "item_icon", "item_icon_group", "module_config", "file"] {
+    for table in [
+        "o_auth_identity",
+        "item_icon",
+        "item_icon_group",
+        "module_config",
+        "file",
+    ] {
         let sql = format!("DELETE FROM {table} WHERE user_id = ?");
         if sqlx::query(&sql)
             .bind(req.user_id)
@@ -4806,7 +4878,9 @@ async fn delete_file(headers: HeaderMap, request: Request) -> Response {
         Err(error) => return envelope::error(&format!(" [{}]", error)),
     };
     if req.id == 0 {
-        return envelope::error(" [Key: 'RequestDeleteId.Id' Error:Field validation for 'Id' failed on the 'required' tag]");
+        return envelope::error(
+            " [Key: 'RequestDeleteId.Id' Error:Field validation for 'Id' failed on the 'required' tag]",
+        );
     }
     let ctx = appcfg::ctx();
     let pool = match ctx.pool().await {
@@ -4870,24 +4944,22 @@ async fn select_user_theme(
     revision_id: &str,
     mode: &str,
 ) -> Result<(), String> {
-    let package: Option<(i64,)> = sqlx::query_as(
-        "SELECT 1 FROM package_record_v2 WHERE id = ? AND removed = 0",
-    )
-    .bind(package_id)
-    .fetch_optional(pool)
-    .await
-    .unwrap_or(None);
+    let package: Option<(i64,)> =
+        sqlx::query_as("SELECT 1 FROM package_record_v2 WHERE id = ? AND removed = 0")
+            .bind(package_id)
+            .fetch_optional(pool)
+            .await
+            .unwrap_or(None);
     if package.is_none() {
         return Err("record not found".to_string());
     }
-    let revision: Option<(i64,)> = sqlx::query_as(
-        "SELECT 1 FROM revision_record_v2 WHERE id = ? AND package_id = ?",
-    )
-    .bind(revision_id)
-    .bind(package_id)
-    .fetch_optional(pool)
-    .await
-    .unwrap_or(None);
+    let revision: Option<(i64,)> =
+        sqlx::query_as("SELECT 1 FROM revision_record_v2 WHERE id = ? AND package_id = ?")
+            .bind(revision_id)
+            .bind(package_id)
+            .fetch_optional(pool)
+            .await
+            .unwrap_or(None);
     if revision.is_none() {
         return Err("record not found".to_string());
     }
@@ -4949,7 +5021,11 @@ async fn set_theme_preference(headers: HeaderMap, request: Request) -> Response 
         Err(error) => return envelope::error(&error),
     };
     if !req.revision.is_empty() || !req.package_id.is_empty() || !req.mode.is_empty() {
-        let mode = if req.mode.is_empty() { "auto".to_string() } else { req.mode.clone() };
+        let mode = if req.mode.is_empty() {
+            "auto".to_string()
+        } else {
+            req.mode.clone()
+        };
         if !matches!(mode.as_str(), "light" | "dark" | "auto") {
             return envelope::error(" [mode must be light, dark, or auto]");
         }
@@ -4965,7 +5041,9 @@ async fn set_theme_preference(headers: HeaderMap, request: Request) -> Response 
                 Ok(id) => id,
                 Err(error) => return envelope::error(&error),
             };
-            activation_revision(&pool, "instance").await.unwrap_or(instance)
+            activation_revision(&pool, "instance")
+                .await
+                .unwrap_or(instance)
         };
         let revision: Option<(String,)> =
             sqlx::query_as("SELECT package_id FROM revision_record_v2 WHERE id = ?")
@@ -4996,7 +5074,9 @@ async fn set_theme_preference(headers: HeaderMap, request: Request) -> Response 
                 .fetch_optional(&pool)
                 .await
                 .unwrap_or(None);
-        let mode = existing.map(|value| value.0).unwrap_or_else(|| "auto".to_string());
+        let mode = existing
+            .map(|value| value.0)
+            .unwrap_or_else(|| "auto".to_string());
         if let Err(error) = sqlx::query(
             "INSERT INTO user_theme_preference_v2 (user_id, mode, theme_mode, updated_at)
              VALUES (?, ?, ?, ?)
@@ -5016,7 +5096,14 @@ async fn set_theme_preference(headers: HeaderMap, request: Request) -> Response 
 }
 
 /// `ThemeRouter.RevisionsV2`.
-async fn admin_revisions() -> Response {
+async fn admin_revisions(headers: HeaderMap) -> Response {
+    let user = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    if user.role != 1 {
+        return error_code(1005);
+    }
     let ctx = appcfg::ctx();
     let pool = match ctx.pool().await {
         Ok(pool) => pool,
@@ -5067,15 +5154,16 @@ async fn admin_revisions() -> Response {
         })
         .collect();
     let instance = instance_default_revision(pool).await.unwrap_or_default();
-    let default_revision = activation_revision(pool, "instance").await.unwrap_or(instance);
-    let default_package: (String,) = sqlx::query_as(
-        "SELECT package_id FROM revision_record_v2 WHERE id = ?",
-    )
-    .bind(&default_revision)
-    .fetch_optional(pool)
-    .await
-    .unwrap_or(None)
-    .unwrap_or_default();
+    let default_revision = activation_revision(pool, "instance")
+        .await
+        .unwrap_or(instance);
+    let default_package: (String,) =
+        sqlx::query_as("SELECT package_id FROM revision_record_v2 WHERE id = ?")
+            .bind(&default_revision)
+            .fetch_optional(pool)
+            .await
+            .unwrap_or(None)
+            .unwrap_or_default();
     let activation: Option<(String, String, String, Option<String>)> = sqlx::query_as(
         "SELECT active_revision_id, last_good_revision_id, pending_revision_id, trial_started_at FROM activation_record_v2 WHERE scope = 'instance'",
     )
@@ -5095,7 +5183,14 @@ async fn admin_revisions() -> Response {
 }
 
 /// `ThemeRouter.Audit`: the newest 200 theme actions.
-async fn admin_audit() -> Response {
+async fn admin_audit(headers: HeaderMap) -> Response {
+    let user = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    if user.role != 1 {
+        return error_code(1005);
+    }
     let ctx = appcfg::ctx();
     let pool = match ctx.pool().await {
         Ok(pool) => pool,
@@ -5126,28 +5221,33 @@ async fn admin_audit() -> Response {
 }
 
 /// `ThemeRouter.TrustedRuntimePolicyV2`.
-async fn admin_trusted(Path(revision): Path<String>) -> Response {
+async fn admin_trusted(headers: HeaderMap, Path(revision): Path<String>) -> Response {
+    let user = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    if user.role != 1 {
+        return error_code(1005);
+    }
     let ctx = appcfg::ctx();
     let pool = match ctx.pool().await {
         Ok(pool) => pool,
         Err(error) => return envelope::error(&error),
     };
-    let exists: Option<(i64,)> =
-        sqlx::query_as("SELECT 1 FROM revision_record_v2 WHERE id = ?")
+    let exists: Option<(i64,)> = sqlx::query_as("SELECT 1 FROM revision_record_v2 WHERE id = ?")
+        .bind(&revision)
+        .fetch_optional(pool)
+        .await
+        .unwrap_or(None);
+    if exists.is_none() {
+        return error_code(404);
+    }
+    let row: Option<(i64,)> =
+        sqlx::query_as("SELECT enabled FROM trusted_runtime_policy_v2 WHERE revision_id = ?")
             .bind(&revision)
             .fetch_optional(pool)
             .await
             .unwrap_or(None);
-    if exists.is_none() {
-        return error_code(404);
-    }
-    let row: Option<(i64,)> = sqlx::query_as(
-        "SELECT enabled FROM trusted_runtime_policy_v2 WHERE revision_id = ?",
-    )
-    .bind(&revision)
-    .fetch_optional(pool)
-    .await
-    .unwrap_or(None);
     success_data(json!({
         "enabled": row.map(|value| value.0 != 0).unwrap_or(false),
         "revision": revision,
@@ -5164,13 +5264,12 @@ async fn web_wallpaper_asset(
         Ok(pool) => pool,
         Err(error) => return envelope::error(&error),
     };
-    let row: Option<(Vec<u8>, Vec<u8>, String)> = sqlx::query_as(
-        "SELECT html, poster, poster_type FROM web_wallpaper_record WHERE id = ?",
-    )
-    .bind(&id)
-    .fetch_optional(pool)
-    .await
-    .unwrap_or(None);
+    let row: Option<(Vec<u8>, Vec<u8>, String)> =
+        sqlx::query_as("SELECT html, poster, poster_type FROM web_wallpaper_record WHERE id = ?")
+            .bind(&id)
+            .fetch_optional(pool)
+            .await
+            .unwrap_or(None);
     let Some((html, poster, poster_type)) = row else {
         return envelope::empty_not_found();
     };
@@ -5249,9 +5348,11 @@ async fn set_trusted(
         return error_code(404);
     };
     if req.enabled {
-        let manifest: serde_json::Value =
-            serde_json::from_str(&manifest_json).unwrap_or_default();
-        if !supported_modes(&manifest).iter().any(|mode| mode == "trusted") {
+        let manifest: serde_json::Value = serde_json::from_str(&manifest_json).unwrap_or_default();
+        if !supported_modes(&manifest)
+            .iter()
+            .any(|mode| mode == "trusted")
+        {
             return envelope::error(" [theme does not declare support for the trusted runtime]");
         }
     }
@@ -5284,7 +5385,10 @@ async fn set_trusted(
     }
 }
 
-fn manifest_field<'a>(manifest: &'a serde_json::Value, path: &[&str]) -> Option<&'a serde_json::Value> {
+fn manifest_field<'a>(
+    manifest: &'a serde_json::Value,
+    path: &[&str],
+) -> Option<&'a serde_json::Value> {
     let mut current = manifest;
     for key in path {
         current = current.get(*key)?;
@@ -5308,7 +5412,9 @@ fn supported_modes(manifest: &serde_json::Value) -> Vec<String> {
 fn declared_permissions(manifest: &serde_json::Value) -> Vec<String> {
     let mut out = Vec::new();
     for key in ["required", "optional"] {
-        if let Some(list) = manifest_field(manifest, &["permissions", key]).and_then(serde_json::Value::as_array) {
+        if let Some(list) =
+            manifest_field(manifest, &["permissions", key]).and_then(serde_json::Value::as_array)
+        {
             for permission in list {
                 if let Some(name) = permission.get("name").and_then(serde_json::Value::as_str) {
                     out.push(name.to_string());
@@ -5339,27 +5445,38 @@ fn validate_grant(
     permissions: &[String],
 ) -> Result<(), String> {
     if !matches!(execution_mode, "sandbox" | "trusted")
-        || !supported_modes(manifest).iter().any(|mode| mode == execution_mode)
+        || !supported_modes(manifest)
+            .iter()
+            .any(|mode| mode == execution_mode)
     {
-        return Err(format!("theme does not support the {execution_mode} runtime"));
+        return Err(format!(
+            "theme does not support the {execution_mode} runtime"
+        ));
     }
     let allowed = declared_permissions(manifest);
     let mut granted = std::collections::HashSet::new();
     for permission in permissions {
         if !allowed.iter().any(|name| name == permission) || !granted.insert(permission.clone()) {
-            return Err(format!("theme permission {permission:?} is not declared or is duplicated"));
+            return Err(format!(
+                "theme permission {permission:?} is not declared or is duplicated"
+            ));
         }
     }
     for required in required_permissions(manifest) {
         if !granted.contains(&required) {
-            return Err(format!("required theme permission {required:?} must be granted"));
+            return Err(format!(
+                "required theme permission {required:?} must be granted"
+            ));
         }
     }
     Ok(())
 }
 
 fn is_builtin_theme(id: &str) -> bool {
-    matches!(id, "org.yin.default" | "org.yin.glass" | "org.yin.directory")
+    matches!(
+        id,
+        "org.yin.default" | "org.yin.glass" | "org.yin.directory"
+    )
 }
 
 /// `ImplicitBuiltinPermissionsV2`: a verified built-in theme needs no grant.
@@ -5371,15 +5488,20 @@ async fn implicit_builtin_permissions(
         "SELECT manifest_json, verified FROM revision_record_v2 WHERE id = ?",
     )
     .bind(revision)
-            .fetch_optional(pool)
-            .await
-            .unwrap_or(None)?;
+    .fetch_optional(pool)
+    .await
+    .unwrap_or(None)?;
     let (manifest_json, verified) = row;
     if verified == 0 {
         return None;
     }
     let manifest: serde_json::Value = serde_json::from_str(&manifest_json).ok()?;
-    if !is_builtin_theme(manifest.get("id").and_then(serde_json::Value::as_str).unwrap_or("")) {
+    if !is_builtin_theme(
+        manifest
+            .get("id")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or(""),
+    ) {
         return None;
     }
     Some(required_permissions(&manifest))
@@ -5424,14 +5546,15 @@ async fn theme_grant(
         return error_code(404);
     };
     let manifest: serde_json::Value = serde_json::from_str(&manifest_json).unwrap_or_default();
-    let available = supported_modes(&manifest).iter().any(|mode| mode == &execution_mode);
-    let trusted_enabled: Option<(i64,)> = sqlx::query_as(
-        "SELECT enabled FROM trusted_runtime_policy_v2 WHERE revision_id = ?",
-    )
-    .bind(&revision)
-    .fetch_optional(pool)
-    .await
-    .unwrap_or(None);
+    let available = supported_modes(&manifest)
+        .iter()
+        .any(|mode| mode == &execution_mode);
+    let trusted_enabled: Option<(i64,)> =
+        sqlx::query_as("SELECT enabled FROM trusted_runtime_policy_v2 WHERE revision_id = ?")
+            .bind(&revision)
+            .fetch_optional(pool)
+            .await
+            .unwrap_or(None);
     let available = if execution_mode == "trusted" {
         available && trusted_enabled.map(|value| value.0 != 0).unwrap_or(false)
     } else {
@@ -5457,7 +5580,11 @@ async fn theme_grant(
         }));
     }
     if let Some(permissions) = implicit_builtin_permissions(pool, &revision).await {
-        let permissions = if execution_mode == "sandbox" { permissions } else { Vec::new() };
+        let permissions = if execution_mode == "sandbox" {
+            permissions
+        } else {
+            Vec::new()
+        };
         let granted = execution_mode == "sandbox" && available;
         return success_data(json!({
             "available": available,
@@ -5583,7 +5710,11 @@ async fn revoke_theme_grant(
         Ok(pool) => pool,
         Err(error) => return envelope::error(&error),
     };
-    if execution_mode == "sandbox" && implicit_builtin_permissions(pool, &revision).await.is_some() {
+    if execution_mode == "sandbox"
+        && implicit_builtin_permissions(pool, &revision)
+            .await
+            .is_some()
+    {
         let result = sqlx::query(
             "INSERT INTO grant_record_v2 (user_id, revision_id, execution_mode, permissions_json, updated_at)
              VALUES (?, ?, 'sandbox', '[]', ?)
@@ -5616,7 +5747,7 @@ async fn revoke_theme_grant(
 // ------------------------------------------------------------ theme packages
 
 /// `POST /api/theme/v2/admin/preview`.
-async fn theme_preview_upload(headers: HeaderMap, mut multipart: Multipart) -> Response {
+async fn theme_preview_upload(headers: HeaderMap, request: Request) -> Response {
     let user = match require_user(&headers).await {
         Ok(user) => user,
         Err(response) => return response,
@@ -5624,6 +5755,10 @@ async fn theme_preview_upload(headers: HeaderMap, mut multipart: Multipart) -> R
     if user.role != 1 {
         return error_code(1005);
     }
+    let mut multipart = match Multipart::from_request(request, &()).await {
+        Ok(multipart) => multipart,
+        Err(_) => return envelope::error(" [invalid multipart theme upload]"),
+    };
     let mut data: Option<Vec<u8>> = None;
     while let Some(field) = multipart.next_field().await.unwrap_or(None) {
         if field.name() == Some("package") {
@@ -5648,13 +5783,13 @@ async fn theme_preview_upload(headers: HeaderMap, mut multipart: Multipart) -> R
         Err(error) => return envelope::error(&error),
     };
     success_data(json!({
-        "token": token,
         "package": package.preview_public(&token),
+        "token": token,
     }))
 }
 
 /// `POST /api/theme/v2/admin/install`.
-async fn theme_install(headers: HeaderMap, mut multipart: Multipart) -> Response {
+async fn theme_install(headers: HeaderMap, request: Request) -> Response {
     let user = match require_user(&headers).await {
         Ok(user) => user,
         Err(response) => return response,
@@ -5662,6 +5797,10 @@ async fn theme_install(headers: HeaderMap, mut multipart: Multipart) -> Response
     if user.role != 1 {
         return error_code(1005);
     }
+    let mut multipart = match Multipart::from_request(request, &()).await {
+        Ok(multipart) => multipart,
+        Err(_) => return envelope::error(" [invalid multipart theme upload]"),
+    };
     let mut data: Option<Vec<u8>> = None;
     let mut confirm = false;
     while let Some(field) = multipart.next_field().await.unwrap_or(None) {
@@ -5716,14 +5855,13 @@ async fn install_package(
     let tokens_json = serde_json::to_string(&package.tokens).map_err(|error| error.to_string())?;
     let now = now_like_go();
     let mut tx = pool.begin().await.map_err(|error| error.to_string())?;
-    let existing: Option<(String,)> = sqlx::query_as(
-        "SELECT id FROM revision_record_v2 WHERE package_id = ? AND version = ?",
-    )
-    .bind(&manifest.id)
-    .bind(&manifest.version)
-    .fetch_optional(&mut *tx)
-    .await
-    .unwrap_or(None);
+    let existing: Option<(String,)> =
+        sqlx::query_as("SELECT id FROM revision_record_v2 WHERE package_id = ? AND version = ?")
+            .bind(&manifest.id)
+            .bind(&manifest.version)
+            .fetch_optional(&mut *tx)
+            .await
+            .unwrap_or(None);
     if let Some((existing_id,)) = existing {
         if existing_id != package.revision {
             return Err("same theme package version has different content".to_string());
@@ -5764,7 +5902,7 @@ async fn install_package(
                 return Err(
                     "removed theme packages must be explicitly restored before installation"
                         .to_string(),
-                )
+                );
             }
             Some(_) => {}
         }
@@ -5824,7 +5962,7 @@ async fn install_package(
 async fn theme_preview_get(Path(token): Path<String>) -> Response {
     match crate::packages::get_preview(&token) {
         Some(package) => success_data(package.preview_public(&token)),
-        None => error_code(404),
+        None => envelope::empty_not_found(),
     }
 }
 
@@ -5855,9 +5993,13 @@ fn serve_bytes(headers: &HeaderMap, media_type: &str, content: &[u8]) -> Respons
         }
         out.insert(
             header::CONTENT_TYPE,
-            HeaderValue::from_str(media_type).unwrap_or(HeaderValue::from_static("application/octet-stream")),
+            HeaderValue::from_str(media_type)
+                .unwrap_or(HeaderValue::from_static("application/octet-stream")),
         );
-        out.insert(header::X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
+        out.insert(
+            header::X_CONTENT_TYPE_OPTIONS,
+            HeaderValue::from_static("nosniff"),
+        );
         let cache = if is_html {
             "public, max-age=0, must-revalidate, no-transform"
         } else {
@@ -5867,13 +6009,28 @@ fn serve_bytes(headers: &HeaderMap, media_type: &str, content: &[u8]) -> Respons
         if is_html {
             use sha2::{Digest, Sha256};
             let digest = Sha256::digest(content);
-            let etag = format!("\"{}\"", digest.iter().map(|byte| format!("{byte:02x}")).collect::<String>());
-            out.insert(header::ETAG, HeaderValue::from_str(&etag).unwrap_or(HeaderValue::from_static("")));
+            let etag = format!(
+                "\"{}\"",
+                digest
+                    .iter()
+                    .map(|byte| format!("{byte:02x}"))
+                    .collect::<String>()
+            );
+            out.insert(
+                header::ETAG,
+                HeaderValue::from_str(&etag).unwrap_or(HeaderValue::from_static("")),
+            );
             out.insert(header::CONTENT_SECURITY_POLICY, HeaderValue::from_static("sandbox allow-scripts; default-src 'none'; script-src 'unsafe-inline' https://static.cloudflareinsights.com; style-src 'unsafe-inline'; img-src data:; connect-src https://cloudflareinsights.com; font-src 'none'; media-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'none'"));
-            out.insert(header::REFERRER_POLICY, HeaderValue::from_static("no-referrer"));
+            out.insert(
+                header::REFERRER_POLICY,
+                HeaderValue::from_static("no-referrer"),
+            );
         } else if media_type == "image/svg+xml" {
             out.insert(header::CONTENT_SECURITY_POLICY, HeaderValue::from_static("sandbox; default-src 'none'; script-src 'none'; style-src 'unsafe-inline'; img-src data: blob:; object-src 'none'; form-action 'none'; base-uri 'none'"));
-            out.insert(header::REFERRER_POLICY, HeaderValue::from_static("no-referrer"));
+            out.insert(
+                header::REFERRER_POLICY,
+                HeaderValue::from_static("no-referrer"),
+            );
         }
     }
     let (parts, _) = response.into_parts();
@@ -5890,10 +6047,7 @@ struct RevisionRequest {
 
 /// `RemovePackageV2`: built-in themes are protected; a removed package's
 /// activations fall back to the seeded Yin package.
-async fn remove_package(
-    headers: HeaderMap,
-    Path(package_id): Path<String>,
-) -> Response {
+async fn remove_package(headers: HeaderMap, Path(package_id): Path<String>) -> Response {
     let user = match require_user(&headers).await {
         Ok(user) => user,
         Err(response) => return response,
@@ -5909,13 +6063,12 @@ async fn remove_package(
         Ok(pool) => pool.clone(),
         Err(error) => return envelope::error(&error),
     };
-    let record: Option<(i64,)> = sqlx::query_as(
-        "SELECT removed FROM package_record_v2 WHERE id = ? AND removed = 0",
-    )
-    .bind(&package_id)
-    .fetch_optional(&pool)
-    .await
-    .unwrap_or(None);
+    let record: Option<(i64,)> =
+        sqlx::query_as("SELECT removed FROM package_record_v2 WHERE id = ? AND removed = 0")
+            .bind(&package_id)
+            .fetch_optional(&pool)
+            .await
+            .unwrap_or(None);
     if record.is_none() {
         return error_code(404);
     }
@@ -5983,7 +6136,11 @@ async fn set_default_package(headers: HeaderMap, request: Request) -> Response {
     };
     let req: RevisionRequest = match serde_json::from_slice(&body) {
         Ok(req) => req,
-        Err(error) => return envelope::error(&format!(" [{}]", error)),
+        Err(error) if error.is_eof() => RevisionRequest {
+            revision: String::new(),
+            package_id: String::new(),
+        },
+        Err(error) => return envelope::error(&format!(" [{}]", go_json_error(&error))),
     };
     if req.revision.is_empty() && req.package_id.is_empty() {
         return envelope::error(" [revision or packageId is required]");
@@ -6043,7 +6200,11 @@ async fn begin_trial(headers: HeaderMap, request: Request) -> Response {
     };
     let req: RevisionRequest = match serde_json::from_slice(&body) {
         Ok(req) => req,
-        Err(error) => return envelope::error(&format!(" [{}]", error)),
+        Err(error) if error.is_eof() => RevisionRequest {
+            revision: String::new(),
+            package_id: String::new(),
+        },
+        Err(error) => return envelope::error(&format!(" [{}]", go_json_error(&error))),
     };
     if req.revision.is_empty() {
         return envelope::error(" [revision is required]");
@@ -6062,13 +6223,12 @@ async fn begin_trial(headers: HeaderMap, request: Request) -> Response {
     let Some((package_id,)) = revision else {
         return error_code(404);
     };
-    let removed: Option<(i64,)> = sqlx::query_as(
-        "SELECT removed FROM package_record_v2 WHERE id = ?",
-    )
-    .bind(&package_id)
-    .fetch_optional(&pool)
-    .await
-    .unwrap_or(None);
+    let removed: Option<(i64,)> =
+        sqlx::query_as("SELECT removed FROM package_record_v2 WHERE id = ?")
+            .bind(&package_id)
+            .fetch_optional(&pool)
+            .await
+            .unwrap_or(None);
     if removed.map(|value| value.0).unwrap_or(1) != 0 {
         return error_code(404);
     }
@@ -6108,7 +6268,11 @@ async fn confirm_trial(headers: HeaderMap, request: Request) -> Response {
     };
     let req: RevisionRequest = match serde_json::from_slice(&body) {
         Ok(req) => req,
-        Err(error) => return envelope::error(&format!(" [{}]", error)),
+        Err(error) if error.is_eof() => RevisionRequest {
+            revision: String::new(),
+            package_id: String::new(),
+        },
+        Err(error) => return envelope::error(&format!(" [{}]", go_json_error(&error))),
     };
     if req.revision.is_empty() {
         return envelope::error(" [revision is required]");
@@ -6201,7 +6365,11 @@ async fn rollback_theme(headers: HeaderMap) -> Response {
     let Some((last_good,)) = activation else {
         return envelope::database_error();
     };
-    let revision_id = if last_good.is_empty() { fallback } else { last_good };
+    let revision_id = if last_good.is_empty() {
+        fallback
+    } else {
+        last_good
+    };
     let revision: Option<(String,)> =
         sqlx::query_as("SELECT package_id FROM revision_record_v2 WHERE id = ?")
             .bind(&revision_id)
@@ -6251,7 +6419,9 @@ fn link_attributes(html: &str) -> Vec<Vec<(String, String)>> {
                 index += 1;
             }
             let name_start = index;
-            while index < tag.len() && !matches!(bytes[index] as char, '=' | ' ' | '\t' | '\n' | '\r' | '/') {
+            while index < tag.len()
+                && !matches!(bytes[index] as char, '=' | ' ' | '\t' | '\n' | '\r' | '/')
+            {
                 index += 1;
             }
             if name_start == index {
@@ -6311,7 +6481,7 @@ async fn discover_icon(page_url: &str) -> Result<String, String> {
         )
         .send()
         .await
-        .map_err(|error| error.to_string())?;
+        .map_err(|error| go_http_get_error(page_url, &error))?;
     if !response.status().is_success() {
         return Err(format!(
             "HTTP request failed with status code {}",
@@ -6349,6 +6519,26 @@ async fn discover_icon(page_url: &str) -> Result<String, String> {
     Ok(format!("{}://{host}/favicon.ico", page.scheme()))
 }
 
+fn go_http_get_error(url: &str, error: &reqwest::Error) -> String {
+    let cause = std::iter::successors(std::error::Error::source(error), |cause| {
+        std::error::Error::source(*cause)
+    })
+    .map(|cause| cause.to_string())
+    .collect::<Vec<_>>()
+    .join(": ");
+    if error.is_connect() && cause.to_ascii_lowercase().contains("connection refused") {
+        if let Ok(parsed) = reqwest::Url::parse(url) {
+            let host = parsed.host_str().unwrap_or("");
+            let address = parsed
+                .port_or_known_default()
+                .map(|port| format!("{host}:{port}"))
+                .unwrap_or_else(|| host.to_string());
+            return format!("Get \"{url}\": dial tcp {address}: connect: connection refused");
+        }
+    }
+    error.to_string()
+}
+
 /// `ItemIconRouter.GetSiteFavicon`: discover the icon, download it, store it and
 /// record the file row. The name is content-addressed by time in Go, so it is
 /// reproduced the same way rather than being made deterministic.
@@ -6363,7 +6553,7 @@ async fn get_site_favicon(headers: HeaderMap, request: Request) -> Response {
     };
     let req: FaviconRequest = match serde_json::from_slice(&body) {
         Ok(req) => req,
-        Err(error) => return envelope::error(&format!(" [{}]", error)),
+        Err(error) => return envelope::error(&format!(" [{}]", go_json_error(&error))),
     };
     if req.url.trim().is_empty() {
         return success_data(json!({"iconUrl": "", "fileName": ""}));
@@ -6371,7 +6561,7 @@ async fn get_site_favicon(headers: HeaderMap, request: Request) -> Response {
     let icon_url = match discover_icon(req.url.trim()).await {
         Ok(url) => url,
         Err(error) => {
-            return envelope::error(&format!("acquisition failed: get ico error:{error}"))
+            return envelope::error(&format!("acquisition failed: get ico error:{error}"));
         }
     };
     let parsed = match reqwest::Url::parse(req.url.trim()) {
@@ -6386,7 +6576,7 @@ async fn get_site_favicon(headers: HeaderMap, request: Request) -> Response {
             url
         }
         Err(error) => {
-            return envelope::error(&format!("acquisition failed: parsed ico URL :{error}"))
+            return envelope::error(&format!("acquisition failed: parsed ico URL :{error}"));
         }
     };
     let _ = &parsed;
@@ -6426,12 +6616,20 @@ async fn get_site_favicon(headers: HeaderMap, request: Request) -> Response {
         Some(index) => url_file_name[index..].to_string(),
         None => ".ico".to_string(),
     };
-    let extension = if extension.is_empty() { ".ico".to_string() } else { extension };
+    let extension = if extension.is_empty() {
+        ".ico".to_string()
+    } else {
+        extension
+    };
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|value| format!("{}", value.as_nanos()))
         .unwrap_or_default();
-    let file_name = format!("{}{}", hex_digest(format!("{url_file_name}{now}").as_bytes(), false), extension);
+    let file_name = format!(
+        "{}{}",
+        hex_digest(format!("{url_file_name}{now}").as_bytes(), false),
+        extension
+    );
     if store_object(&file_name, &content).is_err() {
         return envelope::error("acquisition failed: download failed to upload file");
     }
@@ -6486,7 +6684,9 @@ async fn wallpaper_library_asset(
 // ------------------------------------------------------- Go router fallback
 
 fn path_segments(path: &str) -> Vec<&str> {
-    path.split('/').filter(|segment| !segment.is_empty()).collect()
+    path.split('/')
+        .filter(|segment| !segment.is_empty())
+        .collect()
 }
 
 /// Gin's tree: static segments, `:param` for one segment and `*name` for the
@@ -6524,20 +6724,25 @@ pub async fn go_fallback(req: Request) -> Response {
     if path.len() > 1 && path.ends_with('/') {
         let trimmed = &path[..path.len() - 1];
         let candidate = format!("{trimmed}/x");
-        let redirects = crate::go_routes::GO_ROUTES.iter().any(|(route_method, pattern)| {
-            *route_method == method
-                && pattern
-                    .rsplit('/')
-                    .next()
-                    .is_some_and(|segment| segment.starts_with(':'))
-                && pattern_matches(pattern, &candidate)
-        });
+        let redirects = crate::go_routes::GO_ROUTES
+            .iter()
+            .any(|(route_method, pattern)| {
+                *route_method == method
+                    && pattern
+                        .rsplit('/')
+                        .next()
+                        .is_some_and(|segment| segment.starts_with(':'))
+                    && pattern_matches(pattern, &candidate)
+            });
         if redirects {
             let body = format!("<a href=\"{trimmed}\">Moved Permanently</a>.\n\n");
             return (
                 StatusCode::MOVED_PERMANENTLY,
                 [
-                    (header::CONTENT_TYPE, HeaderValue::from_static("text/html; charset=utf-8")),
+                    (
+                        header::CONTENT_TYPE,
+                        HeaderValue::from_static("text/html; charset=utf-8"),
+                    ),
                     (
                         header::LOCATION,
                         HeaderValue::from_str(trimmed).unwrap_or(HeaderValue::from_static("/")),
@@ -6718,11 +6923,17 @@ async fn serve_stored_file_api(headers: HeaderMap, Path(filepath): Path<String>)
 async fn serve_stored(headers: &HeaderMap, filepath: String, api_group: bool) -> Response {
     let name = filepath.trim_start_matches('/').to_string();
     if name.is_empty() {
-        return static_error(StatusCode::BAD_REQUEST, "{\"error\":\"file path is required\"}", api_group);
+        return static_error(
+            StatusCode::BAD_REQUEST,
+            "{\"error\":\"file path is required\"}",
+            api_group,
+        );
     }
     let path = storage_dir().join(&name);
     // Uploads can be tens of megabytes; a small image is cheaper to read inline.
-    let size = std::fs::metadata(&path).map(|metadata| metadata.len()).unwrap_or(0);
+    let size = std::fs::metadata(&path)
+        .map(|metadata| metadata.len())
+        .unwrap_or(0);
     let read = if size >= 256 * 1024 {
         let path = path.clone();
         tokio::task::spawn_blocking(move || std::fs::read(&path))
@@ -6739,7 +6950,7 @@ async fn serve_stored(headers: &HeaderMap, filepath: String, api_group: bool) ->
                 StatusCode::NOT_FOUND,
                 "{\"error\":\"failed to get file\"}",
                 api_group,
-            )
+            );
         }
     };
     let extension = extension_of(&name);
@@ -6759,7 +6970,8 @@ async fn serve_stored(headers: &HeaderMap, filepath: String, api_group: bool) ->
         let out = response.headers_mut();
         out.insert(
             header::CONTENT_TYPE,
-            HeaderValue::from_str(content_type).unwrap_or(HeaderValue::from_static("application/octet-stream")),
+            HeaderValue::from_str(content_type)
+                .unwrap_or(HeaderValue::from_static("application/octet-stream")),
         );
         out.insert(
             header::CONTENT_DISPOSITION,
@@ -6769,6 +6981,18 @@ async fn serve_stored(headers: &HeaderMap, filepath: String, api_group: bool) ->
         out.insert(
             header::CACHE_CONTROL,
             HeaderValue::from_static("public, max-age=31536000, immutable"),
+        );
+        out.insert(
+            header::REFERRER_POLICY,
+            HeaderValue::from_static("strict-origin-when-cross-origin"),
+        );
+        out.insert(
+            header::X_CONTENT_TYPE_OPTIONS,
+            HeaderValue::from_static("nosniff"),
+        );
+        out.insert(
+            header::X_FRAME_OPTIONS,
+            HeaderValue::from_static("SAMEORIGIN"),
         );
     }
     // `GetS3File` sends only mp4/webm through `http.ServeContent`; an image is
@@ -6784,12 +7008,29 @@ async fn serve_stored(headers: &HeaderMap, filepath: String, api_group: bool) ->
 /// A JSON error from the static file routes, with the middleware headers the
 /// matched route would add.
 fn static_error(status: StatusCode, body: &'static str, api_group: bool) -> Response {
-    let mut response = (status, [(header::CONTENT_TYPE, HeaderValue::from_static("application/json; charset=utf-8"))], body).into_response();
+    let mut response = (
+        status,
+        [(
+            header::CONTENT_TYPE,
+            HeaderValue::from_static("application/json; charset=utf-8"),
+        )],
+        body,
+    )
+        .into_response();
     {
         let headers = response.headers_mut();
-        headers.insert(header::REFERRER_POLICY, HeaderValue::from_static("strict-origin-when-cross-origin"));
-        headers.insert(header::X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
-        headers.insert(header::X_FRAME_OPTIONS, HeaderValue::from_static("SAMEORIGIN"));
+        headers.insert(
+            header::REFERRER_POLICY,
+            HeaderValue::from_static("strict-origin-when-cross-origin"),
+        );
+        headers.insert(
+            header::X_CONTENT_TYPE_OPTIONS,
+            HeaderValue::from_static("nosniff"),
+        );
+        headers.insert(
+            header::X_FRAME_OPTIONS,
+            HeaderValue::from_static("SAMEORIGIN"),
+        );
         if api_group {
             headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
         }
@@ -6817,7 +7058,7 @@ async fn set_user_space_theme(
     };
     let req: RevisionRequest = match serde_json::from_slice(&body) {
         Ok(req) => req,
-        Err(error) => return envelope::error(&format!(" [{}]", error)),
+        Err(error) => return envelope::error(&format!(" [{}]", go_json_error(&error))),
     };
     let ctx = appcfg::ctx();
     let pool = match ctx.pool().await {
@@ -6861,11 +7102,118 @@ async fn set_user_space_theme(
     }
 }
 
-/// `ClearUserSpaceThemeV2`.
-async fn clear_user_space_theme(
+/// `SetSpaceThemeV2`: the default theme for a Space, managed by its admin.
+async fn set_space_theme(
     headers: HeaderMap,
     Path(space_id): Path<String>,
+    request: Request,
 ) -> Response {
+    let user = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    let space_id: i64 = match space_id.parse() {
+        Ok(value) => value,
+        Err(_) => return envelope::error(" [spaceId must be a positive integer]"),
+    };
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool.clone(),
+        Err(error) => return envelope::error(&error),
+    };
+    let exists: Option<(i64,)> = sqlx::query_as(r#"SELECT id FROM "space" WHERE id = ?"#)
+        .bind(space_id)
+        .fetch_optional(&pool)
+        .await
+        .unwrap_or(None);
+    if exists.is_none() {
+        return error_code(404);
+    }
+    if !can_manage(&pool, user.id, space_id).await {
+        return error_code(1005);
+    }
+    let body = match axum::body::to_bytes(request.into_body(), 1 << 20).await {
+        Ok(body) => body,
+        Err(_) => return envelope::error("invalid request body"),
+    };
+    let req: RevisionRequest = match serde_json::from_slice(&body) {
+        Ok(req) => req,
+        Err(error) => return envelope::error(&format!(" [{}]", go_json_error(&error))),
+    };
+    let revision_id = if !req.revision.is_empty() {
+        req.revision
+    } else if !req.package_id.is_empty() {
+        match latest_revision_of(&pool, &req.package_id).await {
+            Ok(id) => id,
+            Err(_) => return error_code(404),
+        }
+    } else {
+        return envelope::error(" [packageId or revision is required]");
+    };
+    let package: Option<(String,)> =
+        sqlx::query_as("SELECT package_id FROM revision_record_v2 WHERE id = ?")
+            .bind(&revision_id)
+            .fetch_optional(&pool)
+            .await
+            .unwrap_or(None);
+    let Some((package_id,)) = package else {
+        return error_code(404);
+    };
+    match sqlx::query(
+        "INSERT INTO space_theme_preference_v2 (space_id, package_id, revision_id, updated_at)
+         VALUES (?, ?, ?, ?)
+         ON CONFLICT(space_id) DO UPDATE SET package_id = excluded.package_id, revision_id = excluded.revision_id, updated_at = excluded.updated_at",
+    )
+    .bind(space_id)
+    .bind(package_id)
+    .bind(revision_id)
+    .bind(now_like_go())
+    .execute(&pool)
+    .await
+    {
+        Ok(_) => success(),
+        Err(error) => envelope::error(&error.to_string()),
+    }
+}
+
+/// `ClearSpaceThemeV2`: remove the Space-level default theme selection.
+async fn clear_space_theme(headers: HeaderMap, Path(space_id): Path<String>) -> Response {
+    let user = match require_user(&headers).await {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    let space_id: i64 = match space_id.parse() {
+        Ok(value) => value,
+        Err(_) => return envelope::error(" [spaceId must be a positive integer]"),
+    };
+    let ctx = appcfg::ctx();
+    let pool = match ctx.pool().await {
+        Ok(pool) => pool.clone(),
+        Err(error) => return envelope::error(&error),
+    };
+    let exists: Option<(i64,)> = sqlx::query_as(r#"SELECT id FROM "space" WHERE id = ?"#)
+        .bind(space_id)
+        .fetch_optional(&pool)
+        .await
+        .unwrap_or(None);
+    if exists.is_none() {
+        return error_code(404);
+    }
+    if !can_manage(&pool, user.id, space_id).await {
+        return error_code(1005);
+    }
+    match sqlx::query("DELETE FROM space_theme_preference_v2 WHERE space_id = ?")
+        .bind(space_id)
+        .execute(&pool)
+        .await
+    {
+        Ok(_) => success(),
+        Err(error) => envelope::error(&error.to_string()),
+    }
+}
+
+/// `ClearUserSpaceThemeV2`.
+async fn clear_user_space_theme(headers: HeaderMap, Path(space_id): Path<String>) -> Response {
     let user = match require_user(&headers).await {
         Ok(user) => user,
         Err(response) => return response,
@@ -6893,11 +7241,7 @@ async fn clear_user_space_theme(
 }
 
 /// `SpaceRouter.Copy`: a new shared Space holding copies of every group and item.
-async fn copy_space(
-    headers: HeaderMap,
-    Path(space_id): Path<i64>,
-    request: Request,
-) -> Response {
+async fn copy_space(headers: HeaderMap, Path(space_id): Path<i64>, request: Request) -> Response {
     let user = match require_user(&headers).await {
         Ok(user) => user,
         Err(response) => return response,
@@ -6921,7 +7265,9 @@ async fn copy_space(
     let body = axum::body::to_bytes(request.into_body(), 1 << 20)
         .await
         .unwrap_or_default();
-    let req: RenameRequest = serde_json::from_slice(&body).unwrap_or(RenameRequest { name: String::new() });
+    let req: RenameRequest = serde_json::from_slice(&body).unwrap_or(RenameRequest {
+        name: String::new(),
+    });
     let name = if req.name.is_empty() {
         format!("{source_name} Copy")
     } else {
@@ -7012,13 +7358,19 @@ async fn copy_space(
 /// `validWallpaperBytes`: the media type must match the bytes.
 fn valid_wallpaper_bytes(media_type: &str, data: &[u8]) -> bool {
     match media_type {
-        "image/png" => data.len() >= 8 && data[..8] == [0x89, b'P', b'N', b'G', b'\r', b'\n', 0x1a, b'\n'],
+        "image/png" => {
+            data.len() >= 8 && data[..8] == [0x89, b'P', b'N', b'G', b'\r', b'\n', 0x1a, b'\n']
+        }
         "image/jpeg" => data.len() >= 3 && data[..3] == [0xff, 0xd8, 0xff],
         "image/gif" => data.len() >= 6 && (&data[..6] == b"GIF87a" || &data[..6] == b"GIF89a"),
         "image/webp" => data.len() >= 12 && &data[..4] == b"RIFF" && &data[8..12] == b"WEBP",
         "video/mp4" => data.len() >= 12 && data.len() <= 20 << 20 && &data[4..8] == b"ftyp",
-        "video/webm" => data.len() >= 4 && data.len() <= 20 << 20 && data[..4] == [0x1a, 0x45, 0xdf, 0xa3],
-        "text/html" => !data.is_empty() && data.len() <= 5 << 20 && std::str::from_utf8(data).is_ok(),
+        "video/webm" => {
+            data.len() >= 4 && data.len() <= 20 << 20 && data[..4] == [0x1a, 0x45, 0xdf, 0xa3]
+        }
+        "text/html" => {
+            !data.is_empty() && data.len() <= 5 << 20 && std::str::from_utf8(data).is_ok()
+        }
         _ => false,
     }
 }
@@ -7031,8 +7383,8 @@ fn parse_web_wallpaper(data: &[u8]) -> Result<(Vec<u8>, Vec<u8>, String), String
     if data.is_empty() || data.len() > MAX_WEB_WALLPAPER {
         return Err("web wallpaper package exceeds 6 MiB".to_string());
     }
-    let mut archive = zip::ZipArchive::new(std::io::Cursor::new(data))
-        .map_err(|error| error.to_string())?;
+    let mut archive =
+        zip::ZipArchive::new(std::io::Cursor::new(data)).map_err(|error| error.to_string())?;
     if archive.len() != 2 {
         return Err("web wallpaper must contain index.html and one poster".to_string());
     }
@@ -7063,7 +7415,8 @@ fn parse_web_wallpaper(data: &[u8]) -> Result<(Vec<u8>, Vec<u8>, String), String
             other => return Err(format!("unexpected web wallpaper file {other:?}")),
         }
     }
-    let html = html.ok_or_else(|| "web wallpaper must contain index.html and one poster".to_string())?;
+    let html =
+        html.ok_or_else(|| "web wallpaper must contain index.html and one poster".to_string())?;
     let (poster, poster_type) =
         poster.ok_or_else(|| "web wallpaper must contain index.html and one poster".to_string())?;
     if html.len() + poster.len() > MAX_WEB_WALLPAPER
@@ -7076,10 +7429,14 @@ fn parse_web_wallpaper(data: &[u8]) -> Result<(Vec<u8>, Vec<u8>, String), String
 }
 
 /// `POST /api/theme/v2/wallpaper/web`: a self-contained web wallpaper archive.
-async fn upload_web_wallpaper(headers: HeaderMap, mut multipart: Multipart) -> Response {
+async fn upload_web_wallpaper(headers: HeaderMap, request: Request) -> Response {
     let user = match require_user(&headers).await {
         Ok(user) => user,
         Err(response) => return response,
+    };
+    let mut multipart = match Multipart::from_request(request, &()).await {
+        Ok(multipart) => multipart,
+        Err(_) => return envelope::error(" [web wallpaper package is required]"),
     };
     let mut data: Option<Vec<u8>> = None;
     while let Some(field) = multipart.next_field().await.unwrap_or(None) {
@@ -7105,18 +7462,21 @@ async fn upload_web_wallpaper(headers: HeaderMap, mut multipart: Multipart) -> R
     hasher.update(format!("{}:", user.id).as_bytes());
     hasher.update(&html);
     hasher.update(&poster);
-    let id: String = hasher.finalize().iter().map(|byte| format!("{byte:02x}")).collect();
+    let id: String = hasher
+        .finalize()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
     let ctx = appcfg::ctx();
     let pool = match ctx.pool().await {
         Ok(pool) => pool,
         Err(error) => return envelope::error(&error),
     };
-    let exists: Option<(i64,)> =
-        sqlx::query_as("SELECT 1 FROM web_wallpaper_record WHERE id = ?")
-            .bind(&id)
-            .fetch_optional(pool)
-            .await
-            .unwrap_or(None);
+    let exists: Option<(i64,)> = sqlx::query_as("SELECT 1 FROM web_wallpaper_record WHERE id = ?")
+        .bind(&id)
+        .fetch_optional(pool)
+        .await
+        .unwrap_or(None);
     if exists.is_none() {
         if sqlx::query(
             "INSERT INTO web_wallpaper_record (id, owner_id, html, poster, poster_type, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -7154,8 +7514,7 @@ pub async fn head_gate(req: Request, next: axum::middleware::Next) -> Response {
         let path = req.uri().path();
         let served = matches!(
             path,
-            "/"
-                | "/index.html"
+            "/" | "/index.html"
                 | "/login"
                 | "/oauth/callback"
                 | "/clear.html"
@@ -7230,7 +7589,7 @@ pub async fn api_gzip(req: Request, next: axum::middleware::Next) -> Response {
         return Response::from_parts(parts, axum::body::Body::from(bytes));
     }
     use std::io::Write as _;
-    let mut encoder = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
+    let mut encoder = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::fast());
     if encoder.write_all(&bytes).is_err() {
         return Response::from_parts(parts, axum::body::Body::from(bytes));
     }

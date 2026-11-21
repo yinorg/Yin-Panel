@@ -336,3 +336,44 @@ per request because the file is stat'ed to decide whether to read it inline or
 off the async workers; that stat is what keeps a 500 KB asset from blocking a
 runtime thread, and the small-file path stays inline because offloading a
 13 KB file measured 66 µs worse with no p99 gain.
+
+
+### Gzip CPU/size trade-off
+
+The default Rust zlib encoder was slower than Go's pooled writer on JSON. Tested
+with the same 3-repetition, c=32 method and `Accept-Encoding: gzip`, Rust's
+`Compression::fast()` changes:
+
+| Endpoint | Go RPS | Rust RPS | Go gzip bytes | Rust gzip bytes | Rust CPU/req | Go CPU/req |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `/api/about` | 10,862 | 10,997 | 123 | 104 | 160 µs | 240 µs |
+| `theme/v2/current` | 3,219 | 2,930 | 1,546 | 1,827 | 1,395 µs | 1,305 µs |
+| wallpaper library | 1,260 | 1,927 | 8,530 | 10,273 | 630 µs | 6,540 µs |
+
+The level-1 trade is now active: it preserves decoded bytes and headers, brings
+the small JSON route to throughput parity, and lets the large immutable
+catalogue use 79% less CPU per request than Go, at 1.7 KB more wire bytes. The
+wallpaper body is still 89% smaller than its 94,430-byte uncompressed form.
+`theme/current` remains a known gzip CPU/latency gap; the one-query join reduced
+its DB round trips but did not move the c=32 median outside the noise. Caching
+it is not yet justified: CPU at c=1 is close to Go on identity encoding, while
+compression, not repeated query count, is the largest measured c=32 cost.
+
+### Release-gate baseline (2026-11-21)
+
+The consolidated `scripts/verify-rust-release.sh` run uses the same database
+snapshot, five alternating repetitions, and validates every response.
+Identity-encoded median RPS from the clean integrated run:
+
+| Endpoint | c=1 Go | c=1 Rust | c=32 Go | c=32 Rust | Rust/Go at c=32 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `/api/about` | 4,612 | 5,970 | 24,890 | 25,729 | 1.03x |
+| `/` | 3,300 | 4,378 | 7,392 | 7,903 | 1.07x |
+| `theme/v2/current` | 842 | 675 | 3,639 | 3,532 | 0.97x |
+| `/api/spaces` | 1,070 | 1,054 | 5,834 | 5,366 | 0.92x |
+
+The one-query `theme/current` path preserves its response in parity checks but
+does not improve the high-concurrency median beyond measurement noise. The
+remaining `/api/spaces` throughput gap is paired with lower Rust CPU/request
+and p99 (753 µs and 7.02 ms versus Go's 997 µs and 11.83 ms). No additional
+cache or pool tuning is justified by this run alone.

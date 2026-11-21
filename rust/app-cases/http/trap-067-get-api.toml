@@ -1,6 +1,6 @@
 [request]
 method = "GET"
-path = "/api/theme/stra%C3%9Fe/current"
+path = "/api/oauth/%E6%97%A5%E6%9C%AC%E8%AA%9E"
 
 [response]
 status = 404

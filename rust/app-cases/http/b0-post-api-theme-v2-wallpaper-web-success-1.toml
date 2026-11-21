@@ -1,0 +1,27 @@
+[request]
+method = "POST"
+path = "/api/theme/v2/wallpaper/web"
+body = """
+--b0-wallpaper\r
+Content-Disposition: form-data; name="package"; filename="wallpaper.zip"\r
+Content-Type: application/zip\r
+\r
+PK\u0003\u0004\u0014\u0000\u0000\u0000\u0000\u0000\u0000\u0000!P!_^R7\u0000\u0000\u00007\u0000\u0000\u0000
+\u0000\u0000\u0000index.html<!doctype html><html><body>B0 wallpaper</body></html>  PK\u0003\u0004\u0014\u0000\u0000\u0000\u0000\u0000\u0000\u0000!PoGwq{\u0000\u0000\u0000{\u0000\u0000\u0000\u000B\u0000\u0000\u0000poster.webpRIFF0000WEBPposter                                                                                                         PK\u0001\u0002\u0014\u0000\u0014\u0000\u0000\u0000\u0000\u0000\u0000\u0000!P!_^R7\u0000\u0000\u00007\u0000\u0000\u0000
+\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000 \u0000\u0000\u0000\u0000\u0000\u0000\u0000index.htmlPK\u0001\u0002\u0014\u0000\u0014\u0000\u0000\u0000\u0000\u0000\u0000\u0000!PoGwq{\u0000\u0000\u0000{\u0000\u0000\u0000\u000B\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000 \u0000\u0000\u0000_\u0000\u0000\u0000poster.webpPK\u0005\u0006\u0000\u0000\u0000\u0000\u0002\u0000\u0002\u0000q\u0000\u0000\u0000\u0003\u0001\u0000\u0000\u0000\u0000\r
+--b0-wallpaper--\r
+"""
+
+[request.headers]
+Content-Type = "multipart/form-data; boundary=b0-wallpaper"
+Cookie = "yin_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoxLCJ0b2tlbl92ZXJzaW9uIjowLCJzdWIiOiJ1c2VyX2FjY2VzcyIsImV4cCI6MjExMDUwNzg2NiwibmJmIjoxNzk1MTQ3ODA2LCJpYXQiOjE3OTUxNDc4MDZ9.mcu_V1ZKGCAvLNlf_e2w51euKxyOTBZwdIKkg8pNzx4"
+
+[response]
+status = 200
+
+[response.headers]
+cache-control = "no-store"
+content-type = "application/json; charset=utf-8"
+referrer-policy = "strict-origin-when-cross-origin"
+x-content-type-options = "nosniff"
+x-frame-options = "SAMEORIGIN"

@@ -81,8 +81,13 @@ fn etag_matches(candidate: &str, ours: &str) -> bool {
 
 fn not_modified(request: &HeaderMap, parts: &axum::http::response::Parts) -> bool {
     if let (Some(if_none_match), Some(etag)) = (
-        request.get(header::IF_NONE_MATCH).and_then(|v| v.to_str().ok()),
-        parts.headers.get(header::ETAG).and_then(|v| v.to_str().ok()),
+        request
+            .get(header::IF_NONE_MATCH)
+            .and_then(|v| v.to_str().ok()),
+        parts
+            .headers
+            .get(header::ETAG)
+            .and_then(|v| v.to_str().ok()),
     ) {
         if if_none_match.trim() == "*" {
             return true;
@@ -93,9 +98,12 @@ fn not_modified(request: &HeaderMap, parts: &axum::http::response::Parts) -> boo
     }
     // If-None-Match takes precedence; the modification time is only consulted
     // when the client did not send a tag.
-    if let (Some(if_modified_since), Some(modified)) =
-        (request.get(header::IF_MODIFIED_SINCE).and_then(|v| v.to_str().ok()), modified_unix(parts))
-    {
+    if let (Some(if_modified_since), Some(modified)) = (
+        request
+            .get(header::IF_MODIFIED_SINCE)
+            .and_then(|v| v.to_str().ok()),
+        modified_unix(parts),
+    ) {
         if let Some(since) = http_date_to_unix(if_modified_since) {
             return modified <= since;
         }
@@ -108,11 +116,17 @@ fn if_range_allows(request: &HeaderMap, parts: &axum::http::response::Parts) -> 
     let Some(value) = request.get(header::IF_RANGE).and_then(|v| v.to_str().ok()) else {
         return true;
     };
-    if let Some(etag) = parts.headers.get(header::ETAG).and_then(|v| v.to_str().ok()) {
+    if let Some(etag) = parts
+        .headers
+        .get(header::ETAG)
+        .and_then(|v| v.to_str().ok())
+    {
         return etag_matches(value.trim(), etag);
     }
     if let Some(modified) = modified_unix(parts) {
-        return http_date_to_unix(value.trim()).map(|date| date == modified).unwrap_or(false);
+        return http_date_to_unix(value.trim())
+            .map(|date| date == modified)
+            .unwrap_or(false);
     }
     // No ETag and no modification time: Go's `checkIfRange` cannot confirm the
     // representation is unchanged, so it drops the Range and sends the whole
@@ -127,6 +141,9 @@ pub fn serve(
     mut parts: axum::http::response::Parts,
     content: &[u8],
 ) -> Response {
+    parts
+        .headers
+        .insert(header::ACCEPT_RANGES, HeaderValue::from_static("bytes"));
     if not_modified(request, &parts) {
         parts.status = StatusCode::NOT_MODIFIED;
         // `writeNotModified` removes the body headers and keeps the validators.

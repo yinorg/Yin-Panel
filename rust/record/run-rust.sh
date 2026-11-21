@@ -4,7 +4,7 @@
 # database location are identical to the recording.
 #
 # Usage: rust/record/run-rust.sh
-# Environment: PORT (required), YIN_PANEL_RECORD_DIR (optional).
+# Environment: PORT (required), YIN_PANEL_RECORD_DIR and YIN_PANEL_RECORD_CONF (optional).
 set -eu
 
 port="${PORT:-}"
@@ -22,11 +22,12 @@ if [ ! -x "$bin" ]; then
 fi
 
 work="${YIN_PANEL_RECORD_DIR:-${TMPDIR:-/tmp}/yin-panel-record}"
+conf="${YIN_PANEL_RECORD_CONF:-$root/rust/record/conf.yaml}"
 # The recorded cases are a sequence, so every run starts from an empty
 # installation, exactly as `run-original.sh` does.
 rm -rf "$work"
 mkdir -p "$work/uploads"
-cp "$root/rust/record/conf.yaml" "$work/conf.yaml"
+cp "$conf" "$work/conf.yaml"
 sed -i "s/__PORT__/$port/g" "$work/conf.yaml"
 cp -a "$root/backend/lang" "$work/lang"
 

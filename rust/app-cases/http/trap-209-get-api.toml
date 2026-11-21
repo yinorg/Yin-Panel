@@ -1,6 +1,6 @@
 [request]
 method = "GET"
-path = "/api/%F0%9F%91%A8%E2%80%8D%F0%9F%91%A9%E2%80%8D%F0%9F%91%A7%20family/getUser"
+path = "/api/e%CC%81/v2/effective"
 
 [response]
 status = 404

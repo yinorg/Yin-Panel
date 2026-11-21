@@ -15,9 +15,10 @@ fn error_message(code: i64) -> Option<&'static str> {
         1000 => Some("Not logged in yet"),
         1003 => Some("Incorrect username or password"),
         1004 => Some("Account disabled or not activated"),
-        1005 => Some("No current permission for operation"),
+        1005 => Some(""),
         1007 => Some("Old password error"),
         404 => Some("Data not found"),
+        1300 => Some("Upload failed"),
         1200 => Some("Server error"),
         _ => None,
     }
@@ -118,7 +119,12 @@ pub fn error_code(code: i64) -> Response {
 
 /// `response.ErrorDatabase`: code 1200 with the mapped text.
 pub fn database_error() -> Response {
-    (StatusCode::OK, headers(), body(1200, "Server error[Database error]", None)).into_response()
+    (
+        StatusCode::OK,
+        headers(),
+        body(1200, "Server error[Database error]", None),
+    )
+        .into_response()
 }
 
 pub fn error(msg: &str) -> Response {
@@ -126,7 +132,61 @@ pub fn error(msg: &str) -> Response {
 }
 
 /// A response with an extra header, used where the Core sets a cookie.
-pub fn with_header(mut response: Response, name: header::HeaderName, value: HeaderValue) -> Response {
+pub fn with_header(
+    mut response: Response,
+    name: header::HeaderName,
+    value: HeaderValue,
+) -> Response {
     response.headers_mut().insert(name, value);
     response
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{body, error_code, headers, success, success_data};
+    use axum::body::to_bytes;
+    use axum::http::{StatusCode, header};
+
+    #[test]
+    fn envelope_omits_null_data_and_preserves_go_json_escaping() {
+        assert_eq!(body(0, "OK", None), r#"{"code":0,"msg":"OK"}"#);
+        assert_eq!(
+            body(
+                0,
+                "OK",
+                Some(serde_json::json!({"constraint":"x >= 1 & < 2"}))
+            ),
+            r#"{"code":0,"data":{"constraint":"x \u003e= 1 \u0026 \u003c 2"},"msg":"OK"}"#
+        );
+    }
+
+    #[tokio::test]
+    async fn api_responses_include_security_and_no_store_headers() {
+        for response in [
+            success(),
+            success_data(serde_json::json!([])),
+            error_code(1005),
+        ] {
+            assert_eq!(response.status(), StatusCode::OK);
+            assert_eq!(response.headers()[header::CACHE_CONTROL], "no-store");
+            assert_eq!(
+                response.headers()[header::X_CONTENT_TYPE_OPTIONS],
+                "nosniff"
+            );
+            assert_eq!(response.headers()[header::X_FRAME_OPTIONS], "SAMEORIGIN");
+        }
+        assert_eq!(headers().len(), 5);
+    }
+
+    #[tokio::test]
+    async fn mapped_error_codes_match_go_text() {
+        let response = error_code(1005);
+        let bytes = to_bytes(response.into_body(), usize::MAX)
+            .await
+            .expect("body");
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(&bytes).expect("json")["msg"],
+            ""
+        );
+    }
 }

@@ -44,12 +44,10 @@ server_pid=""
 
 # Go's `EnsureBuiltinV2` installs the built-in themes on every start, and the
 # GORM update that follows bumps `package_record_v2.updated_at` even when the
-# revision did not change. Phase 4b therefore always sees a new timestamp there.
-# Only that column is excused: the comparison still requires every package row
-# to exist with the same id, name, revision and `created_at`. Rust does not
-# refresh those rows yet, which is a behaviour difference recorded in
-# `rust/UPGRADE.md`.
-COMPARE_POLICY=(--ignore-column package_record_v2.updated_at)
+# revision did not change. Only the Go restart gets that one-column exception;
+# the Rust phase is compared strictly. Rust does not refresh the timestamp yet,
+# a behaviour difference recorded in `rust/UPGRADE.md`.
+COMPARE_POLICY_GO_RESTART=(--ignore-column package_record_v2.updated_at)
 
 for bin in "$go_bin" "$rust_bin"; do
     [[ -x "$bin" ]] || { printf 'missing binary: %s\n' "$bin" >&2; exit 1; }
@@ -250,7 +248,7 @@ stop rust
 say "phase 3c: content comparison, Rust phase"
 python3 "$compare" snapshot "$work/database/database.db" "$work/after-rust.json" \
     --uploads "$work/uploads"
-python3 "$compare" compare "$work/before.json" "$work/after-rust.json" "${COMPARE_POLICY[@]}"
+python3 "$compare" compare "$work/before.json" "$work/after-rust.json"
 
 say "phase 4: back to Go, the Rust-written state must be readable"
 start "$go_bin" go2
@@ -266,7 +264,8 @@ printf '  Rust session, spaces and groups: OK\n'
 say "phase 4b: content comparison after Go read the Rust state"
 python3 "$compare" snapshot "$work/database/database.db" "$work/after-go.json" \
     --uploads "$work/uploads"
-python3 "$compare" compare "$work/before.json" "$work/after-go.json" "${COMPARE_POLICY[@]}"
+python3 "$compare" compare "$work/before.json" "$work/after-go.json" \
+    "${COMPARE_POLICY_GO_RESTART[@]}"
 
 stop go2
 say "upgrade keeps every row and byte, and is reversible"

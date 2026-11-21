@@ -1,11 +1,14 @@
 mod appcfg;
+mod auth;
 mod bootstrap;
 mod content;
-mod go_routes;
-mod auth;
+mod db;
 mod envelope;
+mod go_routes;
+mod i18n;
 mod monitor;
 mod packages;
+mod repository;
 mod routes;
 mod site;
 mod units;
@@ -51,7 +54,10 @@ fn config_argument() -> Option<String> {
         if arg == "-c" || arg == "--config" {
             return args.next();
         }
-        if let Some(value) = arg.strip_prefix("-c=").or_else(|| arg.strip_prefix("--config=")) {
+        if let Some(value) = arg
+            .strip_prefix("-c=")
+            .or_else(|| arg.strip_prefix("--config="))
+        {
             return Some(value.to_string());
         }
     }

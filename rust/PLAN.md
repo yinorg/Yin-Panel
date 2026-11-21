@@ -23,7 +23,9 @@ three does not close.
 The 299 cases only exercise 35 requests. Extend `rust/record/inputs.jsonl` to
 every endpoint in the route inventory, with authenticated flows and the paired
 Space (yin/yang) semantics, then re-record. Target: every route in
-`backend/internal/web/router/**` has at least one success and one failure case.
+`backend/internal/web/router/**` has at least one success and one failure case,
+except for documented public read-only routes with no meaningful request-level
+failure in `rust/record/coverage-exceptions.md`.
 
 ## Batches
 

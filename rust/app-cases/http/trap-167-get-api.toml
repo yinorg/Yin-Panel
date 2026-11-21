@@ -1,6 +1,6 @@
 [request]
 method = "GET"
-path = "/api/theme/v2/stra%C3%9Fe/library"
+path = "/api/%E6%97%A5%E6%9C%AC%E8%AA%9E/v2/wallpaper/library"
 
 [response]
 status = 404

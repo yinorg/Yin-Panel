@@ -1,6 +1,6 @@
 [request]
 method = "GET"
-path = "/api/oauth/%C4%B0stanbul"
+path = "/api/system/%F0%9F%91%8D%F0%9F%8F%BD%20thumbs"
 
 [response]
 status = 404

@@ -40,6 +40,21 @@ rust-anything app wire . wallpaperpack-rs \
 rust-anything app replay . --build rust/app/target/release/run-original
 ```
 
+The preview API creates an opaque random token, so its upload and follow-up
+reads need a stateful differential run rather than independent recorded cases:
+
+```sh
+python3 rust/record/replay-preview-sequence.py
+python3 rust/record/replay-monitor-sequence.py
+```
+
+This uploads the same package to Go and Rust independently, follows each
+response's token to the preview and declared asset, and compares the results
+after normalizing only the generated token and its URL. The monitor sequence
+uses an isolated recorder config with monitoring enabled and compares disk
+responses exactly; snapshot metrics are compared by structure and type because
+they change between collection times.
+
 `RUST_ANYTHING_UNIT_WALLPAPERPACK=original` sends a wired unit back to Go while
 the port is suspect.
 

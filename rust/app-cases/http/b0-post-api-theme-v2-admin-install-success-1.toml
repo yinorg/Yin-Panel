@@ -1,0 +1,29 @@
+[request]
+method = "POST"
+path = "/api/theme/v2/admin/install"
+body = """
+--b0-theme-install\r
+Content-Disposition: form-data; name="package"; filename="theme.zip"\r
+Content-Type: application/zip\r
+\r
+PK\u0003\u0004\u0014\u0000\u0000\u0000\u0000\u0000\u0000\u0000!PR8\u0016\f\u0002\u0002\u0000\u0000\u0002\u0002\u0000\u0000\r\u0000\u0000\u0000manifest.json{"format":"yin-theme","formatVersion":2,"id":"community.b0.coverage","name":"B0 Coverage","version":"1.0.0","themeApi":"^1.0.0","core":">=0.0.0","author":"Yin Panel tests","license":"MIT","tokens":{"format":"DTCG","version":"2025.10","documents":{"light":"tokens/light.json","dark":"tokens/dark.json"}},"defaultScheme":"light","runtime":{"supportedModes":["sandbox","trusted"]},"resources":[]}                                                                                                                         PK\u0003\u0004\u0014\u0000\u0000\u0000\u0000\u0000\u0000\u0000!P*D1\u0019\u0002\u0001\u0000\u0000\u0002\u0001\u0000\u0000\u0011\u0000\u0000\u0000tokens/light.json{"$schema":"https://www.designtokens.org/schemas/2025.10/format.json","color":{"$type":"color","ink":{"$value":{"colorSpace":"srgb","components":[0.1,0.2,0.3],"alpha":1}}}}                                                                                      PK\u0003\u0004\u0014\u0000\u0000\u0000\u0000\u0000\u0000\u0000!P;t\u0015ft\u0001\u0000\u0000t\u0001\u0000\u0000\u0010\u0000\u0000\u0000tokens/dark.json{"$schema":"https://www.designtokens.org/schemas/2025.10/format.json","color":{"$type":"color","ink":{"$value":{"colorSpace":"srgb","components":[0.3,0.2,0.1],"alpha":1}}}}                                                                                                                                                                                                        PK\u0001\u0002\u0014\u0000\u0014\u0000\u0000\u0000\u0000\u0000\u0000\u0000!PR8\u0016\f\u0002\u0002\u0000\u0000\u0002\u0002\u0000\u0000\r\u0000\u0000\u0000J\u0000\u0000\u0000\u0000\u0000 \u0000\u0000\u0000\u0000\u0000\u0000\u0000manifest.jsonccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccPK\u0001\u0002\u0014\u0000\u0014\u0000\u0000\u0000\u0000\u0000\u0000\u0000!P*D1\u0019\u0002\u0001\u0000\u0000\u0002\u0001\u0000\u0000\u0011\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000 \u0000\u0000\u0000-\u0002\u0000\u0000tokens/light.jsonPK\u0001\u0002\u0014\u0000\u0014\u0000\u0000\u0000\u0000\u0000\u0000\u0000!P;t\u0015ft\u0001\u0000\u0000t\u0001\u0000\u0000\u0010\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000 \u0000\u0000\u0000^\u0003\u0000\u0000tokens/dark.jsonPK\u0005\u0006\u0000\u0000\u0000\u0000\u0003\u0000\u0003\u0000\u0002\u0001\u0000\u0000\u0000\u0005\u0000\u0000\u0000\u0000\r
+--b0-theme-install\r
+Content-Disposition: form-data; name="confirmUnverified"\r
+\r
+true\r
+--b0-theme-install--\r
+"""
+
+[request.headers]
+Content-Type = "multipart/form-data; boundary=b0-theme-install"
+Cookie = "yin_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoxLCJ0b2tlbl92ZXJzaW9uIjowLCJzdWIiOiJ1c2VyX2FjY2VzcyIsImV4cCI6MjExMDUwNzg2NiwibmJmIjoxNzk1MTQ3ODA2LCJpYXQiOjE3OTUxNDc4MDZ9.mcu_V1ZKGCAvLNlf_e2w51euKxyOTBZwdIKkg8pNzx4"
+
+[response]
+status = 200
+
+[response.headers]
+cache-control = "no-store"
+content-type = "application/json; charset=utf-8"
+referrer-policy = "strict-origin-when-cross-origin"
+x-content-type-options = "nosniff"
+x-frame-options = "SAMEORIGIN"

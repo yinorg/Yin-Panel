@@ -1,9 +1,12 @@
 [request]
 method = "GET"
-path = "/api/theme/v2/%E6%97%A5%E6%9C%AC%E8%AA%9E/library"
+path = "/api/theme/v2/package/%F0%9F%91%A8%E2%80%8D%F0%9F%91%A9%E2%80%8D%F0%9F%91%A7%20family"
 
 [response]
 status = 404
 
 [response.headers]
-content-type = "text/plain"
+cache-control = "no-store"
+referrer-policy = "strict-origin-when-cross-origin"
+x-content-type-options = "nosniff"
+x-frame-options = "SAMEORIGIN"

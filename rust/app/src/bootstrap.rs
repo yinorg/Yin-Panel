@@ -8,8 +8,8 @@
 
 use std::path::Path;
 
+use sqlx::SqlitePool;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
-use sqlx::{Executor, SqlitePool};
 
 #[path = "seed/assets.rs"]
 mod seed_assets;
@@ -92,4 +92,33 @@ fn now() -> String {
         "[year]-[month]-[day] [hour]:[minute]:[second].[subsecond digits:9][offset_hour sign:mandatory]:[offset_minute]"
     );
     now.format(&format).unwrap_or_default()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::prepare;
+
+    #[tokio::test]
+    async fn prepares_a_temporary_sqlite_database_and_is_idempotent() {
+        let path = std::env::temp_dir().join(format!("yin-bootstrap-{}.db", std::process::id()));
+        let _ = std::fs::remove_file(&path);
+        prepare(&path).await.expect("initial bootstrap");
+        prepare(&path).await.expect("repeat bootstrap");
+
+        let pool = sqlx::SqlitePool::connect(&format!("sqlite://{}", path.display()))
+            .await
+            .expect("open bootstrapped db");
+        let (users,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM \"user\"")
+            .fetch_one(&pool)
+            .await
+            .expect("count seeded users");
+        let (themes,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM package_record_v2")
+            .fetch_one(&pool)
+            .await
+            .expect("count seeded themes");
+        assert_eq!(users, 1);
+        assert!(themes >= 3);
+        pool.close().await;
+        std::fs::remove_file(path).expect("remove temporary database");
+    }
 }

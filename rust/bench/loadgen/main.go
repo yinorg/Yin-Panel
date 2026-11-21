@@ -1,8 +1,8 @@
 // A small keep-alive load generator, written to compare the Go and Rust
 // builds of the same service on the same host.
 //
-//   loadgen -url http://127.0.0.1:3010/api/about -n 2000 -c 32 [-pid 1234]
-//           [-header "Cookie: yin_token=..."] [-json]
+//	loadgen -url http://127.0.0.1:3010/api/about -n 2000 -c 32 [-pid 1234]
+//	        [-header "Cookie: yin_token=..."] [-json]
 //
 // It measures latency percentiles and throughput from the client side, and
 // samples the target process's CPU time and RSS from /proc when `-pid` is set,
@@ -15,6 +15,8 @@
 package main
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"flag"
@@ -32,6 +34,14 @@ import (
 type sample struct {
 	reason string // empty when the request succeeded
 	micros int64
+}
+
+type headersFlag []string
+
+func (headers *headersFlag) String() string { return strings.Join(*headers, ",") }
+func (headers *headersFlag) Set(value string) error {
+	*headers = append(*headers, value)
+	return nil
 }
 
 func procStat(pid string) (utime, stime uint64, rss uint64) {
@@ -135,7 +145,8 @@ func main() {
 	n := flag.Int("n", 2000, "total requests")
 	conc := flag.Int("c", 32, "concurrent connections")
 	pid := flag.String("pid", "", "server pid to sample for CPU and RSS")
-	header := flag.String("header", "", `extra header, "Name: value"`)
+	var headers headersFlag
+	flag.Var(&headers, "header", `extra header, "Name: value" (repeatable)`)
 	asJSON := flag.Bool("json", false, "print one JSON object instead of a line")
 	timeout := flag.Duration("timeout", 30*time.Second, "per-request timeout")
 	expectStatus := flag.Int("expect-status", 200, "status a successful request must return")
@@ -161,8 +172,8 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	if *header != "" {
-		if name, value, ok := strings.Cut(*header, ":"); ok {
+	for _, header := range headers {
+		if name, value, ok := strings.Cut(header, ":"); ok {
 			req.Header.Set(strings.TrimSpace(name), strings.TrimSpace(value))
 		}
 	}
@@ -194,6 +205,18 @@ func main() {
 		resp.Body.Close()
 		if readErr != nil {
 			return sample{reason: "body read failed"}
+		}
+		if resp.Header.Get("Content-Encoding") == "gzip" {
+			reader, err := gzip.NewReader(bytes.NewReader(body))
+			if err != nil {
+				return sample{reason: "invalid gzip body"}
+			}
+			decoded, err := io.ReadAll(reader)
+			closeErr := reader.Close()
+			if err != nil || closeErr != nil {
+				return sample{reason: "gzip body decode failed"}
+			}
+			body = decoded
 		}
 		if reason := checkValidity(resp, body, *expectStatus, *expectCode); reason != "" {
 			return sample{reason: reason}

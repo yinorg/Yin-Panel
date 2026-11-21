@@ -1,9 +1,12 @@
 [request]
 method = "GET"
-path = "/api/theme/%C4%B0stanbul/wallpaper/library"
+path = "/api/theme/v2/package/%F0%9F%91%8D%F0%9F%8F%BD%20thumbs"
 
 [response]
 status = 404
 
 [response.headers]
-content-type = "text/plain"
+cache-control = "no-store"
+referrer-policy = "strict-origin-when-cross-origin"
+x-content-type-options = "nosniff"
+x-frame-options = "SAMEORIGIN"

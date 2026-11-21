@@ -96,6 +96,152 @@ pub async fn upgrade(path: &Path) -> Result<Vec<String>, String> {
     Ok(applied)
 }
 
+#[cfg(test)]
+mod tests {
+    use super::upgrade;
+    use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
+    use sqlx::{Executor, SqlitePool};
+
+    async fn pool(path: &std::path::Path) -> SqlitePool {
+        SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(
+                SqliteConnectOptions::new()
+                    .filename(path)
+                    .create_if_missing(false),
+            )
+            .await
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn upgrades_a_legacy_database_and_is_idempotent() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("legacy.db");
+        std::fs::File::create(&path).unwrap();
+        let db = pool(&path).await;
+        db.execute(
+            r#"
+            CREATE TABLE "user" (
+                id INTEGER PRIMARY KEY,
+                created_at TEXT NOT NULL DEFAULT '',
+                updated_at TEXT NOT NULL DEFAULT '',
+                password TEXT NOT NULL DEFAULT '',
+                name TEXT NOT NULL DEFAULT '',
+                head_image TEXT NOT NULL DEFAULT '',
+                status INTEGER NOT NULL DEFAULT 1,
+                role TEXT NOT NULL DEFAULT 'user',
+                mail TEXT NOT NULL DEFAULT '',
+                oauth_provider TEXT,
+                oauth_id TEXT
+            );
+            INSERT INTO "user" (id, mail, oauth_provider, oauth_id)
+                VALUES (1, ' ADMIN@example.com ', 'github', 'subject-1');
+            INSERT INTO "user" (id, mail)
+                VALUES (2, '' );
+            CREATE TABLE user_config (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at TEXT NOT NULL DEFAULT '',
+                updated_at TEXT NOT NULL DEFAULT '',
+                user_id INTEGER NOT NULL,
+                config_name TEXT NOT NULL DEFAULT '',
+                config_value TEXT NOT NULL DEFAULT ''
+            );
+            INSERT INTO user_config (user_id, config_name, config_value)
+                VALUES (1, 'theme', 'old'), (1, 'theme', 'new');
+            CREATE TABLE space (
+                id INTEGER PRIMARY KEY,
+                created_at TEXT NOT NULL DEFAULT '',
+                updated_at TEXT NOT NULL DEFAULT '',
+                type TEXT NOT NULL DEFAULT '',
+                name TEXT NOT NULL DEFAULT '',
+                owner_user_id INTEGER NOT NULL DEFAULT 0,
+                pair_id INTEGER NOT NULL DEFAULT 0,
+                side TEXT NOT NULL DEFAULT 'yin',
+                team_id INTEGER NOT NULL DEFAULT 0
+            );
+            CREATE INDEX idx_space_team_id ON space(team_id);
+            INSERT INTO space (id, name, owner_user_id, team_id)
+                VALUES (1, 'legacy home', 1, 9);
+            CREATE TABLE team (id INTEGER PRIMARY KEY, name TEXT);
+            INSERT INTO team VALUES (9, 'retired team');
+            "#,
+        )
+        .await
+        .unwrap();
+        db.close().await;
+
+        let applied = upgrade(&path).await.unwrap();
+        assert!(applied.iter().any(|step| step == "normalized login mails"));
+        assert!(
+            applied
+                .iter()
+                .any(|step| step == "backfilled oauth identities")
+        );
+        assert!(
+            applied
+                .iter()
+                .any(|step| step.contains("dropped space.team_id"))
+        );
+
+        let db = pool(&path).await;
+        let mail: (String,) = sqlx::query_as("SELECT mail FROM \"user\" WHERE id = 1")
+            .fetch_one(&db)
+            .await
+            .unwrap();
+        assert_eq!(mail.0, "admin@example.com");
+        let orphan: (String,) = sqlx::query_as("SELECT mail FROM \"user\" WHERE id = 2")
+            .fetch_one(&db)
+            .await
+            .unwrap();
+        assert_eq!(orphan.0, "orphan-2@local.invalid");
+        let identities: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM o_auth_identity WHERE user_id = 1 AND provider = 'github' AND subject = 'subject-1'")
+            .fetch_one(&db)
+            .await
+            .unwrap();
+        assert_eq!(identities.0, 1);
+        let configs: Vec<(String,)> = sqlx::query_as(
+            "SELECT config_value FROM user_config WHERE user_id = 1 AND config_name = 'theme'",
+        )
+        .fetch_all(&db)
+        .await
+        .unwrap();
+        assert_eq!(configs, vec![("new".to_string(),)]);
+        let space: (String, i64) =
+            sqlx::query_as("SELECT name, public_enabled FROM space WHERE id = 1")
+                .fetch_one(&db)
+                .await
+                .unwrap();
+        assert_eq!(space.0, "legacy home");
+        assert_eq!(space.1, 0);
+        let team: (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'team'",
+        )
+        .fetch_one(&db)
+        .await
+        .unwrap();
+        assert_eq!(team.0, 0);
+        let index: (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = 'idx_space_team_id'",
+        )
+        .fetch_one(&db)
+        .await
+        .unwrap();
+        assert_eq!(index.0, 0);
+        let unique_mail: (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = 'uk_user_mail'",
+        )
+        .fetch_one(&db)
+        .await
+        .unwrap();
+        assert_eq!(unique_mail.0, 1);
+        db.close().await;
+
+        // Re-running an upgraded schema must do no work and preserve contents.
+        assert!(upgrade(&path).await.unwrap().is_empty());
+    }
+}
+
 /// Columns the current models declare that an older database may not have yet.
 const ADDED_COLUMNS: &[(&str, &str, &str)] = &[
     ("user", "token_version", "integer NOT NULL DEFAULT 0"),

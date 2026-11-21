@@ -19,6 +19,7 @@ reps=5
 requests=4000
 concurrency=32
 token=""
+accept_encoding="identity"
 mail="admin@yiniot.com"
 password="admin@yiniot.com"
 endpoints=()
@@ -35,6 +36,7 @@ while [[ $# -gt 0 ]]; do
         --concurrency) concurrency="$2"; shift 2 ;;
         --endpoint) endpoints+=("$2"); shift 2 ;;
         --token) token="$2"; shift 2 ;;
+        --encoding) accept_encoding="$2"; shift 2 ;;
         --mail) mail="$2"; shift 2 ;;
         --password) password="$2"; shift 2 ;;
         --loadgen) loadgen="$2"; shift 2 ;;
@@ -87,7 +89,8 @@ results="$work/results.jsonl"
 cleanup() { rm -rf "$work"; }
 trap cleanup EXIT
 
-printf 'load: %s requests, %s connections, %s repetitions per side\n' "$requests" "$concurrency" "$reps"
+printf 'load: %s requests, %s connections, %s repetitions per side, Accept-Encoding: %s\n' \
+    "$requests" "$concurrency" "$reps" "$accept_encoding"
 printf 'go   %s pid %s\nrust %s pid %s\n' "$go_url" "$go_pid" "$rust_url" "$rust_pid"
 
 for index in "${!endpoints[@]}"; do
@@ -99,7 +102,8 @@ for index in "${!endpoints[@]}"; do
             base="$rust_url"; pid="$rust_pid"
         fi
         "$loadgen" -url "$base$endpoint" -n 100 -c 4 -pid "$pid" \
-            -header "Cookie: yin_token=$token" -allow-failures > /dev/null 2>&1 || true
+            -header "Cookie: yin_token=$token" \
+            -header "Accept-Encoding: $accept_encoding" -allow-failures > /dev/null 2>&1 || true
     done
 
     for rep in $(seq 1 "$reps"); do
@@ -113,7 +117,8 @@ for index in "${!endpoints[@]}"; do
             fi
             set +e
             body="$("$loadgen" -url "$base$endpoint" -n "$requests" -c "$concurrency" \
-                -pid "$pid" -header "Cookie: yin_token=$token" -json 2>"$work/error")"
+                -pid "$pid" -header "Cookie: yin_token=$token" \
+                -header "Accept-Encoding: $accept_encoding" -json 2>"$work/error")"
             status=$?
             set -e
             [[ -n "$body" ]] || { cat "$work/error" >&2; die "loadgen produced no result for $side $endpoint"; }

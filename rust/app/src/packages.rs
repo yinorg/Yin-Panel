@@ -94,7 +94,11 @@ pub struct Entrypoints {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Runtime {
-    #[serde(default, rename = "supportedModes", skip_serializing_if = "Vec::is_empty")]
+    #[serde(
+        default,
+        rename = "supportedModes",
+        skip_serializing_if = "Vec::is_empty"
+    )]
     pub supported_modes: Vec<String>,
 }
 
@@ -107,7 +111,11 @@ pub struct Contributions {
     pub regions: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub components: Vec<String>,
-    #[serde(default, rename = "homeLayout", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        rename = "homeLayout",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub home_layout: Option<HomeLayout>,
 }
 
@@ -185,6 +193,14 @@ impl Package {
                 escaped.join("/")
             );
         }
+        let mut manifest = serde_json::to_value(manifest).unwrap_or(serde_json::Value::Null);
+        if manifest
+            .get("resources")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(Vec::is_empty)
+        {
+            manifest["resources"] = serde_json::Value::Null;
+        }
         serde_json::json!({
             "manifest": manifest,
             "tokens": self.tokens,
@@ -198,7 +214,25 @@ pub fn path_escape(segment: &str) -> String {
     let mut out = String::with_capacity(segment.len());
     for byte in segment.bytes() {
         let keep = byte.is_ascii_alphanumeric()
-            || matches!(byte, b'-' | b'_' | b'.' | b'~' | b'+' | b'$' | b'&' | b'!' | b'*' | b'\'' | b'(' | b')' | b',' | b';' | b'=' | b':' | b'@');
+            || matches!(
+                byte,
+                b'-' | b'_'
+                    | b'.'
+                    | b'~'
+                    | b'+'
+                    | b'$'
+                    | b'&'
+                    | b'!'
+                    | b'*'
+                    | b'\''
+                    | b'('
+                    | b')'
+                    | b','
+                    | b';'
+                    | b'='
+                    | b':'
+                    | b'@'
+            );
         if keep {
             out.push(byte as char);
         } else {
@@ -228,9 +262,9 @@ fn valid_id(value: &str) -> bool {
     if !(bytes[0].is_ascii_lowercase() || bytes[0].is_ascii_digit()) {
         return false;
     }
-    bytes
-        .iter()
-        .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || matches!(byte, b'.' | b'-'))
+    bytes.iter().all(|byte| {
+        byte.is_ascii_lowercase() || byte.is_ascii_digit() || matches!(byte, b'.' | b'-')
+    })
 }
 
 fn valid_version(value: &str) -> bool {
@@ -267,7 +301,10 @@ fn allowed_resource(media_type: &str, name: &str) -> bool {
 }
 
 fn is_builtin_theme(id: &str) -> bool {
-    matches!(id, "org.yin.default" | "org.yin.glass" | "org.yin.directory")
+    matches!(
+        id,
+        "org.yin.default" | "org.yin.glass" | "org.yin.directory"
+    )
 }
 
 /// `themeCoreRangeSupports`: enough of a semver range for the `>=x.y.z` forms
@@ -408,8 +445,20 @@ pub fn validate_manifest(manifest: &Manifest, core_version: &str) -> Result<(), 
         return Err("theme package is incompatible with this Yin Core version".to_string());
     }
     if manifest.tokens.documents.len() != 2
-        || manifest.tokens.documents.get("light").map(String::as_str).unwrap_or("").is_empty()
-        || manifest.tokens.documents.get("dark").map(String::as_str).unwrap_or("").is_empty()
+        || manifest
+            .tokens
+            .documents
+            .get("light")
+            .map(String::as_str)
+            .unwrap_or("")
+            .is_empty()
+        || manifest
+            .tokens
+            .documents
+            .get("dark")
+            .map(String::as_str)
+            .unwrap_or("")
+            .is_empty()
         || !matches!(manifest.default_scheme.as_str(), "light" | "dark")
     {
         return Err(
@@ -419,7 +468,10 @@ pub fn validate_manifest(manifest: &Manifest, core_version: &str) -> Result<(), 
     }
     let mut paths = std::collections::HashSet::new();
     for (scheme, name) in &manifest.tokens.documents {
-        if !matches!(scheme.as_str(), "light" | "dark") || !safe_path(name) || !paths.insert(name.clone()) {
+        if !matches!(scheme.as_str(), "light" | "dark")
+            || !safe_path(name)
+            || !paths.insert(name.clone())
+        {
             return Err(format!("invalid or duplicate {scheme} token document path"));
         }
     }
@@ -439,7 +491,9 @@ pub fn validate_manifest(manifest: &Manifest, core_version: &str) -> Result<(), 
         resource_types.insert(resource.path.clone(), resource.media_type.clone());
     }
     if !manifest.entrypoints.script.is_empty()
-        && (resource_types.get(&manifest.entrypoints.script).map(String::as_str)
+        && (resource_types
+            .get(&manifest.entrypoints.script)
+            .map(String::as_str)
             != Some("text/javascript")
             || !manifest.entrypoints.script.ends_with(".mjs"))
     {
@@ -447,7 +501,9 @@ pub fn validate_manifest(manifest: &Manifest, core_version: &str) -> Result<(), 
     }
     for style in &manifest.entrypoints.styles {
         if resource_types.get(style).map(String::as_str) != Some("text/css") {
-            return Err(format!("theme stylesheet {style:?} must be a declared CSS resource"));
+            return Err(format!(
+                "theme stylesheet {style:?} must be a declared CSS resource"
+            ));
         }
     }
     if let Some(settings) = &manifest.settings {
@@ -523,7 +579,14 @@ fn validate_contributions(manifest: &Manifest) -> Result<(), String> {
         (
             "region",
             &manifest.contributes.regions,
-            &["header", "navigation", "content", "monitor", "background", "footer"],
+            &[
+                "header",
+                "navigation",
+                "content",
+                "monitor",
+                "background",
+                "footer",
+            ],
         ),
         (
             "component",
@@ -575,8 +638,14 @@ pub fn parse_archive(data: &[u8], confirm_unverified: bool) -> Result<Package, S
     if data.is_empty() || data.len() > MAX_ARCHIVE {
         return Err("theme package must be between 1 byte and 32 MiB".to_string());
     }
-    let mut archive = zip::ZipArchive::new(std::io::Cursor::new(data))
-        .map_err(|error| format!("invalid theme package archive: {error}"))?;
+    let mut archive = zip::ZipArchive::new(std::io::Cursor::new(data)).map_err(|error| {
+        let detail = if error.to_string().contains("Could not find EOCD") {
+            "zip: not a valid zip file"
+        } else {
+            return format!("invalid theme package archive: {error}");
+        };
+        format!("invalid theme package archive: {detail}")
+    })?;
     if archive.len() > MAX_FILES {
         return Err("theme package contains too many files".to_string());
     }
@@ -618,12 +687,16 @@ pub fn parse_archive(data: &[u8], confirm_unverified: bool) -> Result<Package, S
         .ok_or_else(|| "manifest.json is required".to_string())?;
     let manifest: Manifest = serde_json::from_slice(manifest_bytes)
         .map_err(|error| format!("invalid v2 theme manifest: {error}"))?;
-    let core_version = crate::appcfg::version_name().trim_start_matches('v').to_string();
+    let core_version = crate::appcfg::version_name()
+        .trim_start_matches('v')
+        .to_string();
     validate_manifest(&manifest, &core_version)?;
 
     let mut tokens = BTreeMap::new();
-    let mut used: std::collections::HashSet<String> =
-        ["manifest.json", "signature.ed25519"].iter().map(|value| value.to_string()).collect();
+    let mut used: std::collections::HashSet<String> = ["manifest.json", "signature.ed25519"]
+        .iter()
+        .map(|value| value.to_string())
+        .collect();
     for (scheme, name) in &manifest.tokens.documents {
         let doc = files
             .get(name)
@@ -649,9 +722,15 @@ pub fn parse_archive(data: &[u8], confirm_unverified: bool) -> Result<Package, S
             return Err(format!("resource digest mismatch for {:?}", resource.path));
         }
         if !allowed_resource(&resource.media_type, &resource.path) {
-            return Err(format!("resource type is not allowed for {:?}", resource.path));
+            return Err(format!(
+                "resource type is not allowed for {:?}",
+                resource.path
+            ));
         }
-        packaged.insert(resource.path.clone(), (resource.media_type.clone(), content.clone()));
+        packaged.insert(
+            resource.path.clone(),
+            (resource.media_type.clone(), content.clone()),
+        );
     }
     if let Some(settings) = &manifest.settings {
         match packaged.get(&settings.schema) {
@@ -663,7 +742,7 @@ pub fn parse_archive(data: &[u8], confirm_unverified: bool) -> Result<Package, S
                 return Err(
                     "theme settings require a declared schema and positive schemaVersion"
                         .to_string(),
-                )
+                );
             }
         }
     }
@@ -677,7 +756,9 @@ pub fn parse_archive(data: &[u8], confirm_unverified: bool) -> Result<Package, S
             continue;
         }
         if !used.contains(&name) {
-            return Err(format!("entrypoint {name:?} is not a declared theme resource"));
+            return Err(format!(
+                "entrypoint {name:?} is not a declared theme resource"
+            ));
         }
     }
     for name in files.keys() {
@@ -686,7 +767,11 @@ pub fn parse_archive(data: &[u8], confirm_unverified: bool) -> Result<Package, S
         }
     }
     if !manifest.entrypoints.script.is_empty()
-        && !manifest.runtime.supported_modes.iter().any(|mode| mode == "sandbox" || mode == "trusted")
+        && !manifest
+            .runtime
+            .supported_modes
+            .iter()
+            .any(|mode| mode == "sandbox" || mode == "trusted")
     {
         return Err("script themes must declare a supported runtime mode".to_string());
     }
@@ -732,7 +817,11 @@ fn package_revision(files: &BTreeMap<String, Vec<u8>>) -> String {
         let hex: String = digest.iter().map(|byte| format!("{byte:02x}")).collect();
         hasher.update(format!("{name}\u{0}{hex}\n").as_bytes());
     }
-    hasher.finalize().iter().map(|byte| format!("{byte:02x}")).collect()
+    hasher
+        .finalize()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
 }
 
 fn signature_payload(files: &BTreeMap<String, Vec<u8>>) -> Vec<u8> {
@@ -759,7 +848,8 @@ fn verify_signature(payload: &[u8], signature: &[u8]) -> Result<bool, String> {
             .map_err(|_| "invalid official key".to_string())?,
     )
     .map_err(|_| "invalid official key".to_string())?;
-    let signature = Signature::from_slice(signature).map_err(|_| "theme signature is invalid".to_string())?;
+    let signature =
+        Signature::from_slice(signature).map_err(|_| "theme signature is invalid".to_string())?;
     key.verify(payload, &signature)
         .map(|_| true)
         .map_err(|_| "theme signature is invalid".to_string())
@@ -769,8 +859,7 @@ fn hex_bytes(value: &str) -> Result<Vec<u8>, String> {
     (0..value.len())
         .step_by(2)
         .map(|index| {
-            u8::from_str_radix(&value[index..index + 2], 16)
-                .map_err(|_| "invalid hex".to_string())
+            u8::from_str_radix(&value[index..index + 2], 16).map_err(|_| "invalid hex".to_string())
         })
         .collect()
 }

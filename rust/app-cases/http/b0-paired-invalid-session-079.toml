@@ -1,0 +1,18 @@
+[request]
+method = "PUT"
+path = "/api/theme/v2/space/999999"
+body = "{}"
+
+[request.headers]
+Content-Type = "application/json"
+Cookie = "yin_token=invalid"
+
+[response]
+status = 200
+
+[response.headers]
+cache-control = "no-store"
+content-type = "application/json; charset=utf-8"
+referrer-policy = "strict-origin-when-cross-origin"
+x-content-type-options = "nosniff"
+x-frame-options = "SAMEORIGIN"

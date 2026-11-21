@@ -37,6 +37,106 @@ pub struct NetInfo {
     pub name: String,
 }
 
+#[derive(Serialize)]
+pub struct DiskInfo {
+    pub mountpoint: String,
+    pub total: u64,
+    pub used: u64,
+    pub free: u64,
+    #[serde(rename = "usedPercent")]
+    pub used_percent: f64,
+}
+
+#[derive(Serialize)]
+struct DiskMountpoint {
+    device: String,
+    mountpoint: String,
+    fstype: String,
+    opts: Vec<String>,
+}
+
+pub fn disk_mountpoints() -> Result<Vec<serde_json::Value>, String> {
+    let content = read("/proc/1/mountinfo")
+        .or_else(|| read("/proc/self/mountinfo"))
+        .ok_or_else(|| "failed to read mount information".to_string())?;
+    let mut mounts = Vec::new();
+    for line in content.lines() {
+        let (left, right) = line
+            .split_once(" - ")
+            .ok_or_else(|| "invalid mount information".to_string())?;
+        let left: Vec<&str> = left.split_whitespace().collect();
+        let right: Vec<&str> = right.split_whitespace().collect();
+        if left.len() < 6 || right.len() < 2 {
+            continue;
+        }
+        let mut opts: Vec<String> = left[5].split(',').map(str::to_string).collect();
+        if left[3] != "/" && !opts.iter().any(|option| option == "bind") {
+            opts.push("bind".to_string());
+        }
+        mounts.push(
+            serde_json::to_value(DiskMountpoint {
+                device: unescape_mount_field(right[1]),
+                mountpoint: unescape_mount_field(left[4]),
+                fstype: right[0].to_string(),
+                opts,
+            })
+            .map_err(|error| error.to_string())?,
+        );
+    }
+    Ok(mounts)
+}
+
+fn unescape_mount_field(value: &str) -> String {
+    let mut output = String::with_capacity(value.len());
+    let bytes = value.as_bytes();
+    let mut index = 0;
+    while index < bytes.len() {
+        if bytes[index] == b'\\' && index + 3 < bytes.len() {
+            let octal = &value[index + 1..index + 4];
+            if let Ok(byte) = u8::from_str_radix(octal, 8) {
+                output.push(char::from(byte));
+                index += 4;
+                continue;
+            }
+        }
+        let character = value[index..].chars().next().unwrap_or_default();
+        output.push(character);
+        index += character.len_utf8();
+    }
+    output
+}
+
+pub fn disk_state(path: &str) -> Result<DiskInfo, String> {
+    use std::ffi::CString;
+
+    let path = CString::new(path).map_err(|_| "invalid path".to_string())?;
+    let mut stats = std::mem::MaybeUninit::<libc::statvfs>::uninit();
+    // SAFETY: `path` is NUL-terminated and `stats` points to writable storage.
+    if unsafe { libc::statvfs(path.as_ptr(), stats.as_mut_ptr()) } != 0 {
+        return Err(std::io::Error::last_os_error().to_string());
+    }
+    // SAFETY: statvfs initialized `stats` after returning success.
+    let stats = unsafe { stats.assume_init() };
+    let block_size = stats.f_bsize as u64;
+    let total = (stats.f_blocks as u64).saturating_mul(block_size);
+    let free = (stats.f_bavail as u64).saturating_mul(block_size);
+    let used = (stats.f_blocks as u64)
+        .saturating_sub(stats.f_bfree as u64)
+        .saturating_mul(block_size);
+    let used_percent = if used + free == 0 {
+        0.0
+    } else {
+        used as f64 / (used + free) as f64 * 100.0
+    };
+    Ok(DiskInfo {
+        mountpoint: path.to_string_lossy().into_owned(),
+        total,
+        used,
+        free,
+        used_percent,
+    })
+}
+
 /// The Go collector's map keys, refreshed in the background.
 ///
 /// `internal/biz/cache/monitor.go` runs one collection immediately at start and
@@ -73,7 +173,10 @@ pub async fn start() {
 async fn collect() {
     let mut values = BTreeMap::new();
     if let Ok(cpu) = cpu_info().await {
-        values.insert("CPU_INFO".to_string(), serde_json::to_value(cpu).unwrap_or_default());
+        values.insert(
+            "CPU_INFO".to_string(),
+            serde_json::to_value(cpu).unwrap_or_default(),
+        );
     }
     if let Ok(memory) = memory_info() {
         values.insert(
@@ -96,7 +199,6 @@ async fn collect() {
 pub async fn snapshot() -> BTreeMap<String, serde_json::Value> {
     cache().read().await.clone()
 }
-
 
 fn read(path: &str) -> Option<String> {
     std::fs::read_to_string(path).ok()
@@ -210,7 +312,10 @@ fn quota_cores() -> Option<f64> {
         return Some(quota / period);
     }
     let quota: f64 = first_file(&refs, "cpu.cfs_quota_us")?.trim().parse().ok()?;
-    let period: f64 = first_file(&refs, "cpu.cfs_period_us")?.trim().parse().ok()?;
+    let period: f64 = first_file(&refs, "cpu.cfs_period_us")?
+        .trim()
+        .parse()
+        .ok()?;
     if quota <= 0.0 || period <= 0.0 {
         return None;
     }
@@ -262,7 +367,11 @@ async fn cpu_info() -> Result<CpuInfo, String> {
         }
         usages.push(((total - idle) / total * 100.0).clamp(0.0, 100.0));
     }
-    let host = if usages.is_empty() { 1 } else { usages.len() as i64 };
+    let host = if usages.is_empty() {
+        1
+    } else {
+        usages.len() as i64
+    };
     let effective = effective_cores(host, quota_cores(), cpuset_cores());
     let sum: f64 = usages.iter().sum();
     let percent = (sum / effective as f64).clamp(0.0, 100.0);
@@ -352,7 +461,10 @@ fn memory_info() -> Result<MemoryInfo, String> {
     // gopsutil folds reclaimable slab into the cache before computing `Used`,
     // and does not subtract shared memory.
     let cached = *values.get("Cached").unwrap_or(&0) + *values.get("SReclaimable").unwrap_or(&0);
-    let used = total.saturating_sub(free).saturating_sub(buffers).saturating_sub(cached);
+    let used = total
+        .saturating_sub(free)
+        .saturating_sub(buffers)
+        .saturating_sub(cached);
     Ok(MemoryInfo {
         total,
         free,
@@ -383,4 +495,31 @@ fn net_info() -> Vec<NetInfo> {
         });
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{disk_state, unescape_mount_field};
+
+    #[test]
+    fn mount_fields_decode_kernel_octal_escapes() {
+        assert_eq!(
+            unescape_mount_field("/mnt/with\\040space"),
+            "/mnt/with space"
+        );
+        assert_eq!(unescape_mount_field("/path\\134name"), "/path\\name");
+    }
+
+    #[test]
+    fn disk_state_returns_usage_for_existing_path() {
+        let state = disk_state("/").expect("root filesystem stats");
+        assert_eq!(state.mountpoint, "/");
+        assert!(state.total > 0);
+        assert!(state.used_percent.is_finite());
+    }
+
+    #[test]
+    fn disk_state_rejects_missing_path() {
+        assert!(disk_state("/yin-panel-no-such-mountpoint").is_err());
+    }
 }

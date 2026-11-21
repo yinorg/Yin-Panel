@@ -1,6 +1,6 @@
 [request]
 method = "GET"
-path = "/api/e%CC%81/v2/effective"
+path = "/api/theme/v2/h%C3%A9llo%20w%C3%B6rld/library"
 
 [response]
 status = 404

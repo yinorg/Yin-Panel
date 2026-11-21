@@ -45,7 +45,10 @@ pub static GO_ROUTES: &[(&str, &str)] = &[
     ("GET", "/api/theme/v2/revisions/:revision"),
     ("GET", "/api/theme/v2/space/:spaceId"),
     ("GET", "/api/theme/v2/wallpaper/library"),
-    ("GET", "/api/theme/v2/wallpaper/library/assets/:version/*name"),
+    (
+        "GET",
+        "/api/theme/v2/wallpaper/library/assets/:version/*name",
+    ),
     ("GET", "/api/theme/v2/wallpaper/web/:id/:name"),
     ("GET", "/api/user/getUser"),
     ("GET", "/uploads/*filepath"),

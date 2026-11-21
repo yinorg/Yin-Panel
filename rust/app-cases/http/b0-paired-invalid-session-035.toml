@@ -1,0 +1,15 @@
+[request]
+method = "GET"
+path = "/api/theme/v2/revisions/b0-paired-missing"
+
+[request.headers]
+Cookie = "yin_token=invalid"
+
+[response]
+status = 404
+
+[response.headers]
+cache-control = "no-store"
+referrer-policy = "strict-origin-when-cross-origin"
+x-content-type-options = "nosniff"
+x-frame-options = "SAMEORIGIN"

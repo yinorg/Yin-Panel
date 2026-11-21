@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
 use serde::Deserialize;
-use sqlx::SqlitePool;
+use sqlx::{AnyPool, SqlitePool};
 
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct Conf {
@@ -15,6 +15,10 @@ pub struct Conf {
     pub base: Base,
     #[serde(default)]
     pub sqlite: Sqlite,
+    #[serde(default)]
+    pub mysql: Mysql,
+    #[serde(default)]
+    pub postgres: Postgres,
     #[serde(default)]
     pub jwt: Jwt,
     #[serde(default)]
@@ -47,6 +51,38 @@ pub struct Sqlite {
     pub file_path: String,
     #[serde(default)]
     pub read_pool_size: i64,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct Mysql {
+    #[serde(default)]
+    pub host: String,
+    #[serde(default)]
+    pub port: u16,
+    #[serde(default)]
+    pub username: String,
+    #[serde(default)]
+    pub password: String,
+    #[serde(default)]
+    pub db_name: String,
+    #[serde(default)]
+    pub wait_timeout: u64,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct Postgres {
+    #[serde(default)]
+    pub host: String,
+    #[serde(default)]
+    pub port: u16,
+    #[serde(default)]
+    pub username: String,
+    #[serde(default)]
+    pub password: String,
+    #[serde(default)]
+    pub db_name: String,
+    #[serde(default)]
+    pub ssl_mode: String,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -86,6 +122,7 @@ pub struct Ctx {
     /// exactly as the Go binary resolves them from its working directory.
     pub dir: PathBuf,
     pool: tokio::sync::OnceCell<SqlitePool>,
+    shared_pool: tokio::sync::OnceCell<AnyPool>,
 }
 
 static CTX: OnceLock<Ctx> = OnceLock::new();
@@ -121,14 +158,9 @@ fn config_path() -> PathBuf {
 pub fn ctx() -> &'static Ctx {
     CTX.get_or_init(|| {
         let path = config_path();
-        // The recording template carries `__PORT__`; the harness passes the
-        // real port in the environment.
         let port = std::env::var("PORT").unwrap_or_default();
-        let conf: Conf = std::fs::read_to_string(&path)
-            .ok()
-            .map(|text| text.replace("__PORT__", &port))
-            .and_then(|text| serde_yaml::from_str(&text).ok())
-            .unwrap_or_default();
+        let conf = load_conf(&path, &port)
+            .unwrap_or_else(|error| panic!("configuration load failed: {error}"));
         let dir = path
             .parent()
             .map(Path::to_path_buf)
@@ -137,8 +169,16 @@ pub fn ctx() -> &'static Ctx {
             conf,
             dir,
             pool: tokio::sync::OnceCell::new(),
+            shared_pool: tokio::sync::OnceCell::new(),
         }
     })
+}
+
+fn load_conf(path: &Path, port: &str) -> Result<Conf, String> {
+    let text = std::fs::read_to_string(path)
+        .map_err(|error| format!("reading {}: {error}", path.display()))?;
+    serde_yaml::from_str(&text.replace("__PORT__", port))
+        .map_err(|error| format!("parsing {}: {error}", path.display()))
 }
 
 impl Ctx {
@@ -159,6 +199,91 @@ impl Ctx {
                     .map_err(|error| format!("opening {}: {error}", file.display()))
             })
             .await
+    }
+
+    pub async fn shared_pool(&self) -> Result<&AnyPool, String> {
+        self.shared_pool
+            .get_or_try_init(|| async {
+                let (driver, url) = match self.driver() {
+                    DatabaseDriver::Sqlite => {
+                        let file = self.database_file();
+                        if !file.is_file() {
+                            return Err(format!(
+                                "database file does not exist: {}",
+                                file.display()
+                            ));
+                        }
+                        (
+                            crate::db::Driver::Sqlite,
+                            format!("sqlite://{}", file.display()),
+                        )
+                    }
+                    DatabaseDriver::MySql => (crate::db::Driver::MySql, self.mysql_url()?),
+                    DatabaseDriver::Postgres => (crate::db::Driver::Postgres, self.postgres_url()?),
+                };
+                crate::db::connect(driver, &url)
+                    .await
+                    .map_err(|error| format!("opening {:?} database: {error}", driver))
+            })
+            .await
+    }
+
+    pub fn driver(&self) -> DatabaseDriver {
+        match self
+            .conf
+            .base
+            .database_drive
+            .trim()
+            .to_ascii_lowercase()
+            .as_str()
+        {
+            "mysql" => DatabaseDriver::MySql,
+            "postgres" | "postgresql" => DatabaseDriver::Postgres,
+            _ => DatabaseDriver::Sqlite,
+        }
+    }
+
+    pub fn sqlx_driver(&self) -> crate::db::Driver {
+        match self.driver() {
+            DatabaseDriver::Sqlite => crate::db::Driver::Sqlite,
+            DatabaseDriver::MySql => crate::db::Driver::MySql,
+            DatabaseDriver::Postgres => crate::db::Driver::Postgres,
+        }
+    }
+
+    fn mysql_url(&self) -> Result<String, String> {
+        let config = &self.conf.mysql;
+        if config.host.is_empty() || config.db_name.is_empty() {
+            return Err("mysql.host and mysql.db_name are required".to_string());
+        }
+        let user = urlencoding::encode(&config.username);
+        let password = urlencoding::encode(&config.password);
+        Ok(format!(
+            "mysql://{user}:{password}@{}:{}/{}",
+            config.host,
+            if config.port == 0 { 3306 } else { config.port },
+            urlencoding::encode(&config.db_name)
+        ))
+    }
+
+    fn postgres_url(&self) -> Result<String, String> {
+        let config = &self.conf.postgres;
+        if config.host.is_empty() || config.db_name.is_empty() {
+            return Err("postgres.host and postgres.db_name are required".to_string());
+        }
+        let user = urlencoding::encode(&config.username);
+        let password = urlencoding::encode(&config.password);
+        let mut url = format!(
+            "postgres://{user}:{password}@{}:{}/{}",
+            config.host,
+            if config.port == 0 { 5432 } else { config.port },
+            urlencoding::encode(&config.db_name)
+        );
+        if !config.ssl_mode.is_empty() {
+            url.push_str("?sslmode=");
+            url.push_str(&urlencoding::encode(&config.ssl_mode));
+        }
+        Ok(url)
     }
 
     pub fn database_file(&self) -> PathBuf {
@@ -195,6 +320,100 @@ impl Ctx {
             self.conf.jwt.expire
         } else {
             90 * 24
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DatabaseDriver {
+    Sqlite,
+    MySql,
+    Postgres,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{DatabaseDriver, load_conf};
+
+    #[test]
+    fn config_expands_recorder_port_and_reads_database_settings() {
+        let path = std::env::temp_dir().join(format!("yin-conf-{}-4321.yaml", std::process::id()));
+        std::fs::write(
+            &path,
+            "base:\n  http_port: __PORT__\n  root_url: http://127.0.0.1:__PORT__\nsqlite:\n  file_path: ./data.db\nmysql:\n  host: db.internal\n  port: 3307\n  username: user\n  db_name: yin\npostgres:\n  host: pg.internal\n  port: 5433\n  db_name: yin_pg\n",
+        )
+        .expect("write temporary config");
+        let config = load_conf(&path, "4321").expect("parse config");
+        assert_eq!(config.base.http_port, "4321");
+        assert_eq!(config.base.root_url, "http://127.0.0.1:4321");
+        assert_eq!(config.sqlite.file_path, "./data.db");
+        assert_eq!(config.mysql.host, "db.internal");
+        assert_eq!(config.mysql.port, 3307);
+        assert_eq!(config.postgres.host, "pg.internal");
+        assert_eq!(config.postgres.port, 5433);
+        let ctx = super::Ctx {
+            conf: config,
+            dir: std::env::temp_dir(),
+            pool: tokio::sync::OnceCell::new(),
+            shared_pool: tokio::sync::OnceCell::new(),
+        };
+        assert_eq!(ctx.driver(), DatabaseDriver::Sqlite);
+        assert!(
+            ctx.mysql_url()
+                .unwrap()
+                .starts_with("mysql://user:@db.internal:3307/yin")
+        );
+        assert!(
+            ctx.postgres_url()
+                .unwrap()
+                .starts_with("postgres://:@pg.internal:5433/yin_pg")
+        );
+        std::fs::remove_file(path).expect("remove temporary config");
+    }
+
+    #[test]
+    fn missing_config_is_reported() {
+        let path =
+            std::env::temp_dir().join(format!("yin-missing-conf-{}.yaml", std::process::id()));
+        let error = load_conf(&path, "").expect_err("missing config must fail");
+        assert!(error.contains("reading"));
+        assert!(error.contains("yin-missing-conf"));
+    }
+
+    #[test]
+    fn invalid_yaml_is_reported_instead_of_defaulted() {
+        let path =
+            std::env::temp_dir().join(format!("yin-invalid-conf-{}-4321.yaml", std::process::id()));
+        std::fs::write(&path, "base: [unterminated").expect("write invalid config");
+        let error = load_conf(&path, "").expect_err("invalid YAML must fail");
+        assert!(error.contains("parsing"));
+        std::fs::remove_file(path).expect("remove temporary config");
+    }
+
+    #[test]
+    fn selects_database_driver_case_insensitively() {
+        for (value, expected) in [
+            ("mysql", DatabaseDriver::MySql),
+            ("MySQL", DatabaseDriver::MySql),
+            ("postgres", DatabaseDriver::Postgres),
+            ("postgresql", DatabaseDriver::Postgres),
+            ("sqlite", DatabaseDriver::Sqlite),
+        ] {
+            let path = std::env::temp_dir().join("unused-config-path");
+            let config = super::Conf {
+                base: super::Base {
+                    database_drive: value.to_string(),
+                    ..Default::default()
+                },
+                ..Default::default()
+            };
+            let ctx = super::Ctx {
+                conf: config,
+                dir: path,
+                pool: tokio::sync::OnceCell::new(),
+                shared_pool: tokio::sync::OnceCell::new(),
+            };
+            assert_eq!(ctx.driver(), expected);
         }
     }
 }

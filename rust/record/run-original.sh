@@ -11,6 +11,7 @@
 # Environment:
 #   YIN_PANEL_GO_BIN   use this binary instead of building build-output/yin-panel-go
 #   YIN_PANEL_RECORD_DIR  working directory (default: $TMPDIR/yin-panel-record)
+#   YIN_PANEL_RECORD_CONF  alternate recorder-only config for focused scenarios
 set -eu
 
 port="${1:-}"
@@ -28,9 +29,10 @@ if [ ! -x "$bin" ]; then
 fi
 
 work="${YIN_PANEL_RECORD_DIR:-${TMPDIR:-/tmp}/yin-panel-record}"
+conf="${YIN_PANEL_RECORD_CONF:-$root/rust/record/conf.yaml}"
 rm -rf "$work"
 mkdir -p "$work/uploads"
-cp "$root/rust/record/conf.yaml" "$work/conf.yaml"
+cp "$conf" "$work/conf.yaml"
 sed -i "s/__PORT__/$port/g" "$work/conf.yaml"
 cp -a "$root/backend/lang" "$work/lang"
 

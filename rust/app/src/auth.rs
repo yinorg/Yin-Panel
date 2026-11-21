@@ -6,6 +6,9 @@ use jsonwebtoken::{Algorithm, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
 
 use crate::appcfg;
+use crate::repository;
+
+pub use crate::repository::UserRecord as UserRow;
 
 pub const COOKIE_NAME: &str = "yin_token";
 
@@ -21,18 +24,8 @@ pub struct Claims {
     pub iat: i64,
 }
 
-#[derive(Debug, Clone, sqlx::FromRow)]
-pub struct UserRow {
-    pub id: i64,
-    pub password: String,
-    pub name: String,
-    pub status: i64,
-    pub role: i64,
-    pub mail: String,
-    pub token_version: i64,
-}
-
 /// Why authentication failed, in the shape the Core answers with.
+#[derive(Debug, PartialEq, Eq)]
 pub enum AuthError {
     NotLoggedIn,
     Disabled,
@@ -90,22 +83,31 @@ pub fn claims(headers: &HeaderMap) -> Result<Claims, AuthError> {
 /// version. A token version bump is how logout revokes every session.
 pub async fn user(headers: &HeaderMap) -> Result<UserRow, AuthError> {
     let claims = claims(headers)?;
-    let pool = appcfg::ctx()
-        .pool()
+    let ctx = appcfg::ctx();
+    let pool = ctx
+        .shared_pool()
         .await
         .map_err(|_| AuthError::NotLoggedIn)?;
-    let user: Option<UserRow> = sqlx::query_as(
-        r#"SELECT id, password, name, status, role, mail, token_version FROM "user" WHERE id = ?"#,
-    )
-    .bind(claims.user_id)
-    .fetch_optional(pool)
-    .await
-    .map_err(|_| AuthError::NotLoggedIn)?;
+    user_from_pool(pool, ctx.sqlx_driver(), &claims).await
+}
+
+pub(crate) async fn user_from_pool(
+    pool: &sqlx::AnyPool,
+    driver: crate::db::Driver,
+    claims: &Claims,
+) -> Result<UserRow, AuthError> {
+    let user = repository::user_by_id(pool, driver, claims.user_id)
+        .await
+        .map_err(|_| AuthError::NotLoggedIn)?;
+    validate_user(user, claims.token_version)
+}
+
+fn validate_user(user: Option<UserRow>, token_version: i64) -> Result<UserRow, AuthError> {
     let user = user.ok_or(AuthError::NotLoggedIn)?;
     if user.status != 1 {
         return Err(AuthError::Disabled);
     }
-    if claims.token_version != user.token_version {
+    if token_version != user.token_version {
         return Err(AuthError::NotLoggedIn);
     }
     Ok(user)
@@ -113,9 +115,7 @@ pub async fn user(headers: &HeaderMap) -> Result<UserRow, AuthError> {
 
 /// `interceptor.SetAuthCookie`.
 pub fn session_cookie(token: &str, max_age_seconds: i64) -> String {
-    format!(
-        "{COOKIE_NAME}={token}; Path=/; Max-Age={max_age_seconds}; HttpOnly; SameSite=Lax"
-    )
+    format!("{COOKIE_NAME}={token}; Path=/; Max-Age={max_age_seconds}; HttpOnly; SameSite=Lax")
 }
 
 /// `interceptor.ClearAuthCookie`.
@@ -146,4 +146,115 @@ pub fn now_unix() -> i64 {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|value| value.as_secs() as i64)
         .unwrap_or(0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{AuthError, COOKIE_NAME, Claims, UserRow, bearer_or_cookie, validate_user};
+    use axum::http::{HeaderMap, HeaderValue, header};
+    use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation};
+
+    const SECRET: &[u8] = b"go-token-compatibility-fixture-secret";
+
+    #[test]
+    fn accepts_go_hs256_claims_with_unsigned_integer_fields() {
+        let now = super::now_unix();
+        let go_claims = serde_json::json!({
+            "user_id": 42u64,
+            "token_version": 7u64,
+            "exp": now + 60,
+            "nbf": now - 1,
+            "iat": now - 1,
+            "sub": "user_access"
+        });
+        let token = jsonwebtoken::encode(
+            &Header::new(Algorithm::HS256),
+            &go_claims,
+            &EncodingKey::from_secret(SECRET),
+        )
+        .expect("sign Go-compatible claims");
+        let claims = jsonwebtoken::decode::<Claims>(
+            &token,
+            &DecodingKey::from_secret(SECRET),
+            &Validation::new(Algorithm::HS256),
+        )
+        .expect("decode Go-compatible token")
+        .claims;
+        assert_eq!(claims.user_id, 42);
+        assert_eq!(claims.token_version, 7);
+        assert_eq!(claims.sub, "user_access");
+    }
+
+    #[test]
+    fn verifies_a_token_captured_from_the_go_recorder() {
+        let inputs =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../record/inputs.jsonl");
+        let inputs_text = std::fs::read_to_string(inputs).expect("read Go recorder inputs");
+        let line = inputs_text
+            .lines()
+            .find(|line| line.contains("yin_token="))
+            .expect("recorded Go auth cookie");
+        let input: serde_json::Value = serde_json::from_str(line).expect("parse recorder line");
+        let cookie = input["headers"]["Cookie"].as_str().expect("cookie header");
+        let token = cookie
+            .split(';')
+            .find_map(|part| part.trim().strip_prefix("yin_token="))
+            .expect("yin_token cookie");
+        let mut validation = Validation::new(Algorithm::HS256);
+        validation.leeway = 5;
+        let decoded = jsonwebtoken::decode::<Claims>(
+            token,
+            &DecodingKey::from_secret(b"recording-only-secret"),
+            &validation,
+        )
+        .expect("verify token issued by the Go recorder");
+        assert_eq!(decoded.claims.user_id, 1);
+        assert_eq!(decoded.claims.token_version, 0);
+        assert_eq!(decoded.claims.sub, "user_access");
+    }
+
+    #[test]
+    fn bearer_header_takes_precedence_over_cookie_and_cookie_is_supported() {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            header::COOKIE,
+            HeaderValue::from_static("other=x; yin_token=cookie-token"),
+        );
+        assert_eq!(bearer_or_cookie(&headers).as_deref(), Some("cookie-token"));
+        headers.insert(
+            header::AUTHORIZATION,
+            HeaderValue::from_static("Bearer bearer-token"),
+        );
+        assert_eq!(bearer_or_cookie(&headers).as_deref(), Some("bearer-token"));
+        assert_eq!(COOKIE_NAME, "yin_token");
+    }
+
+    #[test]
+    fn session_account_validation_checks_status_and_token_version() {
+        let active = UserRow {
+            id: 42,
+            password: "hash".to_string(),
+            name: "Test User".to_string(),
+            status: 1,
+            role: 2,
+            mail: "user@example.test".to_string(),
+            token_version: 8,
+        };
+        assert_eq!(validate_user(Some(active.clone()), 8), Ok(active.clone()));
+        assert_eq!(
+            validate_user(Some(active.clone()), 7),
+            Err(AuthError::NotLoggedIn)
+        );
+        assert_eq!(
+            validate_user(
+                Some(UserRow {
+                    status: 0,
+                    ..active
+                }),
+                8
+            ),
+            Err(AuthError::Disabled)
+        );
+        assert_eq!(validate_user(None, 8), Err(AuthError::NotLoggedIn));
+    }
 }

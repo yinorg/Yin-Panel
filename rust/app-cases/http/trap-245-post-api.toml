@@ -1,7 +1,7 @@
 [request]
 method = "POST"
-path = "/api/%E6%97%A5%E6%9C%AC%E8%AA%9E"
-body = '{"mail":"admin@yiniot.com","password":"wrong-password"}'
+path = "/api/h%C3%A9llo%20w%C3%B6rld"
+body = '{"mail":"admin@yiniot.com"}'
 
 [request.headers]
 Content-Type = "application/json"
