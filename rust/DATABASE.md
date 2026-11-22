@@ -70,10 +70,12 @@ sqlx Any  →  sqlite / mysql / postgres driver
   Go binary uses; MySQL/PostgreSQL build a URL from host/port/user/db, with
   `ssl_mode` mapped to `sslmode`.
 - `Ctx::sqlx_driver()` maps the configured driver to `db::Driver`.
-- `Ctx::pool()` (SQLite-only) still exists for the routes not yet migrated.
+- Every handler uses `Ctx::shared_pool()`; the SQLite-only pool is gone.
 
-`repository.rs` holds every migrated query. Records are plain structs, so
-handlers do not depend on sqlx row types.
+`repository.rs` holds the shared helpers, records and the `insert_returning_id`
+macro; the queries live in `repository/{user,space,item,theme,file,config}.rs`
+and are re-exported from `repository`. Records are plain structs, so handlers do
+not depend on sqlx row types.
 
 ## 3. Dialect boundaries (all of these were hit in practice)
 
@@ -93,7 +95,7 @@ Rules that follow from this:
    A fixture that skipped this failed on PostgreSQL with `syntax error at or near ","`.
 2. Never decode a text column with `row.try_get::<String, _>` alone; use `text()`.
 3. Never assume an insert returns an id; use the repository insert helpers.
-4. Keep driver branches in `repository.rs`, not in `routes.rs`.
+4. Keep driver branches in the repository modules, not in the route modules.
 
 ## 4. What is migrated
 

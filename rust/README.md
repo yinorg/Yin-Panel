@@ -9,8 +9,8 @@ last session stopped).
 
 ## Requirements
 
-- Rust 1.97+ (`rustup`), `cargo install rust-anything`, and Go only while
-  re-recording the oracle.
+- Rust 1.97+ (`rustup`) and `cargo install rust-anything` for the recorded
+  replay. The Go oracle is gone; re-recording requires the historical tree.
 - crates.io reachable, or a mirror in `~/.cargo/config.toml` (ADR-008).
 
 ## The loop
@@ -65,6 +65,8 @@ the port is suspect.
 | `rust-db.yml` | changes under `rust/app/src`, `rust/app/Cargo*` or `rust/db-tool` | repository slices and bootstrap on real MySQL 8.4 and PostgreSQL 17 |
 | `rust-nightly.yml` | nightly schedule and manual dispatch | HTTP login/session smoke on SQLite, MySQL and PostgreSQL, plus `migrate-db` into both servers |
 | `ci-docker.yml` | version tags and manual dispatch | multi-arch release image |
+| `e2e.yml` | nightly schedule and manual dispatch | Core + extension Playwright acceptance, including OIDC through the mock provider |
+| `perf.yml` | nightly schedule and manual dispatch | k6 smoke/load thresholds against the Rust binary |
 
 `rust-db.yml` is path-filtered because pulling both database images costs more
 than the tests themselves; `rust-nightly.yml` carries the heavier acceptance run.

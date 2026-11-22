@@ -230,3 +230,22 @@ recording the exception, so the exception stands. The user accepted it on
 2026-11-20; `rust-anything app lift` therefore still refuses, and the lift is
 performed by hand with the same end state (no fallback, no kill switches, units
 called as plain libraries).
+
+## ADR-015: wallpaper assets stay in Git; no LFS history rewrite
+
+**Status:** accepted by the migration owner on 2026-11-22; the audit item is
+closed as "not performed by design"
+
+Moving `rust/wallpaperpack-rs/assets` (973 files, about 132 MB) to Git LFS
+requires rewriting every commit that touched them (`git lfs migrate import`),
+which changes commit ids and trees across the branch history. The repository
+policy forbids history rewrites and force pushes unless the user explicitly and
+specifically authorises them, and an authorised rewrite would also invalidate
+the tags and the published image digests.
+
+The assets are therefore kept as ordinary tracked files. They are required for
+offline builds, recorded replay and the packaged wallpaper library, so moving
+them out of the tree (a release download) would also weaken the offline-build
+guarantee that `ci-docker.yml` maintains. New large binary assets should be
+avoided; a future size reduction needs an explicit, separate history-rewrite
+decision, not a code change.

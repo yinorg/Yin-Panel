@@ -78,7 +78,7 @@ Requires Docker with the Compose plugin.
 ```bash
 mkdir yin-panel && cd yin-panel
 curl -LO https://raw.githubusercontent.com/yinorg/Yin-Panel/master/docker/docker-compose.yml
-curl -o conf.yaml https://raw.githubusercontent.com/yinorg/Yin-Panel/master/backend/conf.yaml.example
+curl -o conf.yaml https://raw.githubusercontent.com/yinorg/Yin-Panel/master/distribution/conf.yaml.example
 mkdir -p database uploads
 jwt_secret="$(openssl rand -hex 32)"
 sed -i "s#^  secret: your_secret_key$#  secret: ${jwt_secret}#" conf.yaml
@@ -91,6 +91,8 @@ Open <http://localhost:3002>.
 `latest` points at the current release and is the quickest way to try the panel; **pin a specific tag or image digest in production** (see [CI/CD architecture](#cicd-architecture)) so a deployment cannot drift.
 
 Default administrator: `admin@yiniot.com`, password `admin@yiniot.com`. Change the password immediately after the first login, and set `base.root_url` and a unique `jwt.secret` in `conf.yaml`.
+
+The image runs as the unprivileged user `10001:10001`. `database/` and `uploads/` are created with that owner inside the image, so the default compose file works unchanged; if you bind-mount a host directory instead, make it writable for UID 10001 (`chown -R 10001:10001 <dir>`).
 
 Every deployment should generate its own random `jwt.secret`. The repository ships only `conf.yaml.example`; the `conf.yaml` in your runtime directory holds instance secrets and OAuth credentials and must not be committed to Git.
 

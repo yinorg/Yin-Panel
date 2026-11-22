@@ -11,7 +11,16 @@ loopback HTTP, warm caches. Numbers are one run each; treat ±10% as noise.
 The Go backend has since been removed, so the pair scripts that compared the
 two builds no longer exist; these numbers are the historical record.
 
-Reproduce with:
+## The baseline that still runs
+
+The Go-versus-Rust pair scripts are gone with the Go tree. The live baseline is
+`.github/workflows/perf.yml`: it builds the Rust binary, starts the seeded
+service, and runs the E2E repository's k6 scripts, whose thresholds are the
+gate (`checks > 0.99`, `http_req_failed < 0.01`, smoke p95 < 500 ms / p99 <
+1 s, load p95 < 800 ms / p99 < 1.5 s). It runs nightly and on demand, so a
+performance regression is visible even though the comparison arm is gone.
+
+Historical reproduction, when a Go build is still available:
 
 ```sh
 # unit level: recorded cases, crossing included
@@ -21,12 +30,7 @@ rust-anything bench rust/wallpaperpack-rs
 # route level: start the front door, then a keep-alive load generator
 PORT=3020 ./rust/app/target/release/run-original
 ./loadgen -url http://127.0.0.1:3020/api/theme/v2/wallpaper/library -n 4000 -c 16
-./loadgen -url http://127.0.0.1:3002/api/theme/v2/wallpaper/library -n 4000 -c 16
 ```
-
-The load generator is a small Go program (`net/http`, keep-alive,
-`Accept-Encoding: identity`, 4000 requests, 16 connections) that also samples
-the serving process's `/proc/<pid>/stat` CPU time and RSS.
 
 ## 1. Unit level: `rust-anything bench`
 

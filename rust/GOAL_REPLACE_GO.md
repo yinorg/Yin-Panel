@@ -267,3 +267,25 @@ command that proves it).
 Already landed before this plan (kept for context): shared `Any` layer, auth,
 space list/members/groups/items reads, search-config/public/wallpaper, admin and
 config reads, and group/item CRUD writes.
+
+## Post-migration hardening
+
+The audit after the Go removal found gaps that did not block the cutover but
+left the deployment less verifiable or less maintainable. They are closed here:
+
+| Audit item | Result | Evidence |
+| --- | --- | --- |
+| CI ran only SQLite | `rust-check.yml` runs unit tests, coverage and the 665-case replay; `rust-db.yml` runs repository/bootstrap on MySQL 8.4 and PostgreSQL 17; `rust-nightly.yml` runs the three-database HTTP smoke and `migrate-db` | all simulated locally, see the commit log |
+| Schema had three implementations | startup tables and `migrate-db` share `copy_sql::parse_table` + `render`; indexes are translated once and `migrate-db` now creates them too | `schema_shared.rs`, `copy_sql.rs`, MySQL/PG smoke |
+| No MySQL/PostgreSQL upgrade path | `migrations.rs` records versions in `schema_migration`, applies them once and in order; `0001_baseline` is stamped on existing shared databases | SQLite migration test + MySQL/PG bootstrap test |
+| OAuth routes missing from the inventory | `/api/oauth/:provider` and callback implemented (OIDC discovery, PKCE, ID-token verification, generic OAuth2, account merge and OIDC group grants); inventory corrected 103 → 105 | fake OIDC provider login, E2E `account-identity` (9 providers, 13 passed) |
+| `Any` runtime type risk | covered by the cross-database gate above | `rust-db.yml` |
+| Two giant files | `repository.rs` split into six domain modules plus helpers and tests; `routes.rs` split into five route modules | `rust/app/src/repository/`, `rust/app/src/routes/` |
+| Swallowed database errors | 58 handler collapses now log the error before falling back | `observability::warn`, `src/observability.rs` |
+| Dead-code warnings | zero warnings (`cargo build --release`) | `cargo build` output |
+| Cookie lacked `Secure` | session and OAuth state cookies add `Secure` when `base.root_url` is HTTPS | local HTTPS-configured OAuth run |
+| Container ran as root | image runs as `10001:10001`, database/uploads owned by that user; provenance and SBOM enabled | local image build, `healthy`, `id -u` = 10001 |
+| No metrics or request-failure logging | Prometheus listener behind `base.enable_metrics`, plus 5xx logging | `/metrics` read locally |
+| No performance gate | `perf.yml` runs the E2E k6 smoke/load thresholds nightly | workflow + endpoint 200 checks |
+| E2E outside the pipeline | `e2e.yml` builds Core and the extension, runs auth/OAuth/spaces/theme/extension acceptance nightly | 13-case local run |
+| Wallpaper assets in Git | kept; LFS needs a history rewrite, recorded as ADR-015 | `rust/DECISIONS.md` |
