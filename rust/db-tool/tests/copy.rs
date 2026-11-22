@@ -93,3 +93,27 @@ async fn copies_a_sqlite_deployment_into_another_file() {
     conn.close().await.unwrap();
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn migration_indexes_are_rendered_for_mysql_and_postgres() {
+    use yin_db_tool::copy_sql::{Dialect, indexes_for, parse_table};
+    use yin_db_tool::schema::{INDEXES, TABLES};
+
+    let tables: Vec<_> = TABLES.iter().filter_map(|statement| parse_table(statement)).collect();
+    let mysql = indexes_for(Dialect::MySql, &tables);
+    let postgres = indexes_for(Dialect::Postgres, &tables);
+    assert_eq!(mysql.len(), INDEXES.len());
+    assert_eq!(postgres.len(), INDEXES.len());
+    assert!(mysql.iter().all(|statement| !statement.contains("IF NOT EXISTS")));
+    let revision = mysql
+        .iter()
+        .find(|statement| statement.contains("revision_record_v2"))
+        .expect("revision indexes");
+    assert!(revision.contains("`package_id`(191)"), "{revision}");
+    assert!(
+        postgres
+            .iter()
+            .any(|statement| statement.contains("\"package_id\"")),
+        "postgres quotes identifiers"
+    );
+}

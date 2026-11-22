@@ -29,7 +29,8 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             rust/app/target
-          key: rust-check-${{ hashFiles('rust/app/Cargo.lock') }}
+            rust/db-tool/target
+          key: rust-check-${{ hashFiles('rust/app/Cargo.lock', 'rust/db-tool/Cargo.lock') }}
       - name: Cache the replay recorder
         uses: actions/cache@v4
         with:
@@ -38,7 +39,9 @@ jobs:
       - name: Metrics may not regress
         run: ./scripts/rust-parity-metrics.sh
       - name: Unit and slice tests
-        run: cargo test --manifest-path rust/app/Cargo.toml
+        run: |
+          cargo test --manifest-path rust/app/Cargo.toml
+          cargo test --manifest-path rust/db-tool/Cargo.toml
       - name: Build the binary
         run: cargo build --release --manifest-path rust/app/Cargo.toml
       - name: Every Go route has a Rust handler

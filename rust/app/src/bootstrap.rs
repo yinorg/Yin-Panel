@@ -397,6 +397,25 @@ mod tests {
             .await
             .unwrap_or_else(|error| panic!("{driver:?} second bootstrap: {error}"));
 
+        // A registered migration must run its DDL on the real server and be
+        // skipped on the second call, not only on SQLite.
+        let probe = [crate::migrations::Migration {
+            version: "9999_migration_probe",
+            statements: &["CREATE TABLE IF NOT EXISTS migration_probe (id INTEGER PRIMARY KEY)"],
+        }];
+        assert_eq!(
+            crate::migrations::apply_with(&pool, driver, &probe)
+                .await
+                .unwrap_or_else(|error| panic!("{driver:?} probe migration: {error}")),
+            vec!["9999_migration_probe".to_string()]
+        );
+        assert!(
+            crate::migrations::apply_with(&pool, driver, &probe)
+                .await
+                .unwrap_or_else(|error| panic!("{driver:?} second probe: {error}"))
+                .is_empty()
+        );
+
         let count = |sql: &str| {
             let pool = pool.clone();
             let sql = sql.to_string();
