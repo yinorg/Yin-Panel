@@ -281,7 +281,7 @@ left the deployment less verifiable or less maintainable. They are closed here:
 | OAuth routes missing from the inventory | `/api/oauth/:provider` and callback implemented (OIDC discovery, PKCE, ID-token verification, generic OAuth2, account merge and OIDC group grants); inventory corrected 103 → 105 | fake OIDC provider login, E2E `account-identity` (9 providers, 13 passed) |
 | `Any` runtime type risk | covered by the cross-database gate above | `rust-db.yml` |
 | Two giant files | `repository.rs` split into six domain modules plus helpers and tests; `routes.rs` split into five route modules | `rust/app/src/repository/`, `rust/app/src/routes/` |
-| Swallowed database errors | 58 handler collapses now log the error before falling back | `observability::warn`, `src/observability.rs` |
+| Swallowed database errors | 77 handler collapses and parity fallbacks now log the error before answering | `observability::warn`, `src/observability.rs` |
 | Dead-code warnings | zero warnings (`cargo build --release`) | `cargo build` output |
 | Cookie lacked `Secure` | session and OAuth state cookies add `Secure` when `base.root_url` is HTTPS | local HTTPS-configured OAuth run |
 | Container ran as root | image runs as `10001:10001`, database/uploads owned by that user; provenance and SBOM enabled | local image build, `healthy`, `id -u` = 10001 |
