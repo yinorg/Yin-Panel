@@ -209,7 +209,12 @@ pub fn ctx() -> &'static Ctx {
 fn load_conf(path: &Path, port: &str) -> Result<Conf, String> {
     let text = std::fs::read_to_string(path)
         .map_err(|error| format!("reading {}: {error}", path.display()))?;
-    serde_yaml::from_str(&text.replace("__PORT__", port))
+    let text = if port.is_empty() {
+        text
+    } else {
+        text.replace("__PORT__", port)
+    };
+    serde_yaml::from_str(&text)
         .map_err(|error| format!("parsing {}: {error}", path.display()))
 }
 

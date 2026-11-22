@@ -97,7 +97,10 @@ pub(super) async fn oauth_callback(
     let location = format!("{}/oauth/callback", ctx.root_url());
     redirect_with_cookies(
         &location,
-        &[crate::oauth::clear_state_cookie(&provider), session],
+        &[
+            crate::oauth::clear_state_cookie(&provider, appcfg::ctx().secure_cookies()),
+            session,
+        ],
     )
 }
 

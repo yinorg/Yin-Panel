@@ -138,8 +138,7 @@ pub fn disabled_404() -> Response {
         .into_response()
 }
 
-fn state_cookie(provider: &str, state: &str, max_age: i64) -> String {
-    let secure = crate::appcfg::ctx().secure_cookies();
+fn state_cookie(provider: &str, state: &str, max_age: i64, secure: bool) -> String {
     let secure = if secure { "; Secure" } else { "" };
     format!(
         "{}={state}; Path=/api/oauth/{provider}/callback; Max-Age={max_age}; HttpOnly{secure}; SameSite=Lax",
@@ -147,8 +146,8 @@ fn state_cookie(provider: &str, state: &str, max_age: i64) -> String {
     )
 }
 
-pub fn clear_state_cookie(provider: &str) -> String {
-    state_cookie(provider, "", 0)
+pub fn clear_state_cookie(provider: &str, secure: bool) -> String {
+    state_cookie(provider, "", 0, secure)
 }
 
 #[derive(Debug, Deserialize)]
@@ -271,7 +270,12 @@ pub async fn begin(provider_name: &str) -> Result<AuthStart, String> {
     };
     Ok(AuthStart {
         location,
-        state_cookie: state_cookie(&provider.name, &state, STATE_TTL.as_secs() as i64),
+        state_cookie: state_cookie(
+            &provider.name,
+            &state,
+            STATE_TTL.as_secs() as i64,
+            ctx.secure_cookies(),
+        ),
     })
 }
 
@@ -742,7 +746,7 @@ mod tests {
 
     #[test]
     fn clears_the_state_cookie_with_the_provider_path() {
-        let cookie = clear_state_cookie("github");
+        let cookie = clear_state_cookie("github", false);
         assert!(cookie.contains("Max-Age=0"));
         assert!(cookie.contains("Path=/api/oauth/github/callback"));
     }

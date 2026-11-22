@@ -259,7 +259,10 @@ fn oauth_failure(provider: &str, reason: &str) -> Response {
         appcfg::ctx().root_url(),
         urlencoding::encode(reason)
     );
-    redirect_with_cookies(&location, &[crate::oauth::clear_state_cookie(provider)])
+    redirect_with_cookies(
+        &location,
+        &[crate::oauth::clear_state_cookie(provider, appcfg::ctx().secure_cookies())],
+    )
 }
 
 /// `UserInfo` in `backend/internal/web/model/base`, whose field order is the
