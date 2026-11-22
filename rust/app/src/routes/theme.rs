@@ -662,7 +662,11 @@ pub(super) async fn set_trusted(
     let manifest_json =
         match crate::repository::revision_manifest(pool, ctx.sqlx_driver(), &revision).await {
             Ok(Some(manifest)) => manifest,
-            Ok(None) | Err(_) => return error_code(404),
+            Ok(None) => return error_code(404),
+            Err(error) => {
+                crate::observability::warn("routes/set_trusted", &error);
+                return error_code(404);
+            }
         };
     if req.enabled {
         let manifest: serde_json::Value = serde_json::from_str(&manifest_json).unwrap_or_default();
@@ -721,7 +725,11 @@ pub(super) async fn theme_grant(
     let manifest_json =
         match crate::repository::revision_manifest(pool, driver, &revision).await {
             Ok(Some(manifest)) => manifest,
-            Ok(None) | Err(_) => return error_code(404),
+            Ok(None) => return error_code(404),
+            Err(error) => {
+                crate::observability::warn("routes/theme_grant", &error);
+                return error_code(404);
+            }
         };
     let manifest: serde_json::Value = serde_json::from_str(&manifest_json).unwrap_or_default();
     let available = supported_modes(&manifest)
@@ -814,7 +822,11 @@ pub(super) async fn set_theme_grant(
     let driver = ctx.sqlx_driver();
     let manifest_json = match crate::repository::revision_manifest(pool, driver, &revision).await {
         Ok(Some(manifest)) => manifest,
-        Ok(None) | Err(_) => return error_code(404),
+        Ok(None) => return error_code(404),
+        Err(error) => {
+            crate::observability::warn("routes/set_theme_grant", &error);
+            return error_code(404);
+        }
     };
     let manifest: serde_json::Value = match serde_json::from_str(&manifest_json) {
         Ok(value) => value,
@@ -1048,7 +1060,11 @@ pub(super) async fn set_default_package(headers: HeaderMap, request: Request) ->
     let package_id =
         match crate::repository::revision_package_id(&pool, ctx.sqlx_driver(), &revision_id).await {
             Ok(Some(id)) => id,
-            Ok(None) | Err(_) => return error_code(404),
+            Ok(None) => return error_code(404),
+            Err(error) => {
+                crate::observability::warn("routes/set_default_package", &error);
+                return error_code(404);
+            }
         };
     match crate::repository::set_default_theme(
         &pool,
@@ -1097,7 +1113,11 @@ pub(super) async fn begin_trial(headers: HeaderMap, request: Request) -> Respons
         match crate::repository::revision_package_id(&pool, ctx.sqlx_driver(), &req.revision).await
         {
             Ok(Some(id)) => id,
-            Ok(None) | Err(_) => return error_code(404),
+            Ok(None) => return error_code(404),
+            Err(error) => {
+                crate::observability::warn("routes/begin_trial", &error);
+                return error_code(404);
+            }
         };
     match crate::repository::package_removed(&pool, ctx.sqlx_driver(), &package_id).await {
         Ok(Some(0)) => {}
@@ -1152,7 +1172,11 @@ pub(super) async fn confirm_trial(headers: HeaderMap, request: Request) -> Respo
     };
     let pending = match crate::repository::instance_pending(&pool, ctx.sqlx_driver()).await {
         Ok(Some(pending)) => pending,
-        Ok(None) | Err(_) => return envelope::error(" [record not found]"),
+        Ok(None) => return envelope::error(" [record not found]"),
+        Err(error) => {
+            crate::observability::warn("routes/confirm_trial", &error);
+            return envelope::error(" [record not found]");
+        }
     };
     if pending.is_empty() || pending != req.revision {
         return envelope::error(" [no matching theme activation trial]");
@@ -1203,7 +1227,11 @@ pub(super) async fn rollback_theme(headers: HeaderMap) -> Response {
     };
     let last_good = match crate::repository::instance_last_good(&pool, ctx.sqlx_driver()).await {
         Ok(Some(last_good)) => last_good,
-        Ok(None) | Err(_) => return envelope::database_error(),
+        Ok(None) => return envelope::database_error(),
+        Err(error) => {
+            crate::observability::warn("routes/rollback_theme", &error);
+            return envelope::database_error();
+        }
     };
     let revision_id = if last_good.is_empty() {
         fallback

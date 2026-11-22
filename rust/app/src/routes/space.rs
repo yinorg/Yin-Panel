@@ -67,7 +67,11 @@ pub(super) async fn search_config(headers: HeaderMap, Path(space_id): Path<i64>)
             .await
         {
             Ok(Some(found)) => found,
-            Ok(None) | Err(_) => return error_code(404),
+            Ok(None) => return error_code(404),
+            Err(error) => {
+                crate::observability::warn("routes/search_config", &error);
+                return error_code(404);
+            }
         };
     if found.owner_user_id != user.id && !found.is_member {
         return error_code(1005);
@@ -232,7 +236,11 @@ pub(super) async fn space_public(headers: HeaderMap, Path(space_id): Path<i64>) 
     let row = match crate::repository::space_public_config(&pool, ctx.sqlx_driver(), space_id).await
     {
         Ok(Some(row)) => row,
-        Ok(None) | Err(_) => return error_code(404),
+        Ok(None) => return error_code(404),
+        Err(error) => {
+            crate::observability::warn("routes/space_public", &error);
+            return error_code(404);
+        }
     };
     success_data(json!({
         "enabled": row.enabled,
@@ -731,7 +739,11 @@ pub(super) async fn add_member(headers: HeaderMap, Path(space_id): Path<i64>, re
     let email = req.email.trim().to_lowercase();
     let target = match crate::repository::user_id_by_mail(&pool, ctx.sqlx_driver(), &email).await {
         Ok(Some(target_id)) => target_id,
-        Ok(None) | Err(_) => return error_code(404),
+        Ok(None) => return error_code(404),
+        Err(error) => {
+            crate::observability::warn("routes/add_member", &error);
+            return error_code(404);
+        }
     };
     if crate::repository::space_owner(&pool, ctx.sqlx_driver(), space_id)
         .await
@@ -863,7 +875,11 @@ pub(super) async fn remove_member(
     }
     let owner = match crate::repository::space_owner(&pool, ctx.sqlx_driver(), space_id).await {
         Ok(Some(owner)) => owner,
-        Ok(None) | Err(_) => return error_code(404),
+        Ok(None) => return error_code(404),
+        Err(error) => {
+            crate::observability::warn("routes/remove_member", &error);
+            return error_code(404);
+        }
     };
     if target == owner {
         return envelope::error("the space owner cannot be removed; leave the space to delete it");
@@ -1010,7 +1026,11 @@ pub(super) async fn get_wallpaper(headers: HeaderMap, Path(space_id): Path<i64>)
             .await
         {
             Ok(Some(stored)) => stored,
-            Ok(None) | Err(_) => return error_code(404),
+            Ok(None) => return error_code(404),
+            Err(error) => {
+                crate::observability::warn("routes/get_wallpaper", &error);
+                return error_code(404);
+            }
         };
     if stored.is_empty() {
         return success();
@@ -1244,7 +1264,11 @@ pub(super) async fn transfer_space(
     let target_id = match crate::repository::user_id_by_mail(&pool, ctx.sqlx_driver(), &email).await
     {
         Ok(Some(id)) => id,
-        Ok(None) | Err(_) => return error_code(404),
+        Ok(None) => return error_code(404),
+        Err(error) => {
+            crate::observability::warn("routes/transfer_space", &error);
+            return error_code(404);
+        }
     };
     match crate::repository::transfer_space(
         &pool,
@@ -1592,7 +1616,11 @@ pub(super) async fn delete_space(headers: HeaderMap, Path(space_id): Path<i64>) 
     let (owner, kind) =
         match crate::repository::space_owner_and_type(&pool, ctx.sqlx_driver(), space_id).await {
             Ok(Some(space)) => space,
-            Ok(None) | Err(_) => return error_code(404),
+            Ok(None) => return error_code(404),
+            Err(error) => {
+                crate::observability::warn("routes/delete_space", &error);
+                return error_code(404);
+            }
         };
     if owner != user.id {
         return error_code(1005);
@@ -1960,7 +1988,11 @@ pub(super) async fn set_user_space_theme(
     let package_id =
         match crate::repository::package_id_for_revision(&pool, driver, &revision_id).await {
             Ok(Some(id)) => id,
-            Ok(None) | Err(_) => return error_code(404),
+            Ok(None) => return error_code(404),
+            Err(error) => {
+                crate::observability::warn("routes/set_user_space_theme", &error);
+                return error_code(404);
+            }
         };
     match crate::repository::save_user_space_theme(
         &pool,
@@ -2037,7 +2069,11 @@ pub(super) async fn set_space_theme(
     let package_id =
         match crate::repository::package_id_for_revision(&pool, driver, &revision_id).await {
             Ok(Some(id)) => id,
-            Ok(None) | Err(_) => return error_code(404),
+            Ok(None) => return error_code(404),
+            Err(error) => {
+                crate::observability::warn("routes/set_space_theme", &error);
+                return error_code(404);
+            }
         };
     match crate::repository::save_space_theme(
         &pool,
@@ -2145,7 +2181,11 @@ pub(super) async fn copy_space(headers: HeaderMap, Path(space_id): Path<i64>, re
     let source_name = match crate::repository::space_name(&pool, ctx.sqlx_driver(), space_id).await
     {
         Ok(Some(name)) => name,
-        Ok(None) | Err(_) => return error_code(404),
+        Ok(None) => return error_code(404),
+        Err(error) => {
+            crate::observability::warn("routes/copy_space", &error);
+            return error_code(404);
+        }
     };
     let body = axum::body::to_bytes(request.into_body(), 1 << 20)
         .await

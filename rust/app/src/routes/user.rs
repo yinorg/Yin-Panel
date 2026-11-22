@@ -394,7 +394,11 @@ pub(super) async fn update_user(headers: HeaderMap, request: Request) -> Respons
     let (existing_password, existing_name) =
         match crate::repository::user_password_and_name(&pool, ctx.sqlx_driver(), input.id).await {
             Ok(Some(pair)) => pair,
-            Ok(None) | Err(_) => return envelope::error(" [record not found]"),
+            Ok(None) => return envelope::error(" [record not found]"),
+            Err(error) => {
+                crate::observability::warn("routes/update_user", &error);
+                return envelope::error(" [record not found]");
+            }
         };
     let mut password = input.password.clone();
     if password.is_empty() {

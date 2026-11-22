@@ -170,7 +170,11 @@ pub(super) async fn delete_file(headers: HeaderMap, request: Request) -> Respons
     let file_name = match crate::repository::file_name_by_id(pool, ctx.sqlx_driver(), req.id).await
     {
         Ok(Some(name)) => name,
-        Ok(None) | Err(_) => return envelope::database_error(),
+        Ok(None) => return envelope::database_error(),
+        Err(error) => {
+            crate::observability::warn("routes/delete_file", &error);
+            return envelope::database_error();
+        }
     };
     let _ = std::fs::remove_file(storage_dir().join(&file_name));
     match crate::repository::delete_file_row(pool, ctx.sqlx_driver(), req.id).await {
