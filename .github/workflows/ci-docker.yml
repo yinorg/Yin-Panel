@@ -136,8 +136,8 @@ jobs:
           file: ./distribution/docker-image/Dockerfile_monolith
           platforms: linux/${{ matrix.arch }}
           push: true
-          provenance: false
-          sbom: false
+          provenance: true
+          sbom: true
           outputs: type=image,name=ghcr.io/yinorg/yin-panel-ce,push-by-digest=true,name-canonical=false,push=true
           build-args: |
             VERSION=${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}

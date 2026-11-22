@@ -1,0 +1,163 @@
+name: E2E Acceptance
+
+# The cross-repository suite lives in its own repository and needs two peers:
+# this Core build plus the unpacked browser extension. It is nightly and manual
+# rather than per-pull-request because it downloads browsers and runs a real
+# Chromium; the pull-request gate stays in `rust-check.yml` and `rust-db.yml`.
+on:
+  schedule:
+    - cron: '33 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  acceptance:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout Core
+        uses: actions/checkout@v7
+
+      - name: Checkout the extension
+        uses: actions/checkout@v7
+        with:
+          repository: yinorg/yin-panel-extension
+          path: .e2e/extension
+          fetch-depth: 1
+
+      - name: Checkout the E2E suite
+        uses: actions/checkout@v7
+        with:
+          repository: yinorg/yin-panel-e2e
+          path: .e2e/suite
+          fetch-depth: 1
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24.21.0
+          cache: npm
+          cache-dependency-path: |
+            frontend/package-lock.json
+            .e2e/suite/package-lock.json
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/app/target
+          key: e2e-${{ hashFiles('rust/app/Cargo.lock') }}
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ hashFiles('.e2e/suite/package-lock.json') }}
+
+      - name: Build the frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build-only
+
+      - name: Build the binary
+        run: cargo build --release --manifest-path rust/app/Cargo.toml
+
+      - name: Install the suite
+        working-directory: .e2e/suite
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Run the Core and extension acceptance suite
+        working-directory: .e2e/suite
+        env:
+          CORE_ROOT: ${{ github.workspace }}
+          CORE_REVISION: ${{ github.sha }}
+        run: |
+          set -eu
+          runtime="$CORE_ROOT/.e2e/runtime"
+          rm -rf "$runtime"
+          mkdir -p "$runtime/database" "$runtime/uploads"
+          ln -s "$CORE_ROOT/runtime/web" "$runtime/web"
+          ln -s "$CORE_ROOT/runtime/lang" "$runtime/lang"
+          cat > "$runtime/conf.yaml" <<CONF
+          base:
+            http_port: 18090
+            root_url: http://127.0.0.1:18090
+            database_drive: sqlite
+            enable_static_server: true
+            enable_monitor: false
+            url_prefix: /uploads/
+          sqlite:
+            file_path: ./database/database.db
+          jwt:
+            secret: e2e-acceptance-secret
+            expire: 24
+          rclone:
+            type: local
+            bucket: ./uploads
+          CONF
+          PORT=18090 YIN_PANEL_CONFIG="$runtime/conf.yaml" \
+            env -C "$runtime" "$CORE_ROOT/rust/app/target/release/yin-panel" \
+            > "$runtime/server.log" 2>&1 &
+          service_pid=$!
+          trap 'kill "$service_pid" 2>/dev/null || true' EXIT
+          for _ in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:18090/api/about >/dev/null; then
+              break
+            fi
+            sleep 0.5
+          done
+          curl -fsS http://127.0.0.1:18090/api/about >/dev/null
+
+          cat > .env.local <<ENV
+          YIN_PANEL_URL=http://127.0.0.1:18090
+          YIN_PANEL_EXTENSION_DIR=$CORE_ROOT/.e2e/extension
+          YIN_PANEL_TEST_USER=admin@yiniot.com
+          YIN_PANEL_TEST_PASSWORD=admin@yiniot.com
+          YIN_PANEL_TEST_ADMIN_USER=admin@yiniot.com
+          YIN_PANEL_TEST_ADMIN_PASSWORD=admin@yiniot.com
+          YIN_PANEL_TEST_SPACE_ID=1
+          YIN_PANEL_TEST_BINARY=$CORE_ROOT/rust/app/target/release/yin-panel
+          YIN_PANEL_TEST_WEB_DIR=$CORE_ROOT/runtime/web
+          YIN_PANEL_TEST_LANG_DIR=$CORE_ROOT/runtime/lang
+          YIN_PANEL_TEST_SOURCE_DIR=$CORE_ROOT
+          YIN_PANEL_TEST_CORE_REVISION=$CORE_REVISION
+          ENV
+
+          xvfb-run -a npx playwright test \
+            tests/auth.spec.mjs \
+            tests/account-identity.spec.mjs \
+            tests/live-smoke.spec.mjs \
+            tests/paired-permissions.spec.mjs \
+            tests/yin-yang-space.spec.mjs \
+            tests/extension-newtab.spec.mjs \
+            --reporter=list
+
+          # The legacy-sandbox layouts in this file need theme fixtures the
+          # suite provisions separately; the first case uses the isolated
+          # service and is stable against this Core build.
+          xvfb-run -a npx playwright test tests/default-theme-interaction.spec.mjs \
+            -g "default theme switches Yin/Yang and keeps items clickable" \
+            --reporter=list
+
+      - name: Upload the Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: |
+            .e2e/suite/playwright-report
+            .e2e/suite/test-results
+          retention-days: 7

@@ -1,0 +1,115 @@
+name: Performance Baseline
+
+# The Go/Rust comparison harness was removed with the Go tree. This workflow
+# keeps a post-migration baseline instead: the E2E repository's k6 smoke and
+# load scripts run against the Rust binary and fail on their own thresholds
+# (checks, failed requests, p95/p99 latency). Nightly, plus manual dispatch.
+on:
+  schedule:
+    - cron: '47 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  baseline:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout Core
+        uses: actions/checkout@v7
+
+      - name: Checkout the E2E suite
+        uses: actions/checkout@v7
+        with:
+          repository: yinorg/yin-panel-e2e
+          path: .perf/suite
+          fetch-depth: 1
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24.21.0
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Set up k6
+        uses: grafana/setup-k6-action@v1
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/app/target
+          key: perf-${{ hashFiles('rust/app/Cargo.lock') }}
+
+      - name: Build the frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build-only
+
+      - name: Build the binary
+        run: cargo build --release --manifest-path rust/app/Cargo.toml
+
+      - name: Start the service and run the baseline
+        env:
+          CORE_ROOT: ${{ github.workspace }}
+        run: |
+          set -eu
+          runtime="$CORE_ROOT/.perf/runtime"
+          rm -rf "$runtime"
+          mkdir -p "$runtime/database" "$runtime/uploads"
+          ln -s "$CORE_ROOT/runtime/web" "$runtime/web"
+          ln -s "$CORE_ROOT/runtime/lang" "$runtime/lang"
+          cat > "$runtime/conf.yaml" <<CONF
+          base:
+            http_port: 18090
+            root_url: http://127.0.0.1:18090
+            database_drive: sqlite
+            enable_static_server: true
+            enable_monitor: false
+            url_prefix: /uploads/
+          sqlite:
+            file_path: ./database/database.db
+          jwt:
+            secret: perf-baseline-secret
+            expire: 24
+          rclone:
+            type: local
+            bucket: ./uploads
+          CONF
+          PORT=18090 YIN_PANEL_CONFIG="$runtime/conf.yaml" \
+            env -C "$runtime" "$CORE_ROOT/rust/app/target/release/yin-panel" \
+            > "$runtime/server.log" 2>&1 &
+          service_pid=$!
+          trap 'kill "$service_pid" 2>/dev/null || true' EXIT
+          for _ in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:18090/api/about >/dev/null; then
+              break
+            fi
+            sleep 0.5
+          done
+          curl -fsS http://127.0.0.1:18090/api/about >/dev/null
+
+          # The load scripts include the public space projection; enable it on
+          # the seeded administrator's personal space before measuring.
+          token="$(
+            curl -fsS http://127.0.0.1:18090/api/login \
+              -H 'Content-Type: application/json' \
+              -d '{"mail":"admin@yiniot.com","password":"admin@yiniot.com"}' \
+            | python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["token"])'
+          )"
+          curl -fsS http://127.0.0.1:18090/api/spaces/1/public \
+            -H "Authorization: Bearer $token" \
+            -H 'Content-Type: application/json' \
+            -d '{"enabled":true,"publicId":"perf-baseline","mode":"direct"}' >/dev/null
+
+          cd "$CORE_ROOT/.perf/suite"
+          BASE_URL=http://127.0.0.1:18090 SPACE_ID=1 k6 run perf/smoke.js
+          BASE_URL=http://127.0.0.1:18090 SPACE_ID=1 k6 run perf/load.js

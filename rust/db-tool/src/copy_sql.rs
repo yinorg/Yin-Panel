@@ -260,6 +260,74 @@ pub fn render(table: &Table, dialect: Dialect) -> String {
     )
 }
 
+/// Translate one `INDEXES` statement for a target dialect. MySQL 8 rejects
+/// `CREATE INDEX IF NOT EXISTS`; PostgreSQL and SQLite keep it.
+pub fn translate_index(statement: &str, dialect: Dialect) -> String {
+    match dialect {
+        Dialect::MySql => statement.replace("IF NOT EXISTS ", ""),
+        Dialect::Postgres => statement.replace('`', "\""),
+    }
+}
+
+/// Index statements for a migration copy. MySQL cannot index a `LONGTEXT`
+/// column without a key length, so text columns from the parsed schema get the
+/// same 191-character prefix the startup path uses.
+pub fn indexes_for(dialect: Dialect, tables: &[Table]) -> Vec<String> {
+    crate::schema::INDEXES
+        .iter()
+        .map(|statement| {
+            if dialect != Dialect::MySql {
+                return translate_index(statement, dialect);
+            }
+            let Some((head, rest)) = statement.split_once(" ON ") else {
+                return translate_index(statement, dialect);
+            };
+            let Some(open) = rest.find('(') else {
+                return translate_index(statement, dialect);
+            };
+            let table_name = rest[..open].trim().trim_matches('`');
+            let Some(close) = rest.rfind(')') else {
+                return translate_index(statement, dialect);
+            };
+            let Some(table) = tables.iter().find(|table| table.name == table_name) else {
+                return translate_index(statement, dialect);
+            };
+            let rendered: Vec<String> = rest[open + 1..close]
+                .split(',')
+                .map(|part| {
+                    let part = part.trim();
+                    let (name, suffix) = match part.split_once(char::is_whitespace) {
+                        Some((name, suffix)) => {
+                            (name.trim_matches('`'), suffix.trim())
+                        }
+                        None => (part.trim_matches('`'), ""),
+                    };
+                    let prefix = match table
+                        .columns
+                        .iter()
+                        .find(|column| column.name == name)
+                    {
+                        Some(column) if column.kind == Kind::Text && column.length.is_none() => {
+                            "(191)"
+                        }
+                        _ => "",
+                    };
+                    if suffix.is_empty() {
+                        format!("`{name}`{prefix}")
+                    } else {
+                        format!("`{name}`{prefix} {suffix}")
+                    }
+                })
+                .collect();
+            format!(
+                "{} ON `{table_name}`({})",
+                head.replace("IF NOT EXISTS ", ""),
+                rendered.join(",")
+            )
+        })
+        .collect()
+}
+
 /// Every table translation, in the embedded schema's order.
 pub fn render_all(dialect: Dialect) -> Vec<String> {
     TABLES
@@ -371,6 +439,12 @@ async fn create_and_copy_mysql(
             println!("  {}: {copied} rows", table.name);
         }
     }
+    for statement in indexes_for(Dialect::MySql, tables) {
+        target
+            .execute(statement.as_str())
+            .await
+            .map_err(|error| format!("create index: {error}\n{statement}"))?;
+    }
     Ok(())
 }
 
@@ -397,6 +471,12 @@ async fn create_and_copy_postgres(
         if !quiet {
             println!("  {}: {copied} rows", table.name);
         }
+    }
+    for statement in indexes_for(Dialect::Postgres, tables) {
+        target
+            .execute(statement.as_str())
+            .await
+            .map_err(|error| format!("create index: {error}\n{statement}"))?;
     }
     Ok(())
 }

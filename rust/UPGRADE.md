@@ -100,6 +100,16 @@ The in-place upgrade of the **real** deployment was also exercised: its
 `idx_space_team_id` index. The first Rust start dropped the index and the
 column, reported it in the log, and the service came up with all existing data.
 
+## MySQL and PostgreSQL upgrades
+
+A SQLite deployment is upgraded in place by `yin-db-tool` at every start. A
+MySQL or PostgreSQL deployment created by the Rust binary is upgraded by the
+versioned runner in `rust/app/src/migrations.rs`: `schema_migration` records
+each applied version and the runner appends only what is missing. The first
+entry, `0001_baseline`, stamps an existing shared database; later releases add
+entries rather than requiring a re-import. `migrate-db` remains the supported
+path for moving a SQLite deployment into an empty MySQL/PostgreSQL database.
+
 ## Known differences
 
 - **Go re-installs the built-in themes on every start; Rust does not.** Go's

@@ -43,13 +43,21 @@ pub struct Base {
     pub monitor_refresh_interval: i64,
     #[serde(default)]
     pub url_prefix: String,
+    /// Start the separate Prometheus listener; it is off by default.
+    #[serde(default)]
+    pub enable_metrics: bool,
+    /// Port of that listener; defaults to 9091.
+    #[serde(default)]
+    pub metrics_port: String,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct Sqlite {
     #[serde(default)]
     pub file_path: String,
+    /// Accepted for compatibility and deliberately unused: see `CONFIG.md`.
     #[serde(default)]
+    #[allow(dead_code)]
     pub read_pool_size: i64,
 }
 
@@ -65,7 +73,9 @@ pub struct Mysql {
     pub password: String,
     #[serde(default)]
     pub db_name: String,
+    /// Accepted for compatibility and deliberately unused.
     #[serde(default)]
+    #[allow(dead_code)]
     pub wait_timeout: u64,
 }
 
@@ -326,6 +336,16 @@ impl Ctx {
             .trim()
             .to_ascii_lowercase()
             .starts_with("https://")
+    }
+
+    pub fn metrics_port(&self) -> u16 {
+        self.conf
+            .base
+            .metrics_port
+            .parse()
+            .ok()
+            .filter(|port: &u16| *port != 0)
+            .unwrap_or(9091)
     }
 
     pub fn jwt_secret(&self) -> &[u8] {

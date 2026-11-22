@@ -23,7 +23,6 @@ zip = { version = "2", default-features = false, features = ["deflate"] }
 time = { version = "0.3", features = ["formatting", "macros", "local-offset"] }
 serde = { version = "1", features = ["derive"] }
 serde_yaml = "0.9"
-ini = "1"
 urlencoding = "2"
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "runtime-tokio-rustls", "any", "sqlite", "mysql", "postgres", "macros"] }
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }

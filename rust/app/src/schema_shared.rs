@@ -43,6 +43,22 @@ fn mysql_text_primary_keys(statement: &str, columns: &[String]) -> String {
 }
 
 pub fn table_statement(driver: Driver, statement: &str) -> String {
+    // A table definition goes through the same parser and renderer that
+    // `migrate-db` uses, so startup schema creation and the copy tool cannot
+    // drift apart. Non-CREATE statements (migrations) keep the text rules.
+    if statement.starts_with("CREATE TABLE")
+        && let Some(table) = yin_db_tool::copy_sql::parse_table(statement)
+    {
+        return match driver {
+            Driver::Sqlite => statement.to_string(),
+            Driver::MySql => {
+                yin_db_tool::copy_sql::render(&table, yin_db_tool::copy_sql::Dialect::MySql)
+            }
+            Driver::Postgres => {
+                yin_db_tool::copy_sql::render(&table, yin_db_tool::copy_sql::Dialect::Postgres)
+            }
+        };
+    }
     let mut out = statement.to_string();
     if driver == Driver::Postgres {
         out = out.replace('`', "\"");
@@ -79,12 +95,14 @@ pub fn table_statement(driver: Driver, statement: &str) -> String {
 
 pub fn index_statement(driver: Driver, statement: &str) -> String {
     match driver {
-        Driver::Postgres => statement.replace('`', "\""),
+        Driver::Postgres => {
+            yin_db_tool::copy_sql::translate_index(statement, yin_db_tool::copy_sql::Dialect::Postgres)
+        }
         Driver::Sqlite => statement.to_string(),
         Driver::MySql => {
             // MySQL 8 rejects `CREATE INDEX IF NOT EXISTS`; existence is checked
             // before the statement instead.
-            statement.replace("IF NOT EXISTS ", "")
+            yin_db_tool::copy_sql::translate_index(statement, yin_db_tool::copy_sql::Dialect::MySql)
         }
     }
 }
@@ -157,7 +175,10 @@ mod tests {
     #[test]
     fn mysql_uses_auto_increment_datetime_and_bounded_primary_keys() {
         let space = table_statement(Driver::MySql, space_table_statement());
-        assert!(space.contains("`id` BIGINT AUTO_INCREMENT PRIMARY KEY"), "{space}");
+        assert!(
+            space.contains("`id` BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY"),
+            "{space}"
+        );
         assert!(space.contains("`created_at` DATETIME(6)"), "{space}");
         assert!(
             space.contains("`public_enabled` TINYINT(1) NOT NULL DEFAULT 0"),
@@ -170,8 +191,9 @@ mod tests {
             .find(|statement| statement.contains("`asset_record_v2`"))
             .expect("asset table");
         let out = table_statement(Driver::MySql, asset);
-        assert!(out.contains("`revision_id` varchar(191)"), "{out}");
-        assert!(out.contains("`path` varchar(191)"), "{out}");
+        let upper = out.to_uppercase();
+        assert!(upper.contains("`REVISION_ID` VARCHAR(191)"), "{out}");
+        assert!(upper.contains("`PATH` VARCHAR(191)"), "{out}");
         assert!(out.contains("`content` LONGBLOB"), "{out}");
     }
 

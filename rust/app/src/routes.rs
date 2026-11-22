@@ -343,6 +343,7 @@ async fn oauth_callback(
         Err(_) => return oauth_failure(&provider, "token_failed"),
     };
     let max_age = ctx.jwt_expire_hours() * 3600;
+    crate::observability::count_login();
     let session = auth::session_cookie(&token, max_age, ctx.secure_cookies());
     let location = format!("{}/oauth/callback", ctx.root_url());
     redirect_with_cookies(
@@ -416,6 +417,7 @@ async fn login(request: Request) -> Response {
         Err(error) => return envelope::error(&error),
     };
     let max_age = ctx.jwt_expire_hours() * 3600;
+    crate::observability::count_login();
     let cookie = auth::session_cookie(&token, max_age, ctx.secure_cookies());
     let response = envelope::success_struct(UserInfo {
         id: user.id,
@@ -840,7 +842,10 @@ async fn space_public(headers: HeaderMap, Path(space_id): Path<i64>) -> Response
     };
     if !crate::repository::can_manage_space(&pool, ctx.sqlx_driver(), user.id, space_id)
         .await
-        .unwrap_or(false)
+        .unwrap_or_else(|error| {
+            crate::observability::warn("routes/space_public", &error);
+            false
+        })
     {
         return error_code(1005);
     }
@@ -884,7 +889,10 @@ async fn set_space_public(
     };
     if !crate::repository::can_manage_space(&pool, ctx.sqlx_driver(), user.id, space_id)
         .await
-        .unwrap_or(false)
+        .unwrap_or_else(|error| {
+            crate::observability::warn("routes/set_space_public", &error);
+            false
+        })
     {
         return error_code(1005);
     }
@@ -958,7 +966,10 @@ async fn module_config(
     };
     let row = crate::repository::module_config_value(pool, ctx.sqlx_driver(), user.id, &name)
         .await
-        .unwrap_or(None);
+        .unwrap_or_else(|error| {
+            crate::observability::warn("routes/module_config", &error);
+            None
+        });
     match row {
         None => (
             axum::http::StatusCode::OK,
@@ -1176,7 +1187,10 @@ async fn user_config(headers: HeaderMap) -> Response {
     };
     let row = crate::repository::user_config(pool, ctx.sqlx_driver(), user.id)
         .await
-        .unwrap_or(None);
+        .unwrap_or_else(|error| {
+            crate::observability::warn("routes/user_config", &error);
+            None
+        });
     let Some(config) = row else {
         return error_code(404);
     };
@@ -1288,7 +1302,10 @@ async fn theme_preference(headers: HeaderMap) -> Response {
     };
     let row = crate::repository::user_theme_preference(pool, ctx.sqlx_driver(), user.id)
         .await
-        .unwrap_or(None);
+        .unwrap_or_else(|error| {
+            crate::observability::warn("routes/theme_preference", &error);
+            None
+        });
     let (mode, theme_mode) =
         row.unwrap_or_else(|| ("auto".to_string(), "follow-space".to_string()));
     let mode = if mode.is_empty() {
@@ -1321,7 +1338,10 @@ async fn theme_space(headers: HeaderMap, Path(space_id): Path<i64>) -> Response 
     let space_theme =
         crate::repository::space_theme_pair(pool, ctx.sqlx_driver(), space_id)
             .await
-            .unwrap_or(None);
+            .unwrap_or_else(|error| {
+                crate::observability::warn("routes/theme_space", &error);
+                None
+            });
     let override_theme = crate::repository::user_space_theme_pair(
         pool,
         ctx.sqlx_driver(),
@@ -1329,7 +1349,10 @@ async fn theme_space(headers: HeaderMap, Path(space_id): Path<i64>) -> Response 
         space_id,
     )
     .await
-    .unwrap_or(None);
+    .unwrap_or_else(|error| {
+        crate::observability::warn("routes/theme_space", &error);
+        None
+    });
     let theme = space_theme
         .map(|(package_id, revision)| json!({"packageId": package_id, "revision": revision}));
     let override_value = override_theme
@@ -1531,12 +1554,18 @@ async fn theme_mine(headers: HeaderMap) -> Response {
     };
     let system = crate::repository::activation_revision(pool, ctx.sqlx_driver(), "instance")
         .await
-        .unwrap_or(Some(instance))
+        .unwrap_or_else(|error| {
+            crate::observability::warn("routes/theme_mine", &error);
+            Some(instance)
+        })
         .unwrap_or_default();
     let scope = format!("user:{}", user.id);
     let selected = crate::repository::activation_revision(pool, ctx.sqlx_driver(), &scope)
         .await
-        .unwrap_or(None);
+        .unwrap_or_else(|error| {
+            crate::observability::warn("routes/theme_mine", &error);
+            None
+        });
     let revision = selected.clone().unwrap_or(system);
     let package = match revision_public(pool, ctx.sqlx_driver(), &revision).await {
         Ok(value) => value,
@@ -1545,7 +1574,10 @@ async fn theme_mine(headers: HeaderMap) -> Response {
     let (mode, theme_mode) = user_theme_modes(pool, ctx.sqlx_driver(), user.id).await;
     let package_id = crate::repository::activation_package(pool, ctx.sqlx_driver(), &scope)
         .await
-        .unwrap_or(None)
+        .unwrap_or_else(|error| {
+            crate::observability::warn("routes/theme_mine", &error);
+            None
+        })
         .unwrap_or_default();
     success_data(json!({
         "package": package,
@@ -1565,7 +1597,10 @@ async fn user_theme_modes(
 ) -> (String, String) {
     let row = crate::repository::user_theme_preference(pool, driver, user_id)
         .await
-        .unwrap_or(None);
+        .unwrap_or_else(|error| {
+            crate::observability::warn("routes/user_theme_modes", &error);
+            None
+        });
     let (mode, theme_mode) =
         row.unwrap_or_else(|| ("auto".to_string(), "follow-space".to_string()));
     (
@@ -1604,7 +1639,10 @@ async fn theme_effective(
     };
     let system = crate::repository::activation_revision(pool, driver, "instance")
         .await
-        .unwrap_or(Some(instance))
+        .unwrap_or_else(|error| {
+            crate::observability::warn("routes/theme_effective", &error);
+            Some(instance)
+        })
         .unwrap_or_default();
 
     let mut resolution: Option<(String, &str)> = None;
@@ -1676,7 +1714,10 @@ async fn theme_asset(
     };
     let row = crate::repository::theme_asset_content(pool, ctx.sqlx_driver(), &revision, name)
         .await
-        .unwrap_or(None);
+        .unwrap_or_else(|error| {
+            crate::observability::warn("routes/theme_asset", &error);
+            None
+        });
     let Some((media_type, content)) = row else {
         return envelope::empty_not_found();
     };
@@ -1946,7 +1987,10 @@ async fn create_group(headers: HeaderMap, Path(space_id): Path<i64>, request: Re
     };
     if !crate::repository::can_edit_space(&pool, ctx.sqlx_driver(), user.id, space_id)
         .await
-        .unwrap_or(false)
+        .unwrap_or_else(|error| {
+            crate::observability::warn("routes/create_group", &error);
+            false
+        })
     {
         return error_code(1005);
     }
@@ -2034,7 +2078,10 @@ async fn update_group(
     };
     if !crate::repository::can_edit_space(&pool, ctx.sqlx_driver(), user.id, space_id)
         .await
-        .unwrap_or(false)
+        .unwrap_or_else(|error| {
+            crate::observability::warn("routes/update_group", &error);
+            false
+        })
     {
         return error_code(1005);
     }
@@ -2052,7 +2099,10 @@ async fn update_group(
     if let Some(parent) = req.parent_id {
         let belongs = crate::repository::group_belongs(&pool, ctx.sqlx_driver(), space_id, parent)
             .await
-            .unwrap_or(false);
+            .unwrap_or_else(|error| {
+                crate::observability::warn("routes/update_group", &error);
+                false
+            });
         if parent == group_id || !belongs {
             return envelope::error(" [invalid parent group]");
         }
@@ -2064,7 +2114,10 @@ async fn update_group(
             parent,
         )
         .await
-        .unwrap_or(false)
+        .unwrap_or_else(|error| {
+            crate::observability::warn("routes/update_group", &error);
+            false
+        })
         {
             return envelope::error(" [group cycle detected]");
         }
@@ -2107,7 +2160,10 @@ async fn delete_group(
     };
     if !crate::repository::can_edit_space(&pool, ctx.sqlx_driver(), user.id, space_id)
         .await
-        .unwrap_or(false)
+        .unwrap_or_else(|error| {
+            crate::observability::warn("routes/delete_group", &error);
+            false
+        })
     {
         return error_code(1005);
     }
@@ -2180,7 +2236,10 @@ async fn create_item(headers: HeaderMap, Path(space_id): Path<i64>, request: Req
     };
     if !crate::repository::can_edit_space(&pool, ctx.sqlx_driver(), user.id, space_id)
         .await
-        .unwrap_or(false)
+        .unwrap_or_else(|error| {
+            crate::observability::warn("routes/create_item", &error);
+            false
+        })
     {
         return error_code(1005);
     }
@@ -2206,7 +2265,10 @@ async fn create_item(headers: HeaderMap, Path(space_id): Path<i64>, request: Req
         input.item_icon_group_id,
     )
     .await
-    .unwrap_or(false);
+    .unwrap_or_else(|error| {
+        crate::observability::warn("routes/create_item", &error);
+        false
+    });
     if !group_exists {
         return error_code(404);
     }
@@ -2311,7 +2373,10 @@ async fn update_item(
     };
     if !crate::repository::can_edit_space(&pool, ctx.sqlx_driver(), user.id, space_id)
         .await
-        .unwrap_or(false)
+        .unwrap_or_else(|error| {
+            crate::observability::warn("routes/update_item", &error);
+            false
+        })
     {
         return error_code(1005);
     }
@@ -2337,7 +2402,10 @@ async fn update_item(
         input.item_icon_group_id,
     )
     .await
-    .unwrap_or(false);
+    .unwrap_or_else(|error| {
+        crate::observability::warn("routes/update_item", &error);
+        false
+    });
     if !group_exists {
         return error_code(404);
     }
@@ -2388,7 +2456,10 @@ async fn delete_item(
     };
     if !crate::repository::can_edit_space(&pool, ctx.sqlx_driver(), user.id, space_id)
         .await
-        .unwrap_or(false)
+        .unwrap_or_else(|error| {
+            crate::observability::warn("routes/delete_item", &error);
+            false
+        })
     {
         return error_code(1005);
     }
@@ -2430,7 +2501,10 @@ async fn add_member(headers: HeaderMap, Path(space_id): Path<i64>, request: Requ
     };
     if !crate::repository::can_manage_space(&pool, ctx.sqlx_driver(), user.id, space_id)
         .await
-        .unwrap_or(false)
+        .unwrap_or_else(|error| {
+            crate::observability::warn("routes/add_member", &error);
+            false
+        })
     {
         return error_code(1005);
     }
@@ -2452,7 +2526,10 @@ async fn add_member(headers: HeaderMap, Path(space_id): Path<i64>, request: Requ
     };
     if crate::repository::space_owner(&pool, ctx.sqlx_driver(), space_id)
         .await
-        .unwrap_or(None)
+        .unwrap_or_else(|error| {
+            crate::observability::warn("routes/add_member", &error);
+            None
+        })
         .is_none()
     {
         return error_code(404);
@@ -2500,7 +2577,10 @@ async fn update_member(
     };
     if !crate::repository::can_manage_space(&pool, ctx.sqlx_driver(), user.id, space_id)
         .await
-        .unwrap_or(false)
+        .unwrap_or_else(|error| {
+            crate::observability::warn("routes/update_member", &error);
+            false
+        })
     {
         return error_code(1005);
     }
@@ -2517,7 +2597,10 @@ async fn update_member(
     }
     if crate::repository::space_owner(&pool, ctx.sqlx_driver(), space_id)
         .await
-        .unwrap_or(None)
+        .unwrap_or_else(|error| {
+            crate::observability::warn("routes/update_member", &error);
+            None
+        })
         .is_none()
     {
         return error_code(404);
@@ -2562,7 +2645,10 @@ async fn remove_member(
     };
     if !crate::repository::can_manage_space(&pool, ctx.sqlx_driver(), user.id, space_id)
         .await
-        .unwrap_or(false)
+        .unwrap_or_else(|error| {
+            crate::observability::warn("routes/remove_member", &error);
+            false
+        })
     {
         return error_code(1005);
     }
@@ -2611,7 +2697,10 @@ async fn rename_space(headers: HeaderMap, Path(space_id): Path<i64>, request: Re
     };
     if !crate::repository::can_manage_space(&pool, ctx.sqlx_driver(), user.id, space_id)
         .await
-        .unwrap_or(false)
+        .unwrap_or_else(|error| {
+            crate::observability::warn("routes/rename_space", &error);
+            false
+        })
     {
         return error_code(1005);
     }
@@ -2631,7 +2720,10 @@ async fn rename_space(headers: HeaderMap, Path(space_id): Path<i64>, request: Re
     }
     if crate::repository::space_owner(&pool, ctx.sqlx_driver(), space_id)
         .await
-        .unwrap_or(None)
+        .unwrap_or_else(|error| {
+            crate::observability::warn("routes/rename_space", &error);
+            None
+        })
         .is_none()
     {
         return error_code(404);
@@ -2667,7 +2759,10 @@ async fn set_search_config(
     };
     if !crate::repository::can_edit_space(&pool, ctx.sqlx_driver(), user.id, space_id)
         .await
-        .unwrap_or(false)
+        .unwrap_or_else(|error| {
+            crate::observability::warn("routes/set_search_config", &error);
+            false
+        })
     {
         return error_code(1005);
     }
@@ -2766,7 +2861,10 @@ async fn set_wallpaper(
     };
     if !crate::repository::can_edit_space(&pool, ctx.sqlx_driver(), user.id, space_id)
         .await
-        .unwrap_or(false)
+        .unwrap_or_else(|error| {
+            crate::observability::warn("routes/set_wallpaper", &error);
+            false
+        })
     {
         return error_code(1005);
     }
@@ -2849,7 +2947,10 @@ async fn add_oidc_group(
     };
     if !crate::repository::can_manage_space(&pool, ctx.sqlx_driver(), user.id, space_id)
         .await
-        .unwrap_or(false)
+        .unwrap_or_else(|error| {
+            crate::observability::warn("routes/add_oidc_group", &error);
+            false
+        })
     {
         return error_code(1005);
     }
@@ -2924,7 +3025,10 @@ async fn delete_oidc_group(
     };
     if !crate::repository::can_manage_space(&pool, ctx.sqlx_driver(), user.id, space_id)
         .await
-        .unwrap_or(false)
+        .unwrap_or_else(|error| {
+            crate::observability::warn("routes/delete_oidc_group", &error);
+            false
+        })
     {
         return error_code(1005);
     }
@@ -2957,7 +3061,10 @@ async fn transfer_space(
     };
     if !crate::repository::can_manage_space(&pool, ctx.sqlx_driver(), user.id, space_id)
         .await
-        .unwrap_or(false)
+        .unwrap_or_else(|error| {
+            crate::observability::warn("routes/transfer_space", &error);
+            false
+        })
     {
         return error_code(1005);
     }
@@ -3003,7 +3110,10 @@ async fn clear_space(headers: HeaderMap, Path(space_id): Path<i64>) -> Response 
     };
     if !crate::repository::can_manage_space(&pool, ctx.sqlx_driver(), user.id, space_id)
         .await
-        .unwrap_or(false)
+        .unwrap_or_else(|error| {
+            crate::observability::warn("routes/clear_space", &error);
+            false
+        })
     {
         return error_code(1005);
     }
@@ -3079,7 +3189,10 @@ async fn sort_items(headers: HeaderMap, Path(space_id): Path<i64>, request: Requ
     };
     if !crate::repository::can_edit_space(&pool, ctx.sqlx_driver(), user.id, space_id)
         .await
-        .unwrap_or(false)
+        .unwrap_or_else(|error| {
+            crate::observability::warn("routes/sort_items", &error);
+            false
+        })
     {
         return error_code(1005);
     }
@@ -3136,7 +3249,10 @@ async fn sort_groups(headers: HeaderMap, Path(space_id): Path<i64>, request: Req
     };
     if !crate::repository::can_edit_space(&pool, ctx.sqlx_driver(), user.id, space_id)
         .await
-        .unwrap_or(false)
+        .unwrap_or_else(|error| {
+            crate::observability::warn("routes/sort_groups", &error);
+            false
+        })
     {
         return error_code(1005);
     }
@@ -3154,7 +3270,10 @@ async fn sort_groups(headers: HeaderMap, Path(space_id): Path<i64>, request: Req
     if let Some(parent) = req.parent_id {
         let belongs = crate::repository::group_belongs(&pool, ctx.sqlx_driver(), space_id, parent)
             .await
-            .unwrap_or(false);
+            .unwrap_or_else(|error| {
+                crate::observability::warn("routes/sort_groups", &error);
+                false
+            });
         if !belongs {
             return envelope::error(" [invalid parent group]");
         }
@@ -3235,7 +3354,10 @@ async fn arrange_layout(
     };
     if !crate::repository::can_edit_space(&pool, ctx.sqlx_driver(), user.id, space_id)
         .await
-        .unwrap_or(false)
+        .unwrap_or_else(|error| {
+            crate::observability::warn("routes/arrange_layout", &error);
+            false
+        })
     {
         return error_code(1005);
     }
@@ -3281,7 +3403,10 @@ async fn arrange_layout(
     for item in &req.items {
         if !crate::repository::item_belongs(&pool, ctx.sqlx_driver(), space_id, item.id)
             .await
-            .unwrap_or(false)
+            .unwrap_or_else(|error| {
+                crate::observability::warn("routes/arrange_layout", &error);
+                false
+            })
         {
             return envelope::error(&format!(" [item {} is not in this space]", item.id));
         }
@@ -3292,7 +3417,10 @@ async fn arrange_layout(
             item.item_icon_group_id,
         )
         .await
-        .unwrap_or(false)
+        .unwrap_or_else(|error| {
+            crate::observability::warn("routes/arrange_layout", &error);
+            false
+        })
         {
             return envelope::error(&format!(
                 " [target group {} is not in this space]",
@@ -3303,7 +3431,10 @@ async fn arrange_layout(
     for group in &req.groups {
         if !crate::repository::group_belongs(&pool, ctx.sqlx_driver(), space_id, group.id)
             .await
-            .unwrap_or(false)
+            .unwrap_or_else(|error| {
+                crate::observability::warn("routes/arrange_layout", &error);
+                false
+            })
         {
             return envelope::error(&format!(" [group {} is not in this space]", group.id));
         }
@@ -3529,7 +3660,10 @@ async fn create_item_with_icon(
     };
     if !crate::repository::can_edit_space(&pool, ctx.sqlx_driver(), user.id, space_id)
         .await
-        .unwrap_or(false)
+        .unwrap_or_else(|error| {
+            crate::observability::warn("routes/create_item_with_icon", &error);
+            false
+        })
     {
         return error_code(1005);
     }
@@ -3578,7 +3712,10 @@ async fn create_item_with_icon(
         input.item_icon_group_id,
     )
     .await
-    .unwrap_or(false)
+    .unwrap_or_else(|error| {
+        crate::observability::warn("routes/create_item_with_icon", &error);
+        false
+    })
     {
         return error_code(404);
     }
@@ -3844,7 +3981,10 @@ async fn import_bookmarks(
     };
     if !crate::repository::can_edit_space(&pool, ctx.sqlx_driver(), user.id, space_id)
         .await
-        .unwrap_or(false)
+        .unwrap_or_else(|error| {
+            crate::observability::warn("routes/import_bookmarks", &error);
+            false
+        })
     {
         return error_code(1005);
     }
@@ -4501,7 +4641,10 @@ async fn admin_trusted(headers: HeaderMap, Path(revision): Path<String>) -> Resp
     }
     let enabled = crate::repository::trusted_enabled(pool, ctx.sqlx_driver(), &revision)
         .await
-        .unwrap_or(None)
+        .unwrap_or_else(|error| {
+            crate::observability::warn("routes/admin_trusted", &error);
+            None
+        })
         .unwrap_or(false);
     success_data(json!({
         "enabled": enabled,
@@ -4520,7 +4663,10 @@ async fn web_wallpaper_asset(
     };
     let row = crate::repository::web_wallpaper(pool, ctx.sqlx_driver(), &id)
         .await
-        .unwrap_or(None);
+        .unwrap_or_else(|error| {
+            crate::observability::warn("routes/web_wallpaper_asset", &error);
+            None
+        });
     let Some(record) = row else {
         return envelope::empty_not_found();
     };
@@ -4789,7 +4935,10 @@ async fn theme_grant(
         .any(|mode| mode == &execution_mode);
     let trusted = crate::repository::trusted_enabled(pool, driver, &revision)
         .await
-        .unwrap_or(None)
+        .unwrap_or_else(|error| {
+            crate::observability::warn("routes/theme_grant", &error);
+            None
+        })
         .unwrap_or(false);
     let available = if execution_mode == "trusted" {
         available && trusted
@@ -4798,7 +4947,10 @@ async fn theme_grant(
     };
     let grant = crate::repository::grant_row(pool, driver, user.id, &revision, &execution_mode)
         .await
-        .unwrap_or(None);
+        .unwrap_or_else(|error| {
+            crate::observability::warn("routes/theme_grant", &error);
+            None
+        });
     if let Some(grant) = grant {
         let permissions: Vec<String> =
             serde_json::from_str(&grant.permissions_json).unwrap_or_default();
@@ -4888,7 +5040,10 @@ async fn set_theme_grant(
     if execution_mode == "trusted"
         && !crate::repository::trusted_enabled(pool, driver, &revision)
             .await
-            .unwrap_or(None)
+            .unwrap_or_else(|error| {
+                crate::observability::warn("routes/set_theme_grant", &error);
+                None
+            })
             .unwrap_or(false)
     {
         return envelope::error(" [trusted runtime is not enabled for this revision]");
@@ -5868,7 +6023,10 @@ async fn update_password(headers: HeaderMap, request: Request) -> Response {
     };
     let stored = match crate::repository::user_password_and_name(&pool, ctx.sqlx_driver(), user.id)
         .await
-        .unwrap_or(None)
+        .unwrap_or_else(|error| {
+            crate::observability::warn("routes/update_password", &error);
+            None
+        })
     {
         Some((password, _)) => password,
         None => return envelope::error(" [record not found]"),
@@ -6111,14 +6269,20 @@ async fn set_space_theme(
     let driver = ctx.sqlx_driver();
     if crate::repository::space_owner(&pool, driver, space_id)
         .await
-        .unwrap_or(None)
+        .unwrap_or_else(|error| {
+            crate::observability::warn("routes/set_space_theme", &error);
+            None
+        })
         .is_none()
     {
         return error_code(404);
     }
     if !crate::repository::can_manage_space(&pool, driver, user.id, space_id)
         .await
-        .unwrap_or(false)
+        .unwrap_or_else(|error| {
+            crate::observability::warn("routes/set_space_theme", &error);
+            false
+        })
     {
         return error_code(1005);
     }
@@ -6177,14 +6341,20 @@ async fn clear_space_theme(headers: HeaderMap, Path(space_id): Path<String>) -> 
     let driver = ctx.sqlx_driver();
     if crate::repository::space_owner(&pool, driver, space_id)
         .await
-        .unwrap_or(None)
+        .unwrap_or_else(|error| {
+            crate::observability::warn("routes/clear_space_theme", &error);
+            None
+        })
         .is_none()
     {
         return error_code(404);
     }
     if !crate::repository::can_manage_space(&pool, driver, user.id, space_id)
         .await
-        .unwrap_or(false)
+        .unwrap_or_else(|error| {
+            crate::observability::warn("routes/clear_space_theme", &error);
+            false
+        })
     {
         return error_code(1005);
     }
@@ -6235,7 +6405,10 @@ async fn copy_space(headers: HeaderMap, Path(space_id): Path<i64>, request: Requ
     };
     if !crate::repository::can_access_space(&pool, ctx.sqlx_driver(), user.id, space_id)
         .await
-        .unwrap_or(false)
+        .unwrap_or_else(|error| {
+            crate::observability::warn("routes/copy_space", &error);
+            false
+        })
     {
         return error_code(1005);
     }
@@ -6306,7 +6479,7 @@ fn parse_web_wallpaper(data: &[u8]) -> Result<(Vec<u8>, Vec<u8>, String), String
     let mut html: Option<Vec<u8>> = None;
     let mut poster: Option<(Vec<u8>, String)> = None;
     for index in 0..archive.len() {
-        let mut entry = archive.by_index(index).map_err(|error| error.to_string())?;
+        let entry = archive.by_index(index).map_err(|error| error.to_string())?;
         let name = entry.name().to_string();
         if entry.is_dir()
             || name.contains('/')
@@ -6389,7 +6562,10 @@ async fn upload_web_wallpaper(headers: HeaderMap, request: Request) -> Response 
     };
     let exists = crate::repository::web_wallpaper_exists(pool, ctx.sqlx_driver(), &id)
         .await
-        .unwrap_or(false);
+        .unwrap_or_else(|error| {
+            crate::observability::warn("routes/upload_web_wallpaper", &error);
+            false
+        });
     if !exists
         && crate::repository::insert_web_wallpaper(
             pool,

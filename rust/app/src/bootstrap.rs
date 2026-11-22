@@ -59,25 +59,37 @@ pub async fn prepare_shared(pool: &sqlx::AnyPool, driver: Driver) -> Result<(), 
                 .await
                 .map_err(|error| format!("create tables: {error}"))?;
         }
-        for statement in schema_shared::indexes(driver) {
-            if driver == Driver::MySql {
-                let statement = mysql_index_with_prefix(pool, &statement).await?;
-                if index_exists(pool, &statement).await? {
-                    continue;
-                }
-                if let Err(error) = sqlx::query(&statement).execute(pool).await {
-                    // A prior start may have created the index already.
-                    if !error.to_string().contains("Duplicate key name") {
-                        return Err(format!("create indexes: {error}\n{statement}"));
-                    }
-                }
+        println!("schema created");
+    }
+
+    // Indexes are ensured on every start, not only when the tables were just
+    // created: a database imported by `migrate-db` (or by an older release)
+    // may hold the rows without them, and the unique indexes also reject
+    // duplicates at seed time.
+    for statement in schema_shared::indexes(driver) {
+        if driver == Driver::MySql {
+            let statement = mysql_index_with_prefix(pool, &statement).await?;
+            if index_exists(pool, &statement).await? {
                 continue;
             }
             if let Err(error) = sqlx::query(&statement).execute(pool).await {
-                return Err(format!("create indexes: {error}"));
+                // A prior start may have created the index already.
+                if !error.to_string().contains("Duplicate key name") {
+                    return Err(format!("create indexes: {error}\n{statement}"));
+                }
             }
+            continue;
         }
-        println!("schema created");
+        if let Err(error) = sqlx::query(&statement).execute(pool).await {
+            return Err(format!("create indexes: {error}"));
+        }
+    }
+
+    // Versioned migrations run before the seed, so a later release can alter a
+    // deployment that already exists without recreating it.
+    let migrations = crate::migrations::apply(pool, driver).await?;
+    if !migrations.is_empty() {
+        println!("schema migrations: {}", migrations.join(", "));
     }
 
     let row = sqlx::query(&query(
@@ -415,6 +427,16 @@ mod tests {
         assert!(
             count(&format!("SELECT COUNT(*) AS total FROM {space_table}")).await >= 2,
             "{driver:?} seeds the paired space"
+        );
+        // Legacy rows from the Go seed keep their own versions; the Rust
+        // baseline must be present exactly once after the two starts.
+        let recorded = count(
+            "SELECT COUNT(*) AS total FROM schema_migration WHERE version = '0001_baseline'",
+        )
+        .await;
+        assert_eq!(
+            recorded, 1,
+            "{driver:?} records the baseline migration exactly once (found {recorded})"
         );
         pool.close().await;
     }

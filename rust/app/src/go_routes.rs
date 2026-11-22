@@ -117,9 +117,7 @@ pub static GO_ROUTES: &[(&str, &str)] = &[
 /// configuration leaves `oauth.enable` off, so Gin never registers these and a
 /// trailing-slash probe must keep answering its plain 404.
 pub fn conditional_disabled(method: &str, pattern: &str) -> bool {
-    let conditional = matches!(
-        (method, pattern),
-        ("GET", "/api/oauth/:provider") | ("GET", "/api/oauth/:provider/callback")
-    );
+    let conditional = method == "GET"
+        && (pattern == "/api/oauth/:provider" || pattern == "/api/oauth/:provider/callback");
     conditional && !crate::appcfg::ctx().conf.oauth.enable
 }

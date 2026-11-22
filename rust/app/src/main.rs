@@ -5,9 +5,10 @@ mod content;
 mod db;
 mod envelope;
 mod go_routes;
-mod i18n;
+mod migrations;
 mod monitor;
 mod oauth;
+mod observability;
 mod packages;
 mod repository;
 mod routes;
@@ -146,6 +147,10 @@ async fn serve() {
     // hand-ported routes are merged here so a wire cannot drop them. Every route
     // the Go build registered is now answered here, so there is no child process
     // and no proxy: the fallback is Gin's own 404/301 behaviour.
+    observability::mark_start();
+    if appcfg::ctx().conf.base.enable_metrics {
+        tokio::spawn(observability::serve_metrics());
+    }
     let app = units::router()
         .merge(routes::router())
         // The built frontend, when the configuration serves it.
@@ -155,7 +160,8 @@ async fn serve() {
         // path; axum would answer 405 with an `Allow` header.
         .method_not_allowed_fallback(routes::go_fallback)
         .layer(axum::middleware::from_fn(routes::api_gzip))
-        .layer(axum::middleware::from_fn(routes::head_gate));
+        .layer(axum::middleware::from_fn(routes::head_gate))
+        .layer(axum::middleware::from_fn(observability::log_failures));
     let port = appcfg::ctx().listen_port();
     let listener = tokio::net::TcpListener::bind(SocketAddr::from(([0, 0, 0, 0], port)))
         .await

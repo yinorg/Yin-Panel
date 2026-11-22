@@ -31,14 +31,6 @@ pub enum AuthError {
     Disabled,
 }
 
-impl AuthError {
-    pub fn code(&self) -> i64 {
-        match self {
-            AuthError::NotLoggedIn => 1000,
-            AuthError::Disabled => 1004,
-        }
-    }
-}
 
 fn bearer_or_cookie(headers: &HeaderMap) -> Option<String> {
     if let Some(value) = headers.get(header::AUTHORIZATION) {

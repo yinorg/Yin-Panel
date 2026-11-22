@@ -15,6 +15,7 @@ pub enum Driver {
 }
 
 impl Driver {
+    #[cfg(test)]
     pub fn parse(value: &str) -> Result<Self, String> {
         match value.trim().to_ascii_lowercase().as_str() {
             "sqlite" | "" => Ok(Self::Sqlite),
@@ -24,6 +25,7 @@ impl Driver {
         }
     }
 
+    #[cfg(test)]
     pub fn url_scheme(self) -> &'static str {
         match self {
             Self::Sqlite => "sqlite",

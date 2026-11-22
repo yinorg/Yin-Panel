@@ -18,6 +18,8 @@ never falls back silently to a different backend.
 | `base.enable_monitor` | background cache refreshed every 3 s | same | snapshot fell from 1.0037 s to < 1 ms |
 | `base.monitor_refresh_interval` | only returned to the client | only returned to the client | matches Go |
 | `base.url_prefix` | upload URL prefix | same, default `/uploads/` | `upload_prefix()` |
+| `base.enable_metrics` | second listener serving Prometheus metrics, off by default | same listener and text format: requests, failures, logins, uptime, build info | `src/observability.rs`; `/metrics` read on port 19093 |
+| `base.metrics_port` | port of that listener, default 9091 | same | `appcfg::metrics_port` |
 | `jwt.secret`, `jwt.expire` | HS256 sessions | same secret and claims; cookies gain `Secure` when `base.root_url` is HTTPS | Go cookie accepted by Rust and back |
 | `rclone.type: local` | local bucket directory | same, default `uploads` | uploads served byte-identically |
 | `rclone.type: s3` (or any non-local) | errors: "Core only supports local storage" | **refused**, same wording | startup check |

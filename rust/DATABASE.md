@@ -23,6 +23,22 @@ Non-goals at this stage:
 - No schema changes. Column names, defaults and migration order stay as they are
   until B9/B11.
 
+## 1.1 Versioned migrations (MySQL and PostgreSQL)
+
+SQLite keeps its in-place upgrade in `yin-db-tool`. For the shared drivers,
+`rust/app/src/migrations.rs` owns an ordered list of migrations recorded in
+`schema_migration`: each version is applied once, in order, and skipped when
+already present. `bootstrap::prepare_shared` runs it after creating or finding
+the schema and before the seed, so a release that changes a column can append a
+migration instead of requiring a fresh database.
+
+`0001_baseline` is a no-statement marker stamped on any existing shared
+deployment; later entries append to `MIGRATIONS` and are never edited in place.
+Statements are written in SQLite spelling and translated by the same
+`schema_shared::table_statement` used for the initial schema. The SQLite unit
+test proves ordering and idempotency, and the MySQL/PostgreSQL bootstrap test
+asserts the baseline is recorded exactly once across two starts.
+
 ## 2. Architecture
 
 ```
