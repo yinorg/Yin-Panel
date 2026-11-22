@@ -27,6 +27,7 @@ RUN groupadd --gid 10001 yin \
 # not executable"). Setting the mode at COPY time restores it without a
 # `RUN chmod` layer, which would duplicate the whole binary.
 COPY --chmod=755 --chown=10001:10001 build-output/yin-panel /app/yin-panel
+COPY --chmod=755 --chown=10001:10001 docker/entrypoint.sh /app/entrypoint.sh
 COPY --chown=10001:10001 runtime/web /app/web
 COPY --chown=10001:10001 backend/resources/lang /app/lang
 COPY --chown=10001:10001 docker/conf.yaml.example /app/conf.yaml
@@ -45,7 +46,9 @@ LABEL org.opencontainers.image.title="Yin-Panel" \
 
 EXPOSE 3002
 
-USER 10001:10001
+# Start as root only for the volume-ownership repair in the entrypoint; the
+# server itself execs as UID/GID 10001 before it opens the database.
+ENTRYPOINT ["/app/entrypoint.sh"]
 
 # `bash` ships with the base image, so `/dev/tcp` gives a healthcheck without
 # installing curl. Outbound TLS roots come from the Rust TLS stack.

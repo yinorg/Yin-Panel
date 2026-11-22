@@ -92,7 +92,7 @@ Open <http://localhost:3002>.
 
 Default administrator: `admin@yiniot.com`, password `admin@yiniot.com`. Change the password immediately after the first login, and set `base.root_url` and a unique `jwt.secret` in `conf.yaml`.
 
-The image runs as the unprivileged user `10001:10001`. `database/` and `uploads/` are created with that owner inside the image, so the default compose file works unchanged; if you bind-mount a host directory instead, make it writable for UID 10001 (`chown -R 10001:10001 <dir>`).
+The image starts as root only to repair the ownership of bind-mounted `database/` and `uploads/` directories left by older root-run images, then drops to the unprivileged user `10001:10001` before the server opens the database. The default compose file therefore works unchanged, including on an existing deployment; no manual `chown` is required.
 
 Every deployment should generate its own random `jwt.secret`. The repository ships only `conf.yaml.example`; the `conf.yaml` in your runtime directory holds instance secrets and OAuth credentials and must not be committed to Git.
 
