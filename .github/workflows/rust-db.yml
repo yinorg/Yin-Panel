@@ -1,0 +1,94 @@
+name: Rust Cross-Database Check
+
+# The shared repository layer is only safe when it is exercised against real
+# MySQL and PostgreSQL, not the SQLite path alone. This workflow costs a couple
+# of minutes of billed time, so it only runs when database code changes.
+on:
+  pull_request:
+    paths:
+      - 'rust/app/src/**'
+      - 'rust/app/Cargo.lock'
+      - 'rust/app/Cargo.toml'
+      - 'rust/db-tool/**'
+      - '.github/workflows/rust-db.yml'
+  push:
+    paths:
+      - 'rust/app/src/**'
+      - 'rust/app/Cargo.lock'
+      - 'rust/app/Cargo.toml'
+      - 'rust/db-tool/**'
+      - '.github/workflows/rust-db.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cross-db:
+    runs-on: ubuntu-24.04
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: yin_test_only_password
+          MYSQL_ROOT_HOST: '%'
+          MYSQL_DATABASE: yin_repo
+        ports:
+          - 13306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --protocol=tcp -h127.0.0.1 -P3306 -uroot -pyin_test_only_password"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: yin_test_only_password
+          POSTGRES_DB: yin_repo
+        ports:
+          - 15432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d yin_repo"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/app/target
+          key: rust-cross-db-${{ hashFiles('rust/app/Cargo.lock') }}
+      - name: Create the bootstrap database
+        run: |
+          mysql_name="$(docker ps --filter ancestor=mysql:8.4 --format '{{.Names}}' | head -n 1)"
+          pg_name="$(docker ps --filter ancestor=postgres:17 --format '{{.Names}}' | head -n 1)"
+          test -n "$mysql_name"
+          test -n "$pg_name"
+          docker exec "$mysql_name" mysql -uroot -pyin_test_only_password \
+            -e 'create database if not exists yin_boot'
+          docker exec "$pg_name" psql -U postgres -tAc \
+            "select 1 from pg_database where datname = 'yin_boot'" | grep -qx 1 ||
+            docker exec "$pg_name" psql -U postgres -c 'create database yin_boot'
+      - name: Repository slices on MySQL and PostgreSQL
+        env:
+          YIN_MYSQL_TEST_URL: mysql://root:yin_test_only_password@127.0.0.1:13306/yin_repo
+          YIN_POSTGRES_TEST_URL: postgres://postgres:yin_test_only_password@127.0.0.1:15432/yin_repo
+        run: |
+          cargo test --manifest-path rust/app/Cargo.toml \
+            repository::tests::shared_repository_slices_work_on_configured_mysql_and_postgres \
+            -- --exact --nocapture
+      - name: Bootstrap on MySQL and PostgreSQL
+        env:
+          YIN_MYSQL_TEST_URL: mysql://root:yin_test_only_password@127.0.0.1:13306/yin_boot
+          YIN_POSTGRES_TEST_URL: postgres://postgres:yin_test_only_password@127.0.0.1:15432/yin_boot
+        run: |
+          cargo test --manifest-path rust/app/Cargo.toml \
+            bootstrap::tests::prepares_configured_mysql_and_postgres_from_empty \
+            -- --exact --nocapture

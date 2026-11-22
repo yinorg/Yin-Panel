@@ -235,7 +235,7 @@ command that proves it).
 | 0 | T0.1 metrics script | done — `scripts/rust-parity-metrics.sh`, baseline `rust/parity-baseline.txt` |
 | 0 | T0.2 fallback marker | done — `x-yin-unimplemented` only when `YIN_UNIMPLEMENTED_MARKER` is set |
 | 0 | T0.3 inventory probe | done — `rust/check/route-parity.py`, 103 routes, 0 unimplemented |
-| 0 | T0.4 CI wiring | done — `.github/workflows/rust-check.yml` |
+| 0 | T0.4 CI wiring | done — `rust-check.yml` (unit + recorded replay), `rust-db.yml` (repository/bootstrap on MySQL 8.4 and PostgreSQL 17, path-filtered), `rust-nightly.yml` (three-driver HTTP smoke + `migrate-db`) |
 | 1 | T1.1 startup guard | done — `main.rs` boots `prepare_shared` for MySQL/PostgreSQL |
 | 1 | T1.2 driver bootstrap | done — `schema_shared.rs` translates DDL, seed runs on all three |
 | 1 | T1.3 three-driver HTTP smoke | done — `rust/check/db-smoke.sh` passes on MySQL 8.4 and PostgreSQL 17 |

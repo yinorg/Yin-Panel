@@ -57,6 +57,18 @@ they change between collection times.
 `RUST_ANYTHING_UNIT_WALLPAPERPACK=original` sends a wired unit back to Go while
 the port is suspect.
 
+## Continuous checks
+
+| Workflow | Trigger | What it proves |
+| --- | --- | --- |
+| `rust-check.yml` | every pull request and push | parity metrics, `cargo test`, release build, route inventory, recorded coverage, 665-case replay |
+| `rust-db.yml` | changes under `rust/app/src`, `rust/app/Cargo*` or `rust/db-tool` | repository slices and bootstrap on real MySQL 8.4 and PostgreSQL 17 |
+| `rust-nightly.yml` | nightly schedule and manual dispatch | HTTP login/session smoke on SQLite, MySQL and PostgreSQL, plus `migrate-db` into both servers |
+| `ci-docker.yml` | version tags and manual dispatch | multi-arch release image |
+
+`rust-db.yml` is path-filtered because pulling both database images costs more
+than the tests themselves; `rust-nightly.yml` carries the heavier acceptance run.
+
 ## Layout
 
 | Path | What it is |

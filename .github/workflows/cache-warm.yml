@@ -3,17 +3,19 @@ name: Warm Build Caches
 # GitHub scopes action caches to the ref that created them, and every release tag
 # is a ref of its own. A tag run can therefore only restore caches created on that
 # same tag (which never happens twice) or on the default branch — so without this
-# workflow every release starts cold: the Go module and build caches miss and the
-# CGO compile of the SQLite driver (~60s) runs again, on both architectures.
+# workflow every release starts cold: the cargo registry and the release target
+# directory miss, and the Rust release build runs from scratch on both
+# architectures.
 #
-# Keeping the default branch's scope warm is what makes a tag run hit, exactly as
-# it did before the dependency bump invalidated the old cache.
+# Keeping the default branch's scope warm is what makes a tag run hit. The cargo
+# cache key must stay identical to the one `ci-docker.yml` uses for its release
+# matrix, otherwise warming this scope saves nothing.
 on:
   push:
     branches: [master]
     paths:
-      - 'backend/go.mod'
       - 'rust/app/Cargo.lock'
+      - 'rust/app/Cargo.toml'
       - 'frontend/package.json'
       - 'frontend/package-lock.json'
       - '.github/workflows/cache-warm.yml'
@@ -24,7 +26,7 @@ permissions:
   contents: read
 
 jobs:
-  go:
+  rust:
     strategy:
       matrix:
         include:
@@ -36,10 +38,18 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
-      - name: Set up Go
+      - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
-      # Warm the same cargo target directory the release job uses.
-      - name: Build backend
+      # Save the same key the release matrix restores on a tag run.
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/app/target
+          key: yin-panel-release-${{ matrix.arch }}-${{ hashFiles('rust/app/Cargo.lock') }}
+      - name: Build the binary
         run: |
           mkdir -p build-output
           cargo build --release --manifest-path rust/app/Cargo.toml

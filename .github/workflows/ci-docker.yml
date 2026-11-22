@@ -29,7 +29,7 @@ jobs:
         if: github.event_name == 'push'
         run: |
           [[ "${GITHUB_REF_NAME}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ || "${GITHUB_REF_NAME}" =~ ^[0-9]+\.[0-9]+\.[0-9]+-(dev|stg)(\.[0-9]+)?$ ]] || {
-            echo "Only 0.8.0, 0.8.0-dev[.N] or 0.8.0-stg[.N] tags are published."
+            echo "Only X.Y.Z, X.Y.Z-dev[.N] or X.Y.Z-stg[.N] tags are published."
             exit 1
           }
       - name: Validate dispatch tag

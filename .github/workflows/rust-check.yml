@@ -1,8 +1,10 @@
-name: Rust Parity Check
+name: Rust Check
 
-# The Rust front door must keep every route the Go build registers, and the
-# migration metrics may only shrink. These two checks are the gates that stop a
-# missing handler from hiding behind Gin's 404 page.
+# Fast gates on every pull request and push: the migration metrics, the unit and
+# slice tests, the release build, the route inventory probe, the recorded
+# coverage report and the 665-case replay. The replay costs about a second once
+# the binary exists, so it runs in this job instead of a separate one that would
+# pay for its own checkout and runner start.
 on:
   pull_request:
   push:
@@ -13,7 +15,7 @@ permissions:
   contents: read
 
 jobs:
-  rust-parity:
+  rust:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
@@ -27,18 +29,46 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             rust/app/target
-          key: rust-parity-${{ hashFiles('rust/app/Cargo.lock') }}
+          key: rust-check-${{ hashFiles('rust/app/Cargo.lock') }}
+      - name: Cache the replay recorder
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/replay-tools
+          key: rust-anything-2.1.0-${{ runner.os }}
       - name: Metrics may not regress
         run: ./scripts/rust-parity-metrics.sh
       - name: Unit and slice tests
         run: cargo test --manifest-path rust/app/Cargo.toml
-      - name: Build the front door
+      - name: Build the binary
         run: cargo build --release --manifest-path rust/app/Cargo.toml
       - name: Every Go route has a Rust handler
         run: python3 rust/check/route-parity.py
+      - name: Recorded coverage may not regress
+        run: python3 rust/check/coverage-report.py
+      - name: Install rust-anything
+        run: |
+          if [ ! -x "$HOME/.cargo/replay-tools/bin/rust-anything" ]; then
+            cargo install rust-anything --version 2.1.0 --locked \
+              --root "$HOME/.cargo/replay-tools"
+          fi
+          echo "$HOME/.cargo/replay-tools/bin" >> "$GITHUB_PATH"
+      - name: Replay every recorded case
+        run: |
+          python3 -m http.server 18080 --bind 127.0.0.1 \
+            --directory rust/record/favicon-fixture >/tmp/favicon-fixture.log 2>&1 &
+          fixture_pid=$!
+          trap 'kill "$fixture_pid" 2>/dev/null || true' EXIT
+          for _ in $(seq 1 40); do
+            if curl -sf http://127.0.0.1:18080/assets/icon.png >/dev/null; then
+              break
+            fi
+            sleep 0.25
+          done
+          curl -sf http://127.0.0.1:18080/assets/icon.png >/dev/null
+          rust-anything app replay . --build 'sh rust/record/run-rust.sh'
       - name: Upload the unimplemented list on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: parity-unimplemented
           path: rust/parity-unimplemented.txt

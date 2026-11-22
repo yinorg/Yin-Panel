@@ -1,0 +1,137 @@
+name: Rust Nightly Acceptance
+
+# Slower acceptance that a pull request gate should not carry: the same HTTP
+# login/session sequence on all three databases, and the Rust `migrate-db`
+# copying a seeded SQLite deployment into real MySQL and PostgreSQL. Each
+# phase gets its own database name so a previous phase cannot mask a failure.
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  acceptance:
+    runs-on: ubuntu-24.04
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: yin_test_only_password
+          MYSQL_ROOT_HOST: '%'
+          MYSQL_DATABASE: yin_smoke
+        ports:
+          - 13306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --protocol=tcp -h127.0.0.1 -P3306 -uroot -pyin_test_only_password"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: yin_test_only_password
+          POSTGRES_DB: yin_smoke
+        ports:
+          - 15432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d yin_smoke"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/app/target
+            rust/db-tool/target
+          key: rust-nightly-${{ hashFiles('rust/app/Cargo.lock', 'rust/db-tool/Cargo.lock') }}
+      - name: Build both binaries
+        run: |
+          cargo build --release --manifest-path rust/app/Cargo.toml
+          cargo build --release --manifest-path rust/db-tool/Cargo.toml
+      - name: Create the migrate-db database
+        run: |
+          mysql_name="$(docker ps --filter ancestor=mysql:8.4 --format '{{.Names}}' | head -n 1)"
+          pg_name="$(docker ps --filter ancestor=postgres:17 --format '{{.Names}}' | head -n 1)"
+          test -n "$mysql_name"
+          test -n "$pg_name"
+          docker exec "$mysql_name" mysql -uroot -pyin_test_only_password \
+            -e 'create database if not exists yin_migrate'
+          docker exec "$pg_name" psql -U postgres -tAc \
+            "select 1 from pg_database where datname = 'yin_migrate'" | grep -qx 1 ||
+            docker exec "$pg_name" psql -U postgres -c 'create database yin_migrate'
+      - name: HTTP smoke on SQLite
+        env:
+          DB_SMOKE_DRIVE: sqlite
+          DB_SMOKE_PORT_HTTP: '18092'
+        run: sh rust/check/db-smoke.sh
+      - name: HTTP smoke on MySQL
+        env:
+          DB_SMOKE_DRIVE: mysql
+          DB_SMOKE_NAME: yin_smoke
+          DB_SMOKE_PASSWORD: yin_test_only_password
+          DB_SMOKE_PORT_HTTP: '18093'
+        run: sh rust/check/db-smoke.sh
+      - name: HTTP smoke on PostgreSQL
+        env:
+          DB_SMOKE_DRIVE: postgres
+          DB_SMOKE_NAME: yin_smoke
+          DB_SMOKE_PASSWORD: yin_test_only_password
+          DB_SMOKE_PORT_HTTP: '18094'
+        run: sh rust/check/db-smoke.sh
+      - name: Seed a throwaway SQLite deployment
+        run: |
+          mkdir -p /tmp/yin-nightly-seed
+          cat > /tmp/yin-nightly-seed/conf.yaml <<'CONF'
+          base:
+            http_port: 18096
+            root_url: http://127.0.0.1:18096
+            database_drive: sqlite
+            enable_static_server: false
+            enable_monitor: false
+          sqlite:
+            file_path: ./database.db
+          jwt:
+            secret: nightly-only-secret
+            expire: 1
+          rclone:
+            type: local
+            bucket: ./uploads
+          CONF
+          cd /tmp/yin-nightly-seed
+          PORT=18096 YIN_PANEL_CONFIG=/tmp/yin-nightly-seed/conf.yaml \
+            "$GITHUB_WORKSPACE/rust/app/target/release/yin-panel" >server.log 2>&1 &
+          seed_pid=$!
+          ready=0
+          for _ in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:18096/api/about >/dev/null; then
+              ready=1
+              break
+            fi
+            kill -0 "$seed_pid" 2>/dev/null || break
+            sleep 0.5
+          done
+          kill "$seed_pid" 2>/dev/null || true
+          if [ "$ready" -ne 1 ]; then
+            tail -n 30 server.log
+            exit 1
+          fi
+          ls -l /tmp/yin-nightly-seed/database.db
+      - name: migrate-db into MySQL and PostgreSQL
+        env:
+          MIGRATE_SOURCE_CONF: /tmp/yin-nightly-seed/conf.yaml
+          MIGRATE_MYSQL_DB: yin_migrate
+          MIGRATE_POSTGRES_DB: yin_migrate
+          MIGRATE_MYSQL_PASSWORD: yin_test_only_password
+          MIGRATE_POSTGRES_PASSWORD: yin_test_only_password
+        run: bash rust/check/migrate-db-verify.sh

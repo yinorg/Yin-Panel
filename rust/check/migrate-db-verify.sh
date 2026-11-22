@@ -38,8 +38,11 @@ cleanup() {
 }
 trap cleanup EXIT
 
-[[ -f "$repo_root/runtime/conf.yaml" ]] || die "runtime/conf.yaml is missing"
-[[ -f "$repo_root/runtime/database/database.db" ]] || die "the deployment database is missing"
+source_conf="${MIGRATE_SOURCE_CONF:-$repo_root/runtime/conf.yaml}"
+[[ -f "$source_conf" ]] || die "source configuration is missing: $source_conf"
+if [[ "$source_conf" == "$repo_root/runtime/conf.yaml" ]]; then
+    [[ -f "$repo_root/runtime/database/database.db" ]] || die "the deployment database is missing"
+fi
 
 printf 'Building yin-db and yin-panel...\n'
 cargo build --quiet --release --manifest-path "$repo_root/rust/db-tool/Cargo.toml"
@@ -63,7 +66,7 @@ rclone:
   bucket: $work/uploads
 CONF
 printf 'Snapshotting the SQLite deployment...\n'
-"$yin_db" copy --source "$repo_root/runtime/conf.yaml" --target "$work/snapshot.yaml"
+"$yin_db" copy --source "$source_conf" --target "$work/snapshot.yaml"
 
 mysql_conf="$work/mysql.yaml"
 cat >"$mysql_conf" <<CONF
@@ -110,8 +113,6 @@ printf 'Copying into PostgreSQL...\n'
 "$yin_db" copy --source "$work/snapshot.yaml" --target "$pg_conf"
 
 # 2. Compare row counts per table and a few identity rows.
-MIGRATE_MYSQL_CONTAINER="${MIGRATE_MYSQL_CONTAINER:-yin-migrate-mysql}" \
-MIGRATE_POSTGRES_CONTAINER="${MIGRATE_POSTGRES_CONTAINER:-yin-migrate-postgres}" \
 python3 - "$work/source.db" "$mysql_db" "$pg_db" "$MIGRATE_MYSQL_PASSWORD" "$MIGRATE_POSTGRES_PASSWORD" <<'PY'
 import os, sqlite3, subprocess, sys
 
@@ -124,8 +125,17 @@ tables = [
 ]
 counts = {table: conn.execute(f'select count(*) from "{table}"').fetchone()[0] for table in tables}
 
-mysql_container = os.environ.get("MIGRATE_MYSQL_CONTAINER", "yin-migrate-mysql")
-pg_container = os.environ.get("MIGRATE_POSTGRES_CONTAINER", "yin-migrate-postgres")
+def find_container(image):
+    found = subprocess.run(
+        ["docker", "ps", "--filter", f"ancestor={image}", "--format", "{{.ID}}"],
+        capture_output=True, text=True, check=True,
+    ).stdout.strip().splitlines()
+    if not found:
+        raise SystemExit(f"no running container for {image}")
+    return found[0]
+
+mysql_container = os.environ.get("MIGRATE_MYSQL_CONTAINER") or find_container("mysql:8.4")
+pg_container = os.environ.get("MIGRATE_POSTGRES_CONTAINER") or find_container("postgres:17")
 
 def mysql_count(table):
     answer = subprocess.run(
@@ -184,7 +194,7 @@ rclone:
   type: local
   bucket: $work/uploads
 CONF
-(cd "$work" && PORT=3098 YIN_PANEL_CONFIG="$work/mysql-run.yaml" "$panel" >server.log 2>&1) &
+(cd "$work" && exec env PORT=3098 YIN_PANEL_CONFIG="$work/mysql-run.yaml" "$panel" >server.log 2>&1) &
 server_pid=$!
 for _ in $(seq 1 60); do
     if curl -s --noproxy '*' -o /dev/null "http://127.0.0.1:3098/api/about"; then break; fi
@@ -227,7 +237,7 @@ rclone:
   type: local
   bucket: $work/uploads
 CONF
-(cd "$work" && PORT=3097 YIN_PANEL_CONFIG="$work/pg-run.yaml" "$panel" >server-pg.log 2>&1) &
+(cd "$work" && exec env PORT=3097 YIN_PANEL_CONFIG="$work/pg-run.yaml" "$panel" >server-pg.log 2>&1) &
 server_pid=$!
 for _ in $(seq 1 60); do
     if curl -s --noproxy '*' -o /dev/null "http://127.0.0.1:3097/api/about"; then break; fi
