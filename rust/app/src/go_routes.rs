@@ -14,6 +14,8 @@ pub static GO_ROUTES: &[(&str, &str)] = &[
     ("GET", "/api/about"),
     ("GET", "/api/file/getList"),
     ("GET", "/api/file/s3/*filepath"),
+    ("GET", "/api/oauth/:provider"),
+    ("GET", "/api/oauth/:provider/callback"),
     ("GET", "/api/oauth/config"),
     ("GET", "/api/panel/userConfig/getConfig"),
     ("GET", "/api/panel/users/getList"),
@@ -110,3 +112,14 @@ pub static GO_ROUTES: &[(&str, &str)] = &[
     ("PUT", "/api/theme/v2/space/:spaceId"),
     ("PUT", "/api/theme/v2/space/:spaceId/mine"),
 ];
+
+/// Routes the Go router registers only when a feature flag is on. The replay
+/// configuration leaves `oauth.enable` off, so Gin never registers these and a
+/// trailing-slash probe must keep answering its plain 404.
+pub fn conditional_disabled(method: &str, pattern: &str) -> bool {
+    let conditional = matches!(
+        (method, pattern),
+        ("GET", "/api/oauth/:provider") | ("GET", "/api/oauth/:provider/callback")
+    );
+    conditional && !crate::appcfg::ctx().conf.oauth.enable
+}

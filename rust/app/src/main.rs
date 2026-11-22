@@ -7,6 +7,7 @@ mod envelope;
 mod go_routes;
 mod i18n;
 mod monitor;
+mod oauth;
 mod packages;
 mod repository;
 mod routes;

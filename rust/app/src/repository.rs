@@ -1240,6 +1240,235 @@ pub async fn user_id_by_mail(
     row.map(|row| row.try_get("id")).transpose()
 }
 
+/// A row of `o_auth_identity`, the canonical provider/subject link.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OauthIdentityRecord {
+    pub id: i64,
+    pub user_id: i64,
+    pub email: String,
+}
+
+pub async fn oauth_identity(
+    pool: &AnyPool,
+    driver: Driver,
+    provider: &str,
+    subject: &str,
+) -> Result<Option<OauthIdentityRecord>, sqlx::Error> {
+    let text_type = if driver == Driver::MySql {
+        "CHAR"
+    } else {
+        "TEXT"
+    };
+    let sql = query(
+        driver,
+        &format!(
+            "SELECT id, user_id, COALESCE(CAST(email AS {text_type}), '') AS email FROM o_auth_identity WHERE provider = ? AND subject = ? LIMIT 1"
+        ),
+    );
+    let row = sqlx::query(&sql)
+        .bind(provider)
+        .bind(subject)
+        .fetch_optional(pool)
+        .await?;
+    row.map(|row| {
+        Ok(OauthIdentityRecord {
+            id: row.try_get("id")?,
+            user_id: row.try_get("user_id")?,
+            email: text(&row, "email")?,
+        })
+    })
+    .transpose()
+}
+
+/// `FirstOrCreate` with `Assign`: an existing provider/subject row is pointed at
+/// the resolved account, a new one is inserted.
+pub async fn link_oauth_identity(
+    pool: &AnyPool,
+    driver: Driver,
+    user_id: i64,
+    provider: &str,
+    subject: &str,
+    email: &str,
+    now: &str,
+) -> Result<(), sqlx::Error> {
+    let timestamp = timestamp_bind(driver);
+    let update = query(
+        driver,
+        &format!("UPDATE o_auth_identity SET updated_at = {timestamp}, user_id = ?, email = ? WHERE id = ?"),
+    );
+    let insert = query(
+        driver,
+        &format!(
+            "INSERT INTO o_auth_identity (created_at, updated_at, user_id, provider, subject, email) VALUES ({timestamp}, {timestamp}, ?, ?, ?, ?)"
+        ),
+    );
+    let existing = oauth_identity(pool, driver, provider, subject).await?;
+    match existing {
+        Some(identity) => {
+            sqlx::query(&update)
+                .bind(now)
+                .bind(user_id)
+                .bind(email)
+                .bind(identity.id)
+                .execute(pool)
+                .await?;
+        }
+        None => {
+            sqlx::query(&insert)
+                .bind(now)
+                .bind(now)
+                .bind(user_id)
+                .bind(provider)
+                .bind(subject)
+                .bind(email)
+                .execute(pool)
+                .await?;
+        }
+    }
+    Ok(())
+}
+
+pub async fn user_by_mail(
+    pool: &AnyPool,
+    driver: Driver,
+    mail: &str,
+) -> Result<Option<UserRecord>, sqlx::Error> {
+    let table = match driver {
+        Driver::MySql => "`user`",
+        Driver::Sqlite | Driver::Postgres => "\"user\"",
+    };
+    let text_type = if driver == Driver::MySql {
+        "CHAR"
+    } else {
+        "TEXT"
+    };
+    let sql = query(
+        driver,
+        &format!(
+            "SELECT id, CAST(password AS {text_type}) AS password, CAST(name AS {text_type}) AS name, status, role, CAST(mail AS {text_type}) AS mail, token_version FROM {table} WHERE mail = ?"
+        ),
+    );
+    let row = sqlx::query(&sql).bind(mail).fetch_optional(pool).await?;
+    row.map(|row| {
+        Ok(UserRecord {
+            id: row.try_get("id")?,
+            password: text(&row, "password")?,
+            name: text(&row, "name")?,
+            status: row.try_get("status")?,
+            role: row.try_get("role")?,
+            mail: text(&row, "mail")?,
+            token_version: row.try_get("token_version")?,
+        })
+    })
+    .transpose()
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OidcGroupRule {
+    pub space_id: i64,
+    pub group_name: String,
+    pub role: String,
+}
+
+pub async fn oidc_group_rules(
+    pool: &AnyPool,
+    driver: Driver,
+    provider: &str,
+) -> Result<Vec<OidcGroupRule>, sqlx::Error> {
+    let text_type = if driver == Driver::MySql {
+        "CHAR"
+    } else {
+        "TEXT"
+    };
+    let sql = query(
+        driver,
+        &format!(
+            "SELECT space_id, CAST(group_name AS {text_type}) AS group_name, CAST(role AS {text_type}) AS role FROM space_o_id_c_group WHERE provider = ? ORDER BY id"
+        ),
+    );
+    let rows = sqlx::query(&sql).bind(provider).fetch_all(pool).await?;
+    rows.into_iter()
+        .map(|row| {
+            Ok(OidcGroupRule {
+                space_id: row.try_get("space_id")?,
+                group_name: text(&row, "group_name")?,
+                role: text(&row, "role")?,
+            })
+        })
+        .collect()
+}
+
+fn role_rank(role: &str) -> u8 {
+    match role {
+        "admin" => 3,
+        "editor" => 2,
+        "viewer" => 1,
+        _ => 0,
+    }
+}
+
+/// `syncOIDCGroups`: provider groups grant access through the configured rules.
+/// It only adds or upgrades `source = 'oidc'` rows, never removes manual access.
+pub async fn grant_oidc_member(
+    pool: &AnyPool,
+    driver: Driver,
+    space_id: i64,
+    user_id: i64,
+    role: &str,
+    now: &str,
+) -> Result<(), sqlx::Error> {
+    let text_type = if driver == Driver::MySql {
+        "CHAR"
+    } else {
+        "TEXT"
+    };
+    let timestamp = timestamp_bind(driver);
+    let select = query(
+        driver,
+        &format!(
+            "SELECT id, CAST(source AS {text_type}) AS source, CAST(role AS {text_type}) AS role FROM space_member WHERE space_id = ? AND user_id = ? LIMIT 1"
+        ),
+    );
+    let insert = query(
+        driver,
+        &format!(
+            "INSERT INTO space_member (created_at, updated_at, space_id, user_id, role, source, joined_at) VALUES ({timestamp}, {timestamp}, ?, ?, ?, 'oidc', {timestamp})"
+        ),
+    );
+    let update = query(driver, "UPDATE space_member SET role = ? WHERE id = ?");
+    match sqlx::query(&select)
+        .bind(space_id)
+        .bind(user_id)
+        .fetch_optional(pool)
+        .await?
+    {
+        None => {
+            sqlx::query(&insert)
+                .bind(now)
+                .bind(now)
+                .bind(space_id)
+                .bind(user_id)
+                .bind(role)
+                .bind(now)
+                .execute(pool)
+                .await?;
+        }
+        Some(row) => {
+            let current_source: String = text(&row, "source")?;
+            let current_role: String = text(&row, "role")?;
+            if current_source == "oidc" && role_rank(role) > role_rank(&current_role) {
+                let id: i64 = row.try_get("id")?;
+                sqlx::query(&update)
+                    .bind(role)
+                    .bind(id)
+                    .execute(pool)
+                    .await?;
+            }
+        }
+    }
+    Ok(())
+}
+
 pub async fn space_name(
     pool: &AnyPool,
     driver: Driver,
@@ -4330,7 +4559,8 @@ mod tests {
         group_belongs, group_by_id,
         grant_row, group_has_descendant, group_siblings, groups_for_space, insert_file,
         item_belongs, item_by_id, items_for_space,
-        module_config_value, oidc_groups, paired_ids_of, paired_space_ids, remove_space_member,
+        grant_oidc_member, link_oauth_identity, module_config_value, oauth_identity,
+        oidc_group_rules, oidc_groups, paired_ids_of, paired_space_ids, remove_space_member,
         rename_paired_space, revoke_user_sessions, save_module_config, save_user_config,
         set_member_role, spaces_owned_by,
         save_space_theme, save_user_space_theme, sort_groups, sort_items, space_list,
@@ -4460,6 +4690,7 @@ mod tests {
         verify_space_public(&pool, driver).await;
         verify_space_wallpaper(&pool, driver).await;
         verify_admin_and_config_reads(&pool, driver).await;
+        verify_oauth_identity(&pool, driver).await;
         verify_group_writes(&pool, driver).await;
         verify_item_writes(&pool, driver).await;
         verify_sort_writes(&pool, driver).await;
@@ -7874,4 +8105,104 @@ mod tests {
             eprintln!("skipping PostgreSQL repository integration: YIN_POSTGRES_TEST_URL is unset");
         }
     }
+
+    async fn verify_oauth_identity(pool: &sqlx::AnyPool, driver: Driver) {
+        let identity_id = match driver {
+            Driver::Sqlite => "INTEGER PRIMARY KEY AUTOINCREMENT",
+            Driver::MySql => "BIGINT PRIMARY KEY AUTO_INCREMENT",
+            Driver::Postgres => "BIGSERIAL PRIMARY KEY",
+        };
+        for statement in [
+            format!("CREATE TABLE o_auth_identity (id {identity_id}, created_at VARCHAR(40), updated_at VARCHAR(40), user_id BIGINT NOT NULL, provider VARCHAR(50) NOT NULL, subject VARCHAR(255) NOT NULL, email VARCHAR(255))"),
+            format!("CREATE TABLE space_member (id {identity_id}, created_at VARCHAR(40), updated_at VARCHAR(40), space_id BIGINT NOT NULL, user_id BIGINT NOT NULL, role VARCHAR(20) NOT NULL, source VARCHAR(20) NOT NULL DEFAULT 'manual', joined_at VARCHAR(40))"),
+            format!("CREATE TABLE space_o_id_c_group (id {identity_id}, created_at VARCHAR(40), updated_at VARCHAR(40), space_id BIGINT NOT NULL, provider VARCHAR(50) NOT NULL, group_name VARCHAR(255) NOT NULL, role VARCHAR(20) NOT NULL)"),
+        ] {
+            sqlx::query(&statement)
+                .execute(pool)
+                .await
+                .expect("create oauth fixture");
+        }
+        let now = "2024-01-01 00:00:00.000000000+00:00";
+        let text_type = if driver == Driver::MySql { "CHAR" } else { "TEXT" };
+
+        link_oauth_identity(pool, driver, 17, "authentik", "subject-17", "user@example.test", now)
+            .await
+            .expect("link oauth identity");
+        let identity = oauth_identity(pool, driver, "authentik", "subject-17")
+            .await
+            .expect("read oauth identity")
+            .expect("identity exists");
+        assert_eq!(identity.user_id, 17);
+        assert_eq!(identity.email, "user@example.test");
+
+        link_oauth_identity(pool, driver, 18, "authentik", "subject-17", "second@example.test", now)
+            .await
+            .expect("relink oauth identity");
+        let identity = oauth_identity(pool, driver, "authentik", "subject-17")
+            .await
+            .expect("read relinked identity")
+            .expect("identity still exists");
+        assert_eq!(identity.user_id, 18);
+        assert_eq!(identity.email, "second@example.test");
+
+        sqlx::query("INSERT INTO space_o_id_c_group (id, space_id, provider, group_name, role) VALUES (1, 80, 'authentik', 'team', 'editor')")
+            .execute(pool)
+            .await
+            .expect("insert oidc group rule");
+        sqlx::query("INSERT INTO space_o_id_c_group (id, space_id, provider, group_name, role) VALUES (2, 81, 'authentik', 'staff', 'admin')")
+            .execute(pool)
+            .await
+            .expect("insert second oidc group rule");
+        let rules = oidc_group_rules(pool, driver, "authentik")
+            .await
+            .expect("read oidc group rules");
+        assert_eq!(rules.len(), 2);
+        assert_eq!(rules[0].group_name, "team");
+        assert_eq!(rules[0].role, "editor");
+
+        grant_oidc_member(pool, driver, 80, 18, "viewer", now)
+            .await
+            .expect("insert oidc member");
+        grant_oidc_member(pool, driver, 80, 18, "editor", now)
+            .await
+            .expect("upgrade oidc member");
+        grant_oidc_member(pool, driver, 80, 18, "viewer", now)
+            .await
+            .expect("ignore a lower oidc role");
+        let role: String = sqlx::query_scalar(&format!("SELECT CAST(role AS {text_type}) FROM space_member WHERE space_id = 80 AND user_id = 18"))
+            .fetch_one(pool)
+            .await
+            .expect("read oidc member role");
+        assert_eq!(role, "editor");
+        let source: String = sqlx::query_scalar(&format!("SELECT CAST(source AS {text_type}) FROM space_member WHERE space_id = 80 AND user_id = 18"))
+            .fetch_one(pool)
+            .await
+            .expect("read oidc member source");
+        assert_eq!(source, "oidc");
+
+        sqlx::query("INSERT INTO space_member (id, space_id, user_id, role, source) VALUES (11, 81, 18, 'viewer', 'manual')")
+            .execute(pool)
+            .await
+            .expect("insert manual member");
+        grant_oidc_member(pool, driver, 81, 18, "admin", now)
+            .await
+            .expect("leave manual member alone");
+        let manual_role: String = sqlx::query_scalar(&format!("SELECT CAST(role AS {text_type}) FROM space_member WHERE id = 11"))
+            .fetch_one(pool)
+            .await
+            .expect("read manual role");
+        assert_eq!(manual_role, "viewer");
+
+        for statement in [
+            "DROP TABLE space_o_id_c_group",
+            "DROP TABLE space_member",
+            "DROP TABLE o_auth_identity",
+        ] {
+            sqlx::query(statement)
+                .execute(pool)
+                .await
+                .expect("drop oauth fixture");
+        }
+    }
+
 }

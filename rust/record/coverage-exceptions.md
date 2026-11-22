@@ -9,6 +9,8 @@ does not produce a meaningful route-level failure. Infrastructure failures
 | --- | --- | --- |
 | GET | `/api/about` | `system/about.go` returns the build/runtime information without authentication. |
 | GET | `/api/oauth/config` | `system/oauth.go` returns public OAuth configuration without authentication. |
+| GET | `/api/oauth/:provider` | `system/oauth.go` registers this only when `oauth.enable` is true and redirects to the provider; the authorization URL carries runtime-generated `state`, `nonce` and PKCE values that a fixed recorded request cannot reproduce. |
+| GET | `/api/oauth/:provider/callback` | Same router condition; success requires an identity provider to exchange a real authorization code, so no static case can produce the redirect and session cookie. |
 | GET | `/api/system/capabilities` | `system/capabilities.go` returns the static capability projection without authentication. |
 | GET | `/api/theme/v2/current` | `system/theme.go` resolves the current public theme; an invalid session does not change the response contract. |
 | GET | `/api/theme/v2/effective` | `system/theme.go` resolves the public effective theme; an invalid session does not change the response contract. |

@@ -105,6 +105,30 @@ pub struct Oauth {
 pub struct OauthProvider {
     #[serde(default)]
     pub name: String,
+    #[serde(default)]
+    pub client_id: String,
+    #[serde(default)]
+    pub client_secret: String,
+    #[serde(default)]
+    pub issuer_url: String,
+    #[serde(default)]
+    pub discovery_url: String,
+    #[serde(default)]
+    pub auth_url: String,
+    #[serde(default)]
+    pub token_url: String,
+    #[serde(default)]
+    pub user_info_url: String,
+    #[serde(default)]
+    pub user_info_email_url: String,
+    #[serde(default)]
+    pub scopes: String,
+    #[serde(default)]
+    pub field_mapping_identifier: String,
+    #[serde(default)]
+    pub field_mapping_display_name: String,
+    #[serde(default)]
+    pub field_mapping_email: String,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -288,6 +312,20 @@ impl Ctx {
             return port;
         }
         self.conf.base.http_port.parse().unwrap_or(8080)
+    }
+
+    pub fn root_url(&self) -> &str {
+        &self.conf.base.root_url
+    }
+
+    /// Cookies are marked `Secure` when the configured public origin is HTTPS.
+    pub fn secure_cookies(&self) -> bool {
+        self.conf
+            .base
+            .root_url
+            .trim()
+            .to_ascii_lowercase()
+            .starts_with("https://")
     }
 
     pub fn jwt_secret(&self) -> &[u8] {

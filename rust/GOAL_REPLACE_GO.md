@@ -32,7 +32,7 @@ product.
 
 | Metric | Value | How to recount |
 | --- | --- | --- |
-| Go route registrations | 103 (`GO_ROUTES`) | `grep -c '("' rust/app/src/go_routes.rs` |
+| Go route registrations | 105 (`GO_ROUTES`, including the conditional OAuth pair) | `grep -c '("' rust/app/src/go_routes.rs` |
 | Rust hand-written routes | 87 `.route(` calls | `grep -c '\.route(' rust/app/src/routes.rs` |
 | Wire-generated routes | 1 | `wc -l rust/app/src/units/mod.rs` |
 | Handlers on SQLite pool | 55 | `grep -c 'ctx\.pool()\.await' rust/app/src/routes.rs` |
@@ -138,9 +138,11 @@ entry in `GO_ROUTES`.
 Exit criteria: T0.3 green, replay green, `rust/parity-unimplemented.txt` empty.
 
 > Finding from Phase 0: `rust/check/route-parity.py` already reports 0
-> unimplemented out of 103 inventoried routes. The 87 `.route(` calls cover
-> 103 method+path pairs, so T3.3 is green for handler presence. T3.1/T3.2
-> remain: behaviour parity per route, and success+failure recording coverage.
+> unimplemented out of the then-inventoried 103 routes. The OAuth `:provider` and
+> callback routes were missing from the inventory even though the Go router
+> registered them under `oauth.enable`; the implementation and inventory now
+> count 105. T3.1/T3.2 remain: behaviour parity per route, and success+failure
+> recording coverage.
 
 ## Phase 4 — Remove Go (M)
 
@@ -222,7 +224,7 @@ command that proves it).
 | Condition | Evidence |
 | --- | --- |
 | 1. Runtime database parity | `rust/check/db-smoke.sh` passes on SQLite, MySQL 8.4 and PostgreSQL 17 |
-| 2. Route parity | `rust/check/route-parity.py`: 103 inventoried, 0 unimplemented |
+| 2. Route parity | `rust/check/route-parity.py`: 105 inventoried, 0 unimplemented |
 | 3. Behaviour parity | `rust-anything app replay . --build 'sh rust/record/run-rust.sh'`: 665/665, fallback 0% |
 | 4. No Go build | `backend/` removed; no `go build/test/mod/vet` in scripts, `.github` or `distribution` |
 | 5. Upgrade parity | Go→Rust→Go upgrade run preserved 24 tables/43 rows/1 upload; `migrate-db` copied 24 tables/839 rows into MySQL and PostgreSQL and booted on both |
@@ -234,7 +236,7 @@ command that proves it).
 | --- | --- | --- |
 | 0 | T0.1 metrics script | done — `scripts/rust-parity-metrics.sh`, baseline `rust/parity-baseline.txt` |
 | 0 | T0.2 fallback marker | done — `x-yin-unimplemented` only when `YIN_UNIMPLEMENTED_MARKER` is set |
-| 0 | T0.3 inventory probe | done — `rust/check/route-parity.py`, 103 routes, 0 unimplemented |
+| 0 | T0.3 inventory probe | done — `rust/check/route-parity.py`, 105 routes, 0 unimplemented |
 | 0 | T0.4 CI wiring | done — `rust-check.yml` (unit + recorded replay), `rust-db.yml` (repository/bootstrap on MySQL 8.4 and PostgreSQL 17, path-filtered), `rust-nightly.yml` (three-driver HTTP smoke + `migrate-db`) |
 | 1 | T1.1 startup guard | done — `main.rs` boots `prepare_shared` for MySQL/PostgreSQL |
 | 1 | T1.2 driver bootstrap | done — `schema_shared.rs` translates DDL, seed runs on all three |
@@ -251,7 +253,7 @@ command that proves it).
 | 2 | T2.9 theme writes | done — install, remove, default, trial, confirm, rollback on the shared pool |
 | 2 | T2.10 wallpaper | done — web wallpaper upload/asset on the shared pool; library assets are in-memory |
 | 2 | T2.11 icons/favicon | done — OIDC rules, item-with-icon and bookmark import; no `last_insert_rowid` left |
-| 3 | T3.1–T3.3 route parity | done — 103 routes served, 0 unimplemented, recorded coverage `routes missing a pair: 0` |
+| 3 | T3.1–T3.3 route parity | done — 105 routes served, 0 unimplemented, recorded coverage `routes missing a pair: 0` |
 | 4 | T4.1 deploy-local.sh builds Rust | done — `cargo test` + `cargo build`, deploys `yin-panel`; local cutover verified on :3002 |
 | 4 | T4.2 CI builds Rust | done — `ci-docker.yml`, `cache-warm.yml`, `visual-regression.yml` |
 | 4 | T4.3 Docker runtime | done — glibc base, `bash /dev/tcp` healthcheck; image built, started and reported `healthy` |

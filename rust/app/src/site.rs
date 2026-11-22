@@ -224,7 +224,7 @@ async fn clear(headers: HeaderMap) -> Response {
     let mut response = read(&headers, "clear.html", None).await;
     response.headers_mut().insert(
         header::SET_COOKIE,
-        HeaderValue::from_str(&crate::auth::cleared_cookie())
+        HeaderValue::from_str(&crate::auth::cleared_cookie(crate::appcfg::ctx().secure_cookies()))
             .unwrap_or(HeaderValue::from_static("yin_token=; Path=/; Max-Age=0")),
     );
     response

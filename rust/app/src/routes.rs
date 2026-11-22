@@ -29,6 +29,8 @@ pub fn router() -> Router<()> {
         .route("/api/about", get(about))
         .route("/api/system/capabilities", get(capabilities))
         .route("/api/oauth/config", get(oauth_config))
+        .route("/api/oauth/{provider}", get(oauth_login))
+        .route("/api/oauth/{provider}/callback", get(oauth_callback))
         .route("/api/login", post(login))
         .route("/api/logout", post(logout))
         .route("/api/user/getUser", get(get_user))
@@ -251,6 +253,104 @@ async fn oauth_config() -> Response {
     success_data(serde_json::Value::Object(data))
 }
 
+#[derive(serde::Deserialize)]
+struct OauthCallbackQuery {
+    #[serde(default)]
+    code: String,
+    #[serde(default)]
+    state: String,
+    #[serde(default)]
+    error: Option<String>,
+}
+
+fn cookie_named(headers: &HeaderMap, name: &str) -> Option<String> {
+    for value in headers.get_all(header::COOKIE) {
+        let Ok(text) = value.to_str() else { continue };
+        for part in text.split(';') {
+            let part = part.trim();
+            if let Some((cookie_name, cookie_value)) = part.split_once('=')
+                && cookie_name == name
+                && !cookie_value.is_empty()
+            {
+                return Some(cookie_value.to_string());
+            }
+        }
+    }
+    None
+}
+
+/// A `302` with zero or more `Set-Cookie` headers, the shape both OAuth routes
+/// answer with.
+fn redirect_with_cookies(location: &str, cookies: &[String]) -> Response {
+    let location = HeaderValue::from_str(location)
+        .unwrap_or_else(|_| HeaderValue::from_static("/oauth/callback"));
+    let mut response = (StatusCode::FOUND, [(header::LOCATION, location)]).into_response();
+    for cookie in cookies {
+        if let Ok(value) = HeaderValue::from_str(cookie) {
+            response.headers_mut().append(header::SET_COOKIE, value);
+        }
+    }
+    response
+}
+
+fn oauth_failure(provider: &str, reason: &str) -> Response {
+    let location = format!(
+        "{}/oauth/callback?error={}",
+        appcfg::ctx().root_url(),
+        urlencoding::encode(reason)
+    );
+    redirect_with_cookies(&location, &[crate::oauth::clear_state_cookie(provider)])
+}
+
+/// `OAuthRouter.OAuthLogin`. The Go router only registers the route when
+/// `oauth.enable` is true; a disabled deployment answers Gin's plain-text 404.
+async fn oauth_login(Path(provider): Path<String>) -> Response {
+    if !appcfg::ctx().conf.oauth.enable {
+        return crate::oauth::disabled_404();
+    }
+    match crate::oauth::begin(&provider).await {
+        Ok(start) => redirect_with_cookies(&start.location, &[start.state_cookie]),
+        Err(message) => envelope::error(&message),
+    }
+}
+
+/// `OAuthRouter.OAuthCallback` plus the service's code exchange and account
+/// resolution. Every outcome clears the one-time state cookie.
+async fn oauth_callback(
+    Path(provider): Path<String>,
+    Query(query): Query<OauthCallbackQuery>,
+    headers: HeaderMap,
+) -> Response {
+    if !appcfg::ctx().conf.oauth.enable {
+        return crate::oauth::disabled_404();
+    }
+    let state_cookie = cookie_named(&headers, &crate::oauth::state_cookie_name(&provider));
+    let result = crate::oauth::complete(
+        &provider,
+        &query.code,
+        &query.state,
+        state_cookie.as_deref(),
+        query.error.as_deref(),
+    )
+    .await;
+    let user = match result {
+        Ok(user) => user,
+        Err(reason) => return oauth_failure(&provider, &reason),
+    };
+    let ctx = appcfg::ctx();
+    let token = match auth::issue_token(user.id, user.token_version) {
+        Ok(token) => token,
+        Err(_) => return oauth_failure(&provider, "token_failed"),
+    };
+    let max_age = ctx.jwt_expire_hours() * 3600;
+    let session = auth::session_cookie(&token, max_age, ctx.secure_cookies());
+    let location = format!("{}/oauth/callback", ctx.root_url());
+    redirect_with_cookies(
+        &location,
+        &[crate::oauth::clear_state_cookie(&provider), session],
+    )
+}
+
 /// `UserInfo` in `backend/internal/web/model/base`, whose field order is the
 /// order the API answers with.
 #[derive(Serialize)]
@@ -316,7 +416,7 @@ async fn login(request: Request) -> Response {
         Err(error) => return envelope::error(&error),
     };
     let max_age = ctx.jwt_expire_hours() * 3600;
-    let cookie = auth::session_cookie(&token, max_age);
+    let cookie = auth::session_cookie(&token, max_age, ctx.secure_cookies());
     let response = envelope::success_struct(UserInfo {
         id: user.id,
         name: user.name,
@@ -402,7 +502,7 @@ async fn logout(headers: HeaderMap) -> Response {
     envelope::with_header(
         success(),
         header::SET_COOKIE,
-        HeaderValue::from_str(&auth::cleared_cookie())
+        HeaderValue::from_str(&auth::cleared_cookie(appcfg::ctx().secure_cookies()))
             .unwrap_or_else(|_| HeaderValue::from_static("")),
     )
 }
@@ -5644,6 +5744,7 @@ async fn go_fallback_inner(req: Request) -> Response {
             .iter()
             .any(|(route_method, pattern)| {
                 *route_method == method
+                    && !crate::go_routes::conditional_disabled(route_method, pattern)
                     && pattern
                         .rsplit('/')
                         .next()

@@ -18,11 +18,11 @@ never falls back silently to a different backend.
 | `base.enable_monitor` | background cache refreshed every 3 s | same | snapshot fell from 1.0037 s to < 1 ms |
 | `base.monitor_refresh_interval` | only returned to the client | only returned to the client | matches Go |
 | `base.url_prefix` | upload URL prefix | same, default `/uploads/` | `upload_prefix()` |
-| `jwt.secret`, `jwt.expire` | HS256 sessions | same secret and claims | Go cookie accepted by Rust and back |
+| `jwt.secret`, `jwt.expire` | HS256 sessions | same secret and claims; cookies gain `Secure` when `base.root_url` is HTTPS | Go cookie accepted by Rust and back |
 | `rclone.type: local` | local bucket directory | same, default `uploads` | uploads served byte-identically |
 | `rclone.type: s3` (or any non-local) | errors: "Core only supports local storage" | **refused**, same wording | startup check |
-| `oauth.enable` | `/api/oauth/config` plus `:provider` redirect and callback | `/api/oauth/config` only; the login and callback routes do not exist here and answer Gin's 404 | `grep` in `src/routes.rs`; **not implemented** |
-| `oauth.providers[].name` | listed by `/api/oauth/config` | listed by `/api/oauth/config` | same route |
+| `oauth.enable` | `/api/oauth/config` plus `:provider` redirect and callback | same three routes; OIDC discovery, PKCE and ID-token verification, plus generic OAuth2 token exchange | `src/oauth.rs`; fake OIDC and OAuth2 providers exercised login + callback + session |
+| `oauth.providers[]` | provider list and login flow | `name`, `client_id`, `client_secret`, `issuer_url`, `discovery_url`, `auth_url`, `token_url`, `user_info_url`, `user_info_email_url`, `scopes`, `field_mapping_*` | `src/oauth.rs` |
 | `migration.enabled` | imports a legacy SQLite installation at startup | not implemented; already-migrated deployments are unaffected | see below |
 
 ## Why `read_pool_size` is ignored
@@ -43,9 +43,6 @@ with a workload where reads demonstrably queue behind writes.
 
 These are behaviour differences, not silent fallbacks, and each has a record:
 
-- **OAuth login.** `oauth.enable: true` in the shipped configuration, but only
-  the provider list is served. A user who clicks a provider reaches Gin's 404
-  instead of the provider's consent screen. Local password login is unaffected.
 - **Legacy migration.** `migration.enabled: true` asks the Go build to import a
   pre-existing installation. The Rust build only runs the schema upgrade
   (`rust/db-tool`) and the first-run seed, so an already-migrated deployment is

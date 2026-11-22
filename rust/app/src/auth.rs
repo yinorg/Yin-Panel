@@ -114,13 +114,17 @@ fn validate_user(user: Option<UserRow>, token_version: i64) -> Result<UserRow, A
 }
 
 /// `interceptor.SetAuthCookie`.
-pub fn session_cookie(token: &str, max_age_seconds: i64) -> String {
-    format!("{COOKIE_NAME}={token}; Path=/; Max-Age={max_age_seconds}; HttpOnly; SameSite=Lax")
+pub fn session_cookie(token: &str, max_age_seconds: i64, secure: bool) -> String {
+    let secure = if secure { "; Secure" } else { "" };
+    format!(
+        "{COOKIE_NAME}={token}; Path=/; Max-Age={max_age_seconds}; HttpOnly{secure}; SameSite=Lax"
+    )
 }
 
 /// `interceptor.ClearAuthCookie`.
-pub fn cleared_cookie() -> String {
-    format!("{COOKIE_NAME}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax")
+pub fn cleared_cookie(secure: bool) -> String {
+    let secure = if secure { "; Secure" } else { "" };
+    format!("{COOKIE_NAME}=; Path=/; Max-Age=0; HttpOnly{secure}; SameSite=Lax")
 }
 
 pub fn issue_token(user_id: i64, token_version: i64) -> Result<String, String> {
