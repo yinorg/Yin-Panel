@@ -17,16 +17,16 @@ go_route_count=$(grep -c '("' "$go_routes")
 rust_route_count=$(grep -c '\.route(' "$routes")
 wire_route_count=$(grep -c '\.route(' "$units" || true)
 sqlite_pool=$(
-    grep -R 'ctx\.pool()\.await' "$routes" "$routes_dir" | wc -l
+    grep -R 'ctx\.pool()\.await' "$routes" "$routes_dir" | wc -l || true
 )
 shared_pool=$(
-    grep -R 'ctx\.shared_pool()\.await' "$routes" "$routes_dir" | wc -l
+    grep -R 'ctx\.shared_pool()\.await' "$routes" "$routes_dir" | wc -l || true
 )
 insert_rowid=$(
-    grep -R 'last_insert_rowid' "$routes" "$routes_dir" | wc -l
+    grep -R 'last_insert_rowid' "$routes" "$routes_dir" | wc -l || true
 )
 sqlite_params=$(
-    grep -R 'SqlitePool' "$routes" "$routes_dir" | wc -l
+    grep -R 'SqlitePool' "$routes" "$routes_dir" | wc -l || true
 )
 
 print_row() {
