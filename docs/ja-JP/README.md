@@ -78,7 +78,7 @@ Docker と Compose プラグインが必要です。
 ```bash
 mkdir yin-panel && cd yin-panel
 curl -LO https://raw.githubusercontent.com/yinorg/Yin-Panel/master/docker/docker-compose.yml
-curl -o conf.yaml https://raw.githubusercontent.com/yinorg/Yin-Panel/master/backend/conf.yaml.example
+curl -o conf.yaml https://raw.githubusercontent.com/yinorg/Yin-Panel/master/docker/conf.yaml.example
 mkdir -p database uploads
 jwt_secret="$(openssl rand -hex 32)"
 sed -i "s#^  secret: your_secret_key$#  secret: ${jwt_secret}#" conf.yaml
@@ -168,7 +168,7 @@ SQLite 専用の機能（WAL、読み取り専用コネクションプール、�
 
 ## 設定と OAuth/OIDC
 
-`oauth` は OAuth 2.0 と OpenID Connect（OIDC）の共通設定エントリーです。既定のテンプレートには検証済みの 3 つの例（GitHub（OAuth 2.0）、GitLab（標準 OIDC）、Google（OAuth 2.0））があります。例は既定ですべてコメントアウトされています。実際の認証情報を入力し `oauth.enable` を `true` に設定した場合のみ有効になります。すべての設定項目は `backend/conf.yaml.example` を参照してください。
+`oauth` は OAuth 2.0 と OpenID Connect（OIDC）の共通設定エントリーです。既定のテンプレートには検証済みの 3 つの例（GitHub（OAuth 2.0）、GitLab（標準 OIDC）、Google（OAuth 2.0））があります。例は既定ですべてコメントアウトされています。実際の認証情報を入力し `oauth.enable` を `true` に設定した場合のみ有効になります。すべての設定項目は `docker/conf.yaml.example` を参照してください。
 
 標準的な OIDC プロバイダーは discovery、authorization code + PKCE、JWKS 署名検証をサポートし、ユーザー情報で `email` と `email_verified` を返す必要があります。これらの基準を満たすプロバイダーは原理的に利用できますが、サービスによっては追加のフィールドマッピング設定が必要になる場合があります。
 
@@ -193,13 +193,13 @@ OIDC コールバック URL：
 ## Helm
 
 ```bash
-helm upgrade --install yin-panel ./distribution/helm-chart/yin-panel \
+helm upgrade --install yin-panel ./docker/helm/yin-panel \
   --set image.tag=latest
 ```
 
 本番では `image.tag` を具体的なバージョンに変更してください。
 
-デプロイ前に `helm template yin-panel ./distribution/helm-chart/yin-panel` でレンダリング結果を確認できます。
+デプロイ前に `helm template yin-panel ./docker/helm/yin-panel` でレンダリング結果を確認できます。
 
 ## ソースからの開発
 
@@ -231,9 +231,9 @@ go build ./...
 ./scripts/deploy-local.sh
 ```
 
-スクリプトは既定でリポジトリ内の `backend/` を実行ディレクトリとし、そこにローカルの `conf.yaml` が必要です。`.env.local` の `YIN_PANEL_RUNTIME_DIR` で上書きできます。ビルドとテストがすべて成功した後、Yin-Panel のリスナーのみを停止し、`sudo` で旧バイナリと静的ファイルを置き換えます。データベース、アップロードファイル、設定ファイルには触れません。
+スクリプトは既定でリポジトリ内の `runtime/` を実行ディレクトリとし、そこにローカルの `conf.yaml` が必要です。`.env.local` の `YIN_PANEL_RUNTIME_DIR` で上書きできます。ビルドとテストがすべて成功した後、Yin-Panel のリスナーのみを停止し、`sudo` で旧バイナリと静的ファイルを置き換えます。データベース、アップロードファイル、設定ファイルには触れません。
 
-ホームページのテーマシステムは [`frontend/THEME_SYSTEM.md`](../../frontend/THEME_SYSTEM.md) を参照してください。`npm run create:theme -- init "<名前>"` で新しいテーマの雛形を作成できます。AI 開発・リリース・再起動の規約は [AGENTS.md](../../AGENTS.md) にあります。
+ホームページのテーマシステムは [`docs/engineering/THEME_SYSTEM.md`](../../docs/engineering/THEME_SYSTEM.md) を参照してください。`npm run create:theme -- init "<名前>"` で新しいテーマの雛形を作成できます。AI 開発・リリース・再起動の規約は [AGENTS.md](../../AGENTS.md) にあります。
 
 ブラウザー側の受け入れテストは独立したリポジトリ [yinorg/yin-panel-e2e](https://github.com/yinorg/yin-panel-e2e) にあります。Playwright が実ブラウザーで一連の流れ（ログインとアカウント、スペースと権限、ブックマークの入出力、テーマシステム、PWA のオフライン動作、拡張による新規タブの置き換え）を通し、k6 のスクリプトが負荷と容量を測定します。実行には起動済みの Yin-Panel、Core リポジトリの `.env.local`、未パッケージの拡張ソースが必要で、チェックアウト位置は `YIN_PANEL_E2E_DIR` で指定します。
 

@@ -78,7 +78,7 @@ Yin-Panel — это лёгкая панель навигации для сам�
 ```bash
 mkdir yin-panel && cd yin-panel
 curl -LO https://raw.githubusercontent.com/yinorg/Yin-Panel/master/docker/docker-compose.yml
-curl -o conf.yaml https://raw.githubusercontent.com/yinorg/Yin-Panel/master/backend/conf.yaml.example
+curl -o conf.yaml https://raw.githubusercontent.com/yinorg/Yin-Panel/master/docker/conf.yaml.example
 mkdir -p database uploads
 jwt_secret="$(openssl rand -hex 32)"
 sed -i "s#^  secret: your_secret_key$#  secret: ${jwt_secret}#" conf.yaml
@@ -168,7 +168,7 @@ docker pull ghcr.io/yinorg/yin-panel-ce:<x.y.z>
 
 ## Конфигурация и OAuth/OIDC
 
-`oauth` — единая точка настройки OAuth 2.0 и OpenID Connect (OIDC). В шаблоне по умолчанию есть три проверенных примера: GitHub (OAuth 2.0), GitLab (стандартный OIDC) и Google (OAuth 2.0). Все примеры по умолчанию закомментированы; провайдер включается только после заполнения реальных учётных данных и установки `oauth.enable: true`. Все ключи конфигурации описаны в `backend/conf.yaml.example`.
+`oauth` — единая точка настройки OAuth 2.0 и OpenID Connect (OIDC). В шаблоне по умолчанию есть три проверенных примера: GitHub (OAuth 2.0), GitLab (стандартный OIDC) и Google (OAuth 2.0). Все примеры по умолчанию закомментированы; провайдер включается только после заполнения реальных учётных данных и установки `oauth.enable: true`. Все ключи конфигурации описаны в `docker/conf.yaml.example`.
 
 Стандартный OIDC-провайдер должен поддерживать discovery, authorization code + PKCE и проверку подписи JWKS, а также возвращать `email` и `email_verified` в данных пользователя. Провайдеры, соответствующие этим требованиям, в принципе работают, но для некоторых сервисов может потребоваться дополнительная настройка сопоставления полей.
 
@@ -193,13 +193,13 @@ URL обратного вызова OIDC:
 ## Helm
 
 ```bash
-helm upgrade --install yin-panel ./distribution/helm-chart/yin-panel \
+helm upgrade --install yin-panel ./docker/helm/yin-panel \
   --set image.tag=latest
 ```
 
 В продакшене замените `image.tag` на конкретную версию.
 
-Перед развёртыванием просмотрите отрендеренные манифесты с помощью `helm template yin-panel ./distribution/helm-chart/yin-panel`.
+Перед развёртыванием просмотрите отрендеренные манифесты с помощью `helm template yin-panel ./docker/helm/yin-panel`.
 
 ## Разработка из исходного кода
 
@@ -231,9 +231,9 @@ go build ./...
 ./scripts/deploy-local.sh
 ```
 
-Скрипт по умолчанию использует `backend/` репозитория как рабочий каталог и требует локальный `conf.yaml` в нём; `YIN_PANEL_RUNTIME_DIR` в `.env.local` может это переопределить. После успешных сборок и тестов он останавливает только слушатель Yin-Panel, заменяет старый бинарник и статические файлы через `sudo` и никогда не трогает базу данных, загрузки и файлы конфигурации.
+Скрипт по умолчанию использует `runtime/` репозитория как рабочий каталог и требует локальный `conf.yaml` в нём; `YIN_PANEL_RUNTIME_DIR` в `.env.local` может это переопределить. После успешных сборок и тестов он останавливает только слушатель Yin-Panel, заменяет старый бинарник и статические файлы через `sudo` и никогда не трогает базу данных, загрузки и файлы конфигурации.
 
-Система тем главной страницы описана в [`frontend/THEME_SYSTEM.md`](../../frontend/THEME_SYSTEM.md); создать новую тему можно командой `npm run create:theme -- init "<имя>"`. Полные соглашения по ИИ-разработке, выпуску и перезапуску — в [AGENTS.md](../../AGENTS.md).
+Система тем главной страницы описана в [`docs/engineering/THEME_SYSTEM.md`](../../docs/engineering/THEME_SYSTEM.md); создать новую тему можно командой `npm run create:theme -- init "<имя>"`. Полные соглашения по ИИ-разработке, выпуску и перезапуску — в [AGENTS.md](../../AGENTS.md).
 
 Приёмочные тесты в браузере живут в отдельном репозитории [yinorg/yin-panel-e2e](https://github.com/yinorg/yin-panel-e2e): Playwright водит настоящие браузеры по полным сценариям (вход и учётные записи, пространства и права, импорт и экспорт закладок, система тем, офлайн-поведение PWA и перехват новой вкладки расширением), а скрипты k6 измеряют нагрузку и ёмкость. Нужны запущенный экземпляр Yin-Panel, `.env.local` из репозитория Core и непакованные исходники расширения; место checkout задаёт `YIN_PANEL_E2E_DIR`.
 

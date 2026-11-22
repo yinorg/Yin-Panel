@@ -35,7 +35,7 @@ bench_up=0
 cleanup() {
     status=$?
     if [[ "$bench_up" -eq 1 ]]; then
-        "$root/rust/bench/pair.sh" down --work "$bench_work" || true
+        "$root/backend/bench/pair.sh" down --work "$bench_work" || true
     fi
     rm -rf "$work"
     return "$status"
@@ -47,19 +47,19 @@ say() { printf '\n== %s\n' "$*"; }
 
 say "tool self-tests"
 python3 "$root/scripts/upgrade_compare.py" selftest
-bash -n "$root/scripts/verify-upgrade.sh" "$root/rust/bench/pair.sh" "$root/rust/bench/compare.sh"
+bash -n "$root/scripts/verify-upgrade.sh" "$root/backend/bench/pair.sh" "$root/backend/bench/compare.sh"
 
 say "Go -> Rust -> Go content-preserving upgrade"
 "$root/scripts/verify-upgrade.sh" 3040
 
 say "build and record/replay parity"
 export PATH="$HOME/.cargo/bin:$PATH"
-(cd "$root/rust/app" && cargo build --release)
+(cd "$root/backend/app" && cargo build --release)
 export YIN_PANEL_RECORD_DIR="$work/record"
-rust-anything app replay "$root" --build "sh rust/record/run-rust.sh"
+"$root/scripts/replay.sh"
 
 say "Go/Rust gzip and body parity"
-"$root/rust/bench/pair.sh" up \
+"$root/backend/bench/pair.sh" up \
     --work "$bench_work" \
     --source-db "$root/runtime/database/database.db" \
     --go-port 3010 --rust-port 3011
@@ -68,17 +68,17 @@ go_token="$(curl -fsS --noproxy '*' -H 'Content-Type: application/json' \
     -d '{"mail":"admin@yiniot.com","password":"admin@yiniot.com"}' \
     http://127.0.0.1:3010/api/login |
     python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["token"])')"
-python3 "$root/rust/check/gzipcheck.py" \
+python3 "$root/backend/check/gzipcheck.py" \
     http://127.0.0.1:3010 http://127.0.0.1:3011 "$go_token"
-python3 "$root/rust/check/rangecheck.py" \
+python3 "$root/backend/check/rangecheck.py" \
     http://127.0.0.1:3010 http://127.0.0.1:3011 "$go_token"
 
 if [[ "$skip_perf" -eq 0 ]]; then
     say "repeated, alternating head-to-head performance baseline"
-    "$root/rust/bench/compare.sh" \
+    "$root/backend/bench/compare.sh" \
         --go http://127.0.0.1:3010 --rust http://127.0.0.1:3011 \
         --token "$go_token" --reps 5 --requests 1500 --concurrency 1
-    "$root/rust/bench/compare.sh" \
+    "$root/backend/bench/compare.sh" \
         --go http://127.0.0.1:3010 --rust http://127.0.0.1:3011 \
         --token "$go_token" --reps 5 --requests 3000 --concurrency 32
 fi

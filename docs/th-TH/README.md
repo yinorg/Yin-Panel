@@ -78,7 +78,7 @@ Yin-Panel เป็นแผงนำทางแบบเบาที่โฮ�
 ```bash
 mkdir yin-panel && cd yin-panel
 curl -LO https://raw.githubusercontent.com/yinorg/Yin-Panel/master/docker/docker-compose.yml
-curl -o conf.yaml https://raw.githubusercontent.com/yinorg/Yin-Panel/master/backend/conf.yaml.example
+curl -o conf.yaml https://raw.githubusercontent.com/yinorg/Yin-Panel/master/docker/conf.yaml.example
 mkdir -p database uploads
 jwt_secret="$(openssl rand -hex 32)"
 sed -i "s#^  secret: your_secret_key$#  secret: ${jwt_secret}#" conf.yaml
@@ -168,7 +168,7 @@ docker pull ghcr.io/yinorg/yin-panel-ce:<x.y.z>
 
 ## การตั้งค่าและ OAuth/OIDC
 
-`oauth` คือจุดตั้งค่าที่รวมกันสำหรับ OAuth 2.0 และ OpenID Connect (OIDC) เทมเพลตเริ่มต้นมีตัวอย่างที่ผ่านการตรวจสอบแล้วสามตัวอย่าง ได้แก่ GitHub (OAuth 2.0), GitLab (OIDC มาตรฐาน) และ Google (OAuth 2.0) ตัวอย่างทั้งหมดถูกคอมเมนต์ไว้โดยค่าเริ่มต้น ผู้ให้บริการจะเปิดใช้งานได้ก็ต่อเมื่อคุณกรอกข้อมูลรับรองจริงและตั้งค่า `oauth.enable: true` คีย์การตั้งค่าทั้งหมดมีเอกสารอธิบายใน `backend/conf.yaml.example`
+`oauth` คือจุดตั้งค่าที่รวมกันสำหรับ OAuth 2.0 และ OpenID Connect (OIDC) เทมเพลตเริ่มต้นมีตัวอย่างที่ผ่านการตรวจสอบแล้วสามตัวอย่าง ได้แก่ GitHub (OAuth 2.0), GitLab (OIDC มาตรฐาน) และ Google (OAuth 2.0) ตัวอย่างทั้งหมดถูกคอมเมนต์ไว้โดยค่าเริ่มต้น ผู้ให้บริการจะเปิดใช้งานได้ก็ต่อเมื่อคุณกรอกข้อมูลรับรองจริงและตั้งค่า `oauth.enable: true` คีย์การตั้งค่าทั้งหมดมีเอกสารอธิบายใน `docker/conf.yaml.example`
 
 ผู้ให้บริการ OIDC มาตรฐานต้องรองรับ discovery, authorization code + PKCE และการตรวจสอบลายเซ็น JWKS และต้องให้ `email` และ `email_verified` ในข้อมูลผู้ใช้ ผู้ให้บริการที่เป็นไปตามมาตรฐานเหล่านี้ทำงานได้โดยหลักการ แต่ผู้ให้บริการแต่ละรายอาจยังต้องตั้งค่าการแมปฟิลด์เพิ่มเติม
 
@@ -193,13 +193,13 @@ URL callback ของ OIDC:
 ## Helm
 
 ```bash
-helm upgrade --install yin-panel ./distribution/helm-chart/yin-panel \
+helm upgrade --install yin-panel ./docker/helm/yin-panel \
   --set image.tag=latest
 ```
 
 ในโปรดักชันให้เปลี่ยน `image.tag` เป็นเวอร์ชันที่เจาะจง
 
-ก่อนติดตั้ง ให้ดูตัวอย่าง manifest ที่เรนเดอร์แล้วด้วย `helm template yin-panel ./distribution/helm-chart/yin-panel`
+ก่อนติดตั้ง ให้ดูตัวอย่าง manifest ที่เรนเดอร์แล้วด้วย `helm template yin-panel ./docker/helm/yin-panel`
 
 ## การพัฒนาจากซอร์สโค้ด
 
@@ -231,9 +231,9 @@ go build ./...
 ./scripts/deploy-local.sh
 ```
 
-สคริปต์ใช้ `backend/` ของ repository เป็นไดเรกทอรีรันไทม์โดยค่าเริ่มต้น และต้องมี `conf.yaml` ในเครื่องอยู่ที่นั่น `YIN_PANEL_RUNTIME_DIR` ใน `.env.local` สามารถแทนที่ได้ หลังจากบิลด์และการทดสอบทั้งหมดผ่าน จะหยุดเฉพาะตัวรับฟังของ Yin-Panel ใช้ `sudo` เพื่อแทนที่ไบนารีเดิมและไฟล์สแตติก และไม่แตะต้องฐานข้อมูล อัปโหลด หรือไฟล์การตั้งค่าเลย
+สคริปต์ใช้ `runtime/` ของ repository เป็นไดเรกทอรีรันไทม์โดยค่าเริ่มต้น และต้องมี `conf.yaml` ในเครื่องอยู่ที่นั่น `YIN_PANEL_RUNTIME_DIR` ใน `.env.local` สามารถแทนที่ได้ หลังจากบิลด์และการทดสอบทั้งหมดผ่าน จะหยุดเฉพาะตัวรับฟังของ Yin-Panel ใช้ `sudo` เพื่อแทนที่ไบนารีเดิมและไฟล์สแตติก และไม่แตะต้องฐานข้อมูล อัปโหลด หรือไฟล์การตั้งค่าเลย
 
-ระบบธีมของหน้าแรกมีเอกสารอยู่ใน [`frontend/THEME_SYSTEM.md`](../../frontend/THEME_SYSTEM.md); สร้างโครงธีมใหม่ได้ด้วย `npm run create:theme -- init "<name>"` แนวปฏิบัติด้านการพัฒนา AI การออก release และการรีสตาร์ตฉบับเต็มอยู่ใน [AGENTS.md](../../AGENTS.md)
+ระบบธีมของหน้าแรกมีเอกสารอยู่ใน [`docs/engineering/THEME_SYSTEM.md`](../../docs/engineering/THEME_SYSTEM.md); สร้างโครงธีมใหม่ได้ด้วย `npm run create:theme -- init "<name>"` แนวปฏิบัติด้านการพัฒนา AI การออก release และการรีสตาร์ตฉบับเต็มอยู่ใน [AGENTS.md](../../AGENTS.md)
 
 การทดสอบระดับเบราว์เซอร์อยู่ในรีโปแยก [yinorg/yin-panel-e2e](https://github.com/yinorg/yin-panel-e2e): Playwright ขับเบราว์เซอร์จริงไล่ตามขั้นตอนทั้งหมด (เข้าสู่ระบบและบัญชี สเปซและสิทธิ์ นำเข้าและส่งออกบุ๊กมาร์ก ระบบธีม พฤติกรรมออฟไลน์ของ PWA และการแทนที่แท็บใหม่โดยส่วนขยาย) พร้อมสคริปต์ k6 สำหรับวัดโหลดและความจุ ต้องมีอินสแตนซ์ Yin-Panel ที่รันอยู่ ไฟล์ `.env.local` ของรีโป Core และซอร์สส่วนขยายที่ยังไม่แพ็ก และกำหนดตำแหน่งเช็กเอาต์ด้วย `YIN_PANEL_E2E_DIR`
 

@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 # Parity metrics for the Go -> Rust replacement.
 #
-# Prints the counts `rust/GOAL_REPLACE_GO.md` tracks and compares them with
-# `rust/parity-baseline.txt`. Any count that grows fails the run, so progress
+# Prints the counts `docs/engineering/migration/GOAL_REPLACE_GO.md` tracks and compares them with
+# `backend/parity-baseline.txt`. Any count that grows fails the run, so progress
 # can only move forward.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-routes="$repo_root/rust/app/src/routes.rs"
-routes_dir="$repo_root/rust/app/src/routes"
-go_routes="$repo_root/rust/app/src/go_routes.rs"
-units="$repo_root/rust/app/src/units/mod.rs"
-baseline="$repo_root/rust/parity-baseline.txt"
+routes="$repo_root/backend/app/src/routes.rs"
+routes_dir="$repo_root/backend/app/src/routes"
+go_routes="$repo_root/backend/app/src/go_routes.rs"
+units="$repo_root/backend/app/src/units/mod.rs"
+baseline="$repo_root/backend/parity-baseline.txt"
 
 go_route_count=$(grep -c '("' "$go_routes")
 rust_route_count=$(grep -c '\.route(' "$routes")

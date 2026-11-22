@@ -55,8 +55,8 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            rust/app/target
-          key: e2e-${{ hashFiles('rust/app/Cargo.lock') }}
+            backend/app/target
+          key: e2e-${{ hashFiles('backend/app/Cargo.lock') }}
 
       - name: Cache Playwright browsers
         uses: actions/cache@v4
@@ -71,7 +71,7 @@ jobs:
           npm run build-only
 
       - name: Build the binary
-        run: cargo build --release --manifest-path rust/app/Cargo.toml
+        run: cargo build --release --manifest-path backend/app/Cargo.toml
 
       - name: Install the suite
         working-directory: .e2e/suite
@@ -90,7 +90,7 @@ jobs:
           rm -rf "$runtime"
           mkdir -p "$runtime/database" "$runtime/uploads"
           ln -s "$CORE_ROOT/runtime/web" "$runtime/web"
-          ln -s "$CORE_ROOT/runtime/lang" "$runtime/lang"
+          ln -s "$CORE_ROOT/backend/resources/lang" "$backend/resources/lang"
           cat > "$runtime/conf.yaml" <<CONF
           base:
             http_port: 18090
@@ -109,7 +109,7 @@ jobs:
             bucket: ./uploads
           CONF
           PORT=18090 YIN_PANEL_CONFIG="$runtime/conf.yaml" \
-            env -C "$runtime" "$CORE_ROOT/rust/app/target/release/yin-panel" \
+            env -C "$runtime" "$CORE_ROOT/backend/app/target/release/yin-panel" \
             > "$runtime/server.log" 2>&1 &
           service_pid=$!
           trap 'kill "$service_pid" 2>/dev/null || true' EXIT
@@ -129,9 +129,9 @@ jobs:
           YIN_PANEL_TEST_ADMIN_USER=admin@yiniot.com
           YIN_PANEL_TEST_ADMIN_PASSWORD=admin@yiniot.com
           YIN_PANEL_TEST_SPACE_ID=1
-          YIN_PANEL_TEST_BINARY=$CORE_ROOT/rust/app/target/release/yin-panel
+          YIN_PANEL_TEST_BINARY=$CORE_ROOT/backend/app/target/release/yin-panel
           YIN_PANEL_TEST_WEB_DIR=$CORE_ROOT/runtime/web
-          YIN_PANEL_TEST_LANG_DIR=$CORE_ROOT/runtime/lang
+          YIN_PANEL_TEST_LANG_DIR=$CORE_ROOT/backend/resources/lang
           YIN_PANEL_TEST_SOURCE_DIR=$CORE_ROOT
           YIN_PANEL_TEST_CORE_REVISION=$CORE_REVISION
           ENV

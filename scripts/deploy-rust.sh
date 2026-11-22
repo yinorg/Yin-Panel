@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Local cutover to the Rust binary.
 #
-# Builds `rust/app` in release mode, installs it as the runtime `yin-panel`,
+# Builds `backend/app` in release mode, installs it as the runtime `yin-panel`,
 # keeps the existing `web/`, database, uploads and `conf.yaml`, restarts the
 # service and verifies the running HTTP endpoints.
 #
@@ -73,9 +73,9 @@ commit="$(git -C "$repo_root" rev-parse --short=8 HEAD 2>/dev/null || echo unkno
 build_time="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 printf 'Building the Rust binary...\n'
-(cd "$repo_root/rust/app" && cargo build --release)
+(cd "$repo_root/backend/app" && cargo build --release)
 
-binary="$repo_root/rust/app/target/release/yin-panel"
+binary="$repo_root/backend/app/target/release/yin-panel"
 [[ -x "$binary" ]] || die "cargo build did not produce $binary"
 
 pid="$(listening_pid "$port")"

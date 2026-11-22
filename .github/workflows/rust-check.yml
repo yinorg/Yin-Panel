@@ -28,9 +28,9 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            rust/app/target
-            rust/db-tool/target
-          key: rust-check-${{ hashFiles('rust/app/Cargo.lock', 'rust/db-tool/Cargo.lock') }}
+            backend/app/target
+            backend/db-tool/target
+          key: rust-check-${{ hashFiles('backend/app/Cargo.lock', 'backend/db-tool/Cargo.lock') }}
       - name: Cache the replay recorder
         uses: actions/cache@v4
         with:
@@ -40,14 +40,14 @@ jobs:
         run: ./scripts/rust-parity-metrics.sh
       - name: Unit and slice tests
         run: |
-          cargo test --manifest-path rust/app/Cargo.toml
-          cargo test --manifest-path rust/db-tool/Cargo.toml
+          cargo test --manifest-path backend/app/Cargo.toml
+          cargo test --manifest-path backend/db-tool/Cargo.toml
       - name: Build the binary
-        run: cargo build --release --manifest-path rust/app/Cargo.toml
+        run: cargo build --release --manifest-path backend/app/Cargo.toml
       - name: Every Go route has a Rust handler
-        run: python3 rust/check/route-parity.py
+        run: python3 backend/check/route-parity.py
       - name: Recorded coverage may not regress
-        run: python3 rust/check/coverage-report.py
+        run: python3 backend/check/coverage-report.py
       - name: Install rust-anything
         run: |
           if [ ! -x "$HOME/.cargo/replay-tools/bin/rust-anything" ]; then
@@ -58,7 +58,7 @@ jobs:
       - name: Replay every recorded case
         run: |
           python3 -m http.server 18080 --bind 127.0.0.1 \
-            --directory rust/record/favicon-fixture >/tmp/favicon-fixture.log 2>&1 &
+            --directory backend/record/favicon-fixture >/tmp/favicon-fixture.log 2>&1 &
           fixture_pid=$!
           trap 'kill "$fixture_pid" 2>/dev/null || true' EXIT
           for _ in $(seq 1 40); do
@@ -68,11 +68,11 @@ jobs:
             sleep 0.25
           done
           curl -sf http://127.0.0.1:18080/assets/icon.png >/dev/null
-          rust-anything app replay . --build 'sh rust/record/run-rust.sh'
+          sh scripts/replay.sh
       - name: Upload the unimplemented list on failure
         if: failure()
         uses: actions/upload-artifact@v7
         with:
           name: parity-unimplemented
-          path: rust/parity-unimplemented.txt
+          path: backend/parity-unimplemented.txt
           if-no-files-found: ignore

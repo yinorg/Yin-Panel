@@ -78,7 +78,7 @@ Requer Docker com o plugin Compose.
 ```bash
 mkdir yin-panel && cd yin-panel
 curl -LO https://raw.githubusercontent.com/yinorg/Yin-Panel/master/docker/docker-compose.yml
-curl -o conf.yaml https://raw.githubusercontent.com/yinorg/Yin-Panel/master/backend/conf.yaml.example
+curl -o conf.yaml https://raw.githubusercontent.com/yinorg/Yin-Panel/master/docker/conf.yaml.example
 mkdir -p database uploads
 jwt_secret="$(openssl rand -hex 32)"
 sed -i "s#^  secret: your_secret_key$#  secret: ${jwt_secret}#" conf.yaml
@@ -168,7 +168,7 @@ A migração cria o esquema completo no destino, copia todas as linhas **preserv
 
 ## Configuração e OAuth/OIDC
 
-`oauth` é o ponto de entrada de configuração unificado para OAuth 2.0 e OpenID Connect (OIDC). O modelo padrão inclui três exemplos verificados: GitHub (OAuth 2.0), GitLab (OIDC padrão) e Google (OAuth 2.0). Todos os exemplos vêm comentados por padrão; um provedor só é ativado depois de preencher credenciais reais e definir `oauth.enable: true`. Todas as chaves de configuração estão documentadas em `backend/conf.yaml.example`.
+`oauth` é o ponto de entrada de configuração unificado para OAuth 2.0 e OpenID Connect (OIDC). O modelo padrão inclui três exemplos verificados: GitHub (OAuth 2.0), GitLab (OIDC padrão) e Google (OAuth 2.0). Todos os exemplos vêm comentados por padrão; um provedor só é ativado depois de preencher credenciais reais e definir `oauth.enable: true`. Todas as chaves de configuração estão documentadas em `docker/conf.yaml.example`.
 
 Um provedor OIDC padrão precisa oferecer suporte a discovery, authorization code + PKCE e validação de assinatura JWKS, além de fornecer `email` e `email_verified` nas informações do usuário. Provedores que atendem a esses padrões funcionam em princípio, mas alguns serviços ainda podem exigir configuração extra de mapeamento de campos.
 
@@ -193,13 +193,13 @@ Criar um espaço, renomear, adicionar grupos, membros e regras OIDC acontecem em
 ## Helm
 
 ```bash
-helm upgrade --install yin-panel ./distribution/helm-chart/yin-panel \
+helm upgrade --install yin-panel ./docker/helm/yin-panel \
   --set image.tag=latest
 ```
 
 Em produção, troque `image.tag` por uma versão concreta.
 
-Antes de implantar, visualize os manifestos renderizados com `helm template yin-panel ./distribution/helm-chart/yin-panel`.
+Antes de implantar, visualize os manifestos renderizados com `helm template yin-panel ./docker/helm/yin-panel`.
 
 ## Desenvolvimento a partir do código-fonte
 
@@ -231,9 +231,9 @@ Atualização local completa (build do frontend, testes e build do backend, impl
 ./scripts/deploy-local.sh
 ```
 
-O script usa `backend/` do repositório como diretório de execução por padrão e exige um `conf.yaml` local nele; `YIN_PANEL_RUNTIME_DIR` em `.env.local` pode substituí-lo. Depois que todos os builds e testes passam, ele para apenas o listener do Yin-Panel, substitui o binário antigo e os arquivos estáticos com `sudo`, e nunca toca no banco de dados, nos uploads ou nos arquivos de configuração.
+O script usa `runtime/` do repositório como diretório de execução por padrão e exige um `conf.yaml` local nele; `YIN_PANEL_RUNTIME_DIR` em `.env.local` pode substituí-lo. Depois que todos os builds e testes passam, ele para apenas o listener do Yin-Panel, substitui o binário antigo e os arquivos estáticos com `sudo`, e nunca toca no banco de dados, nos uploads ou nos arquivos de configuração.
 
-O sistema de temas da página inicial está documentado em [`frontend/THEME_SYSTEM.md`](../../frontend/THEME_SYSTEM.md); crie um tema novo com `npm run create:theme -- init "<nome>"`. As convenções completas de desenvolvimento com IA, publicação e reinício estão em [AGENTS.md](../../AGENTS.md).
+O sistema de temas da página inicial está documentado em [`docs/engineering/THEME_SYSTEM.md`](../../docs/engineering/THEME_SYSTEM.md); crie um tema novo com `npm run create:theme -- init "<nome>"`. As convenções completas de desenvolvimento com IA, publicação e reinício estão em [AGENTS.md](../../AGENTS.md).
 
 Os testes de aceitação no navegador ficam em um repositório separado, [yinorg/yin-panel-e2e](https://github.com/yinorg/yin-panel-e2e): o Playwright conduz navegadores reais por jornadas completas (login e contas, espaços e permissões, importação e exportação de favoritos, o sistema de temas, o comportamento offline do PWA e a substituição da nova aba pela extensão), com um conjunto k6 para medir carga e capacidade. É preciso ter uma instância do Yin-Panel em execução, o `.env.local` do repositório Core e o código não empacotado da extensão; o local do checkout é definido por `YIN_PANEL_E2E_DIR`.
 

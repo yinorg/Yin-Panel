@@ -50,7 +50,7 @@ if ! command -v setsid >/dev/null 2>&1 && ! command -v nohup >/dev/null 2>&1; th
 fi
 
 [[ -f "$repo_root/frontend/package.json" ]] || die "frontend/package.json is missing"
-[[ -f "$repo_root/rust/app/Cargo.toml" ]] || die "rust/app/Cargo.toml is missing"
+[[ -f "$repo_root/backend/app/Cargo.toml" ]] || die "backend/app/Cargo.toml is missing"
 [[ -f "$run_dir/conf.yaml" ]] || die "runtime config is missing: $run_dir/conf.yaml"
 
 # Replacing the runtime artifacts normally needs root, because on a packaged
@@ -89,14 +89,14 @@ printf 'Building frontend...\n'
 cp -a "$repo_root/runtime/web" "$build_dir/web"
 
 printf 'Testing backend...\n'
-(cd "$repo_root/rust/app" && cargo test --quiet)
+(cd "$repo_root/backend/app" && cargo test --quiet)
 
 printf 'Building backend...\n'
 version="$(git -C "$repo_root" describe --tags --always --dirty 2>/dev/null || printf 'dev')"
 commit="$(git -C "$repo_root" rev-parse --short HEAD 2>/dev/null || printf 'unknown')"
 build_time="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-(cd "$repo_root/rust/app" && cargo build --release)
-cp -a "$repo_root/rust/app/target/release/yin-panel" "$build_dir/yin-panel"
+(cd "$repo_root/backend/app" && cargo build --release)
+cp -a "$repo_root/backend/app/target/release/yin-panel" "$build_dir/yin-panel"
 
 [[ -x "$build_dir/yin-panel" ]] || die "cargo build did not produce an executable"
 

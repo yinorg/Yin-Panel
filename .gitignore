@@ -116,9 +116,6 @@ docker-compose.override.yml
 docker-compose.*.local.yml
 
 # Application data and local build output
-backend/my_conf.yaml
-backend/conf.yaml
-backend/database/
 runtime/web/
 runtime/database/
 runtime/uploads/
@@ -126,10 +123,6 @@ runtime/conf.yaml
 runtime/yin-panel
 runtime/yin-panel.log
 runtime/*.log
-backend/uploads/
-backend/yin-panel
-backend/backup/
-backend/data/
 
 # Local planning notes
 docs/optimization-goals.md
@@ -149,12 +142,12 @@ opencode.json
 # Docker build artifact (produced by CI, never committed)
 /build-output/
 
-# Built by rust/bench/compare.sh next to its source, never committed
-rust/bench/loadgen/loadgen
+# Built by backend/bench/compare.sh next to its source, never committed
+backend/bench/loadgen/loadgen
 
 # Created when the pure binary is replayed from the repository root
-rust/record/database.db
-rust/record/database.db-*
+backend/record/database.db
+backend/record/database.db-*
 source.db
 source.db-shm
 source.db-wal

@@ -147,7 +147,7 @@ test('every Theme API command has an explicit required capability', () => {
 })
 
 test('DTCG 2025.10 validator matches the pinned official format suite', () => {
-  const fixture = JSON.parse(readFileSync(new URL('../../../shared/theme/dtcg-conformance/official-2025.10.json', import.meta.url), 'utf8'))
+  const fixture = JSON.parse(readFileSync(new URL('../fixtures/dtcg-conformance/official-2025.10.json', import.meta.url), 'utf8'))
   assert.equal(fixture.cases.length, 220)
   for (const testCase of fixture.cases) {
     let valid = true

@@ -78,7 +78,7 @@ Vereist Docker met de Compose-plugin.
 ```bash
 mkdir yin-panel && cd yin-panel
 curl -LO https://raw.githubusercontent.com/yinorg/Yin-Panel/master/docker/docker-compose.yml
-curl -o conf.yaml https://raw.githubusercontent.com/yinorg/Yin-Panel/master/backend/conf.yaml.example
+curl -o conf.yaml https://raw.githubusercontent.com/yinorg/Yin-Panel/master/docker/conf.yaml.example
 mkdir -p database uploads
 jwt_secret="$(openssl rand -hex 32)"
 sed -i "s#^  secret: your_secret_key$#  secret: ${jwt_secret}#" conf.yaml
@@ -168,7 +168,7 @@ De migratie maakt het volledige schema aan in het doel, kopieert elke rij met be
 
 ## Configuratie en OAuth/OIDC
 
-`oauth` is het uniforme configuratie-item voor OAuth 2.0 en OpenID Connect (OIDC). De standaardsjabloon bevat drie geverifieerde voorbeelden: GitHub (OAuth 2.0), GitLab (standaard OIDC) en Google (OAuth 2.0). De voorbeelden zijn standaard allemaal uitgecommentarieerd; een provider wordt pas ingeschakeld nadat u echte inloggegevens hebt ingevuld en `oauth.enable: true` hebt ingesteld. Alle configuratiesleutels zijn gedocumenteerd in `backend/conf.yaml.example`.
+`oauth` is het uniforme configuratie-item voor OAuth 2.0 en OpenID Connect (OIDC). De standaardsjabloon bevat drie geverifieerde voorbeelden: GitHub (OAuth 2.0), GitLab (standaard OIDC) en Google (OAuth 2.0). De voorbeelden zijn standaard allemaal uitgecommentarieerd; een provider wordt pas ingeschakeld nadat u echte inloggegevens hebt ingevuld en `oauth.enable: true` hebt ingesteld. Alle configuratiesleutels zijn gedocumenteerd in `docker/conf.yaml.example`.
 
 Een standaard OIDC-provider moet discovery, authorization code + PKCE en JWKS-handtekeningvalidatie ondersteunen en moet `email` en `email_verified` in de gebruikersinformatie leveren. Providers die aan deze standaarden voldoen, werken in principe, maar verschillende leveranciers kunnen alsnog extra veldtoewijzingsconfiguratie vereisen.
 
@@ -193,13 +193,13 @@ Het aanmaken van een ruimte, het hernoemen ervan, het toevoegen van groepen, het
 ## Helm
 
 ```bash
-helm upgrade --install yin-panel ./distribution/helm-chart/yin-panel \
+helm upgrade --install yin-panel ./docker/helm/yin-panel \
   --set image.tag=latest
 ```
 
 Zet in productie `image.tag` op een concrete versie.
 
-Bekijk vóór de implementatie de gerenderde manifests met `helm template yin-panel ./distribution/helm-chart/yin-panel`.
+Bekijk vóór de implementatie de gerenderde manifests met `helm template yin-panel ./docker/helm/yin-panel`.
 
 ## Ontwikkeling vanuit de broncode
 
@@ -231,9 +231,9 @@ Volledige lokale update (frontend bouwen, backend testen en bouwen, implementere
 ./scripts/deploy-local.sh
 ```
 
-Het script gebruikt standaard de `backend/` van de repository als runtime-map en vereist daar een lokale `conf.yaml`; `YIN_PANEL_RUNTIME_DIR` in `.env.local` kan dit overschrijven. Nadat alle builds en tests zijn geslaagd, stopt het alleen de Yin-Panel-listener, gebruikt het `sudo` om de oude binary en de statische bestanden te vervangen, en raakt het de database, uploads of configuratiebestanden nooit aan.
+Het script gebruikt standaard de `runtime/` van de repository als runtime-map en vereist daar een lokale `conf.yaml`; `YIN_PANEL_RUNTIME_DIR` in `.env.local` kan dit overschrijven. Nadat alle builds en tests zijn geslaagd, stopt het alleen de Yin-Panel-listener, gebruikt het `sudo` om de oude binary en de statische bestanden te vervangen, en raakt het de database, uploads of configuratiebestanden nooit aan.
 
-Het themasysteem van de startpagina is gedocumenteerd in [`frontend/THEME_SYSTEM.md`](../../frontend/THEME_SYSTEM.md); maak een nieuw thema aan met `npm run create:theme -- init "<name>"`. Volledige conventies voor AI-ontwikkeling, releases en herstarten staan in [AGENTS.md](../../AGENTS.md).
+Het themasysteem van de startpagina is gedocumenteerd in [`docs/engineering/THEME_SYSTEM.md`](../../docs/engineering/THEME_SYSTEM.md); maak een nieuw thema aan met `npm run create:theme -- init "<name>"`. Volledige conventies voor AI-ontwikkeling, releases en herstarten staan in [AGENTS.md](../../AGENTS.md).
 
 De acceptatietests in de browser staan in een aparte repository, [yinorg/yin-panel-e2e](https://github.com/yinorg/yin-panel-e2e): Playwright stuurt echte browsers door volledige flows (inloggen en accounts, ruimten en rechten, bladwijzers importeren en exporteren, het themasysteem, offline gedrag van de PWA en het overnemen van het nieuwe tabblad door de extensie), met daarnaast een k6-suite voor belasting- en capaciteitsmetingen. Je hebt een draaiende Yin-Panel-instantie, de `.env.local` van de Core-repository en de niet-verpakte extensiebron nodig; de checkoutlocatie stel je in met `YIN_PANEL_E2E_DIR`.
 

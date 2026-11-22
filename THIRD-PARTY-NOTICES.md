@@ -82,9 +82,9 @@ require the attribution given above to be preserved:
 
 ## DTCG format fixtures
 
-`shared/theme/dtcg-conformance/` contains DTCG format evaluation fixtures
+`frontend/tests/fixtures/dtcg-conformance/` contains DTCG format evaluation fixtures
 licensed under the W3C 3-clause BSD License. The full notice is in
-[`shared/theme/dtcg-conformance/NOTICE.md`](./shared/theme/dtcg-conformance/NOTICE.md).
+[`frontend/tests/fixtures/dtcg-conformance/NOTICE.md`](./frontend/tests/fixtures/dtcg-conformance/NOTICE.md).
 
 ## Dependencies
 

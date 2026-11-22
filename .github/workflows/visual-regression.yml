@@ -53,9 +53,9 @@ jobs:
         working-directory: frontend
 
       - name: Build the backend
-        run: cargo build --release --manifest-path rust/app/Cargo.toml
+        run: cargo build --release --manifest-path backend/app/Cargo.toml
       - name: Stage the binary
-        run: cp -a rust/app/target/release/yin-panel runtime/yin-panel
+        run: cp -a backend/app/target/release/yin-panel runtime/yin-panel
 
       - name: Capture the ruler from the published image
         env:

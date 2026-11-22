@@ -78,7 +78,7 @@ Docker와 Compose 플러그인이 필요합니다.
 ```bash
 mkdir yin-panel && cd yin-panel
 curl -LO https://raw.githubusercontent.com/yinorg/Yin-Panel/master/docker/docker-compose.yml
-curl -o conf.yaml https://raw.githubusercontent.com/yinorg/Yin-Panel/master/backend/conf.yaml.example
+curl -o conf.yaml https://raw.githubusercontent.com/yinorg/Yin-Panel/master/docker/conf.yaml.example
 mkdir -p database uploads
 jwt_secret="$(openssl rand -hex 32)"
 sed -i "s#^  secret: your_secret_key$#  secret: ${jwt_secret}#" conf.yaml
@@ -168,7 +168,7 @@ SQLite 전용 기능(WAL, 읽기 전용 연결 풀, 파일 스냅샷 기반 마�
 
 ## 구성과 OAuth/OIDC
 
-`oauth`는 OAuth 2.0과 OpenID Connect(OIDC)의 통합 구성 진입점입니다. 기본 템플릿에는 검증된 세 가지 예시가 있습니다: GitHub(OAuth 2.0), GitLab(표준 OIDC), Google(OAuth 2.0). 예시는 기본적으로 모두 주석 처리되어 있으며, 실제 자격 증명을 입력하고 `oauth.enable`을 `true`로 설정해야 활성화됩니다. 모든 구성 키는 `backend/conf.yaml.example`에 문서화되어 있습니다.
+`oauth`는 OAuth 2.0과 OpenID Connect(OIDC)의 통합 구성 진입점입니다. 기본 템플릿에는 검증된 세 가지 예시가 있습니다: GitHub(OAuth 2.0), GitLab(표준 OIDC), Google(OAuth 2.0). 예시는 기본적으로 모두 주석 처리되어 있으며, 실제 자격 증명을 입력하고 `oauth.enable`을 `true`로 설정해야 활성화됩니다. 모든 구성 키는 `docker/conf.yaml.example`에 문서화되어 있습니다.
 
 표준 OIDC 공급자는 discovery, authorization code + PKCE, JWKS 서명 검증을 지원해야 하며 사용자 정보에서 `email`과 `email_verified`를 제공해야 합니다. 이 기준을 충족하는 공급자는 원칙적으로 사용할 수 있지만 공급자마다 추가 필드 매핑 구성이 필요할 수 있습니다.
 
@@ -193,13 +193,13 @@ OIDC 콜백 URL:
 ## Helm
 
 ```bash
-helm upgrade --install yin-panel ./distribution/helm-chart/yin-panel \
+helm upgrade --install yin-panel ./docker/helm/yin-panel \
   --set image.tag=latest
 ```
 
 프로덕션에서는 `image.tag`를 구체적인 버전으로 바꾸세요.
 
-배포 전에 `helm template yin-panel ./distribution/helm-chart/yin-panel`로 렌더링 결과를 확인할 수 있습니다.
+배포 전에 `helm template yin-panel ./docker/helm/yin-panel`로 렌더링 결과를 확인할 수 있습니다.
 
 ## 소스 개발
 
@@ -231,9 +231,9 @@ go build ./...
 ./scripts/deploy-local.sh
 ```
 
-스크립트는 기본적으로 저장소의 `backend/`를 실행 디렉터리로 사용하며 로컬 `conf.yaml`이 필요합니다. `.env.local`의 `YIN_PANEL_RUNTIME_DIR`로 재정의할 수 있습니다. 빌드와 테스트가 모두 통과하면 Yin-Panel 리스너만 중지하고 `sudo`로 이전 바이너리와 정적 파일을 교체하며 데이터베이스, 업로드 파일, 구성 파일은 건드리지 않습니다.
+스크립트는 기본적으로 저장소의 `runtime/`를 실행 디렉터리로 사용하며 로컬 `conf.yaml`이 필요합니다. `.env.local`의 `YIN_PANEL_RUNTIME_DIR`로 재정의할 수 있습니다. 빌드와 테스트가 모두 통과하면 Yin-Panel 리스너만 중지하고 `sudo`로 이전 바이너리와 정적 파일을 교체하며 데이터베이스, 업로드 파일, 구성 파일은 건드리지 않습니다.
 
-홈 페이지 테마 시스템은 [`frontend/THEME_SYSTEM.md`](../../frontend/THEME_SYSTEM.md)에 문서화되어 있습니다. `npm run create:theme -- init "<이름>"`으로 새 테마 뼈대를 만들 수 있습니다. AI 개발·릴리스·재시작 규칙은 [AGENTS.md](../../AGENTS.md)에 있습니다.
+홈 페이지 테마 시스템은 [`docs/engineering/THEME_SYSTEM.md`](../../docs/engineering/THEME_SYSTEM.md)에 문서화되어 있습니다. `npm run create:theme -- init "<이름>"`으로 새 테마 뼈대를 만들 수 있습니다. AI 개발·릴리스·재시작 규칙은 [AGENTS.md](../../AGENTS.md)에 있습니다.
 
 브라우저 수준 인수 테스트는 별도 저장소 [yinorg/yin-panel-e2e](https://github.com/yinorg/yin-panel-e2e)에 있습니다. Playwright가 실제 브라우저로 전체 흐름(로그인과 계정, 공간과 권한, 북마크 가져오기와 내보내기, 테마 시스템, PWA 오프라인 동작, 확장의 새 탭 대체)을 돌리고, k6 스크립트가 부하와 용량을 측정합니다. 실행하려면 돌아가는 Yin-Panel 인스턴스, Core 저장소의 `.env.local`, 패키징하지 않은 확장 소스가 필요하며 체크아웃 위치는 `YIN_PANEL_E2E_DIR`로 지정합니다.
 

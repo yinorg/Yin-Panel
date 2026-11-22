@@ -1,0 +1,17 @@
+{
+  "schema": "rust-anything/app-cases@1",
+  "name": "run-original",
+  "run": [
+    "sh",
+    "backend/record/run-original.sh",
+    "{port}"
+  ],
+  "normalize": [
+    "timestamps"
+  ],
+  "normalizers": {
+    "jwt": "eyJ[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+"
+  },
+  "timeout_secs": 30,
+  "http": {}
+}

@@ -78,7 +78,7 @@ Compose प्लगइन के साथ Docker आवश्यक है।
 ```bash
 mkdir yin-panel && cd yin-panel
 curl -LO https://raw.githubusercontent.com/yinorg/Yin-Panel/master/docker/docker-compose.yml
-curl -o conf.yaml https://raw.githubusercontent.com/yinorg/Yin-Panel/master/backend/conf.yaml.example
+curl -o conf.yaml https://raw.githubusercontent.com/yinorg/Yin-Panel/master/docker/conf.yaml.example
 mkdir -p database uploads
 jwt_secret="$(openssl rand -hex 32)"
 sed -i "s#^  secret: your_secret_key$#  secret: ${jwt_secret}#" conf.yaml
@@ -168,7 +168,7 @@ SQLite (डिफ़ॉल्ट), MySQL, MariaDB और PostgreSQL समर्
 
 ## कॉन्फ़िगरेशन और OAuth/OIDC
 
-`oauth` OAuth 2.0 और OpenID Connect (OIDC) के लिए एकीकृत कॉन्फ़िगरेशन प्रविष्टि है। डिफ़ॉल्ट टेम्पलेट में तीन सत्यापित उदाहरण शामिल हैं: GitHub (OAuth 2.0), GitLab (मानक OIDC) और Google (OAuth 2.0)। उदाहरण डिफ़ॉल्ट रूप से टिप्पणीबद्ध हैं; कोई प्रदाता तभी सक्षम होता है जब आप वास्तविक क्रेडेंशियल भरें और `oauth.enable: true` सेट करें। सभी कॉन्फ़िगरेशन कुंजियाँ `backend/conf.yaml.example` में प्रलेखित हैं।
+`oauth` OAuth 2.0 और OpenID Connect (OIDC) के लिए एकीकृत कॉन्फ़िगरेशन प्रविष्टि है। डिफ़ॉल्ट टेम्पलेट में तीन सत्यापित उदाहरण शामिल हैं: GitHub (OAuth 2.0), GitLab (मानक OIDC) और Google (OAuth 2.0)। उदाहरण डिफ़ॉल्ट रूप से टिप्पणीबद्ध हैं; कोई प्रदाता तभी सक्षम होता है जब आप वास्तविक क्रेडेंशियल भरें और `oauth.enable: true` सेट करें। सभी कॉन्फ़िगरेशन कुंजियाँ `docker/conf.yaml.example` में प्रलेखित हैं।
 
 एक मानक OIDC प्रदाता को डिस्कवरी, authorization code + PKCE और JWKS हस्ताक्षर सत्यापन का समर्थन करना चाहिए, और उपयोगकर्ता जानकारी में `email` और `email_verified` प्रदान करना चाहिए। जो प्रदाता इन मानकों को पूरा करते हैं वे सिद्धांत रूप में काम करते हैं, लेकिन विभिन्न विक्रेताओं को अतिरिक्त फ़ील्ड-मैपिंग कॉन्फ़िगरेशन की आवश्यकता हो सकती है।
 
@@ -193,13 +193,13 @@ OIDC कॉलबैक URL:
 ## Helm
 
 ```bash
-helm upgrade --install yin-panel ./distribution/helm-chart/yin-panel \
+helm upgrade --install yin-panel ./docker/helm/yin-panel \
   --set image.tag=latest
 ```
 
 प्रोडक्शन में `image.tag` को किसी ठोस वर्शन से बदलें।
 
-डिप्लॉय करने से पहले, `helm template yin-panel ./distribution/helm-chart/yin-panel` से रेंडर किए गए मैनिफ़ेस्ट का पूर्वावलोकन करें।
+डिप्लॉय करने से पहले, `helm template yin-panel ./docker/helm/yin-panel` से रेंडर किए गए मैनिफ़ेस्ट का पूर्वावलोकन करें।
 
 ## स्रोत से विकास
 
@@ -231,9 +231,9 @@ go build ./...
 ./scripts/deploy-local.sh
 ```
 
-स्क्रिप्ट डिफ़ॉल्ट रूप से रिपॉज़िटरी की `backend/` को रनटाइम डायरेक्टरी के रूप में उपयोग करती है और वहाँ स्थानीय `conf.yaml` आवश्यक है; `.env.local` में `YIN_PANEL_RUNTIME_DIR` इसे ओवरराइड कर सकता है। सभी बिल्ड और टेस्ट पास होने के बाद, यह केवल Yin-Panel लिसनर को रोकती है, `sudo` का उपयोग करके पुराने बाइनरी और स्टैटिक फ़ाइलें बदलती है, और डेटाबेस, uploads या कॉन्फ़िगरेशन फ़ाइलों को कभी नहीं छूती।
+स्क्रिप्ट डिफ़ॉल्ट रूप से रिपॉज़िटरी की `runtime/` को रनटाइम डायरेक्टरी के रूप में उपयोग करती है और वहाँ स्थानीय `conf.yaml` आवश्यक है; `.env.local` में `YIN_PANEL_RUNTIME_DIR` इसे ओवरराइड कर सकता है। सभी बिल्ड और टेस्ट पास होने के बाद, यह केवल Yin-Panel लिसनर को रोकती है, `sudo` का उपयोग करके पुराने बाइनरी और स्टैटिक फ़ाइलें बदलती है, और डेटाबेस, uploads या कॉन्फ़िगरेशन फ़ाइलों को कभी नहीं छूती।
 
-होम-पेज थीम सिस्टम [`frontend/THEME_SYSTEM.md`](../../frontend/THEME_SYSTEM.md) में प्रलेखित है; `npm run create:theme -- init "<name>"` से नई थीम का ढाँचा बनाएँ। पूर्ण AI विकास, रिलीज़ और रीस्टार्ट परंपराएँ [AGENTS.md](../../AGENTS.md) में हैं।
+होम-पेज थीम सिस्टम [`docs/engineering/THEME_SYSTEM.md`](../../docs/engineering/THEME_SYSTEM.md) में प्रलेखित है; `npm run create:theme -- init "<name>"` से नई थीम का ढाँचा बनाएँ। पूर्ण AI विकास, रिलीज़ और रीस्टार्ट परंपराएँ [AGENTS.md](../../AGENTS.md) में हैं।
 
 ब्राउज़र स्तर के अक्सेप्टेंस टेस्ट अलग रिपॉज़िटरी [yinorg/yin-panel-e2e](https://github.com/yinorg/yin-panel-e2e) में हैं: Playwright असली ब्राउज़र पर पूरे प्रवाह चलाता है (लॉगिन और खाते, स्पेस और अनुमतियाँ, बुकमार्क आयात-निर्यात, थीम सिस्टम, PWA का ऑफ़लाइन व्यवहार, और एक्सटेंशन द्वारा नए टैब का अधिग्रहण), साथ में लोड और क्षमता नापने के लिए k6 स्क्रिप्ट हैं। इसके लिए चलता हुआ Yin-Panel इंस्टेंस, Core रिपॉज़िटरी की `.env.local` और बिना पैकेज किया एक्सटेंशन सोर्स चाहिए; चेकआउट की जगह `YIN_PANEL_E2E_DIR` से तय होती है।
 

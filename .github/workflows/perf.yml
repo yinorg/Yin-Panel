@@ -45,8 +45,8 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            rust/app/target
-          key: perf-${{ hashFiles('rust/app/Cargo.lock') }}
+            backend/app/target
+          key: perf-${{ hashFiles('backend/app/Cargo.lock') }}
 
       - name: Build the frontend
         working-directory: frontend
@@ -55,7 +55,7 @@ jobs:
           npm run build-only
 
       - name: Build the binary
-        run: cargo build --release --manifest-path rust/app/Cargo.toml
+        run: cargo build --release --manifest-path backend/app/Cargo.toml
 
       - name: Start the service and run the baseline
         env:
@@ -66,7 +66,7 @@ jobs:
           rm -rf "$runtime"
           mkdir -p "$runtime/database" "$runtime/uploads"
           ln -s "$CORE_ROOT/runtime/web" "$runtime/web"
-          ln -s "$CORE_ROOT/runtime/lang" "$runtime/lang"
+          ln -s "$CORE_ROOT/backend/resources/lang" "$backend/resources/lang"
           cat > "$runtime/conf.yaml" <<CONF
           base:
             http_port: 18090
@@ -85,7 +85,7 @@ jobs:
             bucket: ./uploads
           CONF
           PORT=18090 YIN_PANEL_CONFIG="$runtime/conf.yaml" \
-            env -C "$runtime" "$CORE_ROOT/rust/app/target/release/yin-panel" \
+            env -C "$runtime" "$CORE_ROOT/backend/app/target/release/yin-panel" \
             > "$runtime/server.log" 2>&1 &
           service_pid=$!
           trap 'kill "$service_pid" 2>/dev/null || true' EXIT

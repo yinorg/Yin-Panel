@@ -78,7 +78,7 @@ Memerlukan Docker dengan plugin Compose.
 ```bash
 mkdir yin-panel && cd yin-panel
 curl -LO https://raw.githubusercontent.com/yinorg/Yin-Panel/master/docker/docker-compose.yml
-curl -o conf.yaml https://raw.githubusercontent.com/yinorg/Yin-Panel/master/backend/conf.yaml.example
+curl -o conf.yaml https://raw.githubusercontent.com/yinorg/Yin-Panel/master/docker/conf.yaml.example
 mkdir -p database uploads
 jwt_secret="$(openssl rand -hex 32)"
 sed -i "s#^  secret: your_secret_key$#  secret: ${jwt_secret}#" conf.yaml
@@ -168,7 +168,7 @@ Migrasi membuat skema lengkap di target, menyalin setiap baris sambil mempertaha
 
 ## Konfigurasi dan OAuth/OIDC
 
-`oauth` adalah entri konfigurasi terpadu untuk OAuth 2.0 dan OpenID Connect (OIDC). Templat bawaan menyertakan tiga contoh yang telah diverifikasi: GitHub (OAuth 2.0), GitLab (OIDC standar), dan Google (OAuth 2.0). Semua contoh dinonaktifkan secara bawaan; penyedia baru diaktifkan setelah Anda mengisi kredensial asli dan menetapkan `oauth.enable: true`. Semua kunci konfigurasi didokumentasikan di `backend/conf.yaml.example`.
+`oauth` adalah entri konfigurasi terpadu untuk OAuth 2.0 dan OpenID Connect (OIDC). Templat bawaan menyertakan tiga contoh yang telah diverifikasi: GitHub (OAuth 2.0), GitLab (OIDC standar), dan Google (OAuth 2.0). Semua contoh dinonaktifkan secara bawaan; penyedia baru diaktifkan setelah Anda mengisi kredensial asli dan menetapkan `oauth.enable: true`. Semua kunci konfigurasi didokumentasikan di `docker/conf.yaml.example`.
 
 Penyedia OIDC standar harus mendukung discovery, authorization code + PKCE, dan validasi tanda tangan JWKS, serta harus menyediakan `email` dan `email_verified` dalam informasi pengguna. Penyedia yang memenuhi standar ini secara prinsip dapat digunakan, tetapi vendor yang berbeda mungkin tetap memerlukan konfigurasi pemetaan bidang tambahan.
 
@@ -193,13 +193,13 @@ Membuat ruang, mengganti namanya, menambahkan grup, menambahkan anggota, dan men
 ## Helm
 
 ```bash
-helm upgrade --install yin-panel ./distribution/helm-chart/yin-panel \
+helm upgrade --install yin-panel ./docker/helm/yin-panel \
   --set image.tag=latest
 ```
 
 Di produksi, ganti `image.tag` dengan versi tertentu.
 
-Sebelum menerapkan, pratinjau manifes yang dirender dengan `helm template yin-panel ./distribution/helm-chart/yin-panel`.
+Sebelum menerapkan, pratinjau manifes yang dirender dengan `helm template yin-panel ./docker/helm/yin-panel`.
 
 ## Pengembangan sumber
 
@@ -231,9 +231,9 @@ Pembaruan lokal lengkap (build frontend, pengujian dan build backend, penerapan,
 ./scripts/deploy-local.sh
 ```
 
-Skrip ini menggunakan `backend/` repositori sebagai direktori runtime secara bawaan dan memerlukan `conf.yaml` lokal di sana; `YIN_PANEL_RUNTIME_DIR` di `.env.local` dapat menimpanya. Setelah semua build dan pengujian lulus, skrip ini hanya menghentikan listener Yin-Panel, menggunakan `sudo` untuk mengganti biner lama dan berkas statis, serta tidak pernah menyentuh basis data, unggahan, atau berkas konfigurasi.
+Skrip ini menggunakan `runtime/` repositori sebagai direktori runtime secara bawaan dan memerlukan `conf.yaml` lokal di sana; `YIN_PANEL_RUNTIME_DIR` di `.env.local` dapat menimpanya. Setelah semua build dan pengujian lulus, skrip ini hanya menghentikan listener Yin-Panel, menggunakan `sudo` untuk mengganti biner lama dan berkas statis, serta tidak pernah menyentuh basis data, unggahan, atau berkas konfigurasi.
 
-Sistem tema halaman beranda didokumentasikan di [`frontend/THEME_SYSTEM.md`](../../frontend/THEME_SYSTEM.md); buat kerangka tema baru dengan `npm run create:theme -- init "<name>"`. Konvensi lengkap pengembangan AI, rilis, dan restart ada di [AGENTS.md](../../AGENTS.md).
+Sistem tema halaman beranda didokumentasikan di [`docs/engineering/THEME_SYSTEM.md`](../../docs/engineering/THEME_SYSTEM.md); buat kerangka tema baru dengan `npm run create:theme -- init "<name>"`. Konvensi lengkap pengembangan AI, rilis, dan restart ada di [AGENTS.md](../../AGENTS.md).
 
 Uji penerimaan di sisi peramban berada di repositori terpisah [yinorg/yin-panel-e2e](https://github.com/yinorg/yin-panel-e2e): Playwright menjalankan peramban sungguhan melalui alur lengkap (masuk dan akun, ruang dan izin, impor dan ekspor bookmark, sistem tema, perilaku offline PWA, serta pengambilalihan tab baru oleh ekstensi), ditambah skrip k6 untuk mengukur beban dan kapasitas. Dibutuhkan instans Yin-Panel yang berjalan, `.env.local` dari repositori Core, dan sumber ekstensi yang belum dikemas; lokasi checkout diatur lewat `YIN_PANEL_E2E_DIR`.
 

@@ -14,8 +14,8 @@ on:
   push:
     branches: [master]
     paths:
-      - 'rust/app/Cargo.lock'
-      - 'rust/app/Cargo.toml'
+      - 'backend/app/Cargo.lock'
+      - 'backend/app/Cargo.toml'
       - 'frontend/package.json'
       - 'frontend/package-lock.json'
       - '.github/workflows/cache-warm.yml'
@@ -47,13 +47,13 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            rust/app/target
-          key: yin-panel-release-${{ matrix.arch }}-${{ hashFiles('rust/app/Cargo.lock') }}
+            backend/app/target
+          key: yin-panel-release-${{ matrix.arch }}-${{ hashFiles('backend/app/Cargo.lock') }}
       - name: Build the binary
         run: |
           mkdir -p build-output
-          cargo build --release --manifest-path rust/app/Cargo.toml
-          cp -a rust/app/target/release/yin-panel build-output/yin-panel
+          cargo build --release --manifest-path backend/app/Cargo.toml
+          cp -a backend/app/target/release/yin-panel build-output/yin-panel
 
   node:
     runs-on: ubuntu-24.04

@@ -176,7 +176,7 @@ test('resolves DTCG group root tokens and inherited tokens with local overrides'
 })
 
 test('maps DTCG 2025.10 wide-gamut, polar, and alpha colors to browser-supported CSS Color 4', async ({ page }) => {
-  const document = JSON.parse(readFileSync(resolve(process.cwd(), '../shared/theme/dtcg-conformance/color-spaces.json'), 'utf8'))
+  const document = JSON.parse(readFileSync(resolve(process.cwd(), 'tests/fixtures/dtcg-conformance/color-spaces.json'), 'utf8'))
   const pkg = makePackage(['light'])
   pkg.documents.light = document
 
@@ -189,7 +189,7 @@ test('maps DTCG 2025.10 wide-gamut, polar, and alpha colors to browser-supported
 })
 
 test('matches the shared DTCG 2025.10 document acceptance fixture', () => {
-  const fixture = JSON.parse(readFileSync(resolve(process.cwd(), '../shared/theme/dtcg-conformance/documents.json'), 'utf8'))
+  const fixture = JSON.parse(readFileSync(resolve(process.cwd(), 'tests/fixtures/dtcg-conformance/documents.json'), 'utf8'))
   for (const entry of fixture.cases) {
     const pkg = makePackage(['light'])
     pkg.documents.light = entry.document

@@ -52,13 +52,13 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            rust/app/target
-            rust/db-tool/target
-          key: rust-nightly-${{ hashFiles('rust/app/Cargo.lock', 'rust/db-tool/Cargo.lock') }}
+            backend/app/target
+            backend/db-tool/target
+          key: rust-nightly-${{ hashFiles('backend/app/Cargo.lock', 'backend/db-tool/Cargo.lock') }}
       - name: Build both binaries
         run: |
-          cargo build --release --manifest-path rust/app/Cargo.toml
-          cargo build --release --manifest-path rust/db-tool/Cargo.toml
+          cargo build --release --manifest-path backend/app/Cargo.toml
+          cargo build --release --manifest-path backend/db-tool/Cargo.toml
       - name: Create the migrate-db database
         run: |
           mysql_name="$(docker ps --filter ancestor=mysql:8.4 --format '{{.Names}}' | head -n 1)"
@@ -74,21 +74,21 @@ jobs:
         env:
           DB_SMOKE_DRIVE: sqlite
           DB_SMOKE_PORT_HTTP: '18092'
-        run: sh rust/check/db-smoke.sh
+        run: sh backend/check/db-smoke.sh
       - name: HTTP smoke on MySQL
         env:
           DB_SMOKE_DRIVE: mysql
           DB_SMOKE_NAME: yin_smoke
           DB_SMOKE_PASSWORD: yin_test_only_password
           DB_SMOKE_PORT_HTTP: '18093'
-        run: sh rust/check/db-smoke.sh
+        run: sh backend/check/db-smoke.sh
       - name: HTTP smoke on PostgreSQL
         env:
           DB_SMOKE_DRIVE: postgres
           DB_SMOKE_NAME: yin_smoke
           DB_SMOKE_PASSWORD: yin_test_only_password
           DB_SMOKE_PORT_HTTP: '18094'
-        run: sh rust/check/db-smoke.sh
+        run: sh backend/check/db-smoke.sh
       - name: Seed a throwaway SQLite deployment
         run: |
           mkdir -p /tmp/yin-nightly-seed
@@ -110,7 +110,7 @@ jobs:
           CONF
           cd /tmp/yin-nightly-seed
           PORT=18096 YIN_PANEL_CONFIG=/tmp/yin-nightly-seed/conf.yaml \
-            "$GITHUB_WORKSPACE/rust/app/target/release/yin-panel" >server.log 2>&1 &
+            "$GITHUB_WORKSPACE/backend/app/target/release/yin-panel" >server.log 2>&1 &
           seed_pid=$!
           ready=0
           for _ in $(seq 1 60); do
@@ -134,4 +134,4 @@ jobs:
           MIGRATE_POSTGRES_DB: yin_migrate
           MIGRATE_MYSQL_PASSWORD: yin_test_only_password
           MIGRATE_POSTGRES_PASSWORD: yin_test_only_password
-        run: bash rust/check/migrate-db-verify.sh
+        run: bash backend/check/migrate-db-verify.sh

@@ -1,1 +1,144 @@
-../backend/conf.yaml.example
+# Base configuration
+base:
+  # Web run port. Default:3002
+  http_port: 3002
+  # Root URL
+  root_url: http://192.168.31.132:3002
+  # Database driver [sqlite(Default)/mysql/postgres]. MariaDB uses `mysql`.
+  database_drive: sqlite
+  # Enable static file server. Default:true
+  enable_static_server: true
+  # Enable system monitor feature. Default:true
+  enable_monitor: true
+  # System monitor snapshot refresh interval in seconds. Default:10
+  monitor_refresh_interval: 10
+  # Serve Prometheus metrics on a separate, unauthenticated listener. Default:false
+  # Never publish this port: it is meant for an in-network scraper only.
+  enable_metrics: false
+  # Metrics listener port. Default:9091
+  metrics_port: 9091
+  # Soft memory limit derived from the container's cgroup limit. 0 uses the
+  # built-in 0.75 ratio; a negative value disables the adaptation.
+  memory_limit_ratio: 0
+  # Enable proxy feature to solve some network issues. Default:false
+  enable_node_proxy: false
+  # Used as prefix to generate file url. For example, it will lookup to "/uploads/xxxx.png"
+  url_prefix: /uploads/
+
+# SQLite configuration (valid when database_drive=sqlite)
+sqlite:
+  file_path: ./database/database.db
+  # Read-only connection pool for non-transactional SELECTs. Reads run in
+  # parallel with the single writer instead of waiting behind it. Default: 4.
+  # Set -1 to disable. Writes, migrations and PRAGMA always stay on the writer.
+  read_pool_size: 4
+
+# MySQL / MariaDB configuration (valid when database_drive=mysql)
+mysql:
+  host: 127.0.0.1
+  port: 3306
+  username: root
+  password: root
+  db_name: sun_panel
+  wait_timeout: 100
+
+# PostgreSQL configuration (valid when database_drive=postgres)
+postgres:
+  host: 127.0.0.1
+  port: 5432
+  username: postgres
+  password: postgres
+  db_name: yin_panel
+  # ssl_mode: disable | require | verify-full ... (default: disable)
+  ssl_mode: disable
+  # time_zone: server session time zone (default: UTC)
+  time_zone: UTC
+  wait_timeout: 100
+
+# File storage. Core supports local storage only; remote/object storage such as
+# S3 is provided by the Enterprise image.
+rclone:
+  # `type: local` stores files under `bucket` on the local disk. Any other type
+  # is accepted only by the Enterprise image.
+  type: local
+  bucket: uploads
+  rclone.conf: |-
+    type = local
+
+    # Remote storage is an Enterprise feature. The examples below are kept for
+    # the Enterprise image; Core rejects any non-local type at startup.
+    # type = s3
+    # provider = AWS
+    # access_key_id = AK
+    # secret_access_key = SK
+    # endpoint = https://s3.ap-east-1.amazonaws.com
+    # region = ap-east-1
+
+    # type = s3
+    # provider = Minio
+    # access_key_id = AK
+    # secret_access_key = SK
+    # endpoint=http://minio.infra:9000
+
+    # type=s3
+    # provider = Alibaba
+    # access_key_id = AK
+    # secret_access_key = SK
+    # endpoint = oss-cn-hangzhou.aliyuncs.com
+
+# JWT configuration
+jwt:
+  # JWT secret key
+  secret: your_secret_key
+  # JWT token expiration time in hours, default: 2160 (90 days). Values <= 0 use the default.
+  expire: 2160
+
+# OAuth 2.0 / OpenID Connect providers
+oauth:
+  # Enable OAuth login, default: false
+  enable: false
+  # Add one or more providers and set enable: true to enable OAuth login.
+  providers: []
+    # GitHub (OAuth 2.0)
+    # Register <base.root_url>/api/oauth/github/callback as the callback URL.
+    # - name: github
+    #   client_id: your_github_client_id
+    #   client_secret: your_github_client_secret
+    #   auth_url: https://github.com/login/oauth/authorize
+    #   token_url: https://github.com/login/oauth/access_token
+    #   user_info_url: https://api.github.com/user
+    #   user_info_email_url: https://api.github.com/user/emails
+    #   scopes: read:user user:email
+    #   field_mapping_identifier: id
+    #   field_mapping_display_name: name
+    #   field_mapping_email: email
+
+    # GitLab (standard OIDC)
+    # Register <base.root_url>/api/oauth/gitlab/callback as the callback URL.
+    # - name: gitlab
+    #   client_id: your_gitlab_client_id
+    #   client_secret: your_gitlab_client_secret
+    #   issuer_url: https://gitlab.com
+    #   scopes: openid profile email
+    #   field_mapping_identifier: sub
+    #   field_mapping_display_name: name
+    #   field_mapping_email: email
+
+    # Google (OAuth 2.0)
+    # Register <base.root_url>/api/oauth/google/callback as the callback URL.
+    # - name: google
+    #   client_id: your_google_client_id
+    #   client_secret: your_google_client_secret
+    #   auth_url: https://accounts.google.com/o/oauth2/v2/auth
+    #   token_url: https://oauth2.googleapis.com/token
+    #   user_info_url: https://www.googleapis.com/oauth2/v3/userinfo
+    #   scopes: profile email
+    #   field_mapping_identifier: sub
+    #   field_mapping_display_name: name
+    #   field_mapping_email: email
+
+# Legacy database and upload migration
+migration:
+  enabled: true
+  dry_run: false
+  backup_path: ./backup

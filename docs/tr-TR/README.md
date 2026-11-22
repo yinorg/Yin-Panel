@@ -78,7 +78,7 @@ Docker'ın Compose eklentisiyle birlikte kurulu olmasını gerektirir.
 ```bash
 mkdir yin-panel && cd yin-panel
 curl -LO https://raw.githubusercontent.com/yinorg/Yin-Panel/master/docker/docker-compose.yml
-curl -o conf.yaml https://raw.githubusercontent.com/yinorg/Yin-Panel/master/backend/conf.yaml.example
+curl -o conf.yaml https://raw.githubusercontent.com/yinorg/Yin-Panel/master/docker/conf.yaml.example
 mkdir -p database uploads
 jwt_secret="$(openssl rand -hex 32)"
 sed -i "s#^  secret: your_secret_key$#  secret: ${jwt_secret}#" conf.yaml
@@ -168,7 +168,7 @@ Geçiş, hedefte tam şemayı oluşturur, birincil anahtarları koruyarak her sa
 
 ## Yapılandırma ve OAuth/OIDC
 
-`oauth`, OAuth 2.0 ve OpenID Connect (OIDC) için birleşik yapılandırma girişidir. Varsayılan şablon doğrulanmış üç örnek içerir: GitHub (OAuth 2.0), GitLab (standart OIDC) ve Google (OAuth 2.0). Örneklerin tümü varsayılan olarak yorum satırıdır; bir sağlayıcı ancak gerçek kimlik bilgilerini girip `oauth.enable: true` olarak ayarladıktan sonra etkinleşir. Tüm yapılandırma anahtarları `backend/conf.yaml.example` içinde belgelenmiştir.
+`oauth`, OAuth 2.0 ve OpenID Connect (OIDC) için birleşik yapılandırma girişidir. Varsayılan şablon doğrulanmış üç örnek içerir: GitHub (OAuth 2.0), GitLab (standart OIDC) ve Google (OAuth 2.0). Örneklerin tümü varsayılan olarak yorum satırıdır; bir sağlayıcı ancak gerçek kimlik bilgilerini girip `oauth.enable: true` olarak ayarladıktan sonra etkinleşir. Tüm yapılandırma anahtarları `docker/conf.yaml.example` içinde belgelenmiştir.
 
 Standart bir OIDC sağlayıcısı keşif, yetkilendirme kodu + PKCE ve JWKS imza doğrulamasını desteklemeli ve kullanıcı bilgilerinde `email` ile `email_verified` sunmalıdır. Bu standartları karşılayan sağlayıcılar ilke olarak çalışır, ancak farklı sağlayıcılar yine de ek alan eşleme yapılandırması gerektirebilir.
 
@@ -193,13 +193,13 @@ Alan oluşturma, yeniden adlandırma, grup ekleme, üye ekleme ve OIDC kuralı e
 ## Helm
 
 ```bash
-helm upgrade --install yin-panel ./distribution/helm-chart/yin-panel \
+helm upgrade --install yin-panel ./docker/helm/yin-panel \
   --set image.tag=latest
 ```
 
 Üretimde `image.tag` değerini somut bir sürüme çevirin.
 
-Dağıtımdan önce oluşturulan manifestleri `helm template yin-panel ./distribution/helm-chart/yin-panel` ile önizleyin.
+Dağıtımdan önce oluşturulan manifestleri `helm template yin-panel ./docker/helm/yin-panel` ile önizleyin.
 
 ## Kaynak geliştirme
 
@@ -231,9 +231,9 @@ Tam yerel güncelleme (ön yüz derlemesi, arka uç testleri ve derlemesi, dağ�
 ./scripts/deploy-local.sh
 ```
 
-Betik varsayılan olarak depodaki `backend/` dizinini çalışma dizini olarak kullanır ve orada yerel bir `conf.yaml` gerektirir; `.env.local` içindeki `YIN_PANEL_RUNTIME_DIR` bunu geçersiz kılabilir. Tüm derlemeler ve testler geçtikten sonra yalnızca Yin-Panel dinleyicisini durdurur, eski ikili dosyayı ve statik dosyaları `sudo` ile değiştirir ve veritabanına, yüklemelere veya yapılandırma dosyalarına hiç dokunmaz.
+Betik varsayılan olarak depodaki `runtime/` dizinini çalışma dizini olarak kullanır ve orada yerel bir `conf.yaml` gerektirir; `.env.local` içindeki `YIN_PANEL_RUNTIME_DIR` bunu geçersiz kılabilir. Tüm derlemeler ve testler geçtikten sonra yalnızca Yin-Panel dinleyicisini durdurur, eski ikili dosyayı ve statik dosyaları `sudo` ile değiştirir ve veritabanına, yüklemelere veya yapılandırma dosyalarına hiç dokunmaz.
 
-Ana sayfa tema sistemi [`frontend/THEME_SYSTEM.md`](../../frontend/THEME_SYSTEM.md) içinde belgelenmiştir; `npm run create:theme -- init "<name>"` ile yeni bir tema oluşturabilirsiniz. Tüm yapay zeka geliştirme, sürüm ve yeniden başlatma kuralları [AGENTS.md](../../AGENTS.md) içinde yer alır.
+Ana sayfa tema sistemi [`docs/engineering/THEME_SYSTEM.md`](../../docs/engineering/THEME_SYSTEM.md) içinde belgelenmiştir; `npm run create:theme -- init "<name>"` ile yeni bir tema oluşturabilirsiniz. Tüm yapay zeka geliştirme, sürüm ve yeniden başlatma kuralları [AGENTS.md](../../AGENTS.md) içinde yer alır.
 
 Tarayıcı tarafındaki kabul testleri ayrı bir depoda, [yinorg/yin-panel-e2e](https://github.com/yinorg/yin-panel-e2e) içinde: Playwright gerçek tarayıcıları baştan sona akışlarda gezdirir (giriş ve hesaplar, alanlar ve izinler, yer işareti içe ve dışa aktarma, tema sistemi, PWA'nın çevrimdışı davranışı ve uzantının yeni sekmeyi devralması), ayrıca k6 betikleri yük ve kapasiteyi ölçer. Çalışan bir Yin-Panel örneği, Core deposunun `.env.local` dosyası ve paketlenmemiş uzantı kaynakları gerekir; checkout konumu `YIN_PANEL_E2E_DIR` ile belirtilir.
 

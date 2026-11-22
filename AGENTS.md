@@ -118,7 +118,7 @@ This section is hand-authored for this repository. Do not run `graphify opencode
 
 ## Home Rendering Boundary (Core vs Theme)
 
-The home page is rendered by a theme package. The Core supplies only what a theme cannot safely do for itself. This section is the binding summary; the full statement lives in `frontend/THEME_SYSTEM.md`.
+The home page is rendered by a theme package. The Core supplies only what a theme cannot safely do for itself. This section is the binding summary; the full statement lives in `docs/engineering/THEME_SYSTEM.md`.
 
 ### Core responsibilities (frontend)
 
@@ -135,7 +135,7 @@ All presentation and interaction of the home page: layout, styling, and which af
 
 ### Theme execution and trust
 
-A theme is a **same-origin, trusted application** ("theme = app"), not sandboxed code: it may render the whole home and reuse Core components. The security boundary is three layers — **install trust** (installing a theme and every version update is an explicit act), the **backend ceiling** (the server authorizes every request against the acting user's rights), and **frontend hardening** (httpOnly token + a strict `connect-src`/`img-src 'self'` CSP). The fake sandbox is not the boundary; the iframe frame path is retained only for explicitly untrusted packages. Full statement in `frontend/THEME_SYSTEM.md`.
+A theme is a **same-origin, trusted application** ("theme = app"), not sandboxed code: it may render the whole home and reuse Core components. The security boundary is three layers — **install trust** (installing a theme and every version update is an explicit act), the **backend ceiling** (the server authorizes every request against the acting user's rights), and **frontend hardening** (httpOnly token + a strict `connect-src`/`img-src 'self'` CSP). The fake sandbox is not the boundary; the iframe frame path is retained only for explicitly untrusted packages. Full statement in `docs/engineering/THEME_SYSTEM.md`.
 
 ### Core component bridge
 
@@ -168,7 +168,7 @@ A theme invokes them; the Core renders them: `editor.open` (item editor — priv
 - Browser extension repository: `https://github.com/yinorg/yin-panel-extension`
 - E2E project: configure its location with `YIN_PANEL_E2E_DIR`; it is separate from Core.
 - Frontend: `frontend/`
-- Backend: `rust/app/` (the Rust binary). The Go tree has been removed.
+- Backend: `backend/app/` (the Rust binary). The Go tree has been removed.
 - Frontend production output: `runtime/web/`
 - Local runtime directory: repository `runtime/` by default; `YIN_PANEL_RUNTIME_DIR` may explicitly override it
 - Local binary: `$YIN_PANEL_RUNTIME_DIR/yin-panel`
@@ -177,7 +177,7 @@ A theme invokes them; the Core renders them: `editor.open` (item editor — priv
 
 ## Test Placement and Ownership
 
-- Keep unit and subsystem integration tests with the code they exercise: backend tests belong under `rust/app/` (and `rust/db-tool/`), and frontend tests belong under `frontend/` using the local framework conventions.
+- Keep unit and subsystem integration tests with the code they exercise: backend tests belong under `backend/app/` (and `backend/db-tool/`), and frontend tests belong under `frontend/` using the local framework conventions.
 - Put cross-repository acceptance tests and real-browser workflows in the separate E2E repository at `YIN_PANEL_E2E_DIR`, under its `tests/` directory.
 - Scenarios that load the browser extension, exercise `chrome_url_overrides`, or verify Core plus extension behavior belong in E2E, even when the reported defect is in extension code.
 - Do not copy Core or extension source into the E2E repository. Load the tested extension through `YIN_PANEL_EXTENSION_DIR` and record the tested source commit in CI or the test run context.
@@ -255,7 +255,7 @@ Run the complete local deployment with:
 ./scripts/deploy-local.sh
 ```
 
-The script requires `runtime/conf.yaml` before it stops any running process. It builds the frontend, runs `cargo test`, builds `rust/app` in release mode, then stops only the Yin-Panel listener, replaces the `yin-panel` binary and `web/`, and starts the new binary from the target directory. It does not create backups and never touches database, upload, or configuration files.
+The script requires `runtime/conf.yaml` before it stops any running process. It builds the frontend, runs `cargo test`, builds `backend/app` in release mode, then stops only the Yin-Panel listener, replaces the `yin-panel` binary and `web/`, and starts the new binary from the target directory. It does not create backups and never touches database, upload, or configuration files.
 
 ## Versioning and Tags
 
@@ -303,7 +303,7 @@ For combined or backend changes, run:
 
 ```bash
 repo_root="$(git rev-parse --show-toplevel)"
-cd "$repo_root/rust/app" && cargo test
+cd "$repo_root/backend/app" && cargo test
 cd "$repo_root/frontend" && npm run build-only
 cd "$repo_root" && git diff --check
 ```

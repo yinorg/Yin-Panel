@@ -8,7 +8,7 @@ echo "Building Yin Panel monolith image for linux/amd64 (tag: ${TAG})"
 
 docker build --platform linux/amd64 \
   --build-arg VERSION="${TAG}" \
-  -f distribution/docker-image/Dockerfile_monolith \
+  -f docker/Dockerfile \
   -t "${IMAGE_ROOT}:${TAG}" .
 
 echo "Built: ${IMAGE_ROOT}/monolith:${TAG}"

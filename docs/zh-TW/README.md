@@ -78,7 +78,7 @@ Yin-Panel 是一個輕量、可自架的個人與共享空間導覽面板，適�
 ```bash
 mkdir yin-panel && cd yin-panel
 curl -LO https://raw.githubusercontent.com/yinorg/Yin-Panel/master/docker/docker-compose.yml
-curl -o conf.yaml https://raw.githubusercontent.com/yinorg/Yin-Panel/master/backend/conf.yaml.example
+curl -o conf.yaml https://raw.githubusercontent.com/yinorg/Yin-Panel/master/docker/conf.yaml.example
 mkdir -p database uploads
 jwt_secret="$(openssl rand -hex 32)"
 sed -i "s#^  secret: your_secret_key$#  secret: ${jwt_secret}#" conf.yaml
@@ -168,7 +168,7 @@ SQLite 專屬能力（WAL、唯讀連線池、以檔案快照為基礎的遷移�
 
 ## 設定與 OAuth/OIDC
 
-`oauth` 是 OAuth 2.0 與 OpenID Connect（OIDC）的統一設定入口。預設範本提供三個已驗證的範例：GitHub（OAuth 2.0）、GitLab（標準 OIDC）與 Google（OAuth 2.0）。範例預設全部註解，填寫實際憑證並將 `oauth.enable` 設為 `true` 後才會啟用。全部設定項見 `backend/conf.yaml.example`。
+`oauth` 是 OAuth 2.0 與 OpenID Connect（OIDC）的統一設定入口。預設範本提供三個已驗證的範例：GitHub（OAuth 2.0）、GitLab（標準 OIDC）與 Google（OAuth 2.0）。範例預設全部註解，填寫實際憑證並將 `oauth.enable` 設為 `true` 後才會啟用。全部設定項見 `docker/conf.yaml.example`。
 
 標準 OIDC provider 需要支援 discovery、authorization code + PKCE 與 JWKS 簽章驗證，並在使用者資訊中提供 `email` 與 `email_verified`。符合這些標準的 provider 理論上可用，但不同服務商可能仍需要額外的欄位對應設定。
 
@@ -193,13 +193,13 @@ OIDC 回呼位址：
 ## Helm
 
 ```bash
-helm upgrade --install yin-panel ./distribution/helm-chart/yin-panel \
+helm upgrade --install yin-panel ./docker/helm/yin-panel \
   --set image.tag=latest
 ```
 
 正式環境請把 `image.tag` 換成具體版本號。
 
-部署前可用 `helm template yin-panel ./distribution/helm-chart/yin-panel` 檢查渲染結果。
+部署前可用 `helm template yin-panel ./docker/helm/yin-panel` 檢查渲染結果。
 
 ## 原始碼開發
 
@@ -231,9 +231,9 @@ go build ./...
 ./scripts/deploy-local.sh
 ```
 
-腳本預設將儲存庫內的 `backend/` 作為執行目錄，要求其中存在本機 `conf.yaml`；可透過 `.env.local` 中的 `YIN_PANEL_RUNTIME_DIR` 覆寫。腳本會在建置與測試全部通過後，僅停止 Yin-Panel 監聽程序，使用 `sudo` 替換舊二進位檔與靜態檔案，不會修改資料庫、上傳檔案或設定檔。
+腳本預設將儲存庫內的 `runtime/` 作為執行目錄，要求其中存在本機 `conf.yaml`；可透過 `.env.local` 中的 `YIN_PANEL_RUNTIME_DIR` 覆寫。腳本會在建置與測試全部通過後，僅停止 Yin-Panel 監聽程序，使用 `sudo` 替換舊二進位檔與靜態檔案，不會修改資料庫、上傳檔案或設定檔。
 
-首頁主題系統見 [`frontend/THEME_SYSTEM.md`](../../frontend/THEME_SYSTEM.md)；使用 `npm run create:theme -- init "<名稱>"` 可建立新主題骨架。完整的 AI 開發、發佈與重新啟動慣例見 [AGENTS.md](../../AGENTS.md)。
+首頁主題系統見 [`docs/engineering/THEME_SYSTEM.md`](../../docs/engineering/THEME_SYSTEM.md)；使用 `npm run create:theme -- init "<名稱>"` 可建立新主題骨架。完整的 AI 開發、發佈與重新啟動慣例見 [AGENTS.md](../../AGENTS.md)。
 
 瀏覽器端的驗收測試放在獨立儲存庫 [yinorg/yin-panel-e2e](https://github.com/yinorg/yin-panel-e2e)：用 Playwright 驅動真實瀏覽器跑完整流程（登入與帳號、空間與權限、書籤匯入匯出、主題系統、PWA 離線行為，以及擴充功能接管新分頁），另有一套 k6 腳本做負載與容量量測。執行前需要一個已啟動的 Yin-Panel 實例、Core 儲存庫的 `.env.local` 與未封裝的擴充功能原始碼，檢出位置由 `YIN_PANEL_E2E_DIR` 指定。
 
