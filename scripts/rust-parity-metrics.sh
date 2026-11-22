@@ -8,6 +8,7 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 routes="$repo_root/rust/app/src/routes.rs"
+routes_dir="$repo_root/rust/app/src/routes"
 go_routes="$repo_root/rust/app/src/go_routes.rs"
 units="$repo_root/rust/app/src/units/mod.rs"
 baseline="$repo_root/rust/parity-baseline.txt"
@@ -16,16 +17,16 @@ go_route_count=$(grep -c '("' "$go_routes")
 rust_route_count=$(grep -c '\.route(' "$routes")
 wire_route_count=$(grep -c '\.route(' "$units" || true)
 sqlite_pool=$(
-    grep -c 'ctx\.pool()\.await' "$routes" || true
+    grep -R 'ctx\.pool()\.await' "$routes" "$routes_dir" | wc -l
 )
 shared_pool=$(
-    grep -c 'ctx\.shared_pool()\.await' "$routes" || true
+    grep -R 'ctx\.shared_pool()\.await' "$routes" "$routes_dir" | wc -l
 )
 insert_rowid=$(
-    grep -c 'last_insert_rowid' "$routes" || true
+    grep -R 'last_insert_rowid' "$routes" "$routes_dir" | wc -l
 )
 sqlite_params=$(
-    grep -c 'SqlitePool' "$routes" || true
+    grep -R 'SqlitePool' "$routes" "$routes_dir" | wc -l
 )
 
 print_row() {
