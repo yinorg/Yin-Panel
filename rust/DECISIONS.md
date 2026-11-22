@@ -233,19 +233,13 @@ called as plain libraries).
 
 ## ADR-015: wallpaper assets stay in Git; no LFS history rewrite
 
-**Status:** accepted by the migration owner on 2026-11-22; the audit item is
-closed as "not performed by design"
+**Status:** decided by the user on 2026-11-22. The wallpaper assets are kept in
+Git on purpose; this is not a debt item.
 
-Moving `rust/wallpaperpack-rs/assets` (973 files, about 132 MB) to Git LFS
-requires rewriting every commit that touched them (`git lfs migrate import`),
-which changes commit ids and trees across the branch history. The repository
-policy forbids history rewrites and force pushes unless the user explicitly and
-specifically authorises them, and an authorised rewrite would also invalidate
-the tags and the published image digests.
-
-The assets are therefore kept as ordinary tracked files. They are required for
-offline builds, recorded replay and the packaged wallpaper library, so moving
-them out of the tree (a release download) would also weaken the offline-build
-guarantee that `ci-docker.yml` maintains. New large binary assets should be
-avoided; a future size reduction needs an explicit, separate history-rewrite
-decision, not a code change.
+The repository owner requires `rust/wallpaperpack-rs/assets` (973 files, about
+132 MB) to travel with the source so that offline builds, recorded replay and
+the packaged wallpaper library work from a clone alone. A Git LFS migration
+(`git lfs migrate import`) would rewrite every commit that touched the files,
+change commit ids and trees, and invalidate the tags and published image
+digests; it would also remove the clone-alone guarantee. The size is therefore
+accepted, and the assets stay ordinary tracked files.

@@ -288,4 +288,4 @@ left the deployment less verifiable or less maintainable. They are closed here:
 | No metrics or request-failure logging | Prometheus listener behind `base.enable_metrics`, plus 5xx logging | `/metrics` read locally |
 | No performance gate | `perf.yml` runs the E2E k6 smoke/load thresholds nightly | workflow + endpoint 200 checks |
 | E2E outside the pipeline | `e2e.yml` builds Core and the extension, runs auth/OAuth/spaces/theme/extension acceptance nightly | 13-case local run |
-| Wallpaper assets in Git | kept; LFS needs a history rewrite, recorded as ADR-015 | `rust/DECISIONS.md` |
+| Wallpaper assets in Git | kept because the owner requires clone-alone, offline builds; recorded as ADR-015 | `rust/DECISIONS.md` |
